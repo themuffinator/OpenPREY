@@ -1,0 +1,73 @@
+name: Purge src paths from history
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type PURGE_SRC_HISTORY to confirm destructive rewrite"
+        required: true
+        type: string
+      dry_run:
+        description: "Rewrite locally only (skip force-push)"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  purge-history:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation
+        run: |
+          set -euo pipefail
+          test "${{ github.event.inputs.confirmation }}" = "PURGE_SRC_HISTORY"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install git-filter-repo
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade git-filter-repo
+
+      - name: Clone repository as mirror
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --mirror "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" mirror.git
+
+      - name: Rewrite history
+        run: |
+          set -euo pipefail
+          cd mirror.git
+          git filter-repo --force \
+            --path src/bse \
+            --path src/game \
+            --invert-paths
+
+      - name: Show rewritten refs
+        run: |
+          set -euo pipefail
+          cd mirror.git
+          echo "Branches:"
+          git for-each-ref --format='%(refname:short) %(objectname:short)' refs/heads
+          echo "Tags:"
+          git for-each-ref --format='%(refname:short) %(objectname:short)' refs/tags
+
+      - name: Push rewritten history
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -euo pipefail
+          cd mirror.git
+          git push --force origin --all
+          git push --force origin --tags
+
+      - name: Dry run notice
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: echo "Dry run complete. No refs were pushed."

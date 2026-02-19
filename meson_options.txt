@@ -1,0 +1,56 @@
+option(
+  'use_pch',
+  type: 'boolean',
+  value: true,
+  description: 'Enable precompiled headers (src/idlib/precompiled.h).',
+)
+
+option(
+  'build_engine',
+  type: 'boolean',
+  value: true,
+  description: 'Build engine executables (OpenQ4-client_<arch>/OpenQ4-ded_<arch>).',
+)
+
+option(
+  'build_games',
+  type: 'boolean',
+  value: true,
+  description: 'Build game modules (game-sp_<arch>/game-mp_<arch>) from the synchronized game source mirror.',
+)
+
+option(
+  'build_game_sp',
+  type: 'boolean',
+  value: true,
+  description: 'Build the single-player game module (game-sp_<arch>).',
+)
+
+option(
+  'build_game_mp',
+  type: 'boolean',
+  value: true,
+  description: 'Build the multiplayer game module (game-mp_<arch>).',
+)
+
+option(
+  'build_libbse',
+  type: 'boolean',
+  value: true,
+  description: 'Build the external BSE runtime module (libbse-q4) from OpenQ4-BSE.',
+)
+
+option(
+  'platform_backend',
+  type: 'combo',
+  choices: ['sdl3', 'legacy_win32'],
+  value: 'sdl3',
+  description: 'Window/input backend on Windows (SDL3 is the portability default; legacy_win32 is transitional).',
+)
+
+option(
+  'enforce_msvc_2026',
+  type: 'boolean',
+  value: false,
+  description: 'Fail configure when MSVC is older than the VS 2026 baseline (19.46+).',
+)

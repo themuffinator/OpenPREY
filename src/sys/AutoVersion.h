@@ -1,0 +1,13 @@
+#ifndef __AUTO_VERSION_HEADER
+#define __AUTO_VERSION_HEADER
+
+// used by the .rc files
+#define VERSION_MAJOR_RELEASE			0
+#define VERSION_MINOR_RELEASE			0
+#define VERSION_INTERNAL_BUILD			1
+#define VERSION_BUILD_NUMBER			0
+
+#define VERSION_STRING					"0, 0, 1, 0"
+#define VERSION_STRING_DOTTED			"0.0.1"
+
+#endif // __AUTO_VERSION_HEADER

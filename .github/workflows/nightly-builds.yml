@@ -1,0 +1,117 @@
+name: Nightly Builds
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.platform != 'windows' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            label: Windows
+          - os: ubuntu-latest
+            platform: linux
+            label: Linux
+          - os: macos-latest
+            platform: macos
+            label: macOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Meson and Ninja
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install meson ninja
+
+      - name: Compute nightly version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_version="$(python - <<'PY'
+          import pathlib
+          import re
+
+          text = pathlib.Path("meson.build").read_text(encoding="utf-8")
+          match = re.search(r"version:\s*'([^']+)'", text)
+          if not match:
+              raise SystemExit("failed to parse project version from meson.build")
+          print(match.group(1))
+          PY
+          )"
+          nightly_date="$(date -u +%Y%m%d)"
+          short_sha="$(git rev-parse --short=8 HEAD)"
+          run_id="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+
+          version="${base_version}-nightly.${nightly_date}.${run_id}+${short_sha}"
+          version_tag="${base_version}-nightly.${nightly_date}.${run_id}-${short_sha}"
+
+          echo "base_version=${base_version}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${version_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and install (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $env:OPENQ4_SKIP_GAMELIBS_SYNC = "1"
+
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype release --wrap-mode=forcefallback
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
+
+      - name: Build and install (Linux/macOS, best effort)
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: |
+          set +e
+          export OPENQ4_SKIP_GAMELIBS_SYNC=1
+
+          tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype release --wrap-mode=forcefallback
+          if [ $? -eq 0 ]; then
+            tools/build/meson_setup.sh compile -C builddir
+            tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
+          else
+            echo "::warning::Build is currently expected to fail on ${RUNNER_OS} until non-Windows host support is enabled in meson.build."
+          fi
+          exit 0
+
+      - name: Prepare package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/build/package_nightly.py \
+            --platform "${{ matrix.platform }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --version-tag "${{ steps.version.outputs.version_tag }}" \
+            --source-root "${GITHUB_WORKSPACE}" \
+            --output-dir "${RUNNER_TEMP}"
+
+          echo "zip_path=${RUNNER_TEMP}/openq4-${{ steps.version.outputs.version_tag }}-${{ matrix.platform }}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openq4-nightly-${{ steps.version.outputs.version_tag }}-${{ matrix.platform }}
+          path: ${{ steps.package.outputs.zip_path }}
+          if-no-files-found: error
