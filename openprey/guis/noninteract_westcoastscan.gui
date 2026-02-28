@@ -1,0 +1,371 @@
+//WEST COAST SCAN
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+
+	
+	windowDef bg1 {
+		rect		0, 0, 320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	windowDef bg2 {
+		rect		320, 0, -320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	windowDef bg3 {
+		rect		0, 240, 320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	windowDef bg4 {
+		rect		320, 240, -320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	
+	
+	
+	windowDef sphere {
+		rect		80, 180, 120, 120
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere"
+		rotate 	time * -0.003
+		onTime 0 {
+		}
+
+		onTime 3000 {
+		
+			transition "sphere::matcolor" "1, 1, 1, 1" "1, 0.0, 0.0, 1" "2200" ;		}
+		onTime 6500 {
+			transition "sphere::matcolor" "1, 0.0, 0.0, 1" "1, 1, 1, 1" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+
+
+
+//==================================================
+//TEXT HERE
+//==================================================
+
+
+
+	windowDef scanner6 {
+
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"6 7 73848 738677  217838 8 23 4211288 83843 24758873  87323 612 22234  211288838 4873 8"
+		font		"fonts/alien"
+		textscale	0.4
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 10 {
+		
+			transition "scanner6::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.5" "1800" ;
+			transition "scanner6::rect" "60, 224, 500, 40 " "-80, 224, 500, 40 " "7950" ;
+			set "scanner6::visible" "1"
+		}
+		onTime 6400 {
+			transition "scanner6::forecolor" "1, 0.4, 0.1, 0.5" "1, 0.4, 0.1, 0" "1400" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner3::visible" "0"
+		}
+	}
+	windowDef scanner7 {
+
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"342 838432 738732366  87387323663 25 61  243  3842345  3842384 23 56124  35187  387323 6632 5617 666"
+		font		"fonts/alien"
+		textscale	0.38
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 20 {
+		
+			transition "scanner7::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.5" "1700" ;
+			transition "scanner7::rect" "70, 297, 500, 40 " "-80, 297, 500, 40 " "7900" ;
+			set "scanner7::visible" "1"
+		}
+		onTime 6300 {
+			transition "scanner7::forecolor" "1, 0.4, 0.1, 0.5" "1, 0.4, 0.1, 0" "1400" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner3::visible" "0"
+		}
+	}
+	
+/*	
+	windowDef scanner8 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"22435187 3872 43 51222 2 56218 738732  23842356 435187 87387 63 25 61  243  3842345  3842384 233"
+		font		"fonts/alien"
+		textscale	0.6
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 20 {
+		
+			transition "scanner8::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.2" "1700" ;
+			transition "scanner8::rect" "40, -90, 575, 450 " "40, 90, 575, 450 " "7900" ;
+			set "scanner8::visible" "1"
+		}
+		onTime 6500 {
+			transition "scanner8::forecolor" "1, 0.4, 0.1, 0.2" "1, 0.4, 0.1, 0" "1400" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner8::visible" "0"
+		}
+	}
+
+*/	
+	
+	windowDef scannerup {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"342 838432 738732366  87387323663 25 61  243  3842345  3842384 23 56124  35187  387323 6632 5617 666"
+		font		"fonts/alien"
+		textscale	0.4
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 10 {
+		
+			transition "scannerup::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.5" "2000" ;
+			transition "scannerup::rect" "60, 165, 800, 30 " "-200, 165, 800, 30 " "7900" ;
+			set "scannerup::visible" "1"
+		}
+		onTime 6400 {
+			transition "scannerup::forecolor" "1, 0.4, 0.1, 0.5" "1, 0.4, 0.1, 0" "1200" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scannerup::visible" "0"
+		}
+	}	
+	
+	
+
+	
+	
+//==================================================
+//TEXT UP
+//==================================================
+
+/*		
+	windowDef coast {
+		rect		300, 75, 300, 320
+		matcolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/westcoast"
+		onTime 0 {
+		}
+
+		onTime 3000 {
+		
+			transition "coast::matcolor" "1, 1, 1, 1" "1, 0.1, 0.0, 0.4" "2200" ;		
+		}
+		onTime 6500 {
+			transition "coast::matcolor" "1, 0.1, 0.0, 0.4" "1, 1, 1, 1" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+*/	
+	windowDef coast {
+		rect		300, 75, 300, 320
+		background	"guis/assets/non_interact/earthmoonscan/westcoast"
+		matcolor	1, 1, 1, 1
+		float clipperY 0
+		
+		onTime 3000 {
+			transition "clipperY" "0" "1" "2200";
+			transition "coast::matcolor" "1, 1, 1, 1" "1, 0.1, 0.0, 0.4" "2200" ;
+		}
+		onTime 6500 {
+			transition "clipperY" "1" "0" "1000";
+			transition "coast::matcolor" "1, 0.1, 0.0, 0.4" "1, 1, 1, 1" "1000" ;
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+
+		windowDef coastClipper {
+			rect		0, 320 * (1 - "coast::clipperY"), 300, 320
+			
+			windowDef DroidFill {
+				rect		300, 320 * "coast::clipperY", 300, 320
+				background	"guis/assets/non_interact/earthmoonscan/westcoast2"
+				matcolor	1, 1, 1, 0.7
+				invertrect	1
+			}
+		}
+	}
+
+
+
+	windowDef scanner5 {
+
+		rect 		0, 0, 0, 0
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		background	"guis/assets/mutate/1/blur1"
+
+		onTime 0 {
+		}
+
+		onTime 3000 {
+		
+			transition "scanner5::matcolor" "1, 0.1, 0.1, 0.0" "1, 0.8, 0.4, 0.6" "100" ;
+			transition "scanner5::rect" "280, 386, 340, 15" "280, 69, 340, 15 " "2200" ;
+		}
+		onTime 6500 {
+			transition "scanner5::rect" "280, 69, 340, 15" "280, 386, 340, 15 " "1000" ;		
+		}
+		onTime 7700 {
+			transition "scanner5::matcolor" "1, 0.8, 0.4, 0.6" "1, 0.8, 0.5, 0" "200" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+
+
+
+	windowDef bg1b {
+		rect		0, 0, 320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}	
+
+	windowDef bg2b {
+		rect		320, 0, -320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+	windowDef bg3b {
+		rect		0, 240, 320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+	windowDef bg4b {
+		rect		320, 240, -320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+	
+	
+	
+/*	
+	windowDef bgwt {
+		rect		0, 0, 640, 480
+		backcolor		1, 1, 1, 0
+		forecolor		0, 0, 0, 0
+	}	
+	windowDef bg1b {
+		rect		260, 30, 420, 350
+
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		rotate			270
+		visible 1
+	}
+	windowDef bg2b {
+		rect		0, 100, 380, 380
+
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		rotate			-270
+		visible 1
+	}
+	windowDef bg3b {
+		rect		300, 200, 380, -380
+
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		rotate			-90
+		visible 1
+	}
+	
+	
+*/
+
+
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.2
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	} 
+}

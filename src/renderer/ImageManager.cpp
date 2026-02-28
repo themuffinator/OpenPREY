@@ -60,6 +60,7 @@ static void OpenPrey_RemapLegacyImageName( idStr& name ) {
 
 	static const legacyImageRemap_t remaps[] = {
 		{ "_menushot", "_currentRender" },
+		{ "_replay", "_currentRender" },
 		{ "gfx/guis/loadscreens/generic", "guis/assets/loading/loading" },
 		{ "gfx/splashscreen", "guis/assets/loading/loading" },
 		{ "gfx/guis/white", "guis/assets/white" },

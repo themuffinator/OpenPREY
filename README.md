@@ -109,6 +109,7 @@ Runtime loader behavior:
 - staged runtime package root
 - engine executables in `.install/`
 - game modules and staged overrides in `.install/openprey/`
+- staged Prey GUI scripts/assets in `.install/openprey/guis/`
 
 ---
 

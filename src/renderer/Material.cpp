@@ -1540,6 +1540,18 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			continue;
 		}
 
+		if ( !token.Icmp( "profilemap" ) ) {
+			if ( !src.ReadToken( &token ) ) {
+				common->Warning( "missing parameter for 'profilemap' keyword in material '%s'", GetName() );
+				continue;
+			}
+			// Prey compatibility: profilemap shares the same dynamic cinematic
+			// path as soundmap and passes "graph" to select non-waveform mode.
+			ts->cinematic = new idSndWindow();
+			ts->cinematic->InitFromFile( token.c_str(), true );
+			continue;
+		}
+
 		if ( !token.Icmp( "cubeMap" ) ) {
 			str = R_ParsePastImageProgram( src );
 			idStr::Copynz( imageName, str, sizeof( imageName ) );
@@ -1911,7 +1923,8 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			continue;
 		}
 		if ( !token.Icmp( "glowStage" ) ) {
-			// Prey menu materials tag glow-only passes with this token.
+			// Prey tags additive-emissive overlay passes with this token.
+			ss->glowStage = true;
 			continue;
 		}
 		if ( !token.Icmpn( "shaderlevel", 11 ) ) {

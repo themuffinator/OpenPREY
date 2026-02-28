@@ -1,0 +1,4 @@
+// shuttle1.gui
+// invisible gui that activates the shuttle console
+//--------------------------------------------------
+windowDef desktop {rect 0,0,640,480 nocursor 1 float turnedon 0 windowDef OnButton1{rect 0,0,640,480 onActionRelease{set "cmd" "controlvehicle ; activate ; play console_generic_activate";}}}

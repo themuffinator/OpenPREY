@@ -1,0 +1,371 @@
+// generic on/off_1 gui
+//--------------------------------------------------
+
+// gui_parm20:		console color R
+// gui_parm21:		console color G
+// gui_parm22:		console color B
+// gui_parm25:		if set, allows one use only
+// gui_parm26:		script to run when gui is turned on
+// gui_parm27:		script to run when gui is turned off
+// gui_parm28:		initial state (0==initially off, 1==initially on)
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0.25
+	float turnedon		0
+
+	onStartup {
+		if ("gui::gui_parm28" != 0) {	// Initially on
+			set "desktop::turnedon" "1" ;
+
+			set "center_4::matcolor" "1 1 1 0";
+			set "center_3::matcolor" "1 1 1 0";
+			set "center_2::matcolor" "1 1 1 0";
+			set "center_1::matcolor" "1 1 1 1";
+			set "lock::matcolor" "1 1 1 1";
+			set "lock2::matcolor" "1 1 1 1";
+			set "lock::rect" "345 206 45 79";
+			set "lock2::rect" "239 206 -45 79";
+			set "light::visible" "1";
+			set "light2::visible" "1";
+			set "light3::visible" "1";
+			set "light4::visible" "1";
+			set "light5::visible" "1";
+			set "circuit::matcolor" "1 1 1 1";
+			set "circuit2::matcolor" "1 1 1 1";
+		}
+		else {							// Initially off
+			set "desktop::turnedon" "0";
+			set "light::visible" "0" ;
+			set "light2::visible" "0" ;
+			set "light3::visible" "0" ;
+			set "light4::visible" "0" ;
+			set "light5::visible" "0" ;
+			set "lock::matcolor" "1 1 1 0" ;
+			set "lock2::matcolor" "1 1 1 0" ;
+			set "lock::rect" "400 206 45 79" ;
+			set "lock2::rect" "180 206 -45 79" ;
+			set "center_2::matcolor" "1 1 1 1" ;
+			set "center_1::matcolor" "1 1 1 0" ;
+			set "circuit::matcolor" "1 1 1 0.3" ;
+			set "circuit2::matcolor" "1 1 1 0.3" ;
+			set "center_2::matcolor" "1 1 1 0" ;
+			set "center_3::matcolor" "1 1 1 1" ;
+			set "center_3::matcolor" "1 1 1 0" ;
+			set "center_4::matcolor" "1 1 1 1" ;
+		}
+	}
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+
+	windowDef TurnOnSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 1 {
+			set	"Onbutton1::visible" "0" ;
+		}
+		onTime 200 {
+			transition "center_3::matcolor" "1 1 1 0" "1 1 1 1" "200" ;	
+			transition "center_4::matcolor" "1 1 1 1" "1 1 1 0" "200" ;	
+		}
+		onTime 400 {
+			transition "center_3::matcolor" "1 1 1 1" "1 1 1 0" "200" ;	
+			transition "center_2::matcolor" "1 1 1 0" "1 1 1 1" "200" ;	
+		}
+		onTime 600 {
+			transition "center_2::matcolor" "1 1 1 1" "1 1 1 0" "200" ;	
+			transition "center_1::matcolor" "1 1 1 0" "1 1 1 1" "200" ;	
+			transition "lock::matcolor" "1 1 1 0" "1 1 1 1" "300" ;	
+			transition "lock2::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "lock::rect" "400 206 45 79" "345 206 45 79" "300" ;	
+			transition "lock2::rect" "180 206 -45 79" "239 206 -45 79" "300" ;
+		}
+		onTime 1000 {
+			set "light::visible" "1";
+			set "light2::visible" "1";
+			set "light3::visible" "1";
+			set "light4::visible" "1";
+			set "light5::visible" "1";
+			transition "circuit::matcolor" "1 1 1 0.3" "1 1 1 1" "200" ;	
+			transition "circuit2::matcolor" "1 1 1 0.3" "1 1 1 1" "200" ;
+
+			// Now disable this gui if they requested a one-shot setup
+			if ("gui::gui_parm25" != 0) {	// Turn off after single use
+				set "desktop::noninteractive" "1" ;
+				set "Dimmer::visible" "1";
+			}
+			else {
+				set	"Onbutton1::visible" "1" ;
+			}
+		}
+	}
+	
+	
+	windowDef TurnOffSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 1 {
+			set	"Onbutton1::visible" "0" ;
+			set "light::visible" "0" ;
+			set "light2::visible" "0" ;
+			set "light3::visible" "0" ;
+			set "light4::visible" "0" ;
+			set "light5::visible" "0" ;
+		}
+		onTime 200 {
+			transition "lock::matcolor" "1 1 1 1" "1 1 1 0" "300" ;	
+			transition "lock2::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+			transition "lock::rect" "345 206 45 79" "400 206 45 79" "300" ;	
+			transition "lock2::rect" "239 206 -45 79" "180 206 -45 79" "300" ;
+			transition "center_2::matcolor" "1 1 1 0" "1 1 1 1" "200" ;	
+			transition "center_1::matcolor" "1 1 1 1" "1 1 1 0" "200" ;	
+			transition "circuit::matcolor" "1 1 1 1" "1 1 1 0.3" "400" ;	
+			transition "circuit2::matcolor" "1 1 1 1" "1 1 1 0.3" "400" ;
+		}
+		onTime 400 {
+			transition "center_2::matcolor" "1 1 1 1" "1 1 1 0" "200" ;	
+			transition "center_3::matcolor" "1 1 1 0" "1 1 1 1" "200" ;	
+		}
+		onTime 600 {
+			transition "center_3::matcolor" "1 1 1 1" "1 1 1 0" "200" ;	
+			transition "center_4::matcolor" "1 1 1 0" "1 1 1 1" "200" ;	
+		}
+		onTime 1000 {
+			// Now disable this gui if they requested a one-shot setup
+			if ("gui::gui_parm25" != 0) {	// Turn off after single use
+				set "desktop::noninteractive" "1" ;
+				set "Dimmer::visible" "1";
+			}
+			else {
+				set	"Onbutton1::visible" "1" ;
+			}
+		}
+	}
+	
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	
+	windowDef bgl {
+		rect		10, 10, 310, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.85, 0.5, 0.9
+		background	"guis/assets/generic_on_off/generic_3/bg"
+	}
+	windowDef bgr {
+		rect		320, 10, -310, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.85, 0.5, 0.9
+		background	"guis/assets/generic_on_off/generic_3/bg"
+	}
+	windowDef bgl2 {
+		rect		20, 0, 300, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.7
+		background	"guis/assets/generic_on_off/generic_3/bg2"
+	}
+	windowDef bgr2 {
+		rect		315, 30, -300, -460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.7
+		background	"guis/assets/generic_on_off/generic_3/bg2"
+	}
+	windowDef lock {
+		rect		345, 206, 45, 79
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/lock"
+	}
+	windowDef lock2 {
+		rect		239, 206, -45, 79
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/lock"
+	}
+	windowDef light {
+		rect		198, 76, 34, 29
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/light"
+		onTime 0 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0.2" "200" ;
+		}
+		onTime 300 {
+			transition "matcolor" "1 1 1 0.2" "1 1 1 1" "150" ;
+		}
+		onTime 700 {
+			resetTime "0";
+		}
+	}
+	windowDef light2 {
+		rect		297, 130, 34, 29
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/light"
+		onTime 0 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0.2" "200" ;
+		}
+		onTime 300 {
+			transition "matcolor" "1 1 1 0.2" "1 1 1 1" "150" ;
+		}
+		onTime 700 {
+			resetTime "0";
+		}
+	}
+	windowDef light3{
+		rect		298, 331, 34, 29
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/light"
+		onTime 0 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0.2" "200" ;
+		}
+		onTime 300 {
+			transition "matcolor" "1 1 1 0.2" "1 1 1 1" "150" ;
+		}
+		onTime 700 {
+			resetTime "0";
+		}
+	}
+	windowDef light4 {
+		rect		397, 385, 34, 29
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/light"
+		onTime 0 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0.2" "200" ;
+		}
+		onTime 300 {
+			transition "matcolor" "1 1 1 0.2" "1 1 1 1" "150" ;
+		}
+		onTime 700 {
+			resetTime "0";
+		}
+	}
+	windowDef light5 {
+		rect		296, 230, 37, 32
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/light"
+		onTime 0 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0.2" "200" ;
+		}
+		onTime 300 {
+			transition "matcolor" "1 1 1 0.2" "1 1 1 1" "150" ;
+		}
+		onTime 700 {
+			resetTime "0";
+		}
+	}
+	windowDef circuit {
+		rect		307, 326, 260, 95
+		matcolor	1, 1, 1, 0.3
+		background	"guis/assets/generic_on_off/generic_3/bar"
+	}
+	windowDef circuit2 {
+		rect		62, 68, -260, -97
+		matcolor	1, 1, 1, 0.3
+		background	"guis/assets/generic_on_off/generic_3/bar"
+	}
+	windowDef center_1 {
+		rect		170, 118, 290, 253
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/generic_3/center1"
+	}
+	windowDef center_2 {
+		rect		170, 118, 290, 253
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/generic_on_off/generic_3/center2"
+	}
+	windowDef center_3 {
+		rect		170, 118, 290, 253
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/generic_on_off/generic_3/center3"
+	}
+	windowDef center_4 {
+		rect		170, 118, 290, 253
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/generic_on_off/generic_3/center4"
+		visible		1
+	}
+	windowDef scan {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 0.05
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.002]
+
+	}
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.03
+		background	"textures/sfx/static"
+	}
+
+//-----------------------------------------
+// buttons
+//-----------------------------------------
+
+	onNamedEvent AIUse {
+		if ("desktop::turnedon" == 0) {
+			resetTime "TurnOnSequence" "0" ;
+			set "desktop::turnedon" "1";
+			set "cmd" "activate ; play console_generic_activate" ;
+		}
+		else {
+			resetTime "TurnOffSequence" "0" ;
+			set "desktop::turnedon" "0" ;
+			set "light::visible" "0" ;
+			set "light2::visible" "0" ;
+			set "light3::visible" "0" ;
+			set "light4::visible" "0" ;
+			set "light5::visible" "0" ;
+			set "cmd" "activate ; play console_generic_deactivate" ;
+		}
+		if ("gui::gui_parm25" != 0) {	// Turn off after single use
+			set "desktop::noninteractive" "1" ;
+		}
+	}
+
+	windowDef Dimmer {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0.8
+		visible		0
+	}
+	
+	windowDef OnButton1 {
+		rect		30, 30, 580, 420
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.3
+		onAction {
+			// Initially off - use regular behavior
+			if ("desktop::turnedon" == 0) {
+				resetTime "TurnOnSequence" "0" ;
+				set "desktop::turnedon" "1";
+				set "cmd" "activate ; play console_generic_activate" ;
+				runScript "gui::gui_parm26" ;
+			}
+			else {
+				resetTime "TurnOffSequence" "0" ;
+				set "desktop::turnedon" "0" ;
+				set "cmd" "activate ; play console_generic_deactivate" ;
+				runScript "gui::gui_parm27" ;
+			}
+		} 
+	}
+}

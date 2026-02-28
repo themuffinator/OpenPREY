@@ -24,3 +24,8 @@ install_subdir(
   'glprogs',
   install_dir: install_gamedir_dir,
 )
+
+install_subdir(
+  'guis',
+  install_dir: install_gamedir_dir,
+)

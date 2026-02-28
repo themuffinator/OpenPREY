@@ -1,0 +1,103 @@
+
+// Shows text chat lines in multiplayer
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	menugui		0
+	nocursor	1
+
+	windowDef History {
+		rect		0, 220, 600, 150
+
+		windowDef history9 {
+			rect		0, 0, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat9"
+		}
+		windowDef history8 {
+			rect		0, 15, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat8"
+		}
+		windowDef history7 {
+			rect		0, 30, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat7"
+		}
+		windowDef history6 {
+			rect		0, 45, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat6"
+		}
+		windowDef history5 {
+			rect		0, 60, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat5"
+		}
+		windowDef history4 {
+			rect		0, 75, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat4"
+		}		
+		windowDef history3 {
+			rect		0, 90, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat3"
+		}		
+		windowDef history2 {
+			rect		0, 105, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat2"
+		}		
+		windowDef history1 {
+			rect		0, 120, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat1"
+		}
+		windowDef history0 {
+			rect		0, 135, 600, 15
+			forecolor	1, 1, 1, 1
+			textaligny	-3
+			textscale	0.25
+			shadow		1
+			nowrap		1
+			text		"gui::chat0"
+		}
+	}
+}

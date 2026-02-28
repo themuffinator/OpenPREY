@@ -131,6 +131,27 @@ static void R_RGBA8Image( idImage *image ) {
 	image->GenerateImage( (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
 }
 
+static void R_ThresholdImage( idImage *image ) {
+	static const int THRESHOLD_SIZE = 64;
+	byte data[THRESHOLD_SIZE][THRESHOLD_SIZE][4];
+
+	for ( int y = 0; y < THRESHOLD_SIZE; y++ ) {
+		for ( int x = 0; x < THRESHOLD_SIZE; x++ ) {
+			// Deterministic noise map used by legacy Prey shaders (for example invisibility).
+			unsigned int n = static_cast<unsigned int>( x * 73856093u ) ^ static_cast<unsigned int>( y * 19349663u );
+			n = ( n << 13 ) ^ n;
+			const byte alpha = static_cast<byte>( ( n * ( n * n * 15731u + 789221u ) + 1376312589u ) >> 24 );
+
+			data[y][x][0] = 255;
+			data[y][x][1] = 255;
+			data[y][x][2] = 255;
+			data[y][x][3] = alpha;
+		}
+	}
+
+	image->GenerateImage( (byte *)data, THRESHOLD_SIZE, THRESHOLD_SIZE, TF_LINEAR, TR_REPEAT, TD_LOOKUP_TABLE_ALPHA );
+}
+
 static void R_DepthImage( idImage *image ) {
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
 
@@ -646,6 +667,8 @@ void idImageManager::CreateIntrinsicImages() {
 	ImageFromFunction("_forwardRenderResolvedAlbedo", R_RGBA8Image);
 	ImageFromFunction("_postProcessAlbedo0", R_RGBA8Image);
 	ImageFromFunction("_postProcessAlbedo1", R_RGBA8Image);
+	ImageFromFunction("_threshold", R_ThresholdImage);
+	ImageFromFunction("_replay", R_RGBA8Image);
 
 
 	// save a copy of this for material comparison, because currentRenderImage may get

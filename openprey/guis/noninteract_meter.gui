@@ -1,0 +1,148 @@
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+
+	windowDef container {
+		rect	0, 0, 640, 480
+
+		windowDef squarebelow {
+			rect		320-75, 300, 150, 150
+			backcolor	0, 0.2, 0, 1
+			rotate		45
+		}
+
+		// 4th row: Front to back/left
+		windowDef tube13 {
+			rect		367, 175 + (200 * (1-metergui[0.75 + time*0.0003])), 32, 200 * metergui[0.75 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube14 {
+			rect		367-25, 175-25 - 200 * (1-metergui[0.00 + time*0.0003]), 32, 200 * metergui[0.00 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube15 {
+			rect		367-50, 175-50 - 200 * (1-metergui[0.25 + time*0.0003]), 32, 200 * metergui[0.25 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube16 {
+			rect		367-75, 175-75 - 200 * (1-metergui[0.50 + time*0.0003]), 32, 200 * metergui[0.50 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+
+
+		// 3rd row: Front to back/left
+		windowDef tube9 {
+			rect		346, 200 + 200 * (1-metergui[0.50 + time*0.0003]), 32, 200 * metergui[0.50 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube10 {
+			rect		346-25, 200-25 - 200 * (1-metergui[0.75 + time*0.0003]), 32, 200 * metergui[0.75 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	0.5 + 0.5*alpha[time*0.0003], 0, 0, 1
+			background	"guis/assets/meter/testtubefull"
+			onTime 0 {}
+		}
+		windowDef tube11 {
+			rect		346-50, 200-50 - 200 * (1-metergui[0.00 + time*0.0003]), 32, 200 * metergui[0.00 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	0.5 + 0.5*alpha[0.00 + time*0.0003], 0, 0, 1
+			background	"guis/assets/meter/testtubefull"
+			onTime 0 {}
+		}
+		windowDef tube12 {
+			rect		346-75, 200-75 - 200 * (1-metergui[0.25 + time*0.0003]), 32, 200 * metergui[0.25 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+
+
+		// 2nd row: Front to back/left
+		windowDef tube5 {
+			rect		325, 225 + 200 * (1-metergui[0.25 + time*0.0003]), 32, 200 * metergui[0.25 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube6 {
+			rect		325-25, 225-25 - 200 * (1-metergui[0.50 + time*0.0003]), 32, 200 * metergui[0.50 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	0.5 + 0.5*alpha[time*0.0003], 0, 0, 1
+			background	"guis/assets/meter/testtubefull"
+			onTime 0 {}
+		}
+		windowDef tube7 {
+			rect		325-50, 225-50 - 200 * (1-metergui[0.75 + time*0.0003]), 32, 200 * metergui[0.75 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	0.5 + 0.5*alpha[time*0.0003], 0, 0, 1
+			background	"guis/assets/meter/testtubefull"
+			onTime 0 {}
+		}
+		windowDef tube8 {
+			rect		325-75, 225-75 - 200 * (1-metergui[0.00 + time*0.0003]), 32, 200 * metergui[0.00 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+
+		
+		// 1st row: Front to back/left
+		windowDef tube1 {
+			rect		304, 250 + 200 * (1-metergui[0.00 + time*0.0003]), 32, 200 * metergui[0.00 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube2 {
+			rect		304-25, 250-25 - 200 * (1-metergui[0.25 + time*0.0003]), 32, 200 * metergui[0.25 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube3 {
+			rect		304-50, 250-50 - 200 * (1-metergui[0.50 + time*0.0003]), 32, 200 * metergui[0.50 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+		windowDef tube4 {
+			rect		304-75, 250-75 - 200 * (1-metergui[0.75 + time*0.0003]), 32, 200 * metergui[0.75 + time*0.0003]
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/meter/testtube"
+			onTime 0 {}
+		}
+
+		windowDef square {
+			rect		320-75, 300, 150, 150
+			backcolor	0, 0, 0, 0
+			matcolor	0, 0.2, 0, 1
+			background	"guis/assets/meter/border"
+			rotate		45
+			matscale	10, 10
+		}
+
+	}	// container
+}

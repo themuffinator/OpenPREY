@@ -1,0 +1,704 @@
+// Static
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+	onTrigger	{
+		resetTime "ActivationSequence" "0" ;
+	}
+
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions   set "static::visible" "1"
+	// -------------------------------------------------------------------------------
+	
+	windowDef ActivationSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 6000 {
+			resetTime "SphereSequence_Off" "0" ;
+		}
+		onTime 8700 {
+			resetTime "SuperPortalSequence_On" "0" ;
+		}
+		onTime 18000 {
+			resetTime "SuperPortalSequence_Off" "0" ;
+		}
+		onTime 18550 {
+			resetTime "KeeperSequence_On" "0" ;
+		}
+		onTime 26800 {
+			resetTime "KeeperSequence_Off" "0" ;
+		}
+		onTime 30000 {
+			resetTime "Keeper2Sequence_On" "0" ;
+		}
+		onTime 37300 {
+			resetTime "Keeper2Sequence_Off" "0" ;
+		}
+		onTime 41000 {
+			resetTime "biolabsSequence_On" "0" ;
+		}
+		onTime 61500 {
+			resetTime "biolabsSequence_Off" "0" ;
+		}
+		onTime 63000 {
+			resetTime "earthSequence_On" "0" ;
+		}
+	}
+
+	windowDef SphereSequence_Off {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 0 {
+			transition "tag::rect" "355 300 110 80" "355 300 0 0" "300" ;
+		}
+		onTime 400 {
+			transition "tag2::rect" "50 260 80 60" "150 260 0 0" "300" ;
+		}
+		onTime 700 {
+			set "cir_1::visible" "0" ;
+			set "cir_2::visible" "0" ;
+		}
+		onTime 1200 {
+			set "cir::visible" "0" ;
+			set "cir2::visible" "0" ;
+		}
+		onTime 1700 {
+			set "Rotate_rect::visible" "0" ;
+		}
+		onTime 1900 {
+			transition "bg_sphere::matcolor" "1 1 1 0.5" "1 1 1 1" "50" ;
+		}
+		onTime 1950 {
+			transition "bg_sphere::matcolor" "1 1 1 1" "1 1 1 0.4" "50" ;
+		}
+		onTime 2000 {
+			transition "bg_sphere::matcolor" "1 1 1 0.5" "1 1 1 1" "50" ;
+		}
+		onTime 2050 {
+			transition "bg_sphere::matcolor" "1 1 1 1" "1 1 1 0.4" "50" ;
+		}
+		onTime 2100 {
+			transition "bg_sphere::matcolor" "1 1 1 0.4" "1 1 1 0.8" "50" ;
+		}
+		onTime 2200 {
+			transition "bg_sphere::rect" "100 85 300 300" "250 200 0 0" "300" ;
+			transition "bg_sphere::matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+		}
+		onTime 2400 {
+			transition "bg_spherebg::matcolor" "1 1 1 0.3" "1 1 1 1" "50" ;
+		}
+		onTime 2450 {
+			transition "bg_spherebg::matcolor" "1 1 1 1" "1 1 1 0.3" "50" ;
+		}
+		onTime 2550 {
+			transition "bg_spherebg::matcolor" "1 1 1 0.3" "1 1 1 1" "50" ;
+		}
+		onTime 2650 {
+			transition "bg_spherebg::matcolor" "1 1 1 1" "1 1 1 0" "50" ;
+		}
+	}
+	
+	windowDef SuperPortalSequence_On {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 0 {
+			transition "bg_mainback::rect" "40 200 450 0" "40 45 450 385" "300" ;
+			transition "bg_mainback::matcolor" "1 1 1 0" "1 1 1 1" "400" ;
+		}
+		onTime 500 {
+			transition "bg_superp::rect" "450 100 0 0" "20 45 450 385" "300" ;
+			transition "bg_superp::matcolor" "1 1 1 0" "1 1 1 0.8" "400" ;
+		}
+		onTime 600 {
+			transition "bg_superp::matcolor" "1 1 1 0.5" "1 1 1 1" "50" ;
+		}
+		onTime 700 {
+			transition "bg_superp::matcolor" "1 1 1 1" "1 1 1 0" "50" ;
+		}
+		onTime 750 {
+			transition "bg_superp::matcolor" "1 1 1 0" "1 1 1 1" "50" ;
+		}
+	}
+	windowDef SuperPortalSequence_Off {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		
+		onTime 0 {
+			transition "bg_superp::matcolor" "1 1 1 0" "1 1 1 1" "50" ;
+		}
+		onTime 350 {
+			transition "bg_superp::matcolor" "1 1 1 1" "1 1 1 0" "50" ;
+		}
+		onTime 400 {
+			transition "bg_superp::matcolor" "1 1 1 0.5" "1 1 1 1" "50" ;
+		}
+		onTime 450 {
+			transition "bg_superp::rect" "20 45 450 385" "450 400 0 0" "300" ;
+			transition "bg_superp::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+		}
+	}
+	windowDef KeeperSequence_On {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+		
+		onTime 500 {
+			transition "bg_keeper::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "bg_keeper::rect" "450 100 0 0" "40 45 450 385" "500" ;
+		}
+		onTime 1500 {
+			set "outlineWindow::visible" "1" ;
+		}
+		onTime 2500 {
+			transition "keeper_tag2::matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+			transition "keeper_tag2::rect" "260 210 -0 0" "260 140 -110 -90" "200" ;
+		}
+		onTime 3200 {
+			transition "keeper_tag::matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+			transition "keeper_tag::rect" "130 195 0 0" "70 195 80 60" "200" ;
+		}
+		onTime 3700 {
+			set "keeper_tag3::visible" "1" ;
+		}
+	}
+	windowDef KeeperSequence_Off {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 0 {
+			set "keeper_tag3::visible" "0" ;
+		}
+		onTime 500 {
+			transition "keeper_tag::matcolor" "1 1 1 1" "1 1 1 0" "100" ;
+			transition "keeper_tag::rect" "70 195 0 0" "130 195 0 0" "200" ;
+		}
+		onTime 1500 {
+			transition "keeper_tag2::matcolor" "1 1 1 1" "1 1 1 0" "100" ;
+			transition "keeper_tag2::rect" "260 140 -110 -90" "260 210 0 0" "200" ;
+		}
+		onTime 2500 {
+			set "outlineWindow::visible" "0" ;
+		}
+		onTime 3200 {
+			transition "bg_keeper::matcolor" "1 1 1 1" "1 1 1 0" "450" ;
+			transition "bg_keeper::rect" "40 45 450 385" "450 400 0 0" "500" ;
+		}
+	}
+	windowDef Keeper2Sequence_On {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 500 {
+			transition "bg_keeper2::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "bg_keeper2::rect" "450 100 0 0" "40 45 450 385" "500" ;
+		}
+		onTime 1500 {
+			set "k2outlineWindow::visible" "1" ;
+		}
+		onTime 2500 {
+			transition "keeper2_tag2::matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+			transition "keeper2_tag2::rect" "70 135 -0 0" "70 135 80 -60" "200" ;
+		}
+		onTime 3700 {
+			set "keeper2_tag3::visible" "1" ;
+		}
+	}
+	windowDef Keeper2Sequence_Off {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+
+		onTime 500 {
+			set "keeper2_tag3::visible" "0" ;
+		}
+		onTime 1500 {
+			transition "keeper2_tag2::matcolor" "1 1 1 1" "1 1 1 0" "100" ;
+			transition "keeper2_tag2::rect" "70 135 80 -60" "70 135 0 0" "200" ;
+		}
+		onTime 2500 {
+			set "k2outlineWindow::visible" "0" ;
+		}
+		onTime 3700 {
+			transition "bg_keeper2::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+			transition "bg_keeper2::rect" "40 45 450 385" "450 400 0 0" "500" ;
+		}
+	}
+	windowDef biolabsSequence_On {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+
+		onTime 0 {
+			transition "biolabs_1::matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+			transition "biolabs_1::rect" "405 155 0 0" "305 155 190 160" "200" ;
+		}
+		onTime 1000 {
+			transition "biolabs_2::matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+			transition "biolabs_2::rect" "115 400 0 0" "115 275 170 140" "200" ;
+		}
+		onTime 2000 {
+			transition "biolabs_3::matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+			transition "biolabs_3::rect" "75 400 0 0" "75 95 185 152" "200" ;
+		}
+		onTime 2600 {
+			transition "biolabs_3::rect" "75 95 185 152" "75 95 360 280" "300" ;
+			transition "biolabs_1::matcolor" "1 1 1 1" "0 0 0 0" "200" ;
+			transition "biolabs_2::matcolor" "1 1 1 1" "0 0 0 0" "200" ;
+		}
+		onTime 8000 {
+			transition "biolabs_3::rect" "75 95 360 280" "75 95 185 152" "200" ;
+			transition "biolabs_1::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+			transition "biolabs_2::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+		}
+		onTime 8500 {
+			transition "biolabs_2::rect" "115 275 170 140" "70 100 360 280" "300" ;
+			transition "biolabs_3::matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+			transition "biolabs_1::matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+		}
+		onTime 13400 {
+			transition "biolabs_2::rect" "70 100 360 280" "115 275 170 140" "200" ;
+			transition "biolabs_3::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+			transition "biolabs_1::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+		}
+		onTime 14500 {
+			transition "biolabs_1::rect" "305 155 190 160" "70 100 360 280" "300" ;
+			transition "biolabs_3::matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+			transition "biolabs_2::matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+		}
+		onTime 19900 {
+			transition "biolabs_1::rect" "70 100 360 280" "305 155 190 160" "200" ;
+			transition "biolabs_3::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+			transition "biolabs_2::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+		}
+	}
+	windowDef biolabsSequence_Off {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+
+		onTime 0 {
+			transition "biolabs_1::matcolor" "1 1 1 1" "1 1 1 0" "150" ;
+			transition "biolabs_1::rect" "305 155 190 160" "405 155 0 0" "200" ;
+		}
+		onTime 500 {
+			transition "biolabs_2::matcolor" "1 1 1 1" "1 1 1 0" "150" ;
+			transition "biolabs_2::rect" "115 275 170 140" "115 400 0 0" "200" ;
+		}
+		onTime 1000 {
+			transition "biolabs_3::matcolor" "1 1 1 1" "1 1 1 0" "150" ;
+			transition "biolabs_3::rect" "75 95 185 152" "75 400 0 0" "200" ;
+		}
+	}
+	windowDef earthSequence_On {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+
+		onTime 0 {
+			transition "bg_portal::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "bg_portal::rect" "280 250 0 0" "40 45 470 385" "400" ;
+		}
+		onTime 1000 {
+			transition "bg_earth::matcolor" "1 1 1 0" "1 1 1 1" "500" ;
+			transition "bg_earth::rect" "280 250 0 0" "165 120 220 220" "600" ;
+		}
+	}
+	
+	
+//------------------------------------------------------------
+//	Background rects
+//------------------------------------------------------------
+
+	windowDef bg {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg"
+		visible		1
+	}
+	windowDef bg_mainback {
+		rect		40, 45, 450, 385
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_main"
+	}
+
+//------------------------------------------------------------
+//	Sphere Sequence rects
+//------------------------------------------------------------
+
+	windowDef bg_spherebg {
+		rect		45, 47, 440, 380
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_spherebg"
+	}
+	windowDef tag {
+		rect		355, 300, 110, 80
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag"
+	}
+	windowDef tag2 {
+		rect		50, 260, 80, 60
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag2"
+	}
+	windowDef cir
+	{
+		rect		60, 185, 380, 100
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.7, 0.4, 0.3
+		background	"guis/assets/countdown/cir2"
+		rotate time * -0.03
+	}
+	windowDef cir2
+	{
+		rect		60, 185, 380, 100
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.7, 0.4, 0.2
+		background	"guis/assets/countdown/cir2"
+		visible		1
+		rotate time * -0.1
+	}
+	windowDef cir_1
+	{
+		rect		125, 105, 240, 250
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.7, 0.2, 1
+		background	"guis/assets/non_interact/earthscan/cir_1"
+		visible		1
+		onTime 0 {
+			transition "cir_1::rect" "125 105 240 250" "65 45 370 380" "1000" ;
+			transition "matcolor" "1 0.8 0.2 0" "1 0.8 0.2 0.5" "700" ;
+		}
+		onTime 1000 {
+			transition "matcolor" "1 0.8 0.2 0.5" "1 0.8 0.2 0" "700" ;
+		}
+		onTime 1400 {
+			resetTime "0";
+		}
+	}
+	windowDef cir_2
+	{
+		rect		125, 105, 240, 250
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.7, 0.2, 1
+		background	"guis/assets/non_interact/earthscan/cir_1"
+		visible		1
+		onTime 350 {
+			transition "cir_2::rect" "125 105 240 250" "65 45 370 380" "1000" ;
+			transition "matcolor" "1 0.8 0.2 0" "1 0.8 0.2 0.5" "700" ;
+		}
+		onTime 1050 {
+			transition "matcolor" "1 0.8 0.2 0.5" "1 0.8 0.2 0" "700" ;
+		}
+		onTime 1450 {
+			resetTime "0";
+		}
+	}	
+	windowDef Rotate_rect {
+		rect 		115, 75, 265, 320
+		matcolor	0 , 0, 1, 1 
+		visible 1
+		rotate time * 0.05
+		
+		windowDef circ {
+			rect 		5, 25, 30, 30
+			matcolor 	1, 0.5, 0.3, 1
+			background	"guis/assets/non_interact/earthscan/target_2"
+			visible 1
+		}
+		onTime 50 {
+			transition "matcolor" "1 0.8 0.2 0" "1 0.8 0.2 0.4" "300" ;
+		}
+		onTime 650 {
+			transition "matcolor" "1 0.8 0.2 0.4" "1 0.8 0.2 0" "300" ;
+		}
+		onTime 1050 {
+			resetTime "0";
+		}
+	}
+	windowDef bg_sphere {
+		rect		100, 85, 300, 300
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere"
+		visible		1
+	}
+	
+	
+//------------------------------------------------------------
+//	SuperPortal Sequence rects
+//------------------------------------------------------------
+	
+	windowDef bg_superp {
+		rect		40, 45, 450, 385
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_superportal"
+		visible		1
+	}
+	
+	
+//------------------------------------------------------------
+//	Keeper Sequence rects
+//------------------------------------------------------------
+	
+	windowDef bg_keeper {
+		rect		40, 45, 450, 385
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_keeper"
+	}
+	windowDef outlineWindow {
+		rect		40, 45, 450, 385
+		float clipZ 0
+		visible		0
+
+		onTime 0 {
+			transition "clipZ" "0" "1" "950";
+		}
+		onTime 1000 {
+			transition "clipZ" "1" "0" "10";
+		}
+		onTime 1500 {
+			resetTime "0";
+		}
+		windowDef outlineClip {
+			rect		0, 385 * (1 - "outlineWindow::clipZ"), 450, 385
+			
+			windowDef outlineFill {
+				rect		450, 385 * "outlineWindow::clipZ", 450, 385
+				backcolor	0, 0, 0, 0
+				matcolor	0.5, 0.8, 1, 0.8 * jitter1[time*0.05]
+				background	"guis/assets/dialog_elhuit/bg_keeper_outline"
+				invertrect	1
+			}
+		}
+	}
+	windowDef keeper_tag {
+		rect		70, 195, 80, 60
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag2"
+	}
+	windowDef keeper_tag2 {
+		rect		260, 140, -110, -90
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag2"
+	}
+	windowDef keeper_tag3 {
+		rect		70, 60, -110, -80
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag"
+		visible		0
+		onTime 50 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+		}
+		onTime 650 {
+			transition "matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+		}
+		onTime 2000 {
+			resetTime "0";
+		}
+	}
+	windowDef bg_keeper2 {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_keeper2"
+	//	visible		1
+	}
+
+//------------------------------------------------------------
+//	Keeper2 Sequence rects
+//------------------------------------------------------------
+	
+	windowDef bg_keeper2 {
+		rect		40, 45, 450, 385
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_keeper2"
+	}
+	windowDef keeper2_tag2 {
+		rect		70, 135, 80,-60
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag2"
+	}
+	windowDef k2outlineWindow {
+		rect		40, 45, 450, 385
+		float clipZ 0
+		visible		0
+
+		onTime 0 {
+			transition "clipZ" "0" "1" "950";
+		}
+		onTime 1000 {
+			transition "clipZ" "1" "0" "10";
+		}
+		onTime 1500 {
+			resetTime "0";
+		}
+		windowDef outlineClip {
+			rect		0, 385 * (1 - "k2outlineWindow::clipZ"), 450, 385
+			
+			windowDef outlineFill {
+				rect		450, 385 * "k2outlineWindow::clipZ", 450, 385
+				backcolor	0, 0, 0, 0
+				matcolor	0.5, 0.8, 1, 0.8 * jitter1[time*0.05]
+				background	"guis/assets/dialog_elhuit/bg_keeper2_outline"
+				invertrect	1
+			}
+		}
+	}
+	windowDef keeper2_tag3 {
+		rect		360, 50, 110, -80
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere_tag"
+		visible		0
+		onTime 50 {
+			transition "matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+		}
+		onTime 650 {
+			transition "matcolor" "1 1 1 0" "1 1 1 1" "100" ;
+		}
+		onTime 2000 {
+			resetTime "0";
+		}
+	}
+
+
+//------------------------------------------------------------
+//	Bio Labs Sequence rects
+//------------------------------------------------------------
+
+	windowDef biolabs_1 {
+		rect		305, 155, 190, 160
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bio_1"
+	}
+	windowDef biolabs_2 {
+		rect		115, 275, 170, 140
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bio_2"
+	}
+	windowDef biolabs_3 {
+		rect		75, 95, 185, 152
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bio_3"
+	}
+
+//------------------------------------------------------------
+//	Earth Sequence rects
+//------------------------------------------------------------
+
+
+	windowDef bg_portal {
+		rect		40, 45, 470, 385
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_portal"
+	}
+	windowDef bg_earth {
+		rect		165, 120, 220, 220
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/dialog_elhuit/bg_earth"
+	}
+	windowDef crop_rect2 {
+		rect 		490, 50, 100, 100
+		visible 	1
+		forecolor 	1, 1, 1, 1
+		matcolor	1 ,1, 1, 1 
+		onTime 1000 {
+			transition "crop_rect2::rect" "490 50 0 100" "490 50 100 100" "1200" ;
+		}
+		onTime 3000 {
+			resetTime "crop_rect2" "0" ;
+		}
+		
+		windowDef info_text1 {
+			rect 0, 0, 100, 30
+			visible 1
+			forecolor 0, 0, 1, 1
+			backcolor 1, 1, 1, 0
+			background	"guis/assets/non_interact/earthscan/info_text"
+		}
+	}		
+	windowDef crop_rect3 {
+		rect 		470, 400, 100, 100
+		visible 	1
+		forecolor 	1, 1, 1, 1
+		matcolor	1 ,1, 1, 1 
+		onTime 1200 {
+			transition "crop_rect3::rect" "470 400 0 100" "470 400 100 100" "1800" ;
+		}
+		onTime 3200 {
+			resetTime "crop_rect3" "0" ;
+		}
+		
+		windowDef info_text1 {
+			rect 0, 0, 100, 30
+			visible 1
+			forecolor 0, 0, 1, 1
+			backcolor 1, 1, 1, 0
+			background	"guis/assets/non_interact/earthscan/info_text"
+		}
+	}		
+	windowDef textscr2 {
+		rect		520, 140, 80, 180
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 0.5, 1
+		matcolor	1, 1, 0.5, 1
+		background	"guis/assets/non_interact/earthscan/text"
+	}
+
+
+//------------------------------------------------------------
+//	Overlay rects
+//------------------------------------------------------------
+
+	windowDef static {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.1
+		background	"guis/assets/static/static007"
+		visible		1
+	}
+	windowDef scan {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 2
+		background	"guis/assets/wallwalk/scanline"
+	}
+	windowDef scan2 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan3 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.0012]
+	}
+	
+}

@@ -875,6 +875,11 @@ extern idCVar r_windowWidth;				// windowed mode width
 extern idCVar r_windowHeight;				// windowed mode height
 extern idCVar r_multiSamples;			// number of antialiasing samples
 extern idCVar r_postAA;					// post AA mode: 0 = off, 1 = SMAA 1x
+extern idCVar r_bloom;					// enable bloom post-process
+extern idCVar r_bloomThreshold;		// bloom bright-pass threshold
+extern idCVar r_bloomSoftKnee;			// bloom soft threshold knee
+extern idCVar r_bloomIntensity;		// bloom contribution scale
+extern idCVar r_bloomRadius;			// bloom sample radius scale
 extern idCVar r_msaaResolveDepth;		// include depth when resolving MSAA render targets
 extern idCVar r_msaaAlphaToCoverage;	// alpha-to-coverage for perforated materials on MSAA targets
 
@@ -949,6 +954,7 @@ extern idCVar r_lightAllBackFaces;		// light all the back faces, even when they 
 extern idCVar r_useDepthBoundsTest;     // use depth bounds test to reduce shadow fill
 
 extern idCVar r_skipPostProcess;		// skip all post-process renderings
+extern idCVar r_skipGlowOverlay;		// skip glow overlay stages and bloom
 extern idCVar r_skipSuppress;			// ignore the per-view suppressions
 extern idCVar r_skipInteractions;		// skip all light/surface interaction drawing
 extern idCVar r_skipFrontEnd;			// bypasses all front end work, but 2D gui rendering still draws

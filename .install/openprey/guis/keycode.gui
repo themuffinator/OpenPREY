@@ -1,0 +1,40 @@
+// Translates to a random code
+// must be synced up with the keyenter gui
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+
+	windowDef bg {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 1
+		background  "guis/assets/key_pad/border"
+	}
+	windowDef code {
+		rect		145, 100, 320, 240
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 0.6
+//		text		"1 2 3 4"
+		text		"gui::gui_parm1"
+		textscale	3.8
+		textalign	1
+		textaligny	50
+		font		"fonts/alien"
+	}
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}
