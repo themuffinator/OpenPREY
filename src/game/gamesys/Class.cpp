@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 /*
 
 Base class for all C++ objects.  Provides fast run-time type checking and run-time
@@ -5,12 +7,12 @@ instancing of objects.
 
 */
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
-#include "NoGameTypeInfo.h"
+#include "TypeInfo.h"
 
 
 /***********************************************************************
@@ -36,12 +38,7 @@ are initialized before superclasses.
 ================
 */
 idTypeInfo::idTypeInfo( const char *classname, const char *superclass, idEventFunc<idClass> *eventCallbacks, idClass *( *CreateInstance )( void ), 
-// RAVEN BEGIN
-// bdube: added states
-	void ( idClass::*Spawn )( void ), 
-	rvStateFunc<idClass>* stateCallbacks,
-	void ( idClass::*Save )( idSaveGame *savefile ) const, void ( idClass::*Restore )( idRestoreGame *savefile ) ) {									
-// RAVEN END
+	void ( idClass::*Spawn )( void ), void ( idClass::*Save )( idSaveGame *savefile ) const, void ( idClass::*Restore )( idRestoreGame *savefile ) ) {
 
 	idTypeInfo *type;
 	idTypeInfo **insert;
@@ -58,11 +55,6 @@ idTypeInfo::idTypeInfo( const char *classname, const char *superclass, idEventFu
 	this->freeEventMap		= false;
 	typeNum					= 0;
 	lastChild				= 0;
-
-// RAVEN BEGIN
-// bdube: added states
-	this->stateCallbacks = stateCallbacks;
-// RAVEN END
 
 	// Check if any subclasses were initialized before their superclass
 	for( type = typelist; type != NULL; type = type->next ) {
@@ -209,20 +201,13 @@ void idTypeInfo::Shutdown() {
 
 ***********************************************************************/
 
-const idEventDef EV_PostRestore( "<postRestore>", NULL );
 const idEventDef EV_Remove( "<immediateremove>", NULL );
 const idEventDef EV_SafeRemove( "remove", NULL );
 
 ABSTRACT_DECLARATION( NULL, idClass )
-// RAVEN BEGIN
-	EVENT( EV_PostRestore,			idClass::Event_PostRestore )
-// RAVEN END
 	EVENT( EV_Remove,				idClass::Event_Remove )
 	EVENT( EV_SafeRemove,			idClass::Event_SafeRemove )
 END_CLASS
-
-CLASS_STATES_DECLARATION(idClass)
-END_CLASS_STATES
 
 // alphabetical order
 idList<idTypeInfo *>	idClass::types;
@@ -263,11 +248,6 @@ classSpawnFunc_t idClass::CallSpawnFunc( idTypeInfo *cls ) {
 		}
 	}
 
-	// RAVEN BEGIN
-	// hmmm.... stompage of memory has occured
-	assert(cls->Spawn != 0);
-	// RAVEN END
-
 	( this->*cls->Spawn )();
 
 	return cls->Spawn;
@@ -279,16 +259,15 @@ idClass::FindUninitializedMemory
 ================
 */
 void idClass::FindUninitializedMemory( void ) {
-#ifdef ID_DEBUG_MEMORY
+#ifdef ID_DEBUG_UNINITIALIZED_MEMORY
 	unsigned long *ptr = ( ( unsigned long * )this ) - 1;
 	int size = *ptr;
 	assert( ( size & 3 ) == 0 );
 	size >>= 2;
 	for ( int i = 0; i < size; i++ ) {
 		if ( ptr[i] == 0xcdcdcdcd ) {
-// RAVEN BEGIN
-			gameLocal.Warning( "type '%s' has uninitialized variable (offset %d)", GetClassname(), i << 2 );
-// RAVEN END
+			const char *varName = GetTypeVariableName( GetClassname(), i << 2 );
+			gameLocal.Warning( "type '%s' has uninitialized variable %s (offset %d)", GetClassname(), varName, i << 2 );
 		}
 	}
 #endif
@@ -373,10 +352,6 @@ once during the execution of the program or DLL.
 void idClass::Init( void ) {
 	idTypeInfo	*c;
 	int			num;
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG(tag,MA_CLASS);
-// RAVEN END
 
 	gameLocal.Printf( "Initializing class hierarchy\n" );
 
@@ -387,12 +362,6 @@ void idClass::Init( void ) {
 
 	// init the event callback tables for all the classes
 	for( c = typelist; c != NULL; c = c->next ) {
-// RAVEN BEGIN
-// jnewquist: Make sure the superclass was actually registered!
-		if ( c->super == NULL && (c->superclass && idStr::Cmp(c->superclass, "NULL")) ) {
-			common->Error("Superclass %s of %s was never registered!", c->superclass, c->classname);
-		}		
-// RAVEN END
 		c->Init();
 	}
 
@@ -454,19 +423,18 @@ void * idClass::operator new( size_t s ) {
 	int *p;
 
 	s += sizeof( int );
-//RAVEN BEGIN
-//amccarthy: Added memory allocation tag
-	p = (int *)Mem_Alloc( s, MA_CLASS );
-//RAVEN END
+	p = (int *)Mem_Alloc( s );
 	*p = s;
 	memused += s;
 	numobjects++;
 
-#ifdef ID_DEBUG_MEMORY
+#ifdef ID_DEBUG_UNINITIALIZED_MEMORY
 	unsigned long *ptr = (unsigned long *)p;
 	int size = s;
 	assert( ( size & 3 ) == 0 );
-	size >>= 3;
+	// HUMANHEAD tmj: bugfix - shifting by 2 gives the number of DWORDs to fill.
+	// Shifting by 3 is incorrect as it only fills the memory half way.
+	size >>= 2;
 	for ( int i = 1; i < size; i++ ) {
 		ptr[i] = 0xcdcdcdcd;
 	}
@@ -479,19 +447,18 @@ void * idClass::operator new( size_t s, int, int, char *, int ) {
 	int *p;
 
 	s += sizeof( int );
-//RAVEN BEGIN
-//amccarthy: Added memory allocation tag
-	p = (int *)Mem_Alloc( s, MA_CLASS );
-//RAVEN END
+	p = (int *)Mem_Alloc( s );
 	*p = s;
 	memused += s;
 	numobjects++;
 
-#ifdef ID_DEBUG_MEMORY
+#ifdef ID_DEBUG_UNINITIALIZED_MEMORY
 	unsigned long *ptr = (unsigned long *)p;
 	int size = s;
 	assert( ( size & 3 ) == 0 );
-	size >>= 3;
+	// HUMANHEAD tmj: bugfix - shifting by 2 gives the number of DWORDs to fill.
+	// Shifting by 3 is incorrect as it only fills the memory half way.
+	size >>= 2;
 	for ( int i = 1; i < size; i++ ) {
 		ptr[i] = 0xcdcdcdcd;
 	}
@@ -595,6 +562,64 @@ idTypeInfo *idClass::GetType( const int typeNum ) {
 	return NULL;
 }
 
+#ifdef _HH_NET_DEBUGGING //HUMANHEAD rww
+void idClass::PrintHHNetStats_f( const idCmdArgs &args ) {
+	for( int i = 0; i < types.Num(); i++ ) {
+		idTypeInfo *type = types[ i ];
+		idLib::NetworkEntStats(type->classname, type->typeNum);
+	}
+}
+#endif //HUMANHEAD END
+
+#if !GOLD //HUMANHEAD rww
+void idClass::TestSnap_f( const idCmdArgs &args ) {
+	for( int i = 0; i < types.Num(); i++ ) {
+		byte testBuffer[16384];
+		byte testBufferDelta[16384];
+		idBitMsg base;
+		idBitMsg delta;
+		idBitMsgDelta msg;
+
+		memset(testBuffer, 0, sizeof(testBuffer));
+		base.Init(testBuffer, sizeof(testBuffer));
+		int j = 0;
+		while (j < sizeof(testBuffer)/4) { //hack
+			base.WriteBits(0, 32);
+			j++;
+		}
+		delta.Init(testBufferDelta, sizeof(testBufferDelta));
+		msg.Init(&base, (idBitMsg *)NULL, &delta);
+
+		idTypeInfo *type = types[i];
+		if (strcmp(type->classname, "hhDock") &&
+			strcmp(type->classname, "hhFireController") &&
+			strcmp(type->classname, "hhGravityZoneBase") &&
+			strcmp(type->classname, "hhProxDoorSection") &&
+			strcmp(type->classname, "hhVehicle") &&
+			strcmp(type->classname, "hhZone") &&
+			strcmp(type->classname, "idCamera") &&
+			strcmp(type->classname, "idClass") &&
+			strcmp(type->classname, "idEntity") &&
+			strcmp(type->classname, "idPhysics")) { //more hacks
+			idClass *cl = type->CreateInstance();
+			if (cl && cl->IsType(idEntity::Type) &&
+				!cl->IsType(hhWeapon::Type) && !cl->IsType(idWorldspawn::Type)) {
+				idEntity *ent = (idEntity *)cl;
+
+				ent->SetPhysics(NULL);
+				ent->GetPhysics()->SetSelf(ent);
+				ent->WriteToSnapshot(msg);
+				ent->ReadFromSnapshot(msg);
+				if (delta.GetSize() != delta.GetReadCount()) {
+					gameLocal.Error("Snapshot not aligned for '%s'!", type->classname);
+				}
+				ent->Event_Remove();
+			}
+		}
+	}
+}
+#endif //HUMANHEAD END
+
 /*
 ================
 idClass::GetClassname
@@ -632,18 +657,6 @@ void idClass::CancelEvents( const idEventDef *ev ) {
 	idEvent::CancelEvents( this, ev );
 }
 
-// RAVEN BEGIN
-// abahr:
-/*
-================
-idClass::EventIsPosted
-================
-*/
-bool idClass::EventIsPosted( const idEventDef *ev ) const {
-	return idEvent::EventIsPosted( this, ev );
-}
-// RAVEN END
-
 /*
 ================
 idClass::PostEventArgs
@@ -669,21 +682,22 @@ bool idClass::PostEventArgs( const idEventDef *ev, int time, int numargs, ... ) 
 	// we service events on the client to avoid any bad code filling up the event pool
 	// we don't want them processed usually, unless when the map is (re)loading.
 	// we allow threads to run fine, though.
-// RAVEN BEGIN
-// bdube: added a check to see if this is a client entity
-// jnewquist: Use accessor for static class type 
-	bool isClient = !IsClient() && gameLocal.isClient;
-
-#ifdef _XENON
-	// nrausch: We want to allow selectWeapon to pass through, but that's all
-	if ( idStr::Cmp( ev->GetName(), "selectWeapon" ) == 0 ) {
-		isClient = false;
-	}
-#endif
-
-	if(  isClient && ( gameLocal.GameState() != GAMESTATE_STARTUP ) && ( gameLocal.GameState() != GAMESTATE_RESTART ) && !IsType( idThread::GetClassType() ) ) {
-// RAVEN END
-		return true;
+	if ( gameLocal.isClient && ( gameLocal.GameState() != GAMESTATE_STARTUP ) && !IsType( idThread::Type ) )
+	{
+		//HUMANHEAD rww - take client ents into account.
+		if (IsType(idEntity::Type))
+		{
+			idEntity *ent = static_cast<idEntity *>(this);
+			if (!ent->fl.clientEntity && !ent->fl.clientEvents)
+			{ //we add events for client entities, otherwise get out of here.
+				return true;
+			}
+		}
+		else
+		{
+			return true;
+		}
+		//END HUMANHEAD
 	}
 
 	va_start( args, numargs );
@@ -691,6 +705,11 @@ bool idClass::PostEventArgs( const idEventDef *ev, int time, int numargs, ... ) 
 	va_end( args );
 
 	event->Schedule( this, c, time );
+
+	// HUMANHEAD cjr: for showing all posted events
+	if(g_postEventsDebug.GetBool()) {
+		gameLocal.Printf("PostEvent: %s [%s]\n", ev->GetName(), this->GetClassname() );
+	}
 
 	return true;
 }
@@ -981,10 +1000,7 @@ bool idClass::ProcessEventArgPtr( const idEventDef *ev, intptr_t *data ) {
 	assert( ev );
 	assert( idEvent::initialized );
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( g_debugTriggers.GetBool() && ( ev == &EV_Activate ) && IsType( idEntity::GetClassType() ) ) {
-// RAVEN END
+	if ( g_debugTriggers.GetBool() && ( ev == &EV_Activate ) && IsType( idEntity::Type ) ) {
 		const idEntity *ent = *reinterpret_cast<idEntity **>( data );
 		gameLocal.Printf( "%d: '%s' activated by '%s'\n", gameLocal.framenum, static_cast<idEntity *>( this )->GetName(), ent ? ent->GetName() : "NULL" );
 	}
@@ -998,7 +1014,7 @@ bool idClass::ProcessEventArgPtr( const idEventDef *ev, intptr_t *data ) {
 
 	callback = c->eventMap[ num ];
 
-#if 1
+#if !CPU_EASYARGS
 
 /*
 on ppc architecture, floats are passed in a seperate set of registers
@@ -1013,7 +1029,7 @@ http://developer.apple.com/documentation/DeveloperTools/Conceptual/MachORuntime/
 		break;
 
 // generated file - see CREATE_EVENT_CODE
-#include "../Callbacks.cpp"
+#include "Callbacks.cpp"
 
 	default:
 		gameLocal.Warning( "Invalid formatspec on event '%s'", ev->GetName() );
@@ -1024,58 +1040,55 @@ http://developer.apple.com/documentation/DeveloperTools/Conceptual/MachORuntime/
 
 	assert( D_EVENT_MAXARGS == 8 );
 
-	// RB: 64 bit fixes, changed int to intptr_t
-	switch (ev->GetNumArgs())
-	{
-	case 0:
-		(this->*callback)();
+	switch( ev->GetNumArgs() ) {
+	case 0 :
+		( this->*callback )();
 		break;
 
-	case 1:
-		typedef void (idClass::* eventCallback_1_t)(const intptr_t);
-		(this->*(eventCallback_1_t)callback)(data[0]);
+	case 1 :
+		typedef void ( idClass::*eventCallback_1_t )( const int );
+		( this->*( eventCallback_1_t )callback )( data[ 0 ] );
 		break;
 
-	case 2:
-		typedef void (idClass::* eventCallback_2_t)(const intptr_t, const intptr_t);
-		(this->*(eventCallback_2_t)callback)(data[0], data[1]);
+	case 2 :
+		typedef void ( idClass::*eventCallback_2_t )( const int, const int );
+		( this->*( eventCallback_2_t )callback )( data[ 0 ], data[ 1 ] );
 		break;
 
-	case 3:
-		typedef void (idClass::* eventCallback_3_t)(const intptr_t, const intptr_t, const intptr_t);
-		(this->*(eventCallback_3_t)callback)(data[0], data[1], data[2]);
+	case 3 :
+		typedef void ( idClass::*eventCallback_3_t )( const int, const int, const int );
+		( this->*( eventCallback_3_t )callback )( data[ 0 ], data[ 1 ], data[ 2 ] );
 		break;
 
-	case 4:
-		typedef void (idClass::* eventCallback_4_t)(const intptr_t, const intptr_t, const intptr_t, const intptr_t);
-		(this->*(eventCallback_4_t)callback)(data[0], data[1], data[2], data[3]);
+	case 4 :
+		typedef void ( idClass::*eventCallback_4_t )( const int, const int, const int, const int );
+		( this->*( eventCallback_4_t )callback )( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ] );
 		break;
 
-	case 5:
-		typedef void (idClass::* eventCallback_5_t)(const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t);
-		(this->*(eventCallback_5_t)callback)(data[0], data[1], data[2], data[3], data[4]);
+	case 5 :
+		typedef void ( idClass::*eventCallback_5_t )( const int, const int, const int, const int, const int );
+		( this->*( eventCallback_5_t )callback )( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ] );
 		break;
 
-	case 6:
-		typedef void (idClass::* eventCallback_6_t)(const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t);
-		(this->*(eventCallback_6_t)callback)(data[0], data[1], data[2], data[3], data[4], data[5]);
+	case 6 :
+		typedef void ( idClass::*eventCallback_6_t )( const int, const int, const int, const int, const int, const int );
+		( this->*( eventCallback_6_t )callback )( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ] );
 		break;
 
-	case 7:
-		typedef void (idClass::* eventCallback_7_t)(const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t);
-		(this->*(eventCallback_7_t)callback)(data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+	case 7 :
+		typedef void ( idClass::*eventCallback_7_t )( const int, const int, const int, const int, const int, const int, const int );
+		( this->*( eventCallback_7_t )callback )( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ], data[ 6 ] );
 		break;
 
-	case 8:
-		typedef void (idClass::* eventCallback_8_t)(const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t, const intptr_t);
-		(this->*(eventCallback_8_t)callback)(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+	case 8 :
+		typedef void ( idClass::*eventCallback_8_t )( const int, const int, const int, const int, const int, const int, const int, const int );
+		( this->*( eventCallback_8_t )callback )( data[ 0 ], data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ], data[ 6 ], data[ 7 ] );
 		break;
 
 	default:
-		gameLocal.Warning("Invalid formatspec on event '%s'", ev->GetName());
+		gameLocal.Warning( "Invalid formatspec on event '%s'", ev->GetName() );
 		break;
-}
-	// RB end
+	}
 
 #endif
 
@@ -1100,339 +1113,3 @@ void idClass::Event_SafeRemove( void ) {
 	// Forces the remove to be done at a safe time
 	PostEventMS( &EV_Remove, 0 );
 }
-
-// RAVEN BEGIN
-// bdube: client entities
-/*
-================
-idClass::IsClient
-================
-*/
-bool idClass::IsClient ( void ) const {
-	return false;
-}
-
-/*
-================
-idClass::GetDebugInfo
-================
-*/
-void idClass::GetDebugInfo ( debugInfoProc_t proc, void* userData ) {
-}
-
-/*
-================
-idClass::ProcessState
-================
-*/
-stateResult_t idClass::ProcessState ( const rvStateFunc<idClass>* state, const stateParms_t& parms ) {
-	return (this->*(state->function)) ( parms );
-}
-
-stateResult_t idClass::ProcessState ( const char* name, const stateParms_t& parms ) {
-	int				i;
-	idTypeInfo*		cls;
-	
-	for ( cls = GetType(); cls; cls = cls->super ) {
-		for ( i = 0; cls->stateCallbacks[i].function; i ++ ) {
-			if ( !idStr::Icmp ( cls->stateCallbacks[i].name, name ) ) {
-				return (this->*(cls->stateCallbacks[i].function)) ( parms );
-			}
-		}
-	}
-	
-	return SRESULT_ERROR;
-}
-
-/*
-================
-idClass::FindState
-================
-*/
-const rvStateFunc<idClass>* idClass::FindState ( const char* name ) const {
-	int				i;
-	idTypeInfo*		cls;
-	
-	for ( cls = GetType(); cls; cls = cls->super ) {
-		for ( i = 0; cls->stateCallbacks[i].function; i ++ ) {
-			if ( !idStr::Icmp ( cls->stateCallbacks[i].name, name ) ) {
-				return &cls->stateCallbacks[i];
-			}
-		}
-	}
-	
-	return NULL;
-}
-
-/*
-================
-idClass::RegisterClasses
-================
-*/
-void idClass::RegisterClasses( void )
-{
-// jnewquist: Register subclasses explicitly so they aren't dead-stripped
-#define REGISTER(name) void Register_##name(void); Register_##name();
-	REGISTER(idAFAttachment); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_Base); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_ClawFourFingers); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_Generic); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_Gibbable); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_SteamPipe); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_Vehicle); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_VehicleFourWheels); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_VehicleSixWheels); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAFEntity_WithAttachedHead); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idAI); // ..\..\code\game\ai\AI_events.cpp
-	REGISTER(idActivator); // ..\..\code\game\Misc.cpp
-	REGISTER(idActor); // ..\..\code\game\Actor.cpp
-	REGISTER(idAnimated); // ..\..\code\game\Misc.cpp
-	REGISTER(idAnimatedEntity); // ..\..\code\game\Entity.cpp
-	REGISTER(idBarrel); // ..\..\code\game\Moveable.cpp
-	REGISTER(idBeam); // ..\..\code\game\Misc.cpp
-	REGISTER(idBobber); // ..\..\code\game\Mover.cpp
-	REGISTER(idBrittleFracture); // ..\..\code\game\BrittleFracture.cpp
-	REGISTER(idCamera); // ..\..\code\game\Camera.cpp
-	REGISTER(idCameraAnim); // ..\..\code\game\Camera.cpp
-	REGISTER(idCameraView); // ..\..\code\game\Camera.cpp
-	REGISTER(idChain); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idClass); // ..\..\code\game\gamesys\Class.cpp
-	REGISTER(idCursor3D); // ..\..\code\game\GameEdit.cpp
-	REGISTER(idDamagable); // ..\..\code\game\Misc.cpp
-	REGISTER(idDoor); // ..\..\code\game\Mover.cpp
-	REGISTER(idEarthQuake); // ..\..\code\game\Misc.cpp
-	REGISTER(idElevator); // ..\..\code\game\Mover.cpp
-	REGISTER(idEntity); // ..\..\code\game\Entity.cpp
-	REGISTER(idExplodable); // ..\..\code\game\Misc.cpp
-	REGISTER(idExplodingBarrel); // ..\..\code\game\Moveable.cpp
-	REGISTER(idForce); // ..\..\code\game\physics\Force.cpp
-	REGISTER(idForceField); // ..\..\code\game\Misc.cpp
-	REGISTER(idForce_Constant); // ..\..\code\game\physics\Force_Constant.cpp
-	REGISTER(idForce_Drag); // ..\..\code\game\physics\Force_Drag.cpp
-	REGISTER(idForce_Field); // ..\..\code\game\physics\Force_Field.cpp
-	REGISTER(idForce_Spring); // ..\..\code\game\physics\Force_Spring.cpp
-	REGISTER(idFuncAASObstacle); // ..\..\code\game\Misc.cpp
-	REGISTER(idFuncAASPortal); // ..\..\code\game\Misc.cpp
-	REGISTER(idFuncEmitter); // ..\..\code\game\Misc.cpp
-	REGISTER(idFuncPortal); // ..\..\code\game\Misc.cpp
-	REGISTER(idFuncRadioChatter); // ..\..\code\game\Misc.cpp
-	REGISTER(idFuncSplat); // ..\..\code\game\Misc.cpp
-	REGISTER(idGuidedProjectile); // ..\..\code\game\Projectile.cpp
-	REGISTER(idItem); // ..\..\code\game\Item.cpp
-	REGISTER(idItemPowerup); // ..\..\code\game\Item.cpp
-	REGISTER(idItemRemover); // ..\..\code\game\Item.cpp
-	REGISTER(idLight); // ..\..\code\game\Light.cpp
-	REGISTER(idLiquid); // ..\..\code\game\Misc.cpp
-	REGISTER(idLocationEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idLocationSeparatorEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idMoveable); // ..\..\code\game\Moveable.cpp
-	REGISTER(idMoveableItem); // ..\..\code\game\Item.cpp
-	REGISTER(idMover); // ..\..\code\game\Mover.cpp
-	REGISTER(idMover_Binary); // ..\..\code\game\Mover.cpp
-	REGISTER(idMover_Periodic); // ..\..\code\game\Mover.cpp
-	REGISTER(idMultiModelAF); // ..\..\code\game\AFEntity.cpp
-	REGISTER(idObjective); // ..\..\code\game\Item.cpp
-	REGISTER(idObjectiveComplete); // ..\..\code\game\Item.cpp
-	REGISTER(idPathCorner); // ..\..\code\game\Misc.cpp
-	REGISTER(idPendulum); // ..\..\code\game\Mover.cpp
-	REGISTER(idPhantomObjects); // ..\..\code\game\Misc.cpp
-	REGISTER(idPhysics); // ..\..\code\game\physics\Physics.cpp
-	REGISTER(idPhysics_AF); // ..\..\code\game\physics\Physics_AF.cpp
-	REGISTER(idPhysics_Actor); // ..\..\code\game\physics\Physics_Actor.cpp
-	REGISTER(idPhysics_Base); // ..\..\code\game\physics\Physics_Base.cpp
-	REGISTER(idPhysics_Monster); // ..\..\code\game\physics\Physics_Monster.cpp
-	REGISTER(idPhysics_Parametric); // ..\..\code\game\physics\Physics_Parametric.cpp
-	REGISTER(idPhysics_Player); // ..\..\code\game\physics\Physics_Player.cpp
-	REGISTER(idPhysics_RigidBody); // ..\..\code\game\physics\Physics_RigidBody.cpp
-	REGISTER(idPhysics_Static); // ..\..\code\game\physics\Physics_Static.cpp
-	REGISTER(idPhysics_StaticMulti); // ..\..\code\game\physics\Physics_StaticMulti.cpp
-	REGISTER(idPlat); // ..\..\code\game\Mover.cpp
-	REGISTER(idPlayer); // ..\..\code\game\Player.cpp
-	REGISTER(idPlayerStart); // ..\..\code\game\Misc.cpp
-	REGISTER(idProjectile); // ..\..\code\game\Projectile.cpp
-	REGISTER(idRiser); // ..\..\code\game\Mover.cpp
-	REGISTER(idRotater); // ..\..\code\game\Mover.cpp
-	REGISTER(idSecurityCamera); // ..\..\code\game\SecurityCamera.cpp
-	REGISTER(idShaking); // ..\..\code\game\Misc.cpp
-	REGISTER(idSound); // ..\..\code\game\Sound.cpp
-	REGISTER(idSpawnableEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idSplinePath); // ..\..\code\game\Mover.cpp
-	REGISTER(idSpring); // ..\..\code\game\Misc.cpp
-	REGISTER(idStaticEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idTarget); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_CallObjectFunction); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_Damage); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_EnableLevelWeapons); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_EnableStamina); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_EndLevel); // ..\..\code\game\EndLevel.cpp
-	REGISTER(idTarget_EndLevel); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_FadeEntity); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_FadeSoundClass); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_Give); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_GiveEmail); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_GiveSecurity); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_LevelTrigger); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_LightFadeIn); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_LightFadeOut); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_LockDoor); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_Remove); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_RemoveWeapons); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SessionCommand); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetFov); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetGlobalShaderTime); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetInfluence); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetKeyVal); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetModel); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetPrimaryObjective); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetShaderParm); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_SetShaderTime); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_Show); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_Tip); // ..\..\code\game\Target.cpp
-	REGISTER(idTarget_WaitForButton); // ..\..\code\game\Target.cpp
-	REGISTER(idTestModel); // ..\..\code\game\anim\Anim_Testmodel.cpp
-	REGISTER(idTextEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idThread); // ..\..\code\game\script\Script_Thread.cpp
-	REGISTER(idTrigger); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_Count); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_EntityName); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_Fade); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_Hurt); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_Multi); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_Timer); // ..\..\code\game\Trigger.cpp
-	REGISTER(idTrigger_Touch); // ..\..\code\game\Trigger.cpp
-	REGISTER(idVacuumEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idVacuumSeparatorEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(idWorldspawn); // ..\..\code\game\WorldSpawn.cpp
-	REGISTER(rvAFAttractor); // ..\..\code\game\AFEntity.cpp
-	REGISTER(rvAIAvoid); // ..\..\code\game\ai\AI_Helper.cpp
-	REGISTER(rvAITactical); // ..\..\code\game\ai\AI_Tactical.cpp
-	REGISTER(rvAIMedic); // ..\..\code\game\ai\AI_Medic.cpp
-	REGISTER(rvAITether);	// ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvAITetherRadius);	// ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvAITetherBehind);	// ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvAITetherClear);	// ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvAIBecomePassive); // ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvAIBecomeAggressive); // ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvAITrigger);		// ..\..\code\game\ai\AI_Util.cpp
-	REGISTER(rvCTFAssaultPlayerStart); // ..\..\code\game\mp\CTF.cpp
-	REGISTER(rvCTF_AssaultPoint); // ..\..\code\game\mp\CTF.cpp
-	REGISTER(rvCameraPlayback); // ..\..\code\game\Camera.cpp
-	REGISTER(rvCameraPortalSky); // ..\..\code\game\Camera.cpp
-	REGISTER(rvClientCrawlEffect); // ..\..\code\game\client\ClientEffect.cpp
-	REGISTER(rvClientEffect); // ..\..\code\game\client\ClientEffect.cpp
-	REGISTER(rvClientEntity); // ..\..\code\game\client\ClientEntity.cpp
-	REGISTER(rvClientModel); // ..\..\code\game\client\ClientModel.cpp
-	REGISTER(rvAnimatedClientEntity); // ..\..\code\game\client\ClientModel.cpp
-	REGISTER(rvClientAFEntity); // ..\..\code\game\client\ClientAFEntity.cpp
-	REGISTER(rvClientAFAttachment); // ..\..\code\game\client\ClientAFEntity.cpp
-	REGISTER(rvClientMoveable); // ..\..\code\game\client\ClientMoveable.cpp
-	REGISTER(rvClientPhysics); // ..\..\code\game\client\ClientEntity.cpp
-	REGISTER(rvConveyor); // ..\..\code\game\Mover.cpp
-	REGISTER(rvDarkMatterProjectile); // ..\..\code\game\weapon\WeaponDarkMatterGun.cpp
-	REGISTER(rvDebugJumpPoint); // ..\..\code\game\Misc.cpp
-	REGISTER(rvDriftingProjectile); // ..\..\code\game\Projectile.cpp
-	REGISTER(rvEffect); // ..\..\code\game\Effect.cpp
-	REGISTER(rvFuncSaveGame); // ..\..\code\game\Misc.cpp
-	REGISTER(rvGravityArea); // ..\..\code\game\Misc.cpp
-	REGISTER(rvGravityArea_Static); // ..\..\code\game\Misc.cpp
-	REGISTER(rvGravityArea_SurfaceNormal); // ..\..\code\game\Misc.cpp
-	REGISTER(rvGravitySeparatorEntity); // ..\..\code\game\Misc.cpp
-	REGISTER(rvHealingStation); // ..\..\code\game\Healing_Station.cpp
-	REGISTER(rvItemCTFFlag); // ..\..\code\game\Item.cpp
-	REGISTER(rvJumpPad); // ..\..\code\game\Misc.cpp
-	REGISTER(rvMIRVProjectile); // ..\..\code\game\Projectile.cpp
-	REGISTER(rvModviewModel); // ..\..\code\game\GameEdit.cpp
-	REGISTER(rvPusher); // ..\..\code\game\Mover.cpp
-#ifndef _MPBETA
-	REGISTER(rvMonsterBerserker); // ..\..\code\game\ai\Monster_Berserker.cpp
-	REGISTER(rvMonsterBossBuddy); // ..\..\code\game\ai\Monster_BossBuddy.cpp	
-	REGISTER(rvMonsterBossMakron); // ..\..\code\game\ai\Monster_BossMakron.cpp	
-	REGISTER(rvMonsterConvoyGround); // ..\..\code\game\ai\Monster_ConvoyGround.cpp	
-	REGISTER(rvMonsterConvoyHover); // ..\..\code\game\ai\Monster_ConvoyHover.cpp	
-	REGISTER(rvMonsterFailedTransfer); // ..\..\code\game\ai\Monster_FailedTransfer.cpp
-	REGISTER(rvMonsterFatty); // ..\..\code\game\ai\Monster_Fatty.cpp
-	REGISTER(rvMonsterGladiator); // ..\..\code\game\ai\Monster_Gladiator.cpp
-	REGISTER(rvMonsterGrunt); // ..\..\code\game\ai\Monster_Grunt.cpp
-	REGISTER(rvMonsterGunner); // ..\..\code\game\ai\Monster_Gunner.cpp
-	REGISTER(rvMonsterHarvester); // ..\..\code\game\ai\Monster_Harvester.cpp
-	REGISTER(rvMonsterHarvesterDispersal); // ..\..\code\game\ai\Monster_HarvesterDispersal.cpp
-	REGISTER(rvMonsterHeavyHoverTank); // ..\..\code\game\ai\Monster_HeavyHoverTank.cpp
-	REGISTER(rvMonsterIronMaiden); // ..\..\code\game\ai\Monster_IronMaiden.cpp
-	REGISTER(rvMonsterLightTank); // ..\..\code\game\ai\Monster_LightTank.cpp
-	REGISTER(rvMonsterNetworkGuardian); // ..\..\code\game\ai\Monster_NetworkGuardian.cpp
-	REGISTER(rvMonsterRepairBot); // ..\..\code\game\ai\Monster_RepairBot.cpp
-	REGISTER(rvMonsterScientist); // ..\..\code\game\ai\Monster_Scientist.cpp
-	REGISTER(rvMonsterSentry); // ..\..\code\game\ai\Monster_Sentry.cpp
-	REGISTER(rvMonsterSlimyTransfer); // ..\..\code\game\ai\Monster_SlimyTransfer.cpp
-	REGISTER(rvMonsterStroggMarine);// ..\..\code\game\ai\Monster_StroggMarine.cpp
-	REGISTER(rvMonsterStreamProtector); // ..\..\code\game\ai\Monster_StreamProtector.cpp
-	REGISTER(rvMonsterStroggFlyer); // ..\..\code\game\ai\Monster_StroggFlyer.cpp
-	REGISTER(rvMonsterStroggHover); // ..\..\code\game\ai\Monster_StroggHover.cpp
-	REGISTER(rvMonsterTeleportDropper); // ..\..\code\game\ai\Monster_TeleportDropper.cpp
-	REGISTER(rvMonsterTurret); // ..\..\code\game\ai\Monster_Turret.cpp
-	REGISTER(rvMonsterTurretFlying); // ..\..\code\game\ai\Monster_TurretFlying.cpp
-#endif // !_MPBETA
-	REGISTER(rvObjectiveFailed); // ..\..\code\game\Item.cpp
-	REGISTER(rvPhysics_Particle); // ..\..\code\game\physics\Physics_Particle.cpp
-	REGISTER(rvPhysics_VehicleMonster); // ..\..\code\game\physics\Physics_VehicleMonster.cpp
-	REGISTER(rvPhysics_Spline); // ..\..\code\game\SplineMover.cpp
-	REGISTER(rvSpawner); // ..\..\code\game\spawner.cpp
-	REGISTER(rvSpawnerProjectile); // ..\..\code\game\Projectile.cpp
-	REGISTER(rvSplineMover); // ..\..\code\game\SplineMover.cpp
-	// twhitaker: removed database support
-	// REGISTER(rvTarget_AddDatabaseEntry); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_AmmoStash); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_BossBattle); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_ExitAreaAlert); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_LaunchProjectile); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_Nailable); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_SecretArea); // ..\..\code\game\Target.cpp
-	REGISTER(rvTarget_TetherAI); // ..\..\code\game\Target.cpp
-	REGISTER(rvTramCar); // ..\..\code\game\SplineMover.cpp
-	REGISTER(rvTramCar_Marine); // ..\..\code\game\SplineMover.cpp
-	REGISTER(rvTramCar_Strogg); // ..\..\code\game\SplineMover.cpp
-	REGISTER(rvTramGate); // ..\..\code\game\TramGate.cpp
-	REGISTER(rvVehicle); // ..\..\code\game\vehicle\Vehicle.cpp
-	REGISTER(rvVehicleAI); // ..\..\code\game\ai\VehicleAI.cpp
-	REGISTER(rvVehicleAnimated); // ..\..\code\game\vehicle\VehicleAnimated.cpp
-	REGISTER(rvVehicleDriver); // ..\..\code\game\vehicle\VehicleDriver.cpp
-	REGISTER(rvVehicleDropPod); // ..\..\code\game\vehicle\Vehicle_DropPod.cpp
-	REGISTER(rvVehicleHoverpad); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleLight); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleMonster); // ..\..\code\game\vehicle\VehicleMonster.cpp
-	REGISTER(rvVehiclePart); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleRigid); // ..\..\code\game\vehicle\VehicleRigid.cpp
-	REGISTER(rvVehicleSound); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleSpline); // ..\..\code\game\vehicle\VehicleSpline.cpp
-	REGISTER(rvVehicleStatic); // ..\..\code\game\vehicle\VehicleStatic.cpp
-	REGISTER(rvVehicleThruster); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleTurret); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleUserAnimated); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvVehicleWalker); // ..\..\code\game\vehicle\Vehicle_Walker.cpp
-	REGISTER(rvVehicleWeapon); // ..\..\code\game\vehicle\VehicleParts.cpp
-	REGISTER(rvViewWeapon); // ..\..\code\game\Weapon.cpp
-	REGISTER(rvWeapon); // ..\..\code\game\Weapon.cpp
-	REGISTER(rvWeaponBlaster); // ..\..\code\game\weapon\WeaponBlaster.cpp
-	REGISTER(rvWeaponDarkMatterGun); // ..\..\code\game\weapon\WeaponDarkMatterGun.cpp
-	REGISTER(rvWeaponGauntlet); // ..\..\code\game\weapon\WeaponGauntlet.cpp
-	REGISTER(rvWeaponGrenadeLauncher); // ..\..\code\game\weapon\WeaponGrenadeLauncher.cpp
-	REGISTER(rvWeaponHyperblaster); // ..\..\code\game\weapon\WeaponHyperblaster.cpp
-	REGISTER(rvWeaponLightningGun); // ..\..\code\game\weapon\WeaponLightningGun.cpp
-	REGISTER(rvWeaponMachinegun); // ..\..\code\game\weapon\WeaponMachinegun.cpp
-	REGISTER(rvWeaponNailgun); // ..\..\code\game\weapon\WeaponNailgun.cpp
-	REGISTER(rvWeaponRailgun); // ..\..\code\game\weapon\WeaponRailgun.cpp
-	REGISTER(rvWeaponRocketLauncher); // ..\..\code\game\weapon\WeaponRocketLauncher.cpp
-	REGISTER(rvWeaponShotgun); // ..\..\code\game\weapon\WeaponShotgun.cpp
-// RITUAL BEGIN
-	REGISTER(riDeadZonePowerup); // ..\..\code\game\Item.cpp
-	REGISTER(WeaponNapalmGun);	// ..\..\code\game\weapon\WeaponNapalmGun.cpp
-// RITUAL END
-
-// jmarshall
-	REGISTER(rvmBot);
-// jmarshall end
-#undef REGISTER
-}
-
-// RAVEN END
-

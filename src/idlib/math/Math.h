@@ -57,6 +57,7 @@
 
 #define	FLOAT_IS_NAN(x)			(((*(const unsigned long *)&x) & 0x7f800000) == 0x7f800000)
 #define FLOAT_IS_INF(x)			(((*(const unsigned long *)&x) & 0x7fffffff) == 0x7f800000)
+#define FLOAT_IS_INVALID(x)		( FLOAT_IS_NAN( x ) || FLOAT_IS_INF( x ) )
 #define FLOAT_IS_IND(x)			((*(const unsigned long *)&x) == 0xffc00000)
 #define	FLOAT_IS_DENORMAL(x)	(((*(const unsigned long *)&x) & 0x7f800000) == 0x00000000 && \
 								 ((*(const unsigned long *)&x) & 0x007fffff) != 0x00000000 )

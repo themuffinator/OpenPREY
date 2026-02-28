@@ -271,10 +271,12 @@ const char *idEditWindow::HandleEvent(const sysEvent_t *event, bool *updateVisua
 
 		if ( dc->GetOverStrike() ) {
 			if ( maxChars && cursorPos >= maxChars ) {
+	       		RunScript( ON_MAXCHARS );
 	       		return "";
 			}
 		} else {
 			if ( ( len == MAX_EDITFIELD - 1 ) || ( maxChars && len >= maxChars ) ) {
+	       		RunScript( ON_MAXCHARS );
 	       		return "";
 			}
 			memmove( &buffer[ cursorPos + 1 ], &buffer[ cursorPos ], len + 1 - cursorPos );

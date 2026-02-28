@@ -978,7 +978,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 					cvarSystem->SetCVarsFromDict( info );
 					cvarSystem->ClearModifiedFlags( CVAR_USERINFO ); // don't emit back
 				}
-				game->SetUserInfo( clientNum, info, true );
+				game->SetUserInfo( clientNum, info, true, false );
 				break;
 			}
 			case SERVER_RELIABLE_MESSAGE_SYNCEDCVARS: {
@@ -1035,7 +1035,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 			}
 			case SERVER_RELIABLE_MESSAGE_ENTERGAME: {
 				SendUserInfoToServer();
-				game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true );
+				game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true, false );
 				cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
 				break;
 			}
@@ -1849,7 +1849,7 @@ void idAsyncClient::RunFrame( void ) {
 	if ( cvarSystem->GetModifiedFlags() & CVAR_USERINFO ) {
 		game->ThrottleUserInfo( );
 		SendUserInfoToServer( );
-		game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true );
+		game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true, false );
 		cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
 	}
 
@@ -1877,10 +1877,8 @@ void idAsyncClient::RunFrame( void ) {
 			DuplicateUsercmds( snapshotGameFrame, snapshotGameTime );
 
 			// indicate the last prediction frame before a render
-			bool lastPredictFrame = ( snapshotGameFrame + 1 >= gameFrame && gameTimeResidual + clientPredictTime < USERCMD_MSEC );
-
 			// run client prediction
-			gameReturn_t ret = game->ClientPrediction( clientNum, userCmds[ snapshotGameFrame & ( MAX_USERCMD_BACKUP - 1 ) ], lastPredictFrame );
+			gameReturn_t ret = game->ClientPrediction( clientNum, userCmds[ snapshotGameFrame & ( MAX_USERCMD_BACKUP - 1 ) ] );
 
 			idAsyncNetwork::ExecuteSessionCommand( ret.sessionCommand );
 

@@ -1,16 +1,16 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
 CLASS_DECLARATION( idPhysics, idPhysics_StaticMulti )
 END_CLASS
 
-// RAVEN BEGIN
-// rjohnson: converted this from a struct to a class
-idStaticPState defaultState;
-// RAVEN END
+staticPState_t defaultState;
+
 
 /*
 ================
@@ -151,10 +151,7 @@ void idPhysics_StaticMulti::SetClipModel( idClipModel *model, float density, int
 	}
 	clipModels[id] = model;
 	if ( clipModels[id] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModels[id]->Link( self, id, current[id].origin, current[id].axis );
-// RAVEN END
+		clipModels[id]->Link( gameLocal.clip, self, id, current[id].origin, current[id].axis );
 	}
 
 	for ( i = clipModels.Num() - 1; i >= 1; i-- ) {
@@ -175,10 +172,7 @@ idClipModel *idPhysics_StaticMulti::GetClipModel( int id ) const {
 	if ( id >= 0 && id < clipModels.Num() && clipModels[id] ) {
 		return clipModels[id];
 	}
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	return idClip::DefaultClipModel();
-// RAVEN END
+	return gameLocal.clip.DefaultClipModel();
 }
 
 /*
@@ -206,20 +200,6 @@ idPhysics_StaticMulti::GetMass
 float idPhysics_StaticMulti::GetMass( int id ) const {
 	return 0.0f;
 }
-
-// RAVEN BEGIN
-// bdube: Added center mass call
-/*
-================
-idPhysics_StaticMulti::GetCenterMass
-
-default center of mass is origin
-================
-*/
-idVec3 idPhysics_StaticMulti::GetCenterMass ( int id ) const {
-	return GetOrigin();
-}
-// RAVEN END
 
 /*
 ================
@@ -346,6 +326,7 @@ idPhysics_StaticMulti::Evaluate
 ================
 */
 bool idPhysics_StaticMulti::Evaluate( int timeStepMSec, int endTimeMSec ) {
+	PROFILE_SCOPE("StaticMulti", PROFMASK_PHYSICS);
 	int i;
 	idVec3 masterOrigin;
 	idMat3 masterAxis;
@@ -360,10 +341,7 @@ bool idPhysics_StaticMulti::Evaluate( int timeStepMSec, int endTimeMSec ) {
 				current[i].axis = current[i].localAxis;
 			}
 			if ( clipModels[i] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				clipModels[i]->Link( self, i, current[i].origin, current[i].axis );
-// RAVEN END
+				clipModels[i]->Link( gameLocal.clip, self, i, current[i].origin, current[i].axis );
 			}
 		}
 
@@ -458,18 +436,6 @@ bool idPhysics_StaticMulti::IsPushable( void ) const {
 	return false;
 }
 
-// RAVEN BEGIN
-// bdube: water interraction
-/*
-================
-idPhysics_StaticMulti::IsInWater
-================
-*/
-bool idPhysics_StaticMulti::IsInWater ( void ) const {
-	return false;
-}
-// RAVEN END	
-
 /*
 ================
 idPhysics_StaticMulti::SaveState
@@ -504,10 +470,7 @@ void idPhysics_StaticMulti::SetOrigin( const idVec3 &newOrigin, int id ) {
 			current[id].origin = newOrigin;
 		}
 		if ( clipModels[id] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			clipModels[id]->Link( self, id, current[id].origin, current[id].axis );
-// RAVEN END
+			clipModels[id]->Link( gameLocal.clip, self, id, current[id].origin, current[id].axis );
 		}
 	} else if ( id == -1 ) {
 		if ( hasMaster ) {
@@ -537,10 +500,7 @@ void idPhysics_StaticMulti::SetAxis( const idMat3 &newAxis, int id ) {
 			current[id].axis = newAxis;
 		}
 		if ( clipModels[id] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			clipModels[id]->Link( self, id, current[id].origin, current[id].axis );
-// RAVEN END
+			clipModels[id]->Link( gameLocal.clip, self, id, current[id].origin, current[id].axis );
 		}
 	} else if ( id == -1 ) {
 		idMat3 axis;
@@ -572,10 +532,7 @@ void idPhysics_StaticMulti::Translate( const idVec3 &translation, int id ) {
 		current[id].origin += translation;
 
 		if ( clipModels[id] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			clipModels[id]->Link( self, id, current[id].origin, current[id].axis );
-// RAVEN END
+			clipModels[id]->Link( gameLocal.clip, self, id, current[id].origin, current[id].axis );
 		}
 	} else if ( id == -1 ) {
 		for ( i = 0; i < clipModels.Num(); i++ ) {
@@ -583,10 +540,7 @@ void idPhysics_StaticMulti::Translate( const idVec3 &translation, int id ) {
 			current[i].origin += translation;
 
 			if ( clipModels[i] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				clipModels[i]->Link( self, i, current[i].origin, current[i].axis );
-// RAVEN END
+				clipModels[i]->Link( gameLocal.clip, self, i, current[i].origin, current[i].axis );
 			}
 		}
 	}
@@ -616,10 +570,7 @@ void idPhysics_StaticMulti::Rotate( const idRotation &rotation, int id ) {
 		}
 
 		if ( clipModels[id] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			clipModels[id]->Link( self, id, current[id].origin, current[id].axis );
-// RAVEN END
+			clipModels[id]->Link( gameLocal.clip, self, id, current[id].origin, current[id].axis );
 		}
 	} else if ( id == -1 ) {
 		for ( i = 0; i < clipModels.Num(); i++ ) {
@@ -636,10 +587,7 @@ void idPhysics_StaticMulti::Rotate( const idRotation &rotation, int id ) {
 			}
 
 			if ( clipModels[i] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				clipModels[i]->Link( self, i, current[i].origin, current[i].axis );
-// RAVEN END
+				clipModels[i]->Link( gameLocal.clip, self, i, current[i].origin, current[i].axis );
 			}
 		}
 	}
@@ -726,10 +674,6 @@ idPhysics_StaticMulti::GetGravity
 */
 const idVec3 &idPhysics_StaticMulti::GetGravity( void ) const {
 	static idVec3 gravity( 0, 0, -g_gravity.GetFloat() );
-	if( gameLocal.isMultiplayer ) {
-		gravity = idVec3( 0, 0, -g_mp_gravity.GetFloat() );	
-	} 
-
 	return gravity;
 }
 
@@ -775,13 +719,10 @@ int idPhysics_StaticMulti::ClipContents( const idClipModel *model ) const {
 	for ( i = 0; i < clipModels.Num(); i++ ) {
 		if ( clipModels[i] ) {
 			if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-				contents |= gameLocal.ContentsModel( self, clipModels[i]->GetOrigin(), clipModels[i], clipModels[i]->GetAxis(), -1,
-											model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+				contents |= gameLocal.clip.ContentsModel( clipModels[i]->GetOrigin(), clipModels[i], clipModels[i]->GetAxis(), -1,
+											model->Handle(), model->GetOrigin(), model->GetAxis() );
 			} else {
-				contents |= gameLocal.Contents( self, clipModels[i]->GetOrigin(), clipModels[i], clipModels[i]->GetAxis(), -1, NULL );
-// RAVEN END
+				contents |= gameLocal.clip.Contents( clipModels[i]->GetOrigin(), clipModels[i], clipModels[i]->GetAxis(), -1, NULL );
 			}
 		}
 	}
@@ -843,10 +784,7 @@ void idPhysics_StaticMulti::LinkClip( void ) {
 
 	for ( i = 0; i < clipModels.Num(); i++ ) {
 		if ( clipModels[i] ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			clipModels[i]->Link( self, i, current[i].origin, current[i].axis );
-// RAVEN END
+			clipModels[i]->Link( gameLocal.clip, self, i, current[i].origin, current[i].axis );
 		}
 	}
 }
@@ -1034,7 +972,6 @@ void idPhysics_StaticMulti::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	int i;
 	idCQuat quat, localQuat;
 
-	// TODO: Check that this conditional write to delta message is OK
 	msg.WriteByte( current.Num() );
 
 	for ( i = 0; i < current.Num(); i++ ) {

@@ -1,94 +1,81 @@
-# OpenQ4 Agent Guide
+# OpenPrey Agent Guide
 
-This file describes project goals, rules, and upstream credits for anyone working on OpenQ4.
+This file describes project goals, rules, and workflow expectations for anyone working on OpenPrey.
 
 **Project Metadata**
-- Name: OpenQ4
+- Name: OpenPrey
 - Author: themuffinator
 - Company: DarkMatter Productions
 - Version: 0.0.1
-- Website: `www.darkmatter-quake.com`
-- Repository: `https://github.com/themuffinator/OpenQ4`
-- Companion GameLibs Repo (local): `E:\Repositories\OpenQ4-GameLibs`
-- Companion BSE Repo (local, closed-source): `E:\Repositories\OpenQ4-BSE`
+- Repository: `https://github.com/themuffinator/OpenPrey`
+- Companion GameLibs Repo (local): `E:\Repositories\OpenPrey-GameLibs`
 
 **Goals**
-- Deliver a complete, open-source code replacement for Quake 4 (engine + game code).
-- Preserve behavior required by the shipped Quake 4 assets (base PK4s) where practical.
-- Maintain full single-player and multiplayer parity with in-tree game code.
-- Modernize the engine and game code while keeping stock-asset compatibility as a guiding constraint.
-- Package both SP/MP under one unified game directory (`openbase/`) with `game_sp` + `game_mp`.
-- Establish a cross-platform foundation targeting modern systems (Windows, Linux, macOS; x64 first) through SDL3 and Meson.
-- Keep Quake4SDK-derived game-library source ownership in `OpenQ4-GameLibs`, with OpenQ4 consuming synchronized mirrors for local engine/game builds.
-- Keep closed-source BSE implementation ownership in `OpenQ4-BSE`, with OpenQ4 consuming sources directly from that companion repo at build time.
+- Deliver a minimal, clean adaptation of the OpenQ4-derived engine for Prey (2006).
+- Preserve behavior expected by shipped Prey assets where practical.
+- Keep single-player and multiplayer behavior compatible with Prey’s unified game-library model.
+- Prefer Doom 3 lineage behavior over Quake 4-specific behavior where Prey requires it.
+- Restore missing Doom 3/Prey-era systems where required for compatibility (including particle-system behavior).
+- Keep a unified runtime game directory layout under `openprey/`.
 
 **Rules**
-- Do not target compatibility with the proprietary Quake 4 game DLLs; OpenQ4 ships its own game modules and keeps full freedom to evolve the project.
-- Treat `E:\Repositories\OpenQ4-GameLibs` as part of the same development workspace for planning, edits, and validation.
-- For SDK/game-library work, make canonical source edits in `OpenQ4-GameLibs` first; OpenQ4 `src/game` is synchronized from that repo via `tools/build/sync_gamelibs.ps1`.
-- Treat `E:\Repositories\OpenQ4-BSE` as the canonical BSE source location.
-- For BSE work, make canonical edits in `OpenQ4-BSE` first; OpenQ4 builds BSE directly from that repo and does not mirror BSE implementation sources in-tree.
-- OpenQ4 may only contain BSE API wiring (`src/bse_api/`); do not add closed-source BSE implementation code to this repository.
-- Use Meson option `-Dbuild_libbse=true|false` (default `true`) to control whether `libbse-q4` is built in OpenQ4.
-- Use `OPENQ4_BSE_REPO=<path>` to override the default companion BSE repository location (`../OpenQ4-BSE`) when configuring/building OpenQ4.
-- Keep `openbase/` as the single unified game directory; do not split SP/MP into separate mod folders.
-- Prefer changes that match Quake 4 SDK expectations and shipped content behavior.
-- Document significant changes in the documentation and keep `README.md` accurate.
-- Use `builddir/` as the standard Meson build output directory for local builds, VS Code tasks, and launch configurations.
-- Treat `.install/` as the release-style package root; stage built binaries into `.install/` and `.install/openbase/`.
-- Keep game-module outputs available under both `builddir/openbase/` (direct run) and `.install/openbase/` (staged package); keep `libbse-q4` next to engine executables in `builddir/` and `.install/`.
-- Keep `.install/` focused on runtime/staged content: engine executables and `libbse-q4` in `.install/`, game DLLs and staged overrides/assets in `.install/openbase/`.
-- Do not rely on `.install/` as a linker artifact store; keep compiler/linker intermediates and development-only outputs in `builddir/`.
-- MSVC import libraries (`*.lib`) are not runtime requirements for OpenQ4 execution; prefer keeping them in `builddir/` (or other developer artifact output), not in release-style `.install/` packages.
-- Use `meson install -C builddir --no-rebuild --skip-subprojects` (via `tools/build/meson_setup.ps1`) when staging `.install/` to avoid third-party subproject installs outside the package tree.
-- `tools/build/meson_setup.ps1` now coordinates companion repo workflows: it syncs game sources from `../OpenQ4-GameLibs`, and can trigger SDK/game-library builds there during `compile` when `OPENQ4_BUILD_GAMELIBS=1`.
-- On Windows, do not invoke raw `meson ...` from an arbitrary shell; use `tools/build/meson_setup.ps1 ...` (or run `tools/build/openq4_devcmd.cmd` first) so `cl.exe`/MSVC tools are always available.
-- Prefer platform abstractions through SDL3 and avoid introducing new platform-specific dependencies in shared engine code when an SDL3 path exists.
-- Keep Meson as the primary build entry point and keep dependency management through Meson subprojects.
-- Treat x64 as the baseline architecture for active support while staging additional modern architectures incrementally.
-- Keep credits accurate and add new attributions when incorporating upstream work.
-- Avoid adding engine-side content files (e.g., custom material scripts) unless absolutely required for compatibility; the goal is to run with the original game assets and only OpenQ4 binaries (engine + game modules, plus minimal external libs).
-- Any existing custom `q4base/` content is treated as an expedient bootstrap, not a long-term solution. The goal is to remove this reliance by fixing engine compatibility issues rather than shipping replacement assets.
-- For investigations, reference the log file written by `logFileName` (VS Code launch uses `logs/openq4.log`), located under `fs_savepath\<gameDir>\` (e.g. `${workspaceFolder}\\.home\\openbase\\logs\\openq4.log`).
-- For runtime validation, use mode-specific launch tasks: use the SP launch task for single-player testing and the MP launch task for multiplayer testing.
-- Do not treat main-menu startup as sufficient validation; enter in-game/map gameplay relevant to the change before concluding tests.
-- Use `.tmp/` directory in repository for any temporary files required for tasks.
+- Treat `E:\Repositories\OpenPrey-GameLibs` as part of the same working set for planning, edits, and validation.
+- For SDK/game-library work, make canonical source edits in `OpenPrey-GameLibs` first; `src/game` in this repo is a synchronized mirror.
+- Keep `OpenPrey` free of references to the old OpenQ4 closed-source BSE companion-repo workflow.
+- Do not assume Steam/GOG distribution paths for Prey (2006). Auto-detection must support CD-era installs.
+- Prefer robust install discovery from registry/app-path/uninstall entries and known legacy install roots.
+- Never launch OpenPrey in fullscreen from agent workflows; always force windowed mode with `+set r_fullscreen 0` (and equivalent config/cvar handling).
+- Keep Meson as the canonical OpenPrey build entry point.
+- Use `builddir/` as standard local build output.
+- Use `.install/` as staged runtime package root.
+- Keep compiler/linker intermediates in `builddir/`, not `.install/`.
+- Keep documentation current whenever workflow, naming, or repository structure changes.
 
-**.install/ Folder Layout (Staging Target)**
+**Build/Tooling Conventions**
+- On Windows, use `tools/build/meson_setup.ps1 ...` (or `tools/build/openprey_devcmd.cmd`) so MSVC environment setup is consistent.
+- Use `meson install -C builddir --no-rebuild --skip-subprojects` when staging `.install/`.
+- GameLibs helper environment variables:
+  - `OPENPREY_GAMELIBS_REPO=<path>`
+  - `OPENPREY_SKIP_GAMELIBS_SYNC=1`
+  - `OPENPREY_BUILD_GAMELIBS=1`
+  - `OPENPREY_SKIP_GAMELIBS_BUILD=1`
+- Legacy `OPENQ4_*` variants are accepted only as temporary migration compatibility inputs.
+
+**Runtime Module Direction**
+- Treat Prey as primarily using a unified game module (`game`/`gamex86`) rather than hard split SP/MP DLL ownership.
+- OpenPrey may retain temporary split-module compatibility (`game_sp`/`game_mp`) during migration, but unified-module behavior is the target.
+
+**.install Layout (Staging Target)**
 - `.install/` is the runtime package root used by local staging and `fs_cdpath` overlays.
-- Keep executable/runtime artifacts here (for example `.install/OpenQ4-client_x64.exe`, `.install/OpenQ4-ded_x64.exe`, `.install/libbse-q4.dll`, `.install/openbase/game-sp_x64.dll`, `.install/openbase/game-mp_x64.dll`).
-- Stage editable override content under `.install/openbase/` (for example GUI scripts in `.install/openbase/guis/`).
-- Avoid shipping build-only linker artifacts in `.install/`; keep `*.lib` in `builddir/` unless intentionally producing a developer SDK artifact set.
+- Keep executables in `.install/`.
+- Keep game modules and staged content in `.install/openprey/`.
+- Avoid shipping build-only artifacts (for example import libs) in `.install/`.
 
-**Development Procedure (Correct Direction)**
-1. Develop against the installed Quake 4 assets only (base PK4s), not repo `q4base/` content.
-2. Prefer launching from the repo `.install/` directory so locked `fs_cdpath` targets staged OpenQ4 overlays; use a different working directory only when intentionally testing stock-only behavior.
-3. If something is missing or broken, fix the engine/game/loader/parser rather than shipping new material/decl/shader assets.
-4. If engine-side shaders are needed, prefer internal defaults or generated resources that ship with the executable.
-5. Re-run Procedure 1 after each fix to verify clean initialization without custom content.
+**Development Procedure (Current Direction)**
+1. Develop against installed Prey assets (not repo-side replacement content when avoidable).
+2. Prefer launches from `.install/` so staged overlays are exercised.
+3. Fix compatibility in engine/game/parser/loader code rather than shipping content hacks.
+4. Validate with log-driven short-run loops, then with in-game map gameplay relevant to the change.
 
-**Procedure 1 (Debug Loop)**
-1. Launch using the correct mode-specific task (`SP` launch task for single-player, `MP` launch task for multiplayer).
-2. Close the game after 3 seconds.
-3. Read `fs_savepath\<gameDir>\logs\openq4.log` (commonly `${workspaceFolder}\\.home\\openbase\\logs\\openq4.log`).
-4. Identify errors and warnings to resolve.
-5. Resolve the errors and warnings.
-6. Repeat until clean.
+**Debug Loop**
+1. Launch with the mode-appropriate debug configuration in windowed mode only (force `+set r_fullscreen 0`).
+2. Let the engine initialize and enter the target gameplay state.
+3. Close and inspect `fs_savepath\<gameDir>\logs\openprey.log`.
+4. Resolve errors/warnings.
+5. Repeat until clean.
 
-**Planned Review**
-- Strong preference to review and reduce `q4base/` usage, file-by-file, until the engine runs cleanly without any repo content overrides.
+**Temporary Files**
+- Use `.tmp/` under the repository root for temporary task artifacts.
 
 **References (Local, Not Included In Repo)**
-- Quake 4 SDK: `E:\_SOURCE\_CODE\Quake4-1.4.2-SDK`
-- Upstream engine base (local folder name retained): `E:\_SOURCE\_CODE\Quake4Doom-master`
-- Quake 4 BSE (Basic Set of Effects): `E:\_SOURCE\_CODE\Quake4BSE-master`
-- Quake 4 engine decompiled (Hex-Rays): `E:\_SOURCE\_CODE\Quake4Decompiled-main`
-- Quake 4 installation (Steam): `C:\Program Files (x86)\Steam\steamapps\common\Quake 4`
+- OpenQ4 source snapshot baseline: `E:\Repositories\OpenQ4`
+- dhewm3 reference baseline: `E:\_SOURCE\_CODE\dhewm3-master`
+- Prey game-library baseline: `E:\Repositories\OpenPrey-GameLibs`
+- Prey retail install (example legacy path): `C:\Program Files (x86)\Human Head Studios\Prey`
 
 **Upstream Credits**
-- Justin Marshall.
-- Robert Backebans.
-- id Software.
-- Raven Software.
-
-
+- Justin Marshall
+- Robert Backebans
+- id Software
+- Raven Software
+- Human Head Studios

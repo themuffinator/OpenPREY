@@ -9,35 +9,28 @@ option(
   'build_engine',
   type: 'boolean',
   value: true,
-  description: 'Build engine executables (OpenQ4-client_<arch>/OpenQ4-ded_<arch>).',
+  description: 'Build engine executables (OpenPrey-client_<arch>/OpenPrey-ded_<arch>).',
 )
 
 option(
   'build_games',
   type: 'boolean',
   value: true,
-  description: 'Build game modules (game-sp_<arch>/game-mp_<arch>) from the synchronized game source mirror.',
+  description: 'Build the unified game module from the synchronized game source mirror.',
 )
 
 option(
   'build_game_sp',
   type: 'boolean',
-  value: true,
-  description: 'Build the single-player game module (game-sp_<arch>).',
+  value: false,
+  description: 'Legacy no-op compatibility option. Unified game module builds when -Dbuild_games=true.',
 )
 
 option(
   'build_game_mp',
   type: 'boolean',
-  value: true,
-  description: 'Build the multiplayer game module (game-mp_<arch>).',
-)
-
-option(
-  'build_libbse',
-  type: 'boolean',
-  value: true,
-  description: 'Build the external BSE runtime module (libbse-q4) from OpenQ4-BSE.',
+  value: false,
+  description: 'Legacy no-op compatibility option. Unified game module builds when -Dbuild_games=true.',
 )
 
 option(

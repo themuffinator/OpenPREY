@@ -47,7 +47,8 @@ typedef enum {
 	EDITOR_SOUND = BIT(6),
 	EDITOR_DECL = BIT(7),
 	EDITOR_AF = BIT(8),
-	EDITOR_FX = BIT(9),
+	EDITOR_PARTICLE = BIT(9),
+	EDITOR_FX = EDITOR_PARTICLE,
 	EDITOR_PDA = BIT(10),
 	EDITOR_AAS = BIT(11),
 	EDITOR_MATERIAL = BIT(12)
@@ -146,6 +147,7 @@ struct MemInfo_t {
 	// asset totals
 	int				imageAssetsTotal;
 	int				modelAssetsTotal;
+	int				animAssetsTotal;
 	int				soundAssetsTotal;
 };
 
@@ -242,6 +244,30 @@ public:
 
 	// Returns the binding bound to the key
 	virtual const char* BindingFromKey(const char* key) = 0;
+
+	// Returns key display material metadata for a binding.
+	virtual void				MaterialKeyForBinding( const char *binding, char *keyMaterial, char *key, bool &isBound ) {
+		if ( keyMaterial != NULL ) {
+			keyMaterial[0] = '\0';
+		}
+		if ( key != NULL ) {
+			key[0] = '\0';
+		}
+		isBound = false;
+	}
+
+	// Allows game code to scale input sensitivity (Prey compatibility).
+	virtual void				SetGameSensitivityFactor( float factor ) {
+		(void)factor;
+	}
+
+	// Prey compatibility helper used by game command code.
+	virtual void				FixupKeyTranslations( const char *src, char *dst, int dstSize ) {
+		if ( dst == NULL || dstSize <= 0 ) {
+			return;
+		}
+		idStr::Copynz( dst, src ? src : "", dstSize );
+	}
 
 	// Directly sample a button.
 	virtual int					ButtonState(int key) = 0;

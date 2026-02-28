@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_EDIT_H__
 #define __GAME_EDIT_H__
@@ -83,10 +85,6 @@ public:
 	void					ClearSelectedEntities( void );
 	void					DisplayEntities( void );
 	bool					EntityIsSelectable( idEntity *ent, idVec4 *color = NULL, idStr *text = NULL );
-// RAVEN BEGIN
-// bdube: added
-	idEntity*				FindTraceEntity( idVec3 start, idVec3 end, const idEntity *skip );
-// RAVEN END
 private:
 	int						nextSelectTime;
 	idList<selectedTypeInfo_t> selectableEntityClasses;

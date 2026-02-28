@@ -1,9 +1,8 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
-
 #include "../../MayaImport/maya_main.h"
 
 /***********************************************************************
@@ -19,28 +18,6 @@ static exporterShutdown_t	Maya_Shutdown = NULL;
 static int					importDLL = 0;
 
 bool idModelExport::initialized = false;
-
-
-// RAVEN BEGIN
-// scork: now needed to cleanup after last Maya model conversion since I cache them for speed during "exportmodels"
-bool g_bMayaConversionCleanerRunning = false;	// so we can check all calls to Maya_ConvertModel have been updated to include this ;-)
-struct MayaConversionCleaner
-{
-	MayaConversionCleaner()
-	{
-		g_bMayaConversionCleanerRunning = true;
-	}
-	~MayaConversionCleaner()
-	{
-		if ( Maya_ConvertModel )
-		{
-			Maya_ConvertModel( NULL, NULL, NULL );
-		}
-		g_bMayaConversionCleanerRunning = false;
-	}
-};
-// RAVEN END
-
 
 /*
 ====================
@@ -80,10 +57,7 @@ Determines if Maya is installed on the user's machine
 =====================
 */
 bool idModelExport::CheckMayaInstall( void ) {
-// RAVEN BEGIN
-// jscott:revisit - this should go into the exe
-//#ifdef _WIN32
-#ifndef _WINDOWS
+#ifndef _WIN32
 	return false;
 #elif 0
 	HKEY	hKey;
@@ -92,7 +66,11 @@ bool idModelExport::CheckMayaInstall( void ) {
 	lres = RegOpenKey( HKEY_LOCAL_MACHINE, "SOFTWARE\\Alias|Wavefront\\Maya\\4.5\\Setup\\InstallPath", &hKey );
 
 	if ( lres != ERROR_SUCCESS ) {
-		return false;
+		// HUMANHEAD - cjr:  Check for Maya 4.0 as well
+		lres = RegOpenKey( HKEY_LOCAL_MACHINE, "SOFTWARE\\Alias|Wavefront\\Maya\\4.0\\Setup\\InstallPath", &hKey );
+		if ( lres != ERROR_SUCCESS ) {
+			return false;
+		} // END HUMANHEAD
 	}
 
 	lres = RegQueryValueEx( hKey, "MAYA_INSTALL_LOCATION", NULL, (unsigned long*)&lType, (unsigned char*)NULL, (unsigned long*)NULL );
@@ -104,6 +82,8 @@ bool idModelExport::CheckMayaInstall( void ) {
 	}
 	return true;
 #else
+	//HH rww SDK - the standard EE libs don't support these reg functions
+	/*
 	HKEY	hKey;
 	long	lres;
 
@@ -115,6 +95,8 @@ bool idModelExport::CheckMayaInstall( void ) {
 		return false;
 	}
 	return true;
+	*/
+	return false;
 #endif
 }
 
@@ -152,14 +134,7 @@ void idModelExport::LoadMayaDll( void ) {
 	}
 
 	// initialize the DLL
-// RAVEN BEGIN
-// rhummer: unify allocation strategy to try to fix some of our crashes
-#ifdef RV_UNIFIED_ALLOCATOR
-	if ( !dllEntry( MD5_VERSION, common, sys, Memory::Allocate, Memory::Free, Memory::MSize ) ) {
-#else
 	if ( !dllEntry( MD5_VERSION, common, sys ) ) {
-#endif
-// RAVEN END
 		// init failed
 		Maya_ConvertModel = NULL;
 		Maya_Shutdown = NULL;
@@ -168,10 +143,6 @@ void idModelExport::LoadMayaDll( void ) {
 		gameLocal.Error( "Export DLL init failed." );
 		return;
 	}
-// RAVEN BEGIN
-// jscott: maya needs the source control in the tools dll
-	//common->LoadToolsDLL();
-// RAVEN END
 }
 
 /*
@@ -200,30 +171,11 @@ bool idModelExport::ConvertMayaToMD5( void ) {
 		force = true;
 	}
 
-// RAVEN BEGIN
-// bdube: fs_import path
-
-	// we need to make sure we have a full path, so convert the filename to an OS path
-	path.AppendPath( cvarSystem->GetCVarString ("fs_importpath"));
-	path.AppendPath(src);
-
-	idFile* f = fileSystem->OpenExplicitFileRead ( path );
-	if ( !f ) {
-		Maya_Error = "could not open source file";
-		return false;
-	}
-	sourceTime = f->Timestamp ( );
-	fileSystem->CloseFile ( f );
-
-/*
 	// get the source file's time
 	if ( fileSystem->ReadFile( src, NULL, &sourceTime ) < 0 ) {
 		// source file doesn't exist
 		return true;
 	}
-*/
-   
-// RAVEN END
 
 	// get the destination file's time
 	if ( !force && ( fileSystem->ReadFile( dest, NULL, &destTime ) >= 0 ) ) {
@@ -279,12 +231,7 @@ bool idModelExport::ConvertMayaToMD5( void ) {
 	path = fileSystem->RelativePathToOSPath( "" );
 
 	common->SetRefreshOnPrint( true );
-// RAVEN BEGIN
-// scork: if this assert ever triggers it means there's a call to ConvertMayaToMD5() that doesn't have a 'MayaConversionCleaner' object above it. Go and put one in. Now.
-	assert( g_bMayaConversionCleanerRunning );
-// bdube: support src and dest ospath
-	Maya_Error = Maya_ConvertModel( cvarSystem->GetCVarString ( "fs_importpath" ), path, commandLine );
-// RAVEN END
+	Maya_Error = Maya_ConvertModel( path, commandLine );
 	common->SetRefreshOnPrint( false );
 	if ( Maya_Error != "Ok" ) {
 		return false;
@@ -312,14 +259,7 @@ idModelExport::ExportModel
 ====================
 */
 bool idModelExport::ExportModel( const char *model ) {
-
-// RAVEN BEGIN
-// scork:
-	MayaConversionCleaner _any_old_name;
-// RAVEN END
-
 	const char *game = cvarSystem->GetCVarString( "fs_game" );
-
 	if ( strlen(game) == 0 ) {
 		game = BASE_GAMEDIR;
 	}
@@ -344,18 +284,23 @@ idModelExport::ExportAnim
 ====================
 */
 bool idModelExport::ExportAnim( const char *anim ) {
-
-// RAVEN BEGIN
-// scork:
-	MayaConversionCleaner _any_old_name;
-// RAVEN END
+#if !HUMANHEAD	// HUMANHEAD pdm: Unmerged this at JimDose's suggestion to avoid reexporting our models.  Would be handy for an add-on pack though
+	const char *game = cvarSystem->GetCVarString( "fs_game" );
+	if ( strlen(game) == 0 ) {
+		game = BASE_GAMEDIR;
+	}
+#endif
 
 	Reset();
 	src  = anim;
 	dest = anim;
 	dest.SetFileExtension( MD5_ANIM_EXT );
 
+#if HUMANHEAD	// HUMANHEAD pdm: Unmerged this at JimDose's suggestion to avoid reexporting our models.  Would be handy for an add-on pack though
 	sprintf( commandLine, "anim %s -dest %s -game %s", src.c_str(), dest.c_str(), CD_BASEDIR );
+#else
+	sprintf( commandLine, "anim %s -dest %s -game %s", src.c_str(), dest.c_str(), game );
+#endif
 	if ( !ConvertMayaToMD5() ) {
 		gameLocal.Printf( "Failed to export '%s' : %s", src.c_str(), Maya_Error.c_str() );
 		return false;
@@ -435,12 +380,6 @@ idModelExport::ParseExportSection
 ====================
 */
 int idModelExport::ParseExportSection( idParser &parser ) {
-
-// RAVEN BEGIN
-// scork:
-	MayaConversionCleaner _any_old_name;
-// RAVEN END
-
 	idToken	command;
 	idToken	token;
 	idStr	defaultCommands;
@@ -509,6 +448,13 @@ int idModelExport::ParseExportSection( idParser &parser ) {
 
 			Reset();
 			if ( ParseOptions( lex ) ) {
+#if !HUMANHEAD	// HUMANHEAD pdm: Unmerged this at JimDose's suggestion to avoid reexporting our models.  Would be handy for an add-on pack though
+				const char *game = cvarSystem->GetCVarString( "fs_game" );
+				if ( strlen(game) == 0 ) {
+					game = BASE_GAMEDIR;
+				}
+#endif
+
 				if ( command == "mesh" ) {
 					dest.SetFileExtension( MD5_MESH_EXT );
 				} else if ( command == "anim" ) {
@@ -519,7 +465,11 @@ int idModelExport::ParseExportSection( idParser &parser ) {
 					dest.SetFileExtension( command );
 				}
 				idStr back = commandLine;
+#if HUMANHEAD	// HUMANHEAD pdm: Unmerged this at JimDose's suggestion to avoid reexporting our models.  Would be handy for an add-on pack though
 				sprintf( commandLine, "%s %s -dest %s -game %s%s", command.c_str(), src.c_str(), dest.c_str(), CD_BASEDIR, commandLine.c_str() );
+#else
+				sprintf( commandLine, "%s %s -dest %s -game %s%s", command.c_str(), src.c_str(), dest.c_str(), game, commandLine.c_str() );
+#endif
 				if ( ConvertMayaToMD5() ) {
 					count++;
 				} else {

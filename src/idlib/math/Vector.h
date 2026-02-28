@@ -323,6 +323,15 @@ ID_INLINE void idVec2::EnsureIncremental( void )
 //
 //===============================================================
 
+// Direction mask helpers used by Prey vehicle/thruster code.
+#define INDEX_IN_MASK(mask, index) ( ( (mask) & ( 1 << (index) ) ) != 0 )
+#define MASK_NEGX			0x0001
+#define MASK_POSX			0x0002
+#define MASK_NEGY			0x0004
+#define MASK_POSY			0x0008
+#define MASK_NEGZ			0x0010
+#define MASK_POSZ			0x0020
+
 class idVec3 {
 public:	
 	float			x;
@@ -391,6 +400,9 @@ public:
 	idAngles		ToAngles( void ) const;
 	idPolar3		ToPolar( void ) const;
 	idMat3			ToMat3( void ) const;		// vector should be normalized
+	idMat3			hhToMat3( void ) const;		// Prey compatibility: Z-up variant
+	int				DirectionMask() const;		// axis-aligned direction bitmask
+					idVec3( int directionMask );	// construct from direction bitmask
 	const idVec2 &	ToVec2( void ) const;
 	idVec2 &		ToVec2( void );
 	const float *	ToFloatPtr( void ) const;
@@ -587,6 +599,14 @@ ID_INLINE idVec3::idVec3( const float x, const float y, const float z ) {
 	this->x = x;
 	this->y = y;
 	this->z = z;
+}
+
+ID_INLINE idVec3::idVec3( int directionMask ) {
+	for ( int term = 0; term < 3; term++ ) {
+		const int negativeMask = 1 << ( term << 1 );
+		const int positiveMask = 1 << ( ( term << 1 ) + 1 );
+		( *this )[ term ] = ( directionMask & negativeMask ) ? -1.0f : ( directionMask & positiveMask ) ? 1.0f : 0.0f;
+	}
 }
 
 ID_INLINE float idVec3::operator[]( const int index ) const {
@@ -955,6 +975,14 @@ ID_INLINE const float *idVec3::ToFloatPtr( void ) const {
 
 ID_INLINE float *idVec3::ToFloatPtr( void ) {
 	return &x;
+}
+
+ID_INLINE int idVec3::DirectionMask() const {
+	int mask = 0;
+	for ( int term = 0; term < 3; term++ ) {
+		mask += ( *this )[ term ] < 0.0f ? 1 << ( term << 1 ) : ( *this )[ term ] > 0.0f ? 1 << ( ( term << 1 ) + 1 ) : 0;
+	}
+	return mask;
 }
 
 ID_INLINE void idVec3::NormalVectors( idVec3 &left, idVec3 &down ) const {

@@ -1,27 +1,14 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
-
-// RAVEN BEGIN
-#if defined( __has_include )
-	#if __has_include( "../bse_api/BSEInterface.h" )
-		#include "../bse_api/BSEInterface.h"
-	#else
-		#include "../bse/BSEInterface.h"
-	#endif
-#else
-	#include "../bse/BSEInterface.h"
-#endif
-#include "Projectile.h"
-#include "client/ClientEffect.h"
-#include "ai/AI.h"
-#include "ai/AI_Manager.h"
-#include "ai/AAS_tactical.h"
-#include "Game_Log.h"
-// RAVEN END
-
-//#define UI_DEBUG	1
+//HUMANHEAD: aob
+#include "../prey/prey_local.h"
+#include "../framework/BuildVersion.h" // HUMANHEAD mdl
+//HUMANHEAD END
 
 #ifdef GAME_DLL
 
@@ -38,58 +25,73 @@ idUserInterfaceManager *	uiManager = NULL;
 idDeclManager *				declManager = NULL;
 idAASFileManager *			AASFileManager = NULL;
 idCollisionModelManager *	collisionModelManager = NULL;
-
-// RAVEN BEGIN
-// jscott: game interface to the fx system
-rvBSEManager *				bse = NULL;
-// RAVEN END
-
 idCVar *					idCVar::staticVars = NULL;
 
-// RAVEN BEGIN
-// rjohnson: new help system for cvar ui
-//idCVarHelp *				idCVarHelp::staticCVarHelps = NULL;
-//idCVarHelp *				idCVarHelp::staticCVarHelpsTail = NULL;
-// RAVEN END
+// HUMANHEAD pdm
+#if INGAME_PROFILER_ENABLED
+hhProfiler *				profiler = NULL;
+#endif
+// HUMANHEAD END
 
 idCVar com_forceGenericSIMD( "com_forceGenericSIMD", "0", CVAR_BOOL|CVAR_SYSTEM, "force generic platform independent SIMD" );
-
-int Sys_Milliseconds( void ) {
-	return sys ? sys->Milliseconds() : 0;
-}
+idCVar g_printlocations( "g_printlocations", "0", CVAR_BOOL, "print area/location mappings");
 
 #endif
 
 idRenderWorld *				gameRenderWorld = NULL;		// all drawing is done to this world
+idSoundWorld *				gameSoundWorld = NULL;		// all audio goes to this world
 
 static gameExport_t			gameExport;
 
 // global animation lib
-// RAVEN BEGIN
-// jsinger: changed to a pointer to prevent its constructor from allocating
-//          memory before the unified allocator could be initialized
-idAnimManager				*animationLib = NULL;
-// RAVEN END
+idAnimManager				animationLib;
 
 // the rest of the engine will only reference the "game" variable, while all local aspects stay hidden
-idGameLocal					gameLocal;
+// HUMANHEAD mdl:  Commented out the old gameLocal because it was messing up tagging
+//#ifdef HUMANHEAD
+hhGameLocal					gameLocal;
+//#else
+//idGameLocal					gameLocal;
+//#endif
 idGame *					game = &gameLocal;	// statically pointed at an idGameLocal
 
+int *OpenPrey_SpawnIdArray() {
+	return gameLocal.spawnIds;
+}
+
+idEntity **OpenPrey_EntityArray() {
+	return gameLocal.entities;
+}
+
+int OpenPrey_EntityNumber( const idEntity *ent ) {
+	return ent->entityNumber;
+}
+
+#ifdef HUMANHEAD
+//NOTE: Duplicated in tr_rendertools and CamWnd, make any changes there also
+const char *idGameLocal::sufaceTypeNames[ MAX_SURFACE_TYPES ] = {
+	"none",	"metal", "stone", "flesh", "wood", "cardboard", "liquid", "glass", "tile",
+	"wallwalk", "altmetal", "forcefield", "pipe", "spirit", "chaff"
+};
+#else
 const char *idGameLocal::sufaceTypeNames[ MAX_SURFACE_TYPES ] = {
 	"none",	"metal", "stone", "flesh", "wood", "cardboard", "liquid", "glass", "plastic",
 	"ricochet", "surftype10", "surftype11", "surftype12", "surftype13", "surftype14", "surftype15"
 };
+#endif	// HUMANHEAD
 
 /*
 ===========
 GetGameAPI
 ============
 */
-
-#if __GNUC__ >= 4
-#pragma GCC visibility push(default)
+#if __MWERKS__
+#pragma export on
 #endif
 extern "C" gameExport_t *GetGameAPI( gameImport_t *import ) {
+#if __MWERKS__
+#pragma export off
+#endif
 
 	if ( import->version == GAME_API_VERSION ) {
 
@@ -107,18 +109,12 @@ extern "C" gameExport_t *GetGameAPI( gameImport_t *import ) {
 		declManager					= import->declManager;
 		AASFileManager				= import->AASFileManager;
 		collisionModelManager		= import->collisionModelManager;
-// RAVEN BEGIN
-// jscott: import the fx system
-		bse							= import->bse;
-// RAVEN END
 
-// RAVEN BEGIN
-// dluetscher: import the memory system variables
-#ifdef _RV_MEM_SYS_SUPPORT
-		::currentHeapArena			= import->heapArena;
-		rvSetAllSysHeaps( import->systemHeapArray );
-#endif
-// RAVEN END
+		// HUMANHEAD pdm
+#if INGAME_PROFILER_ENABLED
+		profiler					= import->profiler;
+#endif		
+		// HUMANHEAD END
 	}
 
 	// set interface pointers used by idLib
@@ -131,16 +127,9 @@ extern "C" gameExport_t *GetGameAPI( gameImport_t *import ) {
 	gameExport.version = GAME_API_VERSION;
 	gameExport.game = game;
 	gameExport.gameEdit = gameEdit;
-// RAVEN BEGIN
-// bdube: game log
-	gameExport.gameLog = gameLog;
-// RAVEN END	
 
 	return &gameExport;
 }
-#if __GNUC__ >= 4
-#pragma GCC visibility pop
-#endif
 
 /*
 ===========
@@ -165,80 +154,14 @@ void TestGameAPI( void ) {
 	testImport.AASFileManager			= ::AASFileManager;
 	testImport.collisionModelManager	= ::collisionModelManager;
 
-// RAVEN BEGIN
-// jscott: import the fx system
-	testImport.bse						= ::bse;
-// RAVEN END
+	// HUMANHEAD pdm
+#if INGAME_PROFILER_ENABLED
+	testImport.profiler					= ::profiler;
+#endif
+	// HUMANHEAD END
 
 	testExport = *GetGameAPI( &testImport );
 }
-
-/*
-================
-idGameLocal::BuildModList
-================
-*/
-void idGameLocal::BuildModList( ) {
-	int i;
-	idStr currentMod;
-
-	int numServers = networkSystem->GetNumScannedServers();
-
-	if ( filterMod >= 0 && filterMod < modList.Num() ) {
-		currentMod = modList[ filterMod ];
-	} else {
-		currentMod = "";
-	}
-
-	modList.Clear();
-	for (i = 0; i < numServers; i++) {
-		const scannedServer_t *server;
-		idStr modname;
-
-		server = networkSystem->GetScannedServerInfo( i );
-
-		server->serverInfo.GetString( "fs_game", "", modname );
-		modname.ToLower();
-		modList.AddUnique( modname );
-	}
-
-	modList.Sort();
-
-	if ( modList.Num() > 0 && (modList[ 0 ].Cmp( "" ) == 0) ) {
-		modList.RemoveIndex( 0 );
-	}
-
-	filterMod = modList.Num();
-	for (i = 0; i < modList.Num(); i++) {
-		if ( modList[ i ].Icmp( currentMod ) == 0 ) {
-			filterMod = i;
-		}
-	}
-}
-
-/*
-================
-FilterByMod
-================
-*/
-static int FilterByMod( const int* serverIndex ) {
-	const scannedServer_t *server;
-
-	if ( gameLocal.filterMod < 0 || gameLocal.filterMod >= gameLocal.modList.Num() ) {
-		return (int)false;
-	}
-
-	server = networkSystem->GetScannedServerInfo( *serverIndex );
-
-	return (int)(gameLocal.modList[ gameLocal.filterMod ].Icmp( server->serverInfo.GetString( "fs_game" ) ) != 0);
-}
-
-static sortInfo_t filterByMod = {
-	SC_ALL,
-	NULL,
-	FilterByMod,
-	"#str_123006"
-};
 
 /*
 ===========
@@ -263,7 +186,7 @@ void idGameLocal::Clear( void ) {
 		userInfo[i].Clear();
 		persistentPlayerInfo[i].Clear();
 	}
-	usercmds = NULL;
+	memset( usercmds, 0, sizeof( usercmds ) );
 	memset( entities, 0, sizeof( entities ) );
 	memset( spawnIds, -1, sizeof( spawnIds ) );
 	firstFreeIndex = 0;
@@ -273,47 +196,26 @@ void idGameLocal::Clear( void ) {
 	numEntitiesToDeactivate = 0;
 	sortPushers = false;
 	sortTeamMasters = false;
+	//HUMANHEAD rww
+	sortSnapshotPushers = false;
+	sortSnapshotTeamMasters = false;
+	//HUMANHEAD END
 	persistentLevelInfo.Clear();
 	memset( globalShaderParms, 0, sizeof( globalShaderParms ) );
-	ResetSpecialEffects();
 	random.SetSeed( 0 );
 	world = NULL;
 	frameCommandThread = NULL;
 	testmodel = NULL;
-
-	gameRender.forwardRenderPassRT = NULL;
-	gameRender.postProcessRT[0] = NULL;
-	gameRender.postProcessRT[1] = NULL;
-	gameRender.forwardRenderPassResolvedRT = NULL;
-	gameRender.noPostProcessMaterial = NULL;
-	gameRender.casPostProcessMaterial = NULL;
-	gameRender.blurPostProcessMaterial = NULL;
-	gameRender.blackPostProcessMaterial = NULL;
-	gameRender.resolvePostProcessMaterial = NULL;
-	gameRender.smaaEdgePostProcessMaterial = NULL;
-	gameRender.smaaBlendPostProcessMaterial = NULL;
-	gameRender.postProcessAvailable = false;
-	gameRender.smaaAvailable = false;
-	gameRender.videoRestartCount = 0;
-// RAVEN BEGIN
-// bdube: not using id effects
-//	testFx = NULL;
-// ddynerman: multiple clip worlds
-	ShutdownInstances();
-// mwhitlock: Dynamic memory consolidation
-	clip.Clear();
-// RAVEN END
-	
-	for ( i = 0; i < MAX_CLIENTS; i++ ) {
-		clientsPVS[ i ].i = -1;
-		clientsPVS[ i ].h = -1;
-	}
-	freePlayerPVS = false;
+	testFx = NULL;
+	clip.Shutdown();
 	pvs.Shutdown();
 	sessionCommand.Clear();
 	locationEntities = NULL;
+	smokeParticles = NULL;
 	editEntities = NULL;
-	entityHash.Clear( 1024, MAX_GENTITIES );
+	//HUMANHEAD rww - for client entities.
+	entityHash.Clear( 1024, MAX_GENTITIES+MAX_CENTITIES );
+	//HUMANHEAD END
 	inCinematic = false;
 	cinematicSkipTime = 0;
 	cinematicStopTime = 0;
@@ -321,112 +223,68 @@ void idGameLocal::Clear( void ) {
 	framenum = 0;
 	previousTime = 0;
 	time = 0;
-	autoScreenshotStartTime = 0;
-	autoScreenshotPending = false;
-	autoMachinegunImpactStartTime = 0;
-	autoMachinegunImpactPending = false;
 	vacuumAreaNum = 0;
-
-// RAVEN BEGIN
-// abahr
-	gravityInfo.Clear();
-	scriptObjectProxies.Clear();
-// RAVEN END
-
 	mapFileName.Clear();
-// RAVEN BEGIN
-// rjohnson: entity usage stats
-	mapFileNameStripped.Clear();
-// RAVEN END
 	mapFile = NULL;
 	spawnCount = INITIAL_SPAWN_COUNT;
-	memset( isMapEntity, 0, sizeof( bool ) * MAX_GENTITIES );
-
+	mapSpawnCount = 0;
 	camera = NULL;
-
-// RAVEN BEGIN
-// jscott: for portal skies
-	portalSky = NULL;
-// RAVEN END
-
 	aasList.Clear();
 	aasNames.Clear();
-// RAVEN BEGIN
-// bdube: added
 	lastAIAlertEntity = NULL;
-	lastAIAlertEntityTime = 0;
-	lastAIAlertActor = NULL;
-	lastAIAlertActorTime = 0;
-// RAVEN END
+	lastAIAlertTime = 0;
 	spawnArgs.Clear();
 	gravity.Set( 0, 0, -1 );
-	playerPVS.i = -1;
 	playerPVS.h = -1;
-	playerConnectedAreas.i = -1;
 	playerConnectedAreas.h = -1;
 	gamestate = GAMESTATE_UNINITIALIZED;
 	skipCinematic = false;
 	influenceActive = false;
 
+	// HUMANHEAD pdm:
+	isCoop = false;
+	// HUMANHEAD END
+
 	localClientNum = 0;
 	isMultiplayer = false;
 	isServer = false;
 	isClient = false;
-	mpInteractionsGenerated = false;
 	realClientTime = 0;
 	isNewFrame = true;
+	clientSmoothing = 0.1f;
 	entityDefBits = 0;
 
 	nextGibTime = 0;
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
-	unFreezeTime = 0;
-	isFrozen = false;
-// RITUAL END
+	nextSteamTime = 0; // HUMANHEAD mdl
 	globalMaterial = NULL;
 	newInfo.Clear();
 	lastGUIEnt = NULL;
 	lastGUI = 0;
-	
+
+	//HUMANHEAD rww
+	logitechLCDEnabled = false;
+	logitechLCDDisplayAlt = false;
+	logitechLCDButtonsLast = 0;
+	logitechLCDUpdateTime = 0;
+	//HUMANHEAD END
+
 	memset( clientEntityStates, 0, sizeof( clientEntityStates ) );
 	memset( clientPVS, 0, sizeof( clientPVS ) );
 	memset( clientSnapshots, 0, sizeof( clientSnapshots ) );
 
 	eventQueue.Init();
-
-	clientSpawnCount = INITIAL_SPAWN_COUNT;
-	clientSpawnedEntities.Clear();
-	memset( clientEntities, 0, sizeof( clientEntities ) );
-	memset( clientSpawnIds, -1, sizeof( clientSpawnIds ) );
-
-	gameDebug.Shutdown();
-	gameLogLocal.Shutdown();
-	currentThinkingEntity = NULL;
+	savedEventQueue.Init();
 
 	memset( lagometer, 0, sizeof( lagometer ) );
 
-	demoState = DEMO_NONE;
-	serverDemo = false;
-	timeDemo = false;
-
-	memset( &usercmd, 0, sizeof( usercmd ) );
-	memset( &oldUsercmd, 0, sizeof( oldUsercmd ) );
-	followPlayer = -1;	// start free flying
-	demo_hud = NULL;
-	demo_mphud = NULL;
-	demo_cursor = NULL;
-
-	demo_protocol = 0;
-
-	instancesEntityIndexWatermarks.Clear();
-	clientInstanceFirstFreeIndex = MAX_CLIENTS;
-	minSpawnIndex = MAX_CLIENTS;
-
-	modList.Clear();
-	filterMod = -1;
-	if ( networkSystem ) {
-		networkSystem->UseSortFunction( filterByMod, false );
-	}
+	//HUMANHEAD rww - for layeredSpawn
+#if !GOLD
+	spawnPopulating = false;
+#endif
+	// mdl:  Playtime
+	playTime = 0;
+	playTimeStart = -1;
+	//HUMANHEAD END
 }
 
 /*
@@ -436,17 +294,7 @@ idGameLocal::Init
   initialize the game object, only happens once at startup, not each level load
 ============
 */
-// RAVEN BEGIN
-// jsinger: attempt to eliminate cross-DLL allocation issues
-extern idHashTable<rvViseme> *visemeTable100;
-extern idHashTable<rvViseme> *visemeTable66;
-extern idHashTable<rvViseme> *visemeTable33;
-#ifdef RV_UNIFIED_ALLOCATOR
-void idGameLocal::Init( void *(*allocator)(size_t size), void (*deallocator)( void *ptr ), size_t (*msize)(void *ptr) ) {
-#else
 void idGameLocal::Init( void ) {
-#endif
-// RAVEN END
 	const idDict *dict;
 	idAAS *aas;
 
@@ -456,15 +304,6 @@ void idGameLocal::Init( void ) {
 
 #else
 
-	mHz = common->GetUserCmdHz();
-	msec = common->GetUserCmdMSec();
-
-// RAVEN BEGIN
-// jsinger: attempt to eliminate cross-DLL allocation issues
-#ifdef RV_UNIFIED_ALLOCATOR
-	Memory::InitAllocator(allocator, deallocator, msize);
-#endif
-// RAVEN END
 	// initialize idLib
 	idLib::Init();
 
@@ -475,100 +314,46 @@ void idGameLocal::Init( void ) {
 	idSIMD::InitProcessor( "game", com_forceGenericSIMD.GetBool() );
 
 #endif
-// RAVEN BEGIN
-// jsinger: these need to be initialized after the InitAllocator call above in order
-//          to avoid crashes when the allocator is used.
-	if ( animationLib != NULL ) {
-		// When reloading the engine, declManager teardown has already released idAnim refs.
-		animationLib->Shutdown();
-		delete animationLib;
-		animationLib = NULL;
-	}
-	animationLib = new idAnimManager();
-	visemeTable100 = new idHashTable<rvViseme>;
-	visemeTable66 = new idHashTable<rvViseme>;
-	visemeTable33 = new idHashTable<rvViseme>;
-// RAVEN END
 
-	Printf( "------------- Initializing Game -------------\n" );
+	//HUMANHEAD rww
+	ddaManager = new hhDDAManager;
+	//HUMANHEAD END
+
+	Printf( "--------- Initializing Game ----------\n" );
 	Printf( "gamename: %s\n", GAME_VERSION );
 	Printf( "gamedate: %s\n", __DATE__ );
 
-// RAVEN BEGIN
-// rjohnson: new help system for cvar ui
-	//idCVarHelp::RegisterStatics();
-
-// jsinger: added to support serialization/deserialization of binary decls
-#ifdef RV_BINARYDECLS
-	idStr prefix="";
-	if(cvarSystem->GetCVarBool("com_binaryDeclRead"))
-	{
-		prefix = "binary/";
-	}
-	declManager->RegisterDeclType( "model",				DECL_MODELDEF,		idDeclAllocator<idDeclModelDef>, idDeclStreamAllocator<idDeclModelDef> );
-	//declManager->RegisterDeclType( "export",			DECL_MODELEXPORT,	idDeclAllocator<idDecl>, idDeclStreamAllocator<idDecl> );
-	declManager->RegisterDeclType( "camera",			DECL_CAMERADEF,		idDeclAllocator<idDeclCameraDef>, idDeclStreamAllocator<idDeclCameraDef> );
-	declManager->RegisterDeclFolderWrapper( prefix + "def",			".def",			DECL_ENTITYDEF );
-	declManager->RegisterDeclFolderWrapper( prefix + "af",			".af",			DECL_AF );
-#else
-// RAVEN END
 	// register game specific decl types
 	declManager->RegisterDeclType( "model",				DECL_MODELDEF,		idDeclAllocator<idDeclModelDef> );
-	if ( declManager->GetDeclTypeFromName( "export" ) == DECL_MAX_TYPES ) {
-		declManager->RegisterDeclType( "export",		DECL_MODELEXPORT,	idDeclAllocator<idDecl> );
-	}
 
-// RAVEN BEGIN
-// rjohnson: camera is now contained in a def for frame commands
-	declManager->RegisterDeclType( "camera",			DECL_CAMERADEF,		idDeclAllocator<idDeclCameraDef> );
-// RAVEN END
 	// register game specific decl folders
-// RAVEN BEGIN
-#ifndef RV_SINGLE_DECL_FILE
-	declManager->RegisterDeclFolder( "def",			".def",			DECL_ENTITYDEF );
-// bdube: not used in quake 4
-//	declManager->RegisterDeclFolder( "fx",					".fx",			DECL_FX );
-//	declManager->RegisterDeclFolder( "particles",			".prt",			DECL_PARTICLE );
-	declManager->RegisterDeclFolder( "af",			".af",			DECL_AF );
-//	declManager->RegisterDeclFolderWrapper( "newpdas",		".pda",			DECL_PDA );
-#else
-	if(!cvarSystem->GetCVarBool("com_SingleDeclFile"))
-	{
-		declManager->RegisterDeclFolderWrapper( "def",			".def",			DECL_ENTITYDEF );
-		declManager->RegisterDeclFolderWrapper( "af",			".af",			DECL_AF );
-	}
-	else
-	{
-		// loads the second set of decls from the file which will contain
-		// modles, cameras
-		declManager->LoadDeclsFromFile();
-		declManager->FinishLoadingDecls();
-	}
-#endif
-#endif  // RV_BINARYDECLS
-// RAVEN END
+	declManager->RegisterDeclFolder( "def",				".def",				DECL_ENTITYDEF );
+	declManager->RegisterDeclFolder( "fx",				".fx",				DECL_FX );
+	declManager->RegisterDeclFolder( "particles",		".prt",				DECL_PARTICLE );
+	declManager->RegisterDeclFolder( "af",				".af",				DECL_AF );
+	declManager->RegisterDeclFolder( "newpdas",			".pda",				DECL_PDA );
 
 	cmdSystem->AddCommand( "listModelDefs", idListDecls_f<DECL_MODELDEF>, CMD_FL_SYSTEM|CMD_FL_GAME, "lists model defs" );
 	cmdSystem->AddCommand( "printModelDefs", idPrintDecls_f<DECL_MODELDEF>, CMD_FL_SYSTEM|CMD_FL_GAME, "prints a model def", idCmdSystem::ArgCompletion_Decl<DECL_MODELDEF> );
 
+#ifdef _HH_NET_DEBUGGING //HUMANHEAD rww
+	cmdSystem->AddCommand( "networkStats", idClass::PrintHHNetStats_f, CMD_FL_SYSTEM|CMD_FL_GAME, "prints collective potential network optimizations" );
+#endif //HUMANHEAD END
+
 	Clear();
 
 	idEvent::Init();
-// RAVEN BEGIN
-// jnewquist: Register subclasses explicitly so they aren't dead-stripped
-	idClass::RegisterClasses();
-// RAVEN END
 	idClass::Init();
 
 	InitConsoleCommands();
+
 	// load default scripts
 	program.Startup( SCRIPT_DEFAULT );
 	
+	smokeParticles = new idSmokeParticles;
+
 	// set up the aas
-// RAVEN BEGIN
-// ddynerman: added false as 2nd parameter, otherwise def will be created
-	dict = FindEntityDefDict( "aas_types", false );
-// RAVEN END
+	dict = FindEntityDefDict( "aas_types" );
 	if ( !dict ) {
 		Error( "Unable to find entityDef for 'aas_types'" );
 	}
@@ -576,80 +361,29 @@ void idGameLocal::Init( void ) {
 	// allocate space for the aas
 	const idKeyValue *kv = dict->MatchPrefix( "type" );
 	while( kv != NULL ) {
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-		MEM_SCOPED_TAG(tag,MA_AAS);
-// RAVEN END
 		aas = idAAS::Alloc();
 		aasList.Append( aas );
 		aasNames.Append( kv->GetValue() );
 		kv = dict->MatchPrefix( "type", kv );
 	}
 
+	// HUMANHEAD pdm: Startup precaching for menu stuff
+	FindEntityDef( "preCacheStartup", false );
+	if (fileSystem->PerformingCopyFiles()) {
+		FindEntityDef( "preCacheBuild", false );
+	}
+#if defined(_SYSTEM_BUILD_) || defined(ID_DEMO_BUILD)  //HUMANHEAD PCF mdl 05/26/06 - For precaching demo menu stuff.
+	if (cvarSystem->GetCVarBool("com_makingDemoBuild")) {
+		FindEntityDef( "preCacheDemoMainMenu", false );
+	}
+#endif
+	// HUMANHEAD END
+
 	gamestate = GAMESTATE_NOMAP;
-
-// jmarshall
-	InitGameRenderSystem();
-// jmarshall end
-
-// jmarshall
-	// 	   
-	// load in the bot itemtable.
-	botItemTable = FindEntityDef("bot_itemtable", false);
-	if (botItemTable == NULL)
-	{
-		common->Warning("bot_itemtable decl not found. Bot support disabled.\n");
-	}
-	else
-	{
-		// init all the bot systems.
-		botCharacterStatsManager.Init();
-		botFuzzyWeightManager.Init();
-		botWeaponInfoManager.Init();
-		botGoalManager.BotSetupGoalAI();
-	}
-// jmarshall end
 
 	Printf( "...%d aas types\n", aasList.Num() );
 	Printf( "game initialized.\n" );
-	Printf( "---------------------------------------------\n" );
-	
-// RAVEN BEGIN
-// bdube: debug stuff
-	gameDebug.Init();
-	gameLogLocal.Init();
-
-// jscott: facial animation init
-	if( !FAS_Init( "annosoft" ) ) {
-		common->Warning( "Failed to load viseme file" );
-	}
-
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG(tag,MA_RENDER);
-// shouchard:  make sure ban list starts out in a known state
-	banListLoaded = false;
-	banListChanged = false;
-	memset( clientGuids, 0, sizeof( clientGuids ) );
-// RAVEN END
-
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	for(int i=0;i<MAX_CLIENTS;i++)
-	{
-		persistentPlayerInfo[i].SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_PERMANENT));
-	}
-	entityHash.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-	gravityInfo.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-	scriptObjectProxies.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-	entityUsageList.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-	ambientLights.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-	instances.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-	clip.SetAllocatorHeap(rvGetSysHeap(RV_HEAP_ID_LEVEL));
-#endif
-// RAVEN END
-
-	networkSystem->AddSortFunction( filterByMod );
+	Printf( "--------------------------------------\n" );
 }
 
 /*
@@ -661,36 +395,13 @@ idGameLocal::Shutdown
 */
 void idGameLocal::Shutdown( void ) {
 
-	int		i;
-
 	if ( !common ) {
 		return;
 	}
 
-	// Fatal startup failures can call Shutdown() before Init() reached GAMESTATE_NOMAP.
-	if ( gamestate == GAMESTATE_UNINITIALIZED ) {
-		if ( animationLib != NULL ) {
-			animationLib->Shutdown();
-			delete animationLib;
-			animationLib = NULL;
-		}
-		return;
-	}
-
-// RAVEN BEGIN
-// jscott: FAS
-	FAS_Shutdown();
-// shouchard:  clean up ban list stuff
-	SaveBanList();
-	FlushBanList();
-// RAVEN END
-
-	Printf( "--------------- Game Shutdown ---------------\n" );
-
-	networkSystem->RemoveSortFunction( filterByMod );
+	Printf( "------------ Game Shutdown -----------\n" );
 
 	mpGame.Shutdown();
-	ShutdownGameRenderSystem();
 
 	MapShutdown();
 
@@ -704,7 +415,11 @@ void idGameLocal::Shutdown( void ) {
 
 	idEvent::Shutdown();
 
-	program.Shutdown();
+	delete[] locationEntities;
+	locationEntities = NULL;
+
+	delete smokeParticles;
+	smokeParticles = NULL;
 
 	idClass::Shutdown();
 
@@ -719,50 +434,27 @@ void idGameLocal::Shutdown( void ) {
 	mapFile = NULL;
 
 	// free the collision map
-	collisionModelManager->FreeMap( GetMapName() );
-
-// RAVEN BEGIN
-// jscott: free up static objects
-	for( i = 0; i < MAX_CLIENTS; i++ ) {
-		userInfo[i].Clear();
-		persistentPlayerInfo[i].Clear();
-	}
-
-	for( i = 0; i < entityUsageList.Num(); i++ ) {
-		entityUsageList[i].Clear();
-	}
-
-	serverInfo.Clear();
-	persistentLevelInfo.Clear();
-	sessionCommand.Clear();
-	mapFileName.Clear();
-	mapFileNameStripped.Clear();
-	entityUsageList.Clear();
-
-	newInfo.Clear();
-	spawnArgs.Clear();
-	shakeSounds.Clear();
-	aiManager.Clear();
-// RAVEN END
+	collisionModelManager->FreeMap();
 
 	ShutdownConsoleCommands();
 
 	// free memory allocated by class objects
 	Clear();
 
-	// Defer animationLib shutdown until the next Init() so decl shutdown can safely
-	// drop idAnim references first.
+	// shut down the animation manager
+	animationLib.Shutdown();
 
-// RAVEN BEGIN
-// rjohnson: entity usage stats
-	entityUsageList.Clear();
-// RAVEN END
+	Printf( "--------------------------------------\n" );
 
-	freeView.Shutdown();
+	//HUMANHEAD rww
+	delete ddaManager;
+	ddaManager = NULL;
+	//HUMANHEAD END
 
-	Printf( "---------------------------------------------\n" );
-
-	instances.DeleteContents( true );
+	//HUMANHEAD rww
+	delete reactionHandler;
+	reactionHandler = NULL;
+	//HUMANHEAD END
 
 #ifdef GAME_DLL
 
@@ -786,21 +478,10 @@ save the current player state, level name, and level state
 the session may have written some data to the file already
 ============
 */
-// RAVEN BEGIN
-// mekberg: added saveTypes
-void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
-// RAVEN END
+void idGameLocal::SaveGame( idFile *f ) {
 	int i;
 	idEntity *ent;
 	idEntity *link;
-
-	//remove weapon effect entites from the world
-	if(	GetLocalPlayer() && 
-		!GetLocalPlayer()->IsInVehicle() &&	
-		GetLocalPlayer()->weapon )	{
-		
-		GetLocalPlayer()->weapon->PreSave();
-	}
 
 	idSaveGame savegame( f );
 
@@ -811,6 +492,13 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 	}
 
 	savegame.WriteBuildNumber( BUILD_NUMBER );
+
+#if DEATHWALK_AUTOLOAD // HUMANHEAD mdl
+	savegame.WriteBool( bShouldAppend );
+	if ( bShouldAppend ) {
+		savegame.WriteString( serverInfo.GetString("deathwalkmap") );
+	}
+#endif // HUMANHEAD END
 
 	// go through all entities and threads and add them to the object list
 	for( i = 0; i < MAX_GENTITIES; i++ ) {
@@ -833,37 +521,29 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 		savegame.AddObject( threads[i] );
 	}
 
-// RAVEN BEGIN
-// abahr: saving clientEntities
-	rvClientEntity* clientEnt = NULL;
-	for( i = 0; i < MAX_CENTITIES; ++i ) {
-		clientEnt = clientEntities[ i ];
-		if( !clientEnt ) {
-			continue;
-		}
-//		if( clientEnt->IsType( rvClientEffect::GetClassType() )){
-//			continue;
-//		}
-		savegame.AddObject( clientEnt );
+	// HUMANHEAD mdl:  Allows us to save objects that aren't spawned
+	for( i = 0; i < uniqueObjects.Num(); i++ ) {
+		savegame.AddObject( uniqueObjects[i] );
 	}
-// RAVEN END
+	// HUMANHEAD END
 
 	// write out complete object list
 	savegame.WriteObjectList();
 
 	program.Save( &savegame );
 
-	savegame.WriteInt( g_skill.GetInteger() );
+	Save( &savegame ); // HUMANHEAD Added to allow hhGameLocal to save it's data -mdl
+
+//	savegame.WriteInt( g_skill.GetInteger() );	// HUMANHEAD pdm: not used
+	savegame.WriteInt( g_wicked.GetInteger() );	// HUMANHEAD pdm
+	savegame.WriteInt( g_casino.GetInteger() );	// HUMANHEAD pdm
 
 	savegame.WriteDict( &serverInfo );
 
 	savegame.WriteInt( numClients );
 	for( i = 0; i < numClients; i++ ) {
-// RAVEN BEGIN
-// mekberg: don't write out userinfo. Grab from cvars
-//		savegame.WriteDict( &userInfo[ i ] );
-// RAVEN END
-//		savegame.WriteUsercmd( usercmds[ i ] );
+		savegame.WriteDict( &userInfo[ i ] );
+		savegame.WriteUsercmd( usercmds[ i ] );
 		savegame.WriteDict( &persistentPlayerInfo[ i ] );
 	}
 
@@ -871,17 +551,6 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 		savegame.WriteObject( entities[ i ] );
 		savegame.WriteInt( spawnIds[ i ] );
 	}
-
-// RAVEN BEGIN
-// abahr: more clientEntities saving
-	for( i = 0; i < MAX_CENTITIES; i++ ) {
-//		if( clientEntities[ i ] && clientEntities[ i ]->IsType( rvClientEffect::GetClassType() )){
-//			continue;
-//		}
-		savegame.WriteObject( clientEntities[ i ] );
-		savegame.WriteInt( clientSpawnIds[ i ] );
-	}
-// RAVEN END
 
 	savegame.WriteInt( firstFreeIndex );
 	savegame.WriteInt( num_entities );
@@ -895,49 +564,22 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 		savegame.WriteObject( ent );
 	}
 
-	savegame.WriteInt( scriptObjectProxies.Num() );
-	for( i = 0; i < scriptObjectProxies.Num(); ++i ) {
-		scriptObjectProxies[i].Save( &savegame );
-	}
-	// used to write clientSpawnedEntities.Num() then iterate through the spawn nodes
-	// this is fragile however, as some elsewhere get those out of sync (mantis #70)
-	int countClientSpawnedEntities = 0;
-	for ( clientEnt = clientSpawnedEntities.Next(); clientEnt != NULL; clientEnt = clientEnt->spawnNode.Next() ) {
-		countClientSpawnedEntities++;
-	}
-	if ( countClientSpawnedEntities != clientSpawnedEntities.Num() ) {
-		common->Warning( "countClientSpawnedEntities %d != clientSpawnedEntities.Num() %d\n", countClientSpawnedEntities, clientSpawnedEntities.Num() );
-	}
-	savegame.WriteInt( countClientSpawnedEntities );
-	for ( clientEnt = clientSpawnedEntities.Next(); clientEnt != NULL; clientEnt = clientEnt->spawnNode.Next() ) {
-		savegame.WriteObject( clientEnt );
-	}
-	// same as above. haven't seen a problem with that one but I can't trust it either
-	int countActiveEntities = 0;
-	for ( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
-		countActiveEntities++;
-	}
-	if ( countActiveEntities != activeEntities.Num() ) {
-		common->Warning( "countActiveEntities %d != activeEntities.Num() %d\n", countActiveEntities, activeEntities.Num() );
-	}
-	savegame.WriteInt( countActiveEntities );
-	for ( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
+	savegame.WriteInt( activeEntities.Num() );
+	for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
 		savegame.WriteObject( ent );
 	}
 
 	savegame.WriteInt( numEntitiesToDeactivate );
 	savegame.WriteBool( sortPushers );
 	savegame.WriteBool( sortTeamMasters );
+	//HUMANHEAD rww
+	savegame.WriteBool( sortSnapshotPushers );
+	savegame.WriteBool( sortSnapshotTeamMasters );
+	//HUMANHEAD END
 	savegame.WriteDict( &persistentLevelInfo );
 
 	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
 		savegame.WriteFloat( globalShaderParms[ i ] );
-	}
-	savegame.WriteInt( specialEffectsEnabled );
-	for ( int effect = 0; effect < SPECIAL_EFFECT_MAX; effect++ ) {
-		for ( int parm = 0; parm < MAX_ENTITY_SHADER_PARMS; parm++ ) {
-			savegame.WriteFloat( specialEffectParms[ effect ][ parm ] );
-		}
 	}
 
 	savegame.WriteInt( random.GetSeed() );
@@ -948,16 +590,9 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 	// pvs
 
 	testmodel = NULL;
-// RAVEN BEGIN
-// bdube: no test fx
-//	testFx = NULL;
-// RAVEN END
+	testFx = NULL;
 
 	savegame.WriteString( sessionCommand );
-// RAVEN BEGIN
-// nmckenzie: Let the AI system save itself too.
-	aiManager.Save( &savegame );
-// RAVEN END
 
 	// FIXME: save smoke particles
 
@@ -979,9 +614,6 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 	savegame.WriteInt( entityDefBits );
 	savegame.WriteBool( isServer );
 	savegame.WriteBool( isClient );
-// RAVEN BEGIN
-	savegame.WriteBool( isListenServer );
-// RAVEN END
 
 	savegame.WriteInt( localClientNum );
 
@@ -989,6 +621,7 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 
 	savegame.WriteInt( realClientTime );
 	savegame.WriteBool( isNewFrame );
+	savegame.WriteFloat( clientSmoothing );
 
 	savegame.WriteBool( mapCycleLoaded );
 	savegame.WriteInt( spawnCount );
@@ -1006,13 +639,8 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 
 	savegame.WriteMaterial( globalMaterial );
 
-// RAVEN BEGIN
-// bdube: added
-	lastAIAlertActor.Save( &savegame );
 	lastAIAlertEntity.Save( &savegame );
-	savegame.WriteInt( lastAIAlertEntityTime );
-	savegame.WriteInt( lastAIAlertActorTime );
-// RAVEN END
+	savegame.WriteInt( lastAIAlertTime );
 
 	savegame.WriteDict( &spawnArgs );
 
@@ -1027,6 +655,11 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 
 	savegame.WriteBool( influenceActive );
 	savegame.WriteInt( nextGibTime );
+	// HUMANHEAD mdl
+	savegame.WriteInt( nextSteamTime );
+	savegame.WriteBool( isCoop );
+	savegame.WriteInt( GetTimePlayed() );
+	// HUMANHEAD END
 
 	// spawnSpots
 	// initialSpots
@@ -1039,20 +672,6 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 	idEvent::Save( &savegame );
 
 	savegame.Close();
-
-// RAVEN BEGIN
-// mekberg: added saveTypes and wrapped saveMessage
-	if ( saveType != ST_AUTO && GetLocalPlayer() && GetLocalPlayer()->GetHud() ) {
-		GetLocalPlayer()->SaveMessage();
-	}
-
-// jshepard: resume weapon operation
-	if(	GetLocalPlayer() && 
-		!GetLocalPlayer()->IsInVehicle() &&	
-		GetLocalPlayer()->weapon )	{
-		GetLocalPlayer()->weapon->PostSave();
-	}
-// RAVEN END
 }
 
 /*
@@ -1065,10 +684,7 @@ const idDict &idGameLocal::GetPersistentPlayerInfo( int clientNum ) {
 
 	persistentPlayerInfo[ clientNum ].Clear();
 	ent = entities[ clientNum ];
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( ent && ent->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+	if ( ent && ent->IsType( idPlayer::Type ) ) {
 		static_cast<idPlayer *>(ent)->SavePersistantInfo();
 	}
 
@@ -1081,7 +697,6 @@ idGameLocal::SetPersistentPlayerInfo
 ============
 */
 void idGameLocal::SetPersistentPlayerInfo( int clientNum, const idDict &playerInfo ) {
-	TIME_THIS_SCOPE( __FUNCLINE__);
 	persistentPlayerInfo[ clientNum ] = playerInfo;
 }
 
@@ -1136,13 +751,11 @@ void idGameLocal::Warning( const char *fmt, ... ) const {
 	va_end( argptr );
 
 	thread = idThread::CurrentThread();
-// MERGE:FIXME - the following now gets into a recursive stack overflow when enemies are killed.  Not sure why.
-// nmckenzie:
-/*	if ( thread ) {
+	if ( thread ) {
 		thread->Warning( "%s", text );
-	} else {*/
+	} else {
 		common->Warning( "%s", text );
-//	}
+	}
 }
 
 /*
@@ -1185,36 +798,12 @@ void idGameLocal::Error( const char *fmt, ... ) const {
 	idStr::vsnPrintf( text, sizeof( text ), fmt, argptr );
 	va_end( argptr );
 
-// RAVEN BEGIN
-// scork: some model errors arrive here during validation which kills the whole process, so let's just warn about them instead...
-	//if ( common->DoingDeclValidation() ) {
-	//	this->Warning( "%s", text );
-	//	return;
-	//}
-// RAVEN END
-
 	thread = idThread::CurrentThread();
 	if ( thread ) {
 		thread->Error( "%s", text );
 	} else {
 		common->Error( "%s", text );
 	}
-}
-
-/*
-===============
-gameError
-===============
-*/
-void gameError( const char *fmt, ... ) {
-	va_list		argptr;
-	char		text[MAX_STRING_CHARS];
-
-	va_start( argptr, fmt );
-	idStr::vsnPrintf( text, sizeof( text ), fmt, argptr );
-	va_end( argptr );
-
-	gameLocal.Error( "%s", text );
 }
 
 /*
@@ -1231,10 +820,7 @@ void idGameLocal::SetLocalClient( int clientNum ) {
 idGameLocal::SetUserInfo
 ============
 */
-const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, bool isClient ) {
-	
-	TIME_THIS_SCOPE( __FUNCLINE__);
-	
+const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, bool isClient, bool canModify ) {
 	int i;
 	bool modifiedInfo = false;
 
@@ -1244,14 +830,10 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 		idGameLocal::userInfo[ clientNum ] = userInfo;
 
 		// server sanity
-		if ( !isClient ) {
+		if ( canModify ) {
 
 			// don't let numeric nicknames, it can be exploited to go around kick and ban commands from the server
 			if ( idStr::IsNumeric( this->userInfo[ clientNum ].GetString( "ui_name" ) ) ) {
-#if UI_DEBUG
-				common->Printf( "SetUserInfo: client %d changed name from %s to %s_\n", 
-					clientNum, idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) );
-#endif
 				idGameLocal::userInfo[ clientNum ].Set( "ui_name", va( "%s_", idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) );
 				modifiedInfo = true;
 			}
@@ -1261,15 +843,8 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 				if ( i == clientNum ) {
 					continue;
 				}
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-				if ( entities[ i ] && entities[ i ]->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+				if ( entities[ i ] && entities[ i ]->IsType( idPlayer::Type ) ) {
 					if ( !idStr::Icmp( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ i ].GetString( "ui_name" ) ) ) {
-#if UI_DEBUG
-						common->Printf( "SetUserInfo: client %d changed name from %s to %s_ because of client %d\n", 
-							clientNum, idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), i );
-#endif
 						idGameLocal::userInfo[ clientNum ].Set( "ui_name", va( "%s_", idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) );
 						modifiedInfo = true;
 						i = -1;	// rescan
@@ -1279,11 +854,8 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 			}
 		}
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( entities[ clientNum ] && entities[ clientNum ]->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
-			modifiedInfo |= static_cast<idPlayer *>( entities[ clientNum ] )->UserInfoChanged();
+		if ( entities[ clientNum ] && entities[ clientNum ]->IsType( idPlayer::Type ) ) {
+			modifiedInfo |= static_cast<idPlayer *>( entities[ clientNum ] )->UserInfoChanged( canModify );
 		}
 
 		if ( !isClient ) {
@@ -1293,6 +865,7 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 	}
 
 	if ( modifiedInfo ) {
+		assert( canModify );
 		newInfo = idGameLocal::userInfo[ clientNum ];
 		return &newInfo;
 	}
@@ -1305,26 +878,10 @@ idGameLocal::GetUserInfo
 ============
 */
 const idDict* idGameLocal::GetUserInfo( int clientNum ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( entities[ clientNum ] && entities[ clientNum ]->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+	if ( entities[ clientNum ] && entities[ clientNum ]->IsType( idPlayer::Type ) ) {
 		return &userInfo[ clientNum ];
 	}
 	return NULL;
-}
-
-/*
-===========
-idGameLocal::IsClientActive
-============
-*/
-bool idGameLocal::IsClientActive( int clientNum ) {
-	if ( entities[ clientNum ] && entities[ clientNum ]->IsType( idPlayer::GetClassType() ) ) {
-		return true;
-	}
-
-	return false;
 }
 
 /*
@@ -1333,28 +890,13 @@ idGameLocal::SetServerInfo
 ============
 */
 void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
-	TIME_THIS_SCOPE( __FUNCLINE__);
-	
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
-	bool timeLimitChanged = false;
-
-// RAVEN BEGIN
-// mekberg: clear announcer and reschedule time announcements
-	if ( ( isClient || isListenServer ) && mpGame.GetGameState( ) && mpGame.GetGameState( )->GetMPGameState( ) == GAMEON &&
-		serverInfo.GetInt( "si_timelimit" ) != _serverInfo.GetInt( "si_timelimit" ) ) {
-		timeLimitChanged = true;
-	}
 
 	serverInfo = _serverInfo;
-	if ( timeLimitChanged ) {
-		mpGame.ClearAnnouncerSounds( );
-		mpGame.ScheduleTimeAnnouncements( );
-	}
-// RAVEN END
+	UpdateServerInfoFlags();
 
-	if ( isServer ) {
-		
+	if ( !isClient ) {
 		// Let our clients know the server info changed
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
 		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_SERVERINFO );
@@ -1362,6 +904,7 @@ void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
 		networkSystem->ServerSendReliableMessage( -1, outMsg );
 	}
 }
+
 
 /*
 ===================
@@ -1372,19 +915,17 @@ Initializes all map variables common to both save games and spawned games.
 */
 void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	int i;
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG(tag,MA_PARSER);
-// RAVEN END
-	bool sameMap = (mapFile && idStr::Icmp(mapFile->GetName(), mapName) == 0);
+	bool sameMap = (mapFile && idStr::Icmp(mapFileName, mapName) == 0);
 
-	networkSystem->SetLoadingText( mapName );
+	// clear the sound system
+	gameSoundWorld->ClearAllSoundEmitters();
+
+	// HUMANHEAD pdm
+	SpiritWalkSoundMode( false );
+	DialogSoundMode( false );
+	// HUMANHEAD END
 
 	InitAsyncNetwork();
-
-	// these can changed based upon sp / mp
-	mHz = common->GetUserCmdHz();
-	msec = common->GetUserCmdMSec();
 
 	if ( !sameMap || ( mapFile && mapFile->NeedsReload() ) ) {
 		// load the .map file
@@ -1392,46 +933,37 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 			delete mapFile;
 		}
 		mapFile = new idMapFile;
-		idStr mapFilePath = mapName;
-		mapFilePath.SetFileExtension( "map" );
-		if ( !mapFile->Parse( mapFilePath ) ) {
+		if ( !mapFile->Parse( idStr( mapName ) + ".map" ) ) {
 			delete mapFile;
 			mapFile = NULL;
 			Error( "Couldn't load %s", mapName );
 		}
-// RAVEN BEGIN
-// rjohnson: added resolve for handling func_groups and other aspects.  Before, radiant would do this processing on a map destroying the original data
-		mapFile->Resolve();
-// RAVEN END
 	}
 	mapFileName = mapFile->GetName();
-	
-	assert(!idStr::Cmp(mapFileName, mapFile->GetName()));
-	
-// RAVEN BEGIN
-// rjohnson: entity usage stats
-	mapFileNameStripped = mapFileName;
-	mapFileNameStripped.StripFileExtension();
-	mapFileNameStripped.StripPath();
 
-	const char*	entityFilter;
-
-	gameLocal.serverInfo.GetString( "si_entityFilter", "", &entityFilter );
-	if ( entityFilter && *entityFilter ) {
-		mapFileNameStripped += " ";
-		mapFileNameStripped += entityFilter;
-	}
-// RAVEN END
+// HUMANHEAD pdm: Support for level appending
+#if DEATHWALK_AUTOLOAD
+	bool bUseLoaded = collisionModelManager->WillUseAlreadyLoadedCollisionMap(mapFile);
+#endif
+// HUMANHEAD END
 
 	// load the collision map
-	networkSystem->SetLoadingText( common->GetLocalizedString( "#str_107668" ) );
-	collisionModelManager->LoadMap( mapFile, false );
+	collisionModelManager->LoadMap( mapFile );
+
+// HUMANHEAD pdm: Support for level appending
+#if DEATHWALK_AUTOLOAD
+	if (bShouldAppend && !bUseLoaded) {
+		// load the collision map for dw
+		collisionModelManager->AppendMap( additionalMapFile );
+	}
+#endif
+// HUMANHEAD END
 
 	numClients = 0;
 
 	// initialize all entities for this game
 	memset( entities, 0, sizeof( entities ) );
-	usercmds = NULL;
+	memset( usercmds, 0, sizeof( usercmds ) );
 	memset( spawnIds, -1, sizeof( spawnIds ) );
 	spawnCount = INITIAL_SPAWN_COUNT;
 	
@@ -1440,22 +972,16 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	numEntitiesToDeactivate = 0;
 	sortTeamMasters = false;
 	sortPushers = false;
+	//HUMANHEAD rww
+	sortSnapshotPushers = false;
+	sortSnapshotTeamMasters = false;
+	//HUMANHEAD END
 	lastGUIEnt = NULL;
 	lastGUI = 0;
-
-// RAVEN BEGIN
-// bdube: client entities
-	clientSpawnCount = INITIAL_SPAWN_COUNT;
-	clientSpawnedEntities.Clear();
-	memset ( clientSpawnIds, -1, sizeof(clientSpawnIds ) );
-	memset ( clientEntities, 0, sizeof(clientEntities) );
-	firstFreeClientIndex = 0;
-// RAVEN END
 
 	globalMaterial = NULL;
 
 	memset( globalShaderParms, 0, sizeof( globalShaderParms ) );
-	ResetSpecialEffects();
 
 	// always leave room for the max number of clients,
 	// even if they aren't all used, so numbers inside that
@@ -1469,56 +995,34 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	camera			= NULL;
 	world			= NULL;
 	testmodel		= NULL;
-// RAVEN BEGIN
-// bdube: not using id effects
-//	testFx			= NULL;
-// RAVEN END
+	testFx			= NULL;
 
-// RAVEN BEGIN
-// bdube: merged
 	lastAIAlertEntity = NULL;
-	lastAIAlertEntityTime = 0;
-	lastAIAlertActor = NULL;
-	lastAIAlertActorTime = 0;
-// RAVEN END
+	lastAIAlertTime = 0;
 	
 	previousTime	= 0;
 	time			= 0;
 	framenum		= 0;
 	sessionCommand = "";
 	nextGibTime		= 0;
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
-	unFreezeTime	= 0;
-	isFrozen		= 0;
-// RITUAL END
+	nextSteamTime	= 0; // HUMANHEAD mdl
+
+	//HUMANHEAD rww - check lglcd validity and reset values
+	logitechLCDEnabled = sys->LGLCD_Valid();
+	logitechLCDDisplayAlt = false;
+	logitechLCDButtonsLast = 0;
+	logitechLCDUpdateTime = 0;
+	//HUMANHEAD END
 
 	vacuumAreaNum = -1;		// if an info_vacuum is spawned, it will set this
-
-// RAVEN BEGIN
-// abahr
-	gravityInfo.Clear();
-	scriptObjectProxies.Clear();
-// RAVEN END
 
 	if ( !editEntities ) {
 		editEntities = new idEditEntities;
 	}
 
-	if ( gameLocal.isMultiplayer ) {
-		gravity.Set( 0, 0, -g_mp_gravity.GetFloat() );
-	} else {
-		gravity.Set( 0, 0, -g_gravity.GetFloat() );
-	}
+	gravity.Set( 0, 0, -g_gravity.GetFloat() );
 
 	spawnArgs.Clear();
-
-// RAVEN BEGIN
-// nmckenzie:
-	//make sure we clear all reachabilities we marked as blocked!
-	aiManager.UnMarkAllReachBlocked();
-	aiManager.Clear();
-// RAVEN END
 
 	skipCinematic = false;
 	inCinematic = false;
@@ -1526,23 +1030,17 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	cinematicStopTime = 0;
 	cinematicMaxSkipTime = 0;
 
-// RAVEN BEGIN
-// ddynerman: main world instance
-	PACIFIER_UPDATE;
-	AddInstance( 0, true );
-	assert( instances.Num() == 1 && instances[ 0 ]->GetInstanceID() == 0 );
-// RAVEN END
-	pvs.Init();
-// RAVEN BEGIN
-// mwhitlock: Xenon texture streaming
-#if defined(_XENON)
-	// Experimental use of game's PVS for reducing amount of stuff streamed. Will
-	// do this a bit more cleanly if I decide to keep this.
-	extern idPVS* pvsForStreaming;
-	pvsForStreaming=&pvs;
+	// HUMANHEAD pdm: Register our game portals so they can be used in PVS below
+#if GAMEPORTAL_PVS
+	gameRenderWorld->RegisterGamePortals(mapFile);
 #endif
-// RAVEN END
+#if GAMEPORTAL_SOUND
+	gameRenderWorld->LevelInitSoundAreas();
+#endif
+	// HUMANHEAD END
 
+	clip.Init();
+	pvs.Init();
 	playerPVS.i = -1;
 	playerConnectedAreas.i = -1;
 
@@ -1551,21 +1049,15 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 		aasList[ i ]->Init( idStr( mapFileName ).SetFileExtension( aasNames[ i ] ).c_str(), mapFile->GetGeometryCRC() );
 	}
 
-// RAVEN BEGIN
-// cdr: Obstacle Avoidance
-	AI_MoveInitialize();
-// RAVEN END
+	// clear the smoke particle free list
+	smokeParticles->Init();
 
+	// cache miscellanious media references
 	FindEntityDef( "preCacheExtras", false );
 
 	if ( !sameMap ) {
 		mapFile->RemovePrimitiveData();
 	}
-
-// RAVEN BEGIN
-// ddynerman: ambient light list
-	ambientLights.Clear();
-// RAVEN END
 }
 
 /*
@@ -1573,44 +1065,36 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 idGameLocal::LocalMapRestart
 ===================
 */
-void idGameLocal::LocalMapRestart( int instance ) {
+void idGameLocal::LocalMapRestart( ) {
 	int i, latchSpawnCount;
 
-	Printf( "----------- Game Map Restart (%s) ------------\n", instance == -1 ? "all instances" : va( "instance %d", instance ) );
-
-	// client always respawns everything, so make sure it picks up the right map entities
-	if( instance == -1 || isClient ) {
-		memset( isMapEntity, 0, sizeof(bool) * MAX_GENTITIES );
-	} else {
-		assert( instance >= 0 && instance < instances.Num() );
-
-		for( int i = 0; i < instances[ instance ]->GetNumMapEntities(); i++ ) {
-			if ( instances[ instance ]->GetMapEntityNumber( i ) >= 0 && instances[ instance ]->GetMapEntityNumber( i ) < MAX_GENTITIES ) {
-				isMapEntity[ instances[ instance ]->GetMapEntityNumber( i ) ] = false;
-			}
-		}
-	}
+	Printf( "----------- Game Map Restart ------------\n" );
 
 	gamestate = GAMESTATE_SHUTDOWN;
 
 	for ( i = 0; i < MAX_CLIENTS; i++ ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( entities[ i ] && entities[ i ]->IsType( idPlayer::GetClassType() ) && (isClient || instance == -1 || entities[ i ]->GetInstance() == instance ) ) {
-// RAVEN END
+		if ( entities[ i ] && entities[ i ]->IsType( idPlayer::Type ) ) {
 			static_cast< idPlayer * >( entities[ i ] )->PrepareForRestart();
 		}
 	}
 
 	eventQueue.Shutdown();
+	savedEventQueue.Shutdown();
 
-	MapClear( false, instance );
+	MapClear( false );
+
+	// clear the smoke particle free list
+	smokeParticles->Init();
 
 	// clear the sound system
-	soundSystem->StopAllSounds( SOUNDWORLD_GAME );
+	if ( gameSoundWorld ) {
+		gameSoundWorld->ClearAllSoundEmitters();
 
-	// clear icons
-	iconManager->Shutdown();
+		// HUMANHEAD pdm
+		SpiritWalkSoundMode( false );
+		DialogSoundMode( false );
+		// HUMANHEAD END
+	}
 
 	// the spawnCount is reset to zero temporarily to spawn the map entities with the same spawnId
 	// if we don't do that, network clients are confused and don't show any map entities
@@ -1623,7 +1107,7 @@ void idGameLocal::LocalMapRestart( int instance ) {
 
 	InitScriptForMap();
 
-	MapPopulate( instance );
+	MapPopulate();
 
 	// once the map is populated, set the spawnCount back to where it was so we don't risk any collision
 	// (note that if there are no players in the game, we could just leave it at it's current value)
@@ -1631,10 +1115,7 @@ void idGameLocal::LocalMapRestart( int instance ) {
 
 	// setup the client entities again
 	for ( i = 0; i < MAX_CLIENTS; i++ ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( entities[ i ] && entities[ i ]->IsType( idPlayer::GetClassType() ) && (isClient || instance == -1 || entities[ i ]->GetInstance() == instance ) ) {
-// RAVEN END
+		if ( entities[ i ] && entities[ i ]->IsType( idPlayer::Type ) ) {
 			static_cast< idPlayer * >( entities[ i ] )->Restart();
 		}
 	}
@@ -1649,7 +1130,7 @@ void idGameLocal::LocalMapRestart( int instance ) {
 idGameLocal::MapRestart
 ===================
 */
-void idGameLocal::MapRestart( int instance ) {
+void idGameLocal::MapRestart( ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 	idDict		newInfo;
@@ -1657,48 +1138,24 @@ void idGameLocal::MapRestart( int instance ) {
 	const idKeyValue *keyval, *keyval2;
 
 	if ( isClient ) {
-// RAVEN BEGIN
-// ddynerman: check if gametype changed
-		SetGameType();
-// RAVEN END
-		LocalMapRestart( instance );
+		LocalMapRestart();
 	} else {
-
-		if ( mpGame.PickMap( "", true ) ) {
-			common->Warning( "map %s and gametype %s are incompatible, aborting map change", si_map.GetString(), si_gameType.GetString() );
-			return;
-		}
-
 		newInfo = *cvarSystem->MoveCVarsToDict( CVAR_SERVERINFO );
-		// this has to be after the cvars are moved to the dict
 		for ( i = 0; i < newInfo.GetNumKeyVals(); i++ ) {
-
 			keyval = newInfo.GetKeyVal( i );
 			keyval2 = serverInfo.FindKey( keyval->GetKey() );
 			if ( !keyval2 ) {
 				break;
 			}
 			// a select set of si_ changes will cause a full restart of the server
-			if ( keyval->GetValue().Icmp( keyval2->GetValue() ) &&
-				( !keyval->GetKey().Icmp( "si_pure" ) || !keyval->GetKey().Icmp( "si_map" ) ) ) {
+			if ( keyval->GetValue().Cmp( keyval2->GetValue() ) &&
+				( !keyval->GetKey().Cmp( "si_pure" ) || !keyval->GetKey().Cmp( "si_map" ) ) ) {
 				break;
 			}
-//RAVEN BEGIN
-			//asalmon: need to restart if the game type has changed but the map has not cause someone could be connecting
-			if(  keyval->GetValue().Icmp( keyval2->GetValue() ) && (!keyval->GetKey().Icmp("si_gametype")))
-			{
-				break;
-			}
-//RAVEN END
 		}
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" " " __FILE__ " " __LINESTR__ );
-
-		SetGameType();
-
-		mpGame.isBuyingAllowedRightNow = false;
-
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" );
 		if ( i != newInfo.GetNumKeyVals() ) {
-			gameLocal.sessionCommand = "nextMap";
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "nextMap" );
 		} else {
 			outMsg.Init( msgBuf, sizeof( msgBuf ) );
 			outMsg.WriteByte( GAME_RELIABLE_MESSAGE_RESTART );
@@ -1706,19 +1163,10 @@ void idGameLocal::MapRestart( int instance ) {
 			outMsg.WriteDeltaDict( serverInfo, NULL );
 			networkSystem->ServerSendReliableMessage( -1, outMsg );
 
-			LocalMapRestart( instance );
+			LocalMapRestart();
 			mpGame.MapRestart();
 		}
 	}
-}
-
-/*
-===================
-idGameLocal::VerifyServerSettings_f
-===================
-*/
-void idGameLocal::VerifyServerSettings_f( const idCmdArgs &args ) {
-	gameLocal.mpGame.PickMap( si_gameType.GetString() );
 }
 
 /*
@@ -1732,19 +1180,8 @@ void idGameLocal::MapRestart_f( const idCmdArgs &args ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "spawnServer\n" );
 		return;
 	}
-	
-	int instance = -1;
-	if( args.Argc() > 1 ) {
-		instance = atoi( args.Args( 1 ) );
-		if( instance < 0 || instance >= gameLocal.GetNumInstances() ) {
-			common->Warning( "idGameLocal::MapRestart_f() - Invalid instance '%d' specified\n", instance );
-			return;
-		}
-		gameLocal.LocalMapRestart( instance );
-		return;
-	}
 
-	gameLocal.MapRestart( instance );
+	gameLocal.MapRestart( );
 }
 
 /*
@@ -1758,56 +1195,14 @@ bool idGameLocal::NextMap( void ) {
 	idDict				newInfo;
 	const idKeyValue	*keyval, *keyval2;
 	int					i;
-	const char			*mapCycleList, *currentMap;
 
-// RAVEN BEGIN
-// rjohnson: traditional map cycle
-//		si_mapCycle "mp/q4dm4;mp/q4dm5;mp/q4dm6"
-	mapCycleList = si_mapCycle.GetString();
-	if ( mapCycleList && strlen( mapCycleList ) ) {
-		idLexer src;
-		idToken token, firstFound;
-		int		numMaps = 0;
-		bool	foundMap = false;
-
-		src.FreeSource();
-		src.SetFlags( LEXFL_NOFATALERRORS | LEXFL_ALLOWPATHNAMES | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
-		src.LoadMemory( mapCycleList, strlen( mapCycleList ), "idGameLocal::NextMap" );
-		if ( src.IsLoaded() ) {
-
-			currentMap = si_map.GetString();
-			while( src.ReadToken( &token ) ) {
-				if ( token == ";" ) {
-					continue;
-				}
-				numMaps++;
-
-				if ( numMaps == 1 ) {
-					// guarantee that we use a map no matter what ( or when we wrap )
-					firstFound = token;
-				}
-				if ( foundMap ) {
-					firstFound = token;
-					break;
-				}
-				
-				if ( idStr::Icmp( token, currentMap ) == 0 ) {
-					foundMap = true;
-				}
-			}
-
-			if ( firstFound != "" ) {
-				si_map.SetString( firstFound );
-				return true;
-			}
-		}
-
-		return false;
+	// HUMANHEAD pdm: restart current map if cycling is disabled
+	if ( !g_runMapCycle.GetBool() ) {
+		return true;
 	}
-// RAVEN END
 
 	if ( !g_mapCycle.GetString()[0] ) {
-		Printf( common->GetLocalizedString( "#str_104294" ) );
+		Printf( common->GetLanguageDict()->GetString( "#str_04294" ) );
 		return false;
 	}
 	if ( fileSystem->ReadFile( g_mapCycle.GetString(), NULL, NULL ) < 0 ) {
@@ -1837,7 +1232,7 @@ bool idGameLocal::NextMap( void ) {
 	for ( i = 0; i < newInfo.GetNumKeyVals(); i++ ) {
 		keyval = newInfo.GetKeyVal( i );
 		keyval2 = serverInfo.FindKey( keyval->GetKey() );
-		if ( !keyval2 || keyval->GetValue().Icmp( keyval2->GetValue() ) ) {
+		if ( !keyval2 || keyval->GetValue().Cmp( keyval2->GetValue() ) ) {
 			break;
 		}
 	}
@@ -1861,111 +1256,54 @@ void idGameLocal::NextMap_f( const idCmdArgs &args ) {
 }
 
 /*
-===============
-idGameLocal::GetStartingIndexForInstance
-===============
-*/
-int idGameLocal::GetStartingIndexForInstance( int instanceID ) {
-	if ( isServer ) {
-		assert( instancesEntityIndexWatermarks.Num() >= instanceID );
-		if ( instanceID == 0 ) {
-			return MAX_CLIENTS;
-		} else {
-			// the high watermark of the previous instance is the starting index of the next one
-			return instancesEntityIndexWatermarks[ instanceID - 1 ];
-		}
-	} else {
-		assert( instanceID == 0 );
-		return clientInstanceFirstFreeIndex;
-	}
-}
-
-/*
-===============
-idGameLocal::ServerSetEntityIndexWatermark
-keep track of the entity layout at the server - specially when there are multiple instances ( tourney )
-===============
-*/
-void idGameLocal::ServerSetEntityIndexWatermark( int instanceID ) {
-	if ( isClient ) {
-		return;
-	}
-	instancesEntityIndexWatermarks.AssureSize( instanceID + 1, MAX_CLIENTS );
-	// make sure there is no drift. if a value was already set it has to match
-	// otherwise that means the server is repopulating with different indexes, and that would likely lead to net corruption
-	assert( instancesEntityIndexWatermarks[ instanceID ] == MAX_CLIENTS || instancesEntityIndexWatermarks[ instanceID ] == firstFreeIndex );
-	instancesEntityIndexWatermarks[ instanceID ] = firstFreeIndex;
-}
-
-/*
-===============
-idGameLocal::ServerSetMinSpawnIndex
-===============
-*/
-void idGameLocal::ServerSetMinSpawnIndex( void ) {
-	if ( isClient ) {
-		return;
-	}
-	// setup minSpawnIndex with enough headroom so gameplay entities don't cause bad offsets
-	// only needed on server, clients are completely slaved up to server entity layout
-	if ( !idStr::Icmp( serverInfo.GetString( "si_gameType" ), "Tourney" ) ) {
-		minSpawnIndex = MAX_CLIENTS + GetNumMapEntities() * MAX_INSTANCES;
-	}
-}
-
-/*
 ===================
 idGameLocal::MapPopulate
 ===================
 */
-void idGameLocal::MapPopulate( int instance ) {
-
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG(tag,MA_ENTITY);
-// RAVEN END
+void idGameLocal::MapPopulate( void ) {
+	//HUMANHEAD rww - keep track of layered spawning
+#if !GOLD
+	spawnPopulating = true;
+	layeredSpawn = 0;
+#endif
+	//HUMANHEAD END
 
 	if ( isMultiplayer ) {
 		cvarSystem->SetCVarBool( "r_skipSpecular", false );
 	}
-
-	minSpawnIndex = MAX_CLIENTS;
-
 	// parse the key/value pairs and spawn entities
-// RAVEN BEGIN
-// ddynerman: instance code
-	// reload the instances
-	if ( instance == -1 ) {
-		int i;
-		firstFreeIndex = MAX_CLIENTS;
-		for ( i = 0; i < instances.Num(); i++ ) {
-			if ( instances[ i ] ) {
-				instances[ i ]->Restart();
+	SpawnMapEntities();
 
-				ServerSetEntityIndexWatermark( i );
-			}
-		}
-	} else {
-		assert( instance >= 0 && instance < instances.Num() );
-		instances[ instance ]->Restart();
+// HUMANHEAD pdm: Support for level appending
+#if DEATHWALK_AUTOLOAD
+	if (bShouldAppend) {
+		SpawnAppendedMapEntities();
 	}
-// RAVEN END
-
-	ServerSetMinSpawnIndex();
+#endif
+// HUMANHEAD END
 
 	// mark location entities in all connected areas
 	SpreadLocations();
 
-	// RAVEN BEGIN
-	// ddynerman: prepare the list of spawn spots
-	InitializeSpawns();
-	// RAVEN END
+	// prepare the list of randomized initial spawn spots
+	RandomizeInitialSpawns( );
+
+	mapSpawnCount = spawnCount;
 
 	// execute pending events before the very first game frame
 	// this makes sure the map script main() function is called
 	// before the physics are run so entities can bind correctly
-	Printf( "------------ Processing events --------------\n" );
+	Printf( "==== Processing events ====\n" );
 	idEvent::ServiceEvents();
+
+	//HUMANHEAD rww - keep track of layered spawning
+#if !GOLD
+	if (layeredSpawn) {
+		gameLocal.Error("Uneven layeredSpawn at the end of idGameLocal::MapPopulate!\n");
+	}
+	spawnPopulating = false;
+#endif
+	//HUMANHEAD END
 }
 
 /*
@@ -1973,66 +1311,52 @@ void idGameLocal::MapPopulate( int instance ) {
 idGameLocal::InitFromNewMap
 ===================
 */
-void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorld, bool isServer, bool isClient, int randseed ) {
+void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorld, idSoundWorld *soundWorld, bool isServer, bool isClient, int randseed ) {
 
-	TIME_THIS_SCOPE( __FUNCLINE__);
-	
+	uniqueObjects.Clear(); // HUMANHEAD mdl
+
 	this->isServer = isServer;
 	this->isClient = isClient;
-// RAVEN BEGIN
-// ddynerman: listen server
-	this->isListenServer = isServer && !cvarSystem->GetCVarBool( "net_serverDedicated" );
-// RAVEN END
 	this->isMultiplayer = isServer || isClient;
-	mpInteractionsGenerated = false;
-// jmarshall
-	//if ( this->isMultiplayer )
-	//	gameLocal.Error( "This mod is for singleplayer only" );
-// jmarshall end
-	PACIFIER_UPDATE;
 
-//RAVEN BEGIN
-//asalmon: stats for single player
-	if (!this->isMultiplayer) {
-#ifdef _MPBETA
-		return;
-#else
-		statManager->EndGame();
-#ifdef _XENON
-		Live()->DeleteSPSession(true);
-#endif
-		statManager->Shutdown();
-		statManager->Init();
-		statManager->BeginGame();
-		statManager->ClientConnect(0);
-#ifdef _XENON
-		Live()->CreateSPSession();
-#endif
-#endif // _MPBETA
+	// HUMANHEAD mdl:  Playtime
+	if ( playTimeStart != -1 ) {
+		if ( isMultiplayer ) {
+			playTime = 0; // No playtime for MP
+		} else {
+			playTime += gameLocal.time - playTimeStart;
+		}
+		playTimeStart = -1;
 	}
-//RAVEN END
+	// HUMANHEAD END
 
 	if ( mapFileName.Length() ) {
 		MapShutdown();
 	}
 
-	Printf( "-------------- Game Map Init ----------------\n" );
+	Printf( "----------- Game Map Init ------------\n" );
 
 	gamestate = GAMESTATE_STARTUP;
 
 	gameRenderWorld = renderWorld;
-	// Ensure render targets/material handles are fresh for each map transition.
-	InitGameRenderSystem();
+	gameSoundWorld = soundWorld;
 
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	animationLib->BeginLevelLoad();
+// HUMANHEAD pdm: Support for level appending
+#if DEATHWALK_AUTOLOAD
+	bShouldAppend = serverInfo.GetBool("shouldappendlevel");
+
+	additionalMapFile = NULL;
+	if (bShouldAppend) {
+		// Load the deathwalk map
+		idStr additionalMapName = serverInfo.GetString("deathwalkmap");
+		additionalMapName.SetFileExtension( "map" );
+		additionalMapFile = new idMapFile;
+		if ( !additionalMapFile->Parse( additionalMapName.c_str() ) ) {
+			delete additionalMapFile;
+			additionalMapFile = NULL;
+		}
+	}
 #endif
-	
-// ddynerman: set gametype
-	SetGameType();
-// RAVEN END
 
 	LoadMap( mapName, randseed );
 
@@ -2040,61 +1364,26 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 
 	MapPopulate();
 
+	// HUMANHEAD pdm: tell sound system about our location names
+	RegisterLocationsWithSoundWorld();
+
 	mpGame.Reset();
 
 	mpGame.Precache();
 
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	animationLib->EndLevelLoad();
-#endif
-// RAVEN END
-
 	// free up any unused animations
-// RAVEN BEGIN
-// jsinger: animationLib changed to a pointer
-	animationLib->FlushUnusedAnims();
-// RAVEN END
-
-// jmarshall
-	if (botItemTable && gameLocal.IsMultiplayer() && gameLocal.isServer)
-	{
-		botGoalManager.InitLevelItems();
-	}
-// jmarshall end
-
+	animationLib.FlushUnusedAnims();
 
 	gamestate = GAMESTATE_ACTIVE;
-	autoScreenshotStartTime = Sys_Milliseconds();
-	const bool gAutoScreenshot = g_autoScreenshot.GetBool();
-	const bool gAutoScreenshotCvar = cvarSystem->GetCVarBool( "g_autoScreenshot" );
-	autoScreenshotPending = gAutoScreenshot || gAutoScreenshotCvar;
-	const bool comAutoScreenshot = cvarSystem->GetCVarBool( "com_autoScreenshot" );
-	if ( comAutoScreenshot ) {
-		autoScreenshotPending = true;
-	}
-	if ( developer.GetBool() ) {
-		Printf( "AutoScreenshot g_cvar=%d g_sys=%d com_autoScreenshot=%d\n",
-			gAutoScreenshot ? 1 : 0,
-			gAutoScreenshotCvar ? 1 : 0,
-			comAutoScreenshot ? 1 : 0 );
-	}
-	if ( autoScreenshotPending ) {
-		Printf( "AutoScreenshot: armed (delay %d ms)\n", g_autoScreenshotDelayMs.GetInteger() );
-	}
 
-	autoMachinegunImpactStartTime = autoScreenshotStartTime;
-	const bool autoMachinegunImpact = g_autoMachinegunImpact.GetBool();
-	const bool autoMachinegunImpactCvar = cvarSystem->GetCVarBool( "g_autoMachinegunImpact" );
-	autoMachinegunImpactPending = autoMachinegunImpact || autoMachinegunImpactCvar;
-	if ( autoMachinegunImpactPending ) {
-		Printf( "AutoMachinegunImpact: armed (delay %d ms, distance %.1f)\n",
-			g_autoMachinegunImpactDelayMs.GetInteger(),
-			g_autoMachinegunImpactDistance.GetFloat() );
+	// HUMANHEAD mdl:  Start session
+	if ( !isMultiplayer && playTimeStart == ( unsigned int ) -1 ) {
+		playTimeStart = gameLocal.time;
 	}
+	// HUMANHEAD END
 
-	Printf( "---------------------------------------------\n" );
+
+	Printf( "--------------------------------------\n" );
 }
 
 /*
@@ -2102,30 +1391,46 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 idGameLocal::InitFromSaveGame
 =================
 */
-bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWorld, idFile *saveGameFile ) {
-	TIME_THIS_SCOPE( __FUNCLINE__);
-	
+bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWorld, idSoundWorld *soundWorld, idFile *saveGameFile ) {
 	int i;
 	int num;
 	idEntity *ent;
 	idDict si;
-	mpInteractionsGenerated = false;
 
 	if ( mapFileName.Length() ) {
 		MapShutdown();
 	}
 
-	Printf( "---------- Game Map Init SaveGame -----------\n" );
+	Printf( "------- Game Map Init SaveGame -------\n" );
 
 	gamestate = GAMESTATE_STARTUP;
 
 	gameRenderWorld = renderWorld;
-	// Ensure render targets/material handles are fresh for each map transition.
-	InitGameRenderSystem();
+	gameSoundWorld = soundWorld;
+
+	uniqueObjects.Clear(); // HUMANHEAD mdl
 
 	idRestoreGame savegame( saveGameFile );
 
 	savegame.ReadBuildNumber();
+
+	// HUMANHEAD pdm: Support for level appending
+#if DEATHWALK_AUTOLOAD
+	savegame.ReadBool( bShouldAppend );
+
+	additionalMapFile = NULL;
+	if (bShouldAppend) {
+		// Load the deathwalk map
+		idStr additionalMapName;
+		savegame.ReadString( additionalMapName );
+		additionalMapName.SetFileExtension( "map" );
+		additionalMapFile = new idMapFile;
+		if ( !additionalMapFile->Parse( additionalMapName.c_str() ) ) {
+			delete additionalMapFile;
+			additionalMapFile = NULL;
+		}
+	}
+#endif
 
 	// Create the list of all objects in the game
 	savegame.CreateObjects();
@@ -2144,17 +1449,28 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	// load the map needed for this savegame
 	LoadMap( mapName, 0 );
 
-	savegame.ReadInt( i );
-	g_skill.SetInteger( i );
+	Restore( &savegame ); // HUMANHEAD Added to allow hhGameLocal to restore it's data -mdl
+
+//	savegame.ReadInt( i );		// HUMANHEAD pdm: not used
+//	g_skill.SetInteger( i );	// HUMANHEAD pdm: not used
+
+	savegame.ReadInt( i );		// HUMANHEAD pdm
+	g_wicked.SetInteger( i );
+
+	savegame.ReadInt( i );		// HUMANHEAD pdm
+	g_casino.SetInteger( i );
+
+	// precache the player
+	FindEntityDef( GAME_PLAYERDEFNAME, false );	// HUMANHEAD pdm: removed hardcoded name
 
 	// precache any media specified in the map
 	for ( i = 0; i < mapFile->GetNumEntities(); i++ ) {
 		idMapEntity *mapEnt = mapFile->GetEntity( i );
 
-		if ( !InhibitEntitySpawn( mapEnt->epairs ) ) {
+		if ( !idGameLocal::InhibitEntitySpawn( mapEnt->epairs ) ) { // HUMANHEAD mdl:  Need this to call the original function
 			CacheDictionaryMedia( &mapEnt->epairs );
 			const char *classname = mapEnt->epairs.GetString( "classname" );
-			if ( classname[0] != '\0' ) {
+			if ( classname != NULL && classname[0] != '\0' ) {
 				FindEntityDef( classname, false );
 			}
 		}
@@ -2165,11 +1481,8 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 
 	savegame.ReadInt( numClients );
 	for( i = 0; i < numClients; i++ ) {
-// RAVEN BEGIN
-// mekberg: don't read in userinfo. Grab from cvars
-//		savegame.ReadDict( &userInfo[ i ] );
-// RAVEN END
-//		savegame.ReadUsercmd( usercmds[ i ] );
+		savegame.ReadDict( &userInfo[ i ] );
+		savegame.ReadUsercmd( usercmds[ i ] );
 		savegame.ReadDict( &persistentPlayerInfo[ i ] );
 	}
 
@@ -2182,23 +1495,6 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 			entities[ i ]->entityNumber = i;
 		}
 	}
-
-	// Precache the player
-// RAVEN BEGIN
-// bdube: changed so we actually cache stuff
-	FindEntityDef( idPlayer::GetSpawnClassname() );
-
-// abahr: saving clientEntities
-	for( i = 0; i < MAX_CENTITIES; i++ ) {
-		savegame.ReadObject( reinterpret_cast<idClass *&>( clientEntities[ i ] ) );
-		savegame.ReadInt( clientSpawnIds[ i ] );
-
-		// restore the entityNumber
-		if ( clientEntities[ i ] != NULL ) {
-			clientEntities[ i ]->entityNumber = i;
-		}
-	}
-// RAVEN END
 
 	savegame.ReadInt( firstFreeIndex );
 	savegame.ReadInt( num_entities );
@@ -2216,25 +1512,6 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		}
 	}
 
-// RAVEN BEGIN
-// abahr: save scriptObject proxies
-	savegame.ReadInt( num );
-	scriptObjectProxies.SetNum( num );
-	for( i = 0; i < num; ++i ) {
-		scriptObjectProxies[i].Restore( &savegame );
-	}
-// abahr: save client entity stuff
-	rvClientEntity* clientEnt = NULL;
-	savegame.ReadInt( num );
-	for( i = 0; i < num; ++i ) {
-		savegame.ReadObject( reinterpret_cast<idClass *&>( clientEnt ) );
-		assert( clientEnt );
-		if ( clientEnt ) {
-			clientEnt->spawnNode.AddToEnd( clientSpawnedEntities );
-		}
-	}
-// RAVEN END
-
 	savegame.ReadInt( num );
 	for( i = 0; i < num; i++ ) {
 		savegame.ReadObject( reinterpret_cast<idClass *&>( ent ) );
@@ -2247,16 +1524,14 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	savegame.ReadInt( numEntitiesToDeactivate );
 	savegame.ReadBool( sortPushers );
 	savegame.ReadBool( sortTeamMasters );
+	//HUMANHEAD rww
+	savegame.ReadBool( sortSnapshotPushers );
+	savegame.ReadBool( sortSnapshotTeamMasters );
+	//HUMANHEAD END
 	savegame.ReadDict( &persistentLevelInfo );
 
 	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
 		savegame.ReadFloat( globalShaderParms[ i ] );
-	}
-	savegame.ReadInt( specialEffectsEnabled );
-	for ( int effect = 0; effect < SPECIAL_EFFECT_MAX; effect++ ) {
-		for ( int parm = 0; parm < MAX_ENTITY_SHADER_PARMS; parm++ ) {
-			savegame.ReadFloat( specialEffectParms[ effect ][ parm ] );
-		}
 	}
 
 	savegame.ReadInt( i );
@@ -2272,10 +1547,6 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	// testFx = "<NULL>"
 
 	savegame.ReadString( sessionCommand );
-// RAVEN BEGIN
-// nmckenzie: Let the AI system load itself too.
-	aiManager.Restore( &savegame );
-// RAVEN END
 
 	// FIXME: save smoke particles
 
@@ -2297,9 +1568,6 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	savegame.ReadInt( entityDefBits );
 	savegame.ReadBool( isServer );
 	savegame.ReadBool( isClient );
-// RAVEN BEGIN
-	savegame.ReadBool( isListenServer );
-// RAVEN END
 
 	savegame.ReadInt( localClientNum );
 
@@ -2307,6 +1575,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 
 	savegame.ReadInt( realClientTime );
 	savegame.ReadBool( isNewFrame );
+	savegame.ReadFloat( clientSmoothing );
 
 	savegame.ReadBool( mapCycleLoaded );
 	savegame.ReadInt( spawnCount );
@@ -2327,13 +1596,8 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 
 	savegame.ReadMaterial( globalMaterial );
 
-// RAVEN BEGIN
-// bdube: added
 	lastAIAlertEntity.Restore( &savegame );
-	savegame.ReadInt( lastAIAlertEntityTime );
-	lastAIAlertActor.Restore( &savegame );
-	savegame.ReadInt( lastAIAlertActorTime );
-// RAVEN END
+	savegame.ReadInt( lastAIAlertTime );
 
 	savegame.ReadDict( &spawnArgs );
 
@@ -2349,6 +1613,12 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	savegame.ReadBool( influenceActive );
 	savegame.ReadInt( nextGibTime );
 
+	// HUMANHEAD mdl
+	savegame.ReadInt( nextSteamTime );
+	savegame.ReadBool( isCoop );
+	savegame.ReadInt( reinterpret_cast<int &> ( playTime ) );
+	// HUMANHEAD END
+
 	// spawnSpots
 	// initialSpots
 	// currentInitialSpot
@@ -2359,7 +1629,11 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	// Read out pending events
 	idEvent::Restore( &savegame );
 
-	// call the restore functions to read out all the data from the entities
+	// HUMANHEAD PCF rww 05/12/06 - fix for gravity being reset on physics objects after load
+	// update our gravity vector if needed
+	UpdateGravity();
+	// HUMANHEAD END
+
 	savegame.RestoreObjects();
 
 	mpGame.Reset();
@@ -2367,12 +1641,11 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	mpGame.Precache();
 
 	// free up any unused animations
-// RAVEN BEGIN
-// jsinger: animationLib changed to a pointer
-	animationLib->FlushUnusedAnims();
-// RAVEN END
+	animationLib.FlushUnusedAnims();
 
 	gamestate = GAMESTATE_ACTIVE;
+
+	playTimeStart = gameLocal.time; // HUMANHEAD mdl:  Start new session
 
 	Printf( "--------------------------------------\n" );
 
@@ -2384,75 +1657,34 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 idGameLocal::MapClear
 ===========
 */
-// RAVEN BEGIN
-// ddynerman: multiple instances 
-void idGameLocal::MapClear( bool clearClients, int instance ) {
-// RAVEN END
+void idGameLocal::MapClear( bool clearClients ) {
 	int i;
 
-// RAVEN BEGIN
-// bdube: delete client entities first since they reference real entities
-	for( i = 0; i < MAX_CENTITIES; i++ ) {
-		// on the server we need to keep around client entities bound to entities in our instance2
-		if( gameLocal.isServer && gameLocal.GetLocalPlayer() && instance != -1 &&
-			instance != gameLocal.GetLocalPlayer()->GetInstance() && 
-			clientEntities[ i ] && clientEntities[ i ]->GetBindMaster() && 
-			clientEntities[ i ]->GetBindMaster()->GetInstance() == gameLocal.GetLocalPlayer()->GetInstance() ) {
-			continue;
-		}
-		delete clientEntities[ i ];
-		clientEntities[ i ] = NULL;
-		clientSpawnIds[ i ] = -1;
-	}
-// RAVEN END
-
-	for( i = ( clearClients ? 0 : MAX_CLIENTS ); i < MAX_GENTITIES; i++ ) {
-		if( instance >= 0 && entities[ i ] && entities[ i ]->GetInstance() != instance ) {
-			continue;
-		}
-
+	//HUMANHEAD rww - for client entities.
+	//for( i = ( clearClients ? 0 : MAX_CLIENTS ); i < MAX_GENTITIES; i++ ) {
+	for( i = ( clearClients ? 0 : MAX_CLIENTS ); i < (MAX_GENTITIES+MAX_CENTITIES); i++ ) {
+	//HUMANHEAD END
 		delete entities[ i ];
 		// ~idEntity is in charge of setting the pointer to NULL
 		// it will also clear pending events for this entity
 		assert( !entities[ i ] );
-// RAVEN BEGIN
-// see FIXME in idRestoreGame::Error
-		entities[ i ] = NULL;
-// RAVEN END
 		spawnIds[ i ] = -1;
 	}
 
-	entityHash.Clear( 1024, MAX_GENTITIES );
-// RAVEN BEGIN
-// rjohnson: reset spawnedEntities during clear to ensure no left over pieces that get remapped to a new id ( causing bad snapshot reading )
-	if ( instance == -1 ) {
-		spawnedEntities.Clear();
-	}
-// RAVEN END
+	//HUMANHEAD rww - for client entities.
+	//entityHash.Clear( 1024, MAX_GENTITIES );
+	entityHash.Clear( 1024, MAX_GENTITIES+MAX_CENTITIES );
+	//HUMANHEAD END
 
 	if ( !clearClients ) {
-		// add back the hashes of the clients/stuff in other instances
-		for ( i = 0; i < MAX_GENTITIES; i++ ) {
+		// add back the hashes of the clients
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
 			if ( !entities[ i ] ) {
 				continue;
 			}
 			entityHash.Add( entityHash.GenerateKey( entities[ i ]->name.c_str(), true ), i );
-// RAVEN BEGIN
-// rjohnson: reset spawnedEntities during clear to ensure no left over pieces that get remapped to a new id ( causing bad snapshot reading )
-			if ( instance == -1 ) {
-				entities[ i ]->spawnNode.AddToEnd( spawnedEntities );
-			}
-// RAVEN END
 		}
 	}
-
-// RAVEN BEGIN
-// jscott: clear out portal skies
-	portalSky = NULL;
-// abahr:
-	gravityInfo.Clear();
-	scriptObjectProxies.Clear();
-// RAVEN END
 
 	delete frameCommandThread;
 	frameCommandThread = NULL;
@@ -2464,104 +1696,7 @@ void idGameLocal::MapClear( bool clearClients, int instance ) {
 
 	delete[] locationEntities;
 	locationEntities = NULL;
-	
-// RAVEN BEGIN
-// ddynerman: mp clear
-	if( gameLocal.isMultiplayer ) {
-		ClearForwardSpawns();
-		for( i = 0; i < TEAM_MAX; i++ ) {
-			teamSpawnSpots[ i ].Clear();
-		}
-		mpGame.ClearMap();
-	}
-	ambientLights.Clear();
-// RAVEN END
-
-	// set the free index back at MAX_CLIENTS for registering entities again
-	// the deletion of map entities causes the index to go down, but it may not have been left exactly at 32
-	// under such conditions, the map populate that will follow may be offset
-	firstFreeIndex = MAX_CLIENTS;
 }
-
-// RAVEN BEGIN
-// ddynerman: instance-specific clear
-void idGameLocal::InstanceClear( void ) {
-	// note: clears all ents EXCEPT those in the instance
-	int i;
-
-	for( i = 0; i < MAX_CENTITIES; i++ ) {
-		delete clientEntities[ i ];
-		assert( !clientEntities[ i ] );
-		clientSpawnIds[ i ] = -1;
-	}
-
-	for( i = MAX_CLIENTS; i < MAX_GENTITIES; i++ ) {
-		if( i == ENTITYNUM_CLIENT || i == ENTITYNUM_WORLD ) {
-			continue;
-		}
-
-		if( entities[ i ] && entities[ i ]->fl.persistAcrossInstances ) {
-			//common->DPrintf( "Instance %d: persistant: excluding ent from clear: %s (%s)\n", instance, entities[ i ]->name.c_str(), entities[ i ]->GetClassname() );
-			continue;
-		}
-
-		//if( entities[ i ] ) {
-			//Printf( "Instance %d: CLEARING ent from clear: %s (%s)\n", instance, entities[ i ]->name.c_str(), entities[ i ]->GetClassname() );
-		//}
-		
-		delete entities[ i ];
-		// ~idEntity is in charge of setting the pointer to NULL
-		// it will also clear pending events for this entity
-		assert( !entities[ i ] );
-		// RAVEN BEGIN
-		// see FIXME in idRestoreGame::Error
-		entities[ i ] = NULL;
-		// RAVEN END
-		spawnIds[ i ] = -1;
-	}
-
-	entityHash.Clear( 1024, MAX_GENTITIES );
-
-	for ( i = 0; i < MAX_CLIENTS; i++ ) {
-		if ( !entities[ i ] ) {
-			continue;
-		}
-		entityHash.Add( entityHash.GenerateKey( entities[ i ]->name.c_str(), true ), i );
-	}
-
-// RAVEN BEGIN
-// jscott: clear out portal skies
-	portalSky = NULL;
-	// abahr:
-	gravityInfo.Clear();
-	scriptObjectProxies.Clear();
-// RAVEN END
-
-	delete frameCommandThread;
-	frameCommandThread = NULL;
-
-	if ( editEntities ) {
-		delete editEntities;
-		editEntities = NULL;
-	}
-
-	delete[] locationEntities;
-	locationEntities = NULL;
-
-	// RAVEN BEGIN
-	// ddynerman: mp clear
-	if( gameLocal.isMultiplayer ) {
-		ClearForwardSpawns();
-		for( i = 0; i < TEAM_MAX; i++ ) {
-			teamSpawnSpots[ i ].Clear();
-		}
-		mpGame.ClearMap();
-	}
-	ambientLights.Clear();
-
-	
-}
-// RAVEN END
 
 /*
 ===========
@@ -2569,18 +1704,15 @@ idGameLocal::MapShutdown
 ============
 */
 void idGameLocal::MapShutdown( void ) {
-	Printf( "------------ Game Map Shutdown --------------\n" );
+	Printf( "--------- Game Map Shutdown ----------\n" );
 	
 	gamestate = GAMESTATE_SHUTDOWN;
 
-	if ( soundSystem ) {
-	//	soundSystem->ResetListener();
+	if ( gameRenderWorld ) {
+		// clear any debug lines, text, and polygons
+		gameRenderWorld->DebugClearLines( 0 );
+		gameRenderWorld->DebugClearPolygons( 0 );
 	}
-
-// RAVEN BEGIN
-// rjohnson: new blur special effect
-	ResetSpecialEffects();
-// RAVEN END
 
 	// clear out camera if we're in a cinematic
 	if ( inCinematic ) {
@@ -2588,57 +1720,44 @@ void idGameLocal::MapShutdown( void ) {
 		inCinematic = false;
 	}
 
-// RAVEN BEGIN
-// jscott: cleanup playbacks
-	gameEdit->ShutdownPlaybacks();
-// RAVEN END
-
 	MapClear( true );
-
-	instancesEntityIndexWatermarks.Clear();
-	clientInstanceFirstFreeIndex = MAX_CLIENTS;	
-
-// RAVEN BEGIN
-// jscott: make sure any spurious events are killed
-	idEvent::ClearEventList();
 
 	// reset the script to the state it was before the map was started
 	program.Restart();
 
-// bdube: game debug
-	gameDebug.Shutdown( );
-	gameLogLocal.Shutdown( );
-// RAVEN END
+	if ( smokeParticles ) {
+		smokeParticles->Shutdown();
+	}
 
-	iconManager->Shutdown();
+	// HUMANHEAD pdm: clear the sound system.  Fixes bug where a looper playing when you "really die" would keep stuttering during restart gui
+	if ( gameSoundWorld ) {
+		gameSoundWorld->ClearAllSoundEmitters();
+		SpiritWalkSoundMode( false );
+		DialogSoundMode( false );
+	}
+	// HUMANHEAD END
+
+#if GAMEPORTAL_SOUND
+	if (gameRenderWorld) {
+		gameRenderWorld->LevelShutdownSoundAreas();
+	}
+#endif
 
 	pvs.Shutdown();
 
-// RAVEN BEGIN
-// ddynerman: MP multiple instances
-	ShutdownInstances();
-// mwhitlock: Dynamic memory consolidation
-	clip.Clear();
-// RAVEN END
+	clip.Shutdown();
 	idClipModel::ClearTraceModelCache();
-
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	idForce::ClearForceList();
-#endif
-// RAVEN END
 
 	ShutdownAsyncNetwork();
 
 	mapFileName.Clear();
 
 	gameRenderWorld = NULL;
-	mpInteractionsGenerated = false;
+	gameSoundWorld = NULL;
 
 	gamestate = GAMESTATE_NOMAP;
 
-	Printf( "---------------------------------------------\n" );
+	Printf( "--------------------------------------\n" );
 }
 
 /*
@@ -2649,7 +1768,7 @@ idGameLocal::DumpOggSounds
 void idGameLocal::DumpOggSounds( void ) {
 	int i, j, k, size, totalSize;
 	idFile *file;
-	idStrList oggSounds, weaponSounds;
+	idStrList oggSounds, weaponSounds, oggOnlySounds;
 	const idSoundShader *soundShader;
 	const soundShaderParms_t *parms;
 	idStr soundName;
@@ -2666,13 +1785,40 @@ void idGameLocal::DumpOggSounds( void ) {
 				soundName = soundShader->GetSound( j );
 				soundName.BackSlashesToSlashes();
 
+				// HUMANHEAD mdl:  Added a check to make sure we don't try to convert OGG files to OGG files.
+				if ( !idStr::Icmp(soundName.Right( 4 ), ".ogg" ) ) {
+					oggOnlySounds.AddUnique( soundName );
+					continue;
+				}
+				// HUMANHEAD END
+
 				// don't OGG sounds that cause a shake because that would
 				// cause continuous seeking on the OGG file which is expensive
-				if ( parms->shakes != 0.0f ) {
+				if ( parms->shakes != 0.0f || (parms->soundShaderFlags & SSF_VOICEAMPLITUDE)) {
 					shakeSounds.AddUnique( soundName );
 					continue;
 				}
 
+#if HUMANHEAD	// HUMANHEAD mdc - our version of skip logic (to account for our naming conventions)
+
+				// always ogg vo, music, elements
+				if(		soundName.Find( "/elements/", false )	== -1 &&
+						soundName.Find( "/music/", false )	== -1 &&
+						soundName.Find( "/vo/", false )			== -1 ) {
+
+						//don't ogg these
+						if(		soundName.Find("/weapons/", false)			!= -1 ||
+								soundName.Find("/lights/", false )			!= -1 ||
+								(soundName.Find("/monsters/", false) != -1 && soundName.Find("fire", false) != -1) ||
+								soundName.Find("foot", false)				!= -1 ||
+								soundName.Find("pain", false)				!= -1 ) {
+
+						weaponSounds.AddUnique( soundName );
+						continue;
+
+					}
+				}
+#else
 				// if not voice over or combat chatter
 				if (	soundName.Find( "/vo/", false ) == -1 &&
 						soundName.Find( "/combat_chatter/", false ) == -1 &&
@@ -2689,6 +1835,7 @@ void idGameLocal::DumpOggSounds( void ) {
 						continue;
 					}
 				}
+#endif
 
 				for ( k = 0; k < shakeSounds.Num(); k++ ) {
 					if ( shakeSounds[k].IcmpPath( soundName ) == 0 ) {
@@ -2728,38 +1875,44 @@ void idGameLocal::DumpOggSounds( void ) {
 		weaponSounds[i].Replace( "/", "\\" );
 		file->Printf( "echo \"%s\" (%d kB)\n", weaponSounds[i].c_str(), size >> 10 );
 	}
+#if HUMANHEAD
+	file->Printf( "echo %d kB in miscellaneous skipped sounds\n\n\n", totalSize >> 10 );
+#else
 	file->Printf( "echo %d kB in weapon sounds\n\n\n", totalSize >> 10 );
+#endif
+
+	// list all the existing ogg sounds
+	totalSize = 0;
+	for ( i = 0; i < oggOnlySounds.Num(); i++ ) {
+		size = fileSystem->ReadFile( oggOnlySounds[i], NULL, NULL );
+		totalSize += size;
+		oggOnlySounds[i].Replace( "/", "\\" );
+		file->Printf( "echo \"%s\" (%d kB)\n", oggOnlySounds[i].c_str(), size >> 10 );
+	}
+	file->Printf( "echo %d kB in pre-existing OGG sounds\n\n\n", totalSize >> 10 );
 
 	// list commands to convert all other sounds to ogg
 	totalSize = 0;
 	for ( i = 0; i < oggSounds.Num(); i++ ) {
-// RAVEN BEGIN
-// rjohnson: changed path to raven's directories
-// jnewquist: Use filesystem search path to get absolute file path
-		idStr	tempFile;
-		idFile *f = fileSystem->OpenFileRead( oggSounds[i] );
-		if ( !f ) {
-			continue;
-		}
-		size = f->Length();
+		size = fileSystem->ReadFile( oggSounds[i], NULL, NULL );
 		totalSize += size;
-		tempFile = f->GetFullPath();
-		fileSystem->CloseFile(f);
-		f = NULL;
-		tempFile.Replace( "/", "\\" );
-
-// jnewquist: prevent alterations to files relative to cdpath
-		const char *cdPath = cvarSystem->GetCVarString("fs_cdpath");
-		const int cdPathLen = idStr::Length(cdPath);
-		if ( cdPathLen > 0 && idStr::Icmpn(cdPath, tempFile, cdPathLen) == 0 ) {
-			file->Printf( "rem Ignored file from CD path: %s\n", tempFile.c_str() );
-			continue;
+		oggSounds[i].Replace( "/", "\\" );
+#if HUMANHEAD
+#ifdef _SYSTEM_BUILD_
+		for (int shakeIndex = 0; shakeIndex < shakeSounds.Num(); shakeIndex++) {
+			if ( !shakeSounds[shakeIndex].IcmpPath( oggSounds[i] ) ) {
+				file->Printf( "echo \"WARNING:  Shake sound found in ogg conversion:  %s\"\n", oggSounds[i].c_str() );
+				break;
+			}
 		}
-
-		file->Printf( "echo %d / %d\n", i, oggSounds.Num() );
-		file->Printf( "k:\\utility\\oggenc -q 0 \"%s\"\n", tempFile.c_str() );
-		file->Printf( "del \"%s\"\n", tempFile.c_str() );
-// RAVEN END
+#endif // _SYSTEM_BUILD_  
+//HUMANHEAD mdc - modified so this will write out the directory using the fs_savepath, so we don't delete the sounds from our source
+		file->Printf( "p:\\tools\\ogg\\oggenc -q 2 \"%s\\base\\%s\"\n", cvarSystem->GetCVarString("fs_savepath"), oggSounds[i].c_str() );
+		file->Printf( "del \"%s\\base\\%s\"\n", cvarSystem->GetCVarString("fs_savepath"), oggSounds[i].c_str() );
+#else
+		file->Printf( "w:\\doom\\ogg\\oggenc -q 0 \"c:\\doom\\base\\%s\"\n", oggSounds[i].c_str() );
+		file->Printf( "del \"c:\\doom\\base\\%s\"\n", oggSounds[i].c_str() );
+#endif
 	}
 	file->Printf( "\n\necho %d kB in OGG sounds\n\n\n", totalSize >> 10 );
 
@@ -2779,7 +1932,7 @@ void idGameLocal::GetShakeSounds( const idDict *dict ) {
 	idStr soundName;
 
 	soundShaderName = dict->GetString( "s_shader" );
-	if ( soundShaderName[0] != '\0' && dict->GetFloat( "s_shakes" ) != 0.0f ) {
+	if ( soundShaderName != NULL && soundShaderName[0] != '\0' && dict->GetFloat( "s_shakes" ) != 0.0f ) {
 		soundShader = declManager->FindSound( soundShaderName );
 
 		for ( int i = 0; i < soundShader->GetNumSounds(); i++ ) {
@@ -2801,193 +1954,184 @@ avoid the fast pre-cache check associated with each entityDef
 ===================
 */
 void idGameLocal::CacheDictionaryMedia( const idDict *dict ) {
-	idDict spawnerArgs;
-	
-	TIME_THIS_SCOPE( __FUNCLINE__);
+	const idKeyValue *kv;
 
 	if ( dict == NULL ) {
-#ifndef _CONSOLE
 		if ( cvarSystem->GetCVarBool( "com_makingBuild") ) {
 			DumpOggSounds();
 		}
-#endif
 		return;
 	}
 
-#ifndef _CONSOLE
 	if ( cvarSystem->GetCVarBool( "com_makingBuild" ) ) {
 		GetShakeSounds( dict );
 	}
-#endif
 
-	int numVals = dict->GetNumKeyVals();
-	
-	for ( int i = 0; i < numVals; ++i ) {
-		const idKeyValue *kv = dict->GetKeyVal( i );
-		
-		#define MATCH(s) \
-			(!kv->GetKey().Icmpn( s, strlen(s) ))
-		/**/
-		
-		if ( !kv || !kv->GetValue().Length() ) {
-			continue;
-		}
-		
-		if ( MATCH( "model" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MODEL);
+//HUMANHEAD mdc - skip caching if we are in development mode and not making a build
+	if( !g_precache.GetBool() && !sys_forceCache.GetBool() && !cvarSystem->GetCVarBool("com_makingBuild") ) {
+		return;
+	}
+//HUMANHEAD END
+
+	//HUMANHEAD: aob
+	idList<idStr> strList;
+	//HUMANHEAD END
+
+	kv = dict->MatchPrefix( "model" );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
 			declManager->MediaPrint( "Precaching model %s\n", kv->GetValue().c_str() );
 			// precache model/animations
 			if ( declManager->FindType( DECL_MODELDEF, kv->GetValue(), false ) == NULL ) {
 				// precache the render model
 				renderModelManager->FindModel( kv->GetValue() );
 				// precache .cm files only
-// jmarshall: caching code is different in the legacy engine
-				//collisionModelManager->PreCacheModel( GetMapName(), kv->GetValue() );
-				collisionModelManager->LoadModel(GetMapName(), kv->GetValue(), true);
-// jmarshall end
+				collisionModelManager->LoadModel( kv->GetValue(), true );
 			}
-		} else if ( MATCH( "s_shader" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_SOUND);
+		}
+		kv = dict->MatchPrefix( "model", kv );
+	}
+
+	kv = dict->FindKey( "s_shader" );
+	if ( kv && kv->GetValue().Length() ) {
+		declManager->FindType( DECL_SOUND, kv->GetValue() );
+	}
+
+	kv = dict->MatchPrefix( "snd", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
 			declManager->FindType( DECL_SOUND, kv->GetValue() );
-		} else if ( MATCH( "snd_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_SOUND);
-			declManager->FindType( DECL_SOUND, kv->GetValue() );
-		} else if ( MATCH( "gui_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_GUI);
+		}
+		kv = dict->MatchPrefix( "snd", kv );
+	}
+
+
+	kv = dict->MatchPrefix( "gui", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
 			if ( !idStr::Icmp( kv->GetKey(), "gui_noninteractive" )
 				|| !idStr::Icmpn( kv->GetKey(), "gui_parm", 8 )	
 				|| !idStr::Icmp( kv->GetKey(), "gui_inventory" ) ) {
 				// unfortunate flag names, they aren't actually a gui
 			} else {
 				declManager->MediaPrint( "Precaching gui %s\n", kv->GetValue().c_str() );
-				uiManager->FindGui( kv->GetValue().c_str(), true );
+#if 1 //HUMANHEAD rww - keep the gui around, so that we don't hit the disk again when we go to use it
+				uiManager->FindGui(kv->GetValue().c_str(), true, false, false);
+#else
+				idUserInterface *gui = uiManager->Alloc();
+				if ( gui ) {
+					gui->InitFromFile( kv->GetValue() );
+					uiManager->DeAlloc( gui );
+				}
+#endif
 			}
-		} else if ( MATCH( "texture" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MATERIAL);
+		}
+		kv = dict->MatchPrefix( "gui", kv );
+	}
+
+	kv = dict->FindKey( "texture" );
+	if ( kv && kv->GetValue().Length() ) {
+		declManager->FindType( DECL_MATERIAL, kv->GetValue() );
+	}
+
+	kv = dict->MatchPrefix( "mtr", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
+			//HUMANHEAD: aob - this is a temp test to allow bowman to have different fade times on his materials
+			strList.Clear();
+			hhUtils::SplitString( kv->GetValue(), strList );
+			for( int ix = strList.Num() - 1; ix >= 0; --ix ) {
+				declManager->FindType( DECL_MATERIAL, strList[ix] );
+			}
+			//HUMANHEAD END
+		}
+		kv = dict->MatchPrefix( "mtr", kv );
+	}
+
+	// handles hud icons
+	kv = dict->MatchPrefix( "inv_icon", NULL );
+	while ( kv ) {
+		if ( kv->GetValue().Length() ) {
 			declManager->FindType( DECL_MATERIAL, kv->GetValue() );
-		} else if ( MATCH( "mtr_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MATERIAL);
-			declManager->FindType( DECL_MATERIAL, kv->GetValue() );
-		} else if ( MATCH( "screenShot" ) ) {
-		
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MATERIAL);
-			declManager->FindType( DECL_MATERIAL, kv->GetValue() );
-		} else if ( MATCH( "inv_icon" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MATERIAL);
-			declManager->FindType( DECL_MATERIAL, kv->GetValue() );
-		} else if ( MATCH( "teleport" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_EFFECT);
-			int teleportType = atoi( kv->GetValue() );
-			const char *p = ( teleportType ) ? va( "effects/teleporter%i.fx", teleportType ) : "effects/teleporter.fx";
-			declManager->FindType( DECL_EFFECT, p );
-		} else if ( MATCH( "fx_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_EFFECT);
+		}
+		kv = dict->MatchPrefix( "inv_icon", kv );
+	}
+
+/*	HUMANHEAD pdm: not used
+	// handles teleport fx.. this is not ideal but the actual decision on which fx to use
+	// is handled by script code based on the teleport number
+	kv = dict->MatchPrefix( "teleport", NULL );
+	if ( kv && kv->GetValue().Length() ) {
+		int teleportType = atoi( kv->GetValue() );
+		const char *p = ( teleportType ) ? va( "fx/teleporter%i.fx", teleportType ) : "fx/teleporter.fx";
+		declManager->FindType( DECL_FX, p );
+	}
+*/
+
+	kv = dict->MatchPrefix( "fx", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
 			declManager->MediaPrint( "Precaching fx %s\n", kv->GetValue().c_str() );
-			declManager->FindEffect( kv->GetValue() );
-		} else if ( MATCH( "skin" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MATERIAL);
+			declManager->FindType( DECL_FX, kv->GetValue() );
+		}
+		kv = dict->MatchPrefix( "fx", kv );
+	}
+
+	kv = dict->MatchPrefix( "smoke", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
+			idStr prtName = kv->GetValue();
+			int dash = prtName.Find('-');
+			if ( dash > 0 ) {
+				prtName = prtName.Left( dash );
+			}
+			declManager->FindType( DECL_PARTICLE, prtName );
+		}
+		kv = dict->MatchPrefix( "smoke", kv );
+	}
+
+	kv = dict->MatchPrefix( "skin", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
 			declManager->MediaPrint( "Precaching skin %s\n", kv->GetValue().c_str() );
 			declManager->FindType( DECL_SKIN, kv->GetValue() );
-		} else if ( MATCH( "def_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_DECL);
-			FindEntityDef( kv->GetValue().c_str(), false );
-		} else if ( MATCH( "playback_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_ANIM);
-			declManager->MediaPrint( "Precaching playback %s\n", kv->GetValue().c_str() );
-			declManager->FindPlayback( kv->GetValue() );
-		} else if ( MATCH( "lipsync_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_ANIM);
-			declManager->MediaPrint( "Precaching lipsync %s\n", kv->GetValue().c_str() );
-			declManager->FindLipSync( kv->GetValue() );
-			declManager->FindSound ( kv->GetValue() );
-		} else if ( MATCH( "icon " ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_MATERIAL);
-			idLexer  src ( LEXFL_ALLOWPATHNAMES );
-			idToken  token;
-			idToken	 token2;
-			src.LoadMemory( kv->GetValue(), kv->GetValue().Length(), "icon" );
-			
-			src.ReadToken ( &token );
-			if ( src.CheckTokenString ( "," ) ) {
-				int x, y, w, h;
-				src.ReadToken ( &token2 ) ;
-				x = token2.GetIntValue ( );
-				src.ExpectTokenString ( "," );
-				
-				src.ReadToken ( &token2 ) ;
-				y = token2.GetIntValue ( );
-				src.ExpectTokenString ( "," );
-
-				src.ReadToken ( &token2 ) ;
-				w = token2.GetIntValue ( );
-				src.ExpectTokenString ( "," );
-
-				src.ReadToken ( &token2 ) ;
-				h = token2.GetIntValue ( );
-				
-				uiManager->RegisterIcon ( kv->GetKey ( ).c_str() + 5, token, x, y, w, h );
-			} else { 
-				uiManager->RegisterIcon ( kv->GetKey ( ).c_str() + 5, token );
-			}
-		} else if ( MATCH( "spawn_" ) ) {
-			
-			TIME_THIS_SCOPE( __FUNCLINE__);
-			
-			MEM_SCOPED_TAG(tag,MA_DECL);
-			spawnerArgs.Set ( kv->GetKey ( ).c_str() + 6, kv->GetValue ( ) );
 		}
-		
-		#undef MATCH
+		kv = dict->MatchPrefix( "skin", kv );
 	}
 
-	if ( spawnerArgs.GetNumKeyVals() ) {
-		CacheDictionaryMedia ( &spawnerArgs );
+	kv = dict->MatchPrefix( "def", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
+			FindEntityDef( kv->GetValue().c_str(), false );
+		}
+		kv = dict->MatchPrefix( "def", kv );
 	}
-// RAVEN END
+
+/*	HUMANHEAD pdm: not used
+	kv = dict->MatchPrefix( "pda_name", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
+			declManager->FindType( DECL_PDA, kv->GetValue().c_str(), false );
+		}
+		kv = dict->MatchPrefix( "pda_name", kv );
+	}
+
+	kv = dict->MatchPrefix( "video", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
+			declManager->FindType( DECL_VIDEO, kv->GetValue().c_str(), false );
+		}
+		kv = dict->MatchPrefix( "video", kv );
+	}
+
+	kv = dict->MatchPrefix( "audio", NULL );
+	while( kv ) {
+		if ( kv->GetValue().Length() ) {
+			declManager->FindType( DECL_AUDIO, kv->GetValue().c_str(), false );
+		}
+		kv = dict->MatchPrefix( "audio", kv );
+	}
+*/
 }
 
 /*
@@ -2996,27 +2140,13 @@ idGameLocal::InitScriptForMap
 ============
 */
 void idGameLocal::InitScriptForMap( void ) {
-
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG(tag,MA_DEFAULT);
-// RAVEN END
 	// create a thread to run frame commands on
 	frameCommandThread = new idThread();
 	frameCommandThread->ManualDelete();
 	frameCommandThread->SetThreadName( "frameCommands" );
 
-
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG_SET(tag,MA_SCRIPT);
-
 	// run the main game script function (not the level specific main)
 	const function_t *func = program.FindFunction( SCRIPT_DEFAULTFUNC );
-
-
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG_SET(tag,MA_DEFAULT);
-
 	if ( func != NULL ) {
 		idThread *thread = new idThread( func );
 		if ( thread->Start() ) {
@@ -3024,9 +2154,6 @@ void idGameLocal::InitScriptForMap( void ) {
 			delete thread;
 		}
 	}
-
-// RAVEN END
-
 }
 
 /*
@@ -3034,64 +2161,56 @@ void idGameLocal::InitScriptForMap( void ) {
 idGameLocal::SpawnPlayer
 ============
 */
-// jmarshall - bot support
-void idGameLocal::SpawnPlayer(int clientNum, bool isBot, const char* botName) {
-// jmarshall end
-
-	TIME_THIS_SCOPE( __FUNCLINE__);
-
+void idGameLocal::SpawnPlayer( int clientNum ) {
 	idEntity	*ent;
 	idDict		args;
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG(tag,MA_ENTITY);
-// RAVEN END
 
 	// they can connect
-	common->DPrintf( "SpawnPlayer: %i\n", clientNum );
+	Printf( "SpawnPlayer: %i\n", clientNum );
 
 	args.SetInt( "spawn_entnum", clientNum );
 	args.Set( "name", va( "player%d", clientNum + 1 ) );
-// RAVEN BEGIN
-// bdube: changed marine class
-// jmarshall: bot support
-	if (gameLocal.IsMultiplayer())
-	{
-// jmarshall
-		if (isBot)
-		{
-			args.Set("classname", va("%s_bot", idPlayer::GetSpawnClassname()));
-			args.Set("botname", botName);
+#if HUMANHEAD	// HUMANHEAD pdm: removed hardcoded name
+	args.Set( "classname", isMultiplayer ? GAME_PLAYERDEFNAME_MP : GAME_PLAYERDEFNAME );
+
+	// HUMANHEAD mdl:  Check for map specific player health
+	bool mapHealth = false;
+	int playerHealth;
+	const char *mapName = gameLocal.serverInfo.GetString( "si_map" );
+	const idDecl *mapDecl = declManager->FindType(DECL_MAPDEF, mapName, false );
+	if ( mapDecl ) {
+		const idDeclEntityDef *mapInfo = static_cast<const idDeclEntityDef *>(mapDecl);
+		playerHealth = mapInfo->dict.GetInt( "playerHealth" );
+		if ( playerHealth > 0 ) {
+			// Optionally store the old health value in storedHealth
+			if (mapInfo->dict.GetBool( "storePlayerHealth", "0" )) {
+				persistentPlayerInfo[ clientNum ].SetInt( "storedHealth", persistentPlayerInfo[ clientNum ].GetInt( "health", "100" ));
+			}
+			persistentPlayerInfo[ clientNum ].SetInt( "health", playerHealth );
+			mapHealth = true;
 		}
-		else
-		{
-			args.Set("classname", idPlayer::GetSpawnClassname());
+		int playerSpirit = mapInfo->dict.GetInt( "playerSpirit" );
+		if ( playerSpirit > 0 ) {
+			args.SetInt( "ammo_spiritpower", playerSpirit );
 		}
-// jmarshall end
 	}
-	else
-	{
-// jmarshall - bot support
-		if (isBot)
-		{
-			gameLocal.Error("Bots not supported in singleplayer games!\n");
-		}
-// jmarshall end
-		args.Set("classname", idPlayer::GetSpawnClassname());
+
+	// See if we need to restore a previously saved health value
+	playerHealth = persistentPlayerInfo[ clientNum ].GetInt( "storedHealth", "0" );
+	if ( !mapHealth && playerHealth > 0 ) {
+		persistentPlayerInfo[ clientNum ].SetInt( "health", playerHealth );
+		persistentPlayerInfo[ clientNum ].SetInt( "storedHealth", 0 );
 	}
-// RAVEN END
-	
-	// This takes a really long time.
-	PACIFIER_UPDATE;
-	if ( !SpawnEntityDef( args, &ent ) || !entities[ clientNum ] ) {
+#else
+	args.Set( "classname", isMultiplayer ? "player_doommarine_mp" : "player_doommarine" );
+#endif
+	//HUMANHEAD rww - ok on client
+	if ( !SpawnEntityDef( args, &ent, true, false, true ) || !entities[ clientNum ] ) {
 		Error( "Failed to spawn player as '%s'", args.GetString( "classname" ) );
 	}
 
 	// make sure it's a compatible class
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !ent->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+	if ( !ent->IsType( idPlayer::Type ) ) {
 		Error( "'%s' spawned the player as a '%s'.  Player spawnclass must be a subclass of idPlayer.", args.GetString( "classname" ), ent->GetClassname() );
 	}
 
@@ -3099,7 +2218,6 @@ void idGameLocal::SpawnPlayer(int clientNum, bool isBot, const char* botName) {
 		numClients = clientNum + 1;
 	}
 
-	PACIFIER_UPDATE;
 	mpGame.SpawnPlayer( clientNum );
 }
 
@@ -3109,11 +2227,7 @@ idGameLocal::GetClientByNum
 ================
 */
 idPlayer *idGameLocal::GetClientByNum( int current ) const {
-	if ( current == MAX_CLIENTS ) {
-		return NULL;
-	}
 	if ( current < 0 || current >= numClients ) {
-		// that's a bit nasty but I suppose it has it's use
 		current = 0;
 	}
 	if ( entities[current] ) {
@@ -3132,14 +2246,8 @@ idPlayer *idGameLocal::GetClientByName( const char *name ) const {
 	idEntity *ent;
 	for ( i = 0 ; i < numClients ; i++ ) {
 		ent = entities[ i ];
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent && ent->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
-// RAVEN BEGIN
-// bdube: escape codes
-			if ( idStr::IcmpNoEscape( name, userInfo[ i ].GetString( "ui_name" ) ) == 0 ) {
-// RAVEN END			
+		if ( ent && ent->IsType( idPlayer::Type ) ) {
+			if ( idStr::IcmpNoColor( name, userInfo[ i ].GetString( "ui_name" ) ) == 0 ) {
 				return static_cast<idPlayer *>( ent );
 			}
 		}
@@ -3172,26 +2280,6 @@ idPlayer *idGameLocal::GetClientByCmdArgs( const idCmdArgs &args ) const {
 
 /*
 ================
-idGameLocal::GetClientNumByName
-================
-*/
-int idGameLocal::GetClientNumByName( const char *name ) const {
-	int i;
-	idEntity *ent;
-	for ( i = 0 ; i < numClients ; i++ ) {
-		ent = entities[ i ];
-
-		if ( ent && ent->IsType( idPlayer::GetClassType() ) ) {
-			if ( idStr::IcmpNoEscape( name, userInfo[ i ].GetString( "ui_name" ) ) == 0 ) {
-				return i;
-			}
-		}
-	}
-	return -1;
-}
-
-/*
-================
 idGameLocal::GetNextClientNum
 ================
 */
@@ -3201,10 +2289,7 @@ int idGameLocal::GetNextClientNum( int _current ) const {
 	current = 0;
 	for ( i = 0; i < numClients; i++) {
 		current = ( _current + i + 1 ) % numClients;
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( entities[ current ] && entities[ current ]->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+		if ( entities[ current ] && entities[ current ]->IsType( idPlayer::Type ) ) {
 			return current;
 		}
 	}
@@ -3218,33 +2303,42 @@ idGameLocal::GetLocalPlayer
 
 Nothing in the game tic should EVER make a decision based on what the
 local client number is, it shouldn't even be aware that there is a
-draw phase even happening.
-
-localClientNum == MAX_CLIENTS when playing server demos
-don't send back the wrong entity obviously
+draw phase even happening.  This just returns client 0, which will
+be correct for single player.
 ================
 */
 idPlayer *idGameLocal::GetLocalPlayer() const {
-	if ( localClientNum < 0 || localClientNum == MAX_CLIENTS ) {
+	if ( localClientNum < 0 ) {
 		return NULL;
 	}
 
-	if ( !entities[ localClientNum ] || !entities[ localClientNum ]->IsType( idPlayer::GetClassType() ) ) {
+	if ( !entities[ localClientNum ] || !entities[ localClientNum ]->IsType( idPlayer::Type ) ) {
 		// not fully in game yet
 		return NULL;
 	}
-	
-	// through idGameLocal::MapShutdown, deleting player ents, calls idEntity::StopSound
-	// calls in here and triggers the assert because proper type info is already gone
-	//assert( gamestate == GAMESTATE_SHUTDOWN || entities[ localClientNum ]->IsType( idPlayer::GetClassType() ) );
-	
 	return static_cast<idPlayer *>( entities[ localClientNum ] );
 }
+
+
+/*
+=================
+idGameLocal::AmLocalClient
+HUMANHEAD nla - Function that was removed
+=================
+*/
+bool idGameLocal::AmLocalClient( idPlayer *player ) {
+
+	if ( !isClient || player->entityNumber == localClientNum ) {
+		return( true );
+	}
+
+	return( false );
+}
+
 
 /*
 ================
 idGameLocal::SetupClientPVS
-for client spectating others, get the pvs of spectated
 ================
 */
 pvsHandle_t idGameLocal::GetClientPVS( idPlayer *player, pvsType_t type ) {
@@ -3253,89 +2347,7 @@ pvsHandle_t idGameLocal::GetClientPVS( idPlayer *player, pvsType_t type ) {
 	} else if ( camera ) {
 		return pvs.SetupCurrentPVS( camera->GetPVSAreas(), camera->GetNumPVSAreas() );
 	} else {
-		if ( player->spectating && player->spectator != player->entityNumber && entities[ player->spectator ] ) {
-			player = static_cast<idPlayer*>( entities[ player->spectator ] );
-		}
 		return pvs.SetupCurrentPVS( player->GetPVSAreas(), player->GetNumPVSAreas() );
-	}
-}
-
-// RAVEN BEGIN
-// jscott: for portal skies
-/*
-================
-idGameLocal::GetSpawnCount
-================
-*/
-int idGameLocal::GetSpawnCount ( void ) const {
-	return spawnCount;
-}
-
-/*
-================
-idGameLocal::SetupPortalSkyPVS
-================
-*/
-bool idGameLocal::SetupPortalSkyPVS( idPlayer *player ) {
-
-	int			i, count, numAreas;
-	const int	*areaNums;
-	bool		*visibleAreas;
-
-	if( !portalSky ) {
-
-		return( false );
-	}
-// jmarshall - this was a nice optimization but not needed
-	// Allocate room for the area flags
-	//numAreas = gameRenderWorld->NumAreas();
-	//visibleAreas = ( bool * )_alloca( numAreas );
-	//memset( visibleAreas, 0, numAreas );
-	//
-	//// Grab the areas the player can see....
-	//count = player->GetNumPVSAreas();
-	//areaNums = player->GetPVSAreas();
-	//for( i = 0; i < count; i++ ) {
-	//
-	//	// Work out the referenced areas
-	//	gameRenderWorld->FindVisibleAreas( player->GetPhysics()->GetOrigin(), areaNums[i], visibleAreas );
-	//}
-	//
-	//// Do any of the visible areas have a skybox?
-	//for( i = 0; i < numAreas; i++ ) {
-	//
-	//	if( !visibleAreas[i] ) {
-	//
-	//		continue;
-	//	}
-	//
-	//	if( gameRenderWorld->HasSkybox( i ) ) {
-	//
-	//		break;
-	//	}
-	//}
-	//
-	//// .. if any one has a skybox component, then merge in the portal sky
-	//return ( i != numAreas );
-
-	return true;
-// jmarshall end
-}
-// RAVEN END
-
-/*
-===============
-idGameLocal::UpdateClientsPVS
-===============
-*/
-void idGameLocal::UpdateClientsPVS( void ) {
-	int i;
-	for ( i = 0; i < numClients; i++ ) {
-		if ( !entities[ i ] ) {
-			continue;
-		}
-		assert( clientsPVS[ i ].i == -1 );
-		clientsPVS[ i ] = GetClientPVS( static_cast< idPlayer * >( entities[ i ] ), PVS_NORMAL );
 	}
 }
 
@@ -3345,52 +2357,44 @@ idGameLocal::SetupPlayerPVS
 ================
 */
 void idGameLocal::SetupPlayerPVS( void ) {
-	int			i = 0;
-	idPlayer *	player = NULL;
+	int			i;
+	//HUMANHEAD rww
+	int			startIndex = 0;
+	//HUMANHEAD END
+	idEntity *	ent;
+	idPlayer *	player;
 	pvsHandle_t	otherPVS, newPVS;
 
-	UpdateClientsPVS( );
-
 	playerPVS.i = -1;
-	for ( i = 0; i < numClients; i++ ) {
-		if ( !entities[i] ) {
-			return;
-		}
-		assert( entities[i]->IsType( idPlayer::GetClassType() ) );
+	//HUMANHEAD rww
+	if (gameLocal.isClient) {
+		startIndex = gameLocal.localClientNum;
 
-		player = static_cast<idPlayer *>( entities[ i ] );
+		if (gameLocal.localClientNum != -1 && gameLocal.entities[gameLocal.localClientNum] && gameLocal.entities[gameLocal.localClientNum]->IsType(hhPlayer::Type)) {
+			hhPlayer *plClient = static_cast<hhPlayer *>(gameLocal.entities[gameLocal.localClientNum]);
+			if (plClient->spectating && plClient->spectator >= 0 && plClient->spectator < MAX_CLIENTS) {
+				startIndex = plClient->spectator; //build a pvs for the player i am spectating
+			}
+		}
+	}
+	for ( i = startIndex; i < numClients; i++ ) {
+	//HUMANHEAD END
+		ent = entities[i];
+		if ( !ent || !ent->IsType( idPlayer::Type ) ) {
+			continue;
+		}
+
+		player = static_cast<idPlayer *>(ent);
 
 		if ( playerPVS.i == -1 ) {
-			playerPVS = clientsPVS[ i ];
-			freePlayerPVS = false;	// don't try to free it as long as we stick to the client PVS
+			playerPVS = GetClientPVS( player, PVS_NORMAL );
 		} else {
-			otherPVS = clientsPVS[ i ];
+			otherPVS = GetClientPVS( player, PVS_NORMAL );
 			newPVS = pvs.MergeCurrentPVS( playerPVS, otherPVS );
-			if ( freePlayerPVS ) {
-				pvs.FreeCurrentPVS( playerPVS );
-				freePlayerPVS = false;
-			}
-			playerPVS = newPVS;
-			freePlayerPVS = true;	// that merged one will need to be freed
-		}
-
-// RAVEN BEGIN
-// jscott: for portal skies
-		portalSkyVisible = SetupPortalSkyPVS( player );
-		if ( portalSkyVisible ) {
-
-			otherPVS = pvs.SetupCurrentPVS( portalSky->GetPVSAreas(), portalSky->GetNumPVSAreas() );
-			newPVS = pvs.MergeCurrentPVS( playerPVS, otherPVS );
-
-			if ( freePlayerPVS ) {
-				pvs.FreeCurrentPVS( playerPVS );
-				freePlayerPVS = false;
-			}
+			pvs.FreeCurrentPVS( playerPVS );
 			pvs.FreeCurrentPVS( otherPVS );
 			playerPVS = newPVS;
-			freePlayerPVS = true;
 		}
-// RAVEN END
 
 		if ( playerConnectedAreas.i == -1 ) {
 			playerConnectedAreas = GetClientPVS( player, PVS_CONNECTED_AREAS );
@@ -3401,6 +2405,12 @@ void idGameLocal::SetupPlayerPVS( void ) {
 			pvs.FreeCurrentPVS( otherPVS );
 			playerConnectedAreas = newPVS;
 		}
+
+		//HUMANHEAD rww
+		if (gameLocal.isClient) {
+			break;
+		}
+		//HUMANHEAD END
 	}
 }
 
@@ -3410,19 +2420,9 @@ idGameLocal::FreePlayerPVS
 ================
 */
 void idGameLocal::FreePlayerPVS( void ) {
-	int i;
-
-	// only clear playerPVS if it's a different handle than the one in clientsPVS
-	if ( freePlayerPVS && playerPVS.i != -1 ) {
+	if ( playerPVS.i != -1 ) {
 		pvs.FreeCurrentPVS( playerPVS );
-		freePlayerPVS = false;
-	}
-	playerPVS.i = -1;
-	for ( i = 0; i < MAX_CLIENTS; i++ ) {
-		if ( clientsPVS[ i ].i >= 0 ) {
-			pvs.FreeCurrentPVS( clientsPVS[ i ] );
-			clientsPVS[i].i = -1;
-		}
+		playerPVS.i = -1;
 	}
 	if ( playerConnectedAreas.i != -1 ) {
 		pvs.FreeCurrentPVS( playerConnectedAreas );
@@ -3458,7 +2458,6 @@ bool idGameLocal::InPlayerConnectedArea( idEntity *ent ) const {
     return pvs.InCurrentPVS( playerConnectedAreas, ent->GetPVSAreas(), ent->GetNumPVSAreas() );
 }
 
-
 /*
 ================
 idGameLocal::UpdateGravity
@@ -3466,39 +2465,23 @@ idGameLocal::UpdateGravity
 */
 void idGameLocal::UpdateGravity( void ) {
 	idEntity *ent;
-	
-	idCVar* gravityCVar = NULL;
 
-	if( gameLocal.isMultiplayer ) {
-		gravityCVar = &g_mp_gravity;
-	} else {
-		gravityCVar = &g_gravity;
-	}
-
-	if ( gravityCVar->IsModified() ) {
-		if ( gravityCVar->GetFloat() == 0.0f ) {
-			gravityCVar->SetFloat( 1.0f );
+	if ( g_gravity.IsModified() ) {
+		if ( g_gravity.GetFloat() == 0.0f ) {
+			g_gravity.SetFloat( 1.0f );
 		}
-        gravity.Set( 0, 0, -gravityCVar->GetFloat() );
+        gravity.Set( 0, 0, -g_gravity.GetFloat() );
 
 		// update all physics objects
 		for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			if ( ent->IsType( idAFEntity_Generic::GetClassType() ) ) {
-// RAVEN END
+			if ( ent->IsType( idAFEntity_Generic::Type ) ) {
 				idPhysics *phys = ent->GetPhysics();
 				if ( phys ) {
 					phys->SetGravity( gravity );
 				}
-// RAVEN BEGIN
-// ddynerman: jump pads
-			} else if ( ent->IsType( rvJumpPad::GetClassType() ) ) {
-				ent->PostEventMS( &EV_FindTargets, 0 );
 			}
-// RAVEN END
 		}
-		gravityCVar->ClearModified();
+		g_gravity.ClearModified();
 	}
 }
 
@@ -3524,28 +2507,17 @@ void idGameLocal::SortActiveEntityList( void ) {
 
 	// if the active entity list needs to be reordered to place physics team masters at the front
 	if ( sortTeamMasters ) {
-		// Sort bind masters first
-		for ( ent = activeEntities.Next(); ent != NULL; ent = next_ent ) {
-			next_ent = ent->activeNode.Next();
-			for ( part = ent->GetBindMaster ( ); part; part = part->GetBindMaster ( ) ) {
-				// Ensure we dont rerun the whole active entity list if our cached next_ent is one 
-				// of the entities we are moving
-				if ( next_ent == part ) {
-					next_ent = next_ent->activeNode.Next();
-					part = ent->GetBindMaster ( );
-					continue;
-				}
-				part->activeNode.Remove();
-				part->activeNode.AddToFront( activeEntities );												
-			}
-		}				
-	
 		for ( ent = activeEntities.Next(); ent != NULL; ent = next_ent ) {
 			next_ent = ent->activeNode.Next();
 			master = ent->GetTeamMaster();
 			if ( master && master == ent ) {
-				ent->activeNode.Remove();
-				ent->activeNode.AddToFront( activeEntities );												
+				//HUMANHEAD PCF rww 05/27/06 - force pusher sort
+				//hack fix to prevent elevator skipping on harvesterb
+				if (!ent->fl.forcePusherSort) {
+				//HUMANHEAD END
+					ent->activeNode.Remove();
+					ent->activeNode.AddToFront( activeEntities );
+				}
 			}
 		}
 	}
@@ -3559,10 +2531,7 @@ void idGameLocal::SortActiveEntityList( void ) {
 			if ( !master || master == ent ) {
 				// check if there is an actor on the team
 				for ( part = ent; part != NULL; part = part->GetNextTeamEntity() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-					if ( part->GetPhysics()->IsType( idPhysics_Actor::GetClassType() ) ) {
-// RAVEN END
+					if ( part->GetPhysics()->IsType( idPhysics_Actor::Type ) ) {
 						break;
 					}
 				}
@@ -3580,10 +2549,7 @@ void idGameLocal::SortActiveEntityList( void ) {
 			if ( !master || master == ent ) {
 				// check if there is an entity on the team using parametric physics
 				for ( part = ent; part != NULL; part = part->GetNextTeamEntity() ) {
-					if ( part->GetPhysics()->IsType( idPhysics_Parametric::GetClassType() ) ) {
-						break;
-					}
-					if ( part->GetPhysics()->IsType( rvPhysics_Spline::GetClassType() ) ) {
+					if ( part->GetPhysics()->IsType( idPhysics_Parametric::Type ) ) {
 						break;
 					}
 				}
@@ -3600,66 +2566,114 @@ void idGameLocal::SortActiveEntityList( void ) {
 	sortPushers = false;
 }
 
+//HUMANHEAD rww
 /*
 ================
-idGameLocal::MenuFrame
-Called each session frame when a map is not running (e.g. usually in the main menu)
+idGameLocal::SortSnapshotEntityList
+
+  Sorts the snapshot entity list such that pushing entities come first,
+  actors come next and physics team slaves appear after their master.
 ================
 */
-void idGameLocal::MenuFrame( void ) { }
+void idGameLocal::SortSnapshotEntityList( void ) {
+	idEntity *ent, *next_ent, *master, *part;
+
+	// if the snapshot entity list needs to be reordered to place physics team masters at the front
+	if ( sortSnapshotTeamMasters ) {
+		for ( ent = snapshotEntities.Next(); ent != NULL; ent = next_ent ) {
+			next_ent = ent->snapshotNode.Next();
+			master = ent->GetTeamMaster();
+			if ( master && master == ent ) {
+				ent->snapshotNode.Remove();
+				ent->snapshotNode.AddToFront( snapshotEntities );
+			}
+		}
+	}
+
+	// if the snapshot entity list needs to be reordered to place pushers at the front
+	if ( sortSnapshotPushers ) {
+
+		for ( ent = snapshotEntities.Next(); ent != NULL; ent = next_ent ) {
+			next_ent = ent->snapshotNode.Next();
+			master = ent->GetTeamMaster();
+			if ( !master || master == ent ) {
+				// check if there is an actor on the team
+				for ( part = ent; part != NULL; part = part->GetNextTeamEntity() ) {
+					if ( part->GetPhysics()->IsType( idPhysics_Actor::Type ) ) {
+						break;
+					}
+				}
+				// if there is an actor on the team
+				if ( part ) {
+					ent->snapshotNode.Remove();
+					ent->snapshotNode.AddToFront( snapshotEntities );
+				}
+			}
+		}
+
+		for ( ent = snapshotEntities.Next(); ent != NULL; ent = next_ent ) {
+			next_ent = ent->snapshotNode.Next();
+			master = ent->GetTeamMaster();
+			if ( !master || master == ent ) {
+				// check if there is an entity on the team using parametric physics
+				for ( part = ent; part != NULL; part = part->GetNextTeamEntity() ) {
+					if ( part->GetPhysics()->IsType( idPhysics_Parametric::Type ) ) {
+						break;
+					}
+				}
+				// if there is an entity on the team using parametric physics
+				if ( part ) {
+					ent->snapshotNode.Remove();
+					ent->snapshotNode.AddToFront( activeEntities );
+				}
+			}
+		}
+	}
+
+	sortSnapshotTeamMasters = false;
+	sortSnapshotPushers = false;
+}
+//HUMANHEAD END
 
 /*
 ================
 idGameLocal::RunFrame
 ================
 */
-// RAVEN BEGIN
- gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame ) {
+gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds ) {
+/*	HUMANHEAD pdm: OVERRIDDEN
 	idEntity *	ent;
 	int			num;
 	float		ms;
 	idTimer		timer_think, timer_events, timer_singlethink;
-	idTimer		timer_misc, timer_misc2;
 	gameReturn_t ret;
 	idPlayer	*player;
 	const renderView_t *view;
 
-	editors = activeEditors;
-	isLastPredictFrame = lastCatchupFrame;
-
-	assert( !isClient );
-
-	if (gameRenderWorld) {
-		gameRenderWorld->DebugClear(0);
+#ifdef _DEBUG
+	if ( isMultiplayer ) {
+		assert( !isClient );
 	}
+#endif
 
 	player = GetLocalPlayer();
 
 	if ( !isMultiplayer && g_stopTime.GetBool() ) {
+		// clear any debug lines from a previous frame
+		gameRenderWorld->DebugClearLines( time + 1 );
 
 		// set the user commands for this frame
-		usercmds = clientCmds;
+		memcpy( usercmds, clientCmds, numClients * sizeof( usercmds[ 0 ] ) );
 
 		if ( player ) {
-			// ddynerman: save the current thinking entity for instance-dependent
-			currentThinkingEntity = player;
 			player->Think();
-			currentThinkingEntity = NULL;
 		}
 	} else do {
 		// update the game time
 		framenum++;
 		previousTime = time;
-		// bdube: use GetMSec access rather than USERCMD_TIME
-		time += GetMSec();
-
+		time += msec;
 		realClientTime = time;
-		{
-TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
-		// bdube: added advanced debug support
-		gameDebug.BeginFrame( );
-		gameLogLocal.BeginFrame( time );
-		}
 
 #ifdef GAME_DLL
 		// allow changing SIMD usage on the fly
@@ -3680,27 +2694,17 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 			}
 		}
 
-		// If modview is running then let it think
-		//common->ModViewThink( );	
+		// clear any debug lines from a previous frame
+		gameRenderWorld->DebugClearLines( time );
 
-		// rjohnson: added option for guis to always think
-		//common->RunAlwaysThinkGUIs( time );
+		// clear any debug polygons from a previous frame
+		gameRenderWorld->DebugClearPolygons( time );
 
-		// nmckenzie: Let AI System stuff update itself.
-		if ( !isMultiplayer ) {
-#ifndef _MPBETA
-			aiManager.RunFrame();
-#endif // !_MPBETA
-		}
-
-		timer_misc.Start();
-		
 		// set the user commands for this frame
-		usercmds = clientCmds;
+		memcpy( usercmds, clientCmds, numClients * sizeof( usercmds[ 0 ] ) );
 
-		// create a merged pvs for all players
-		// do this before we process events, which may rely on PVS info
-		SetupPlayerPVS();
+		// free old smoke particles
+		smokeParticles->FreeSmokes();
 
 		// process events on the server
 		ServerProcessEntityNetworkEventQueue();
@@ -3708,10 +2712,8 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		// update our gravity vector if needed.
 		UpdateGravity();
 
-		if ( isLastPredictFrame ) {
-			// jscott: effect system uses gravity and the player PVS
-			bse->StartFrame();
-		}
+		// create a merged pvs for all players
+		SetupPlayerPVS();
 
 		// sort the active entity list
 		SortActiveEntityList();
@@ -3719,26 +2721,9 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		timer_think.Clear();
 		timer_think.Start();
 
-		// jscott: for timing and effect handling
-		timer_misc2.Start();
-		timer_misc.Stop();
-
 		// let entities think
 		if ( g_timeentities.GetFloat() ) {
-			// rjohnson: will now draw entity info for long thinkers
-			idPlayer *player;
-			idVec3 origin;
-
-			player = GetLocalPlayer();
-			if ( player ) {
-				origin = player->GetPhysics()->GetOrigin();
-			}
-
-			idBounds	viewTextBounds( origin );
-			viewTextBounds.ExpandSelf( 128.0f );
-
 			num = 0;
-
 			for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
 				if ( g_cinematic.GetBool() && inCinematic && !ent->cinematic ) {
 					ent->GetPhysics()->UpdateTime( time );
@@ -3746,33 +2731,11 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 				}
 				timer_singlethink.Clear();
 				timer_singlethink.Start();
-				// ddynerman: save the current thinking entity for instance-dependent
-				currentThinkingEntity = ent;
 				ent->Think();
-				currentThinkingEntity = NULL;
 				timer_singlethink.Stop();
 				ms = timer_singlethink.Milliseconds();
 				if ( ms >= g_timeentities.GetFloat() ) {
-					// rjohnson: will now draw entity info for long thinkers
-					Printf( "%d: entity '%s' [%s]: %.1f ms\n", time, ent->name.c_str(), ent->GetPhysics()->GetOrigin().ToString(), ms );
-
-					if ( ms >= g_timeentities.GetFloat() * 3.0f )
-					{
-						ent->mLastLongThinkColor = colorRed;
-					}
-					else
-					{
-						ent->mLastLongThinkColor[0] = 1.0f;
-						ent->mLastLongThinkColor[1] = 2.0f - (( ms - g_timeentities.GetFloat()) / g_timeentities.GetFloat() );
-						ent->mLastLongThinkColor[2] = 0.0f;
-						ent->mLastLongThinkColor[3] = 1.0f;
-					}
-					ent->DrawDebugEntityInfo( 0, &viewTextBounds, &ent->mLastLongThinkColor );
-					ent->mLastLongThinkTime = time + 2000;
-				}
-				else if ( ent->mLastLongThinkTime > time )
-				{
-					ent->DrawDebugEntityInfo( 0, &viewTextBounds, &ent->mLastLongThinkColor );
+					Printf( "%d: entity '%s': %.1f ms\n", time, ent->name.c_str(), ms );
 				}
 				num++;
 			}
@@ -3784,19 +2747,13 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 						ent->GetPhysics()->UpdateTime( time );
 						continue;
 					}
-					// ddynerman: save the current thinking entity for instance-dependent
-					currentThinkingEntity = ent;
 					ent->Think();
-					currentThinkingEntity = NULL;
 					num++;
 				}
 			} else {
 				num = 0;
 				for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
-					// ddynerman: save the current thinking entity for instance-dependent
-					currentThinkingEntity = ent;
 					ent->Think();
-					currentThinkingEntity = NULL;
 					num++;
 				}
 			}
@@ -3821,43 +2778,18 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		timer_events.Clear();
 		timer_events.Start();
 
-		if ( isLastPredictFrame ) {
-			// bdube: client entities
-			rvClientEntity* cent;
-			for( cent = clientSpawnedEntities.Next(); cent != NULL; cent = cent->spawnNode.Next() ) {
-				cent->Think();			
-			}	
-		}
-
 		// service any pending events
 		idEvent::ServiceEvents();
 
-		// nrausch: player could have been deleted in an event
-		player = GetLocalPlayer();
-
 		timer_events.Stop();
 
-		if ( isLastPredictFrame ) {
-			// jscott: effect system uses gravity and the player PVS
-			bse->EndFrame();
-			CheckAutoMachinegunImpact();
-		}
+		// free the player pvs
+		FreePlayerPVS();
 
 		// do multiplayer related stuff
 		if ( isMultiplayer ) {
 			mpGame.Run();
 		}
-
-		if ( gameRenderWorld && !mpInteractionsGenerated ) {
-			if ( developer.GetBool() ) {
-				common->Printf( "Deferred GenerateAllInteractions (RunFrame)\n" );
-			}
-			gameRenderWorld->GenerateAllInteractions();
-			mpInteractionsGenerated = true;
-		}
-
-		// free the player pvs
-		FreePlayerPVS();
 
 		// display how long it took to calculate the current game frame
 		if ( g_frametime.GetBool() ) {
@@ -3872,8 +2804,8 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 
 		if ( !isMultiplayer && player ) {
 			ret.health = player->health;
-			ret.heartRate = 0.0f;
-			ret.stamina = 0.0f;
+			ret.heartRate = player->heartRate;
+			ret.stamina = idMath::FtoiFast( player->stamina );
 			// combat is a 0-100 value based on lastHitTime and lastDmgTime
 			// each make up 50% of the time spread over 10 seconds
 			ret.combat = 0;
@@ -3888,7 +2820,6 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		// see if a target_sessionCommand has forced a changelevel
 		if ( sessionCommand.Length() ) {
 			strncpy( ret.sessionCommand, sessionCommand, sizeof( ret.sessionCommand ) );
-			sessionCommand = "";
 			break;
 		}
 
@@ -3898,22 +2829,10 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 			skipCinematic = false;
 			break;
 		}
-
-		// jscott: additional timings
-		timer_misc2.Stop();
-
-		if ( g_frametime.GetInteger() > 1 )  {
-			gameLocal.Printf( "misc:%.1f misc2:%.1f\n", timer_misc.Milliseconds(), timer_misc2.Milliseconds() );
-		}
-		// bdube: let gameDebug know that its not in a game frame anymore
-		gameDebug.EndFrame( );
-		gameLogLocal.EndFrame( );
-
 	} while( ( inCinematic || ( time < cinematicStopTime ) ) && skipCinematic );
 
 	ret.syncNextGameFrame = skipCinematic;
 	if ( skipCinematic ) {
-		//soundSystem->EndCinematic();
 		soundSystem->SetMute( false );
 		skipCinematic = false;		
 	}
@@ -3922,10 +2841,13 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 	RunDebugInfo();
 	D_DrawDebugLines();
 
-	g_simpleItems.ClearModified();
+	return ret;
+*/
+	gameReturn_t ret;
+	ret.consistencyHash = 0;
+	ret.sessionCommand[0] = 0;
 	return ret;
 }
-// RAVEN END
 
 
 /*
@@ -3946,47 +2868,58 @@ Calculates the horizontal and vertical field of view based on a horizontal field
 void idGameLocal::CalcFov( float base_fov, float &fov_x, float &fov_y ) const {
 	float	x;
 	float	y;
-	float	ratio_x = 4.0f;
-	float	ratio_y = 3.0f;
-
+	float	ratio_x;
+	float	ratio_y;
+	
 	// first, calculate the vertical fov based on a 640x480 view
-	x = SCREEN_WIDTH / tan(base_fov / 360.0f * idMath::PI);
-	y = atan2(SCREEN_HEIGHT, x);
+	x = 640.0f / tan( base_fov / 360.0f * idMath::PI );
+	y = atan2( 480.0f, x );
 	fov_y = y * 360.0f / idMath::PI;
 
 	// FIXME: somehow, this is happening occasionally
-	assert(fov_y > 0);
-	if (fov_y <= 0) {
-		Printf(sys->FPU_GetState());
-		Error("idGameLocal::CalcFov: bad result");
-	}
-	// Aspect ratio is always automatic and follows the current render size.
-	const int screenWidth = renderSystem->GetScreenWidth();
-	const int screenHeight = renderSystem->GetScreenHeight();
-	if ( screenWidth > 0 && screenHeight > 0 ) {
-		ratio_x = static_cast<float>( screenWidth );
-		ratio_y = static_cast<float>( screenHeight );
+	assert( fov_y > 0 );
+	if ( fov_y <= 0 ) {
+		Printf( sys->FPU_GetState() );
+		Error( "idGameLocal::CalcFov: bad result" );
 	}
 
-	y = ratio_y / tan(fov_y / 360.0f * idMath::PI);
-	fov_x = atan2(ratio_x, y) * 360.0f / idMath::PI;
-
-	if (fov_x < base_fov) {
+	switch( r_aspectRatio.GetInteger() ) {
+	default :
+	case 0 :
+		// 4:3
 		fov_x = base_fov;
-		x = ratio_x / tan(fov_x / 360.0f * idMath::PI);
-		fov_y = atan2(ratio_y, x) * 360.0f / idMath::PI;
+		return;
+		break;
+
+	case 1 :
+		// 16:9
+		ratio_x = 16.0f;
+		ratio_y = 9.0f;
+		break;
+
+	case 2 :
+		// 16:10
+		ratio_x = 16.0f;
+		ratio_y = 10.0f;
+		break;
+	}
+
+	y = ratio_y / tan( fov_y / 360.0f * idMath::PI );
+	fov_x = atan2( ratio_x, y ) * 360.0f / idMath::PI;
+
+	if ( fov_x < base_fov ) {
+		fov_x = base_fov;
+		x = ratio_x / tan( fov_x / 360.0f * idMath::PI );
+		fov_y = atan2( ratio_y, x ) * 360.0f / idMath::PI;
 	}
 
 	// FIXME: somehow, this is happening occasionally
-	assert((fov_x > 0) && (fov_y > 0));
-	if ((fov_y <= 0) || (fov_x <= 0)) {
-		Printf(sys->FPU_GetState());
-		Error("idGameLocal::CalcFov: bad result");
+	assert( ( fov_x > 0 ) && ( fov_y > 0 ) );
+	if ( ( fov_y <= 0 ) || ( fov_x <= 0 ) ) {
+		Printf( sys->FPU_GetState() );
+		Error( "idGameLocal::CalcFov: bad result" );
 	}
 }
-
-void ClearClipProfile( void );
-void DisplayClipProfile( void );
 
 /*
 ================
@@ -3996,9 +2929,7 @@ makes rendering and sound system calls
 ================
 */
 bool idGameLocal::Draw( int clientNum ) {
-//	DisplayClipProfile( );
-//	ClearClipProfile( );
-
+/*	HUMANHEAD pdm: OVERRIDDEN
 	if ( isMultiplayer ) {
 		return mpGame.Draw( clientNum );
 	}
@@ -4009,215 +2940,10 @@ bool idGameLocal::Draw( int clientNum ) {
 		return false;
 	}
 
-// RAVEN BEGIN
-// mwhitlock: Xenon texture streaming.
-#if defined(_XENON)
-	renderView_t *view = player->GetRenderView();
-	// nrausch: view doesn't necessarily exist yet
-	if ( !view ) {
-		player->CalculateRenderView();
-		view = player->GetRenderView();
-	}
-#endif
-// RAVEN END
 	// render the scene
 	player->playerView.RenderPlayerView( player->hud );
-
-// RAVEN BEGIN
-// bdube: debugging HUD
-	gameDebug.DrawHud( );
-// RAVEN END
-	CheckAutoScreenshot();
+*/
 	return true;
-}
-
-/*
-================
-idGameLocal::CheckAutoMachinegunImpact
-
-Take a one-shot machinegun impact effect sample after map load, for deterministic BSE visual debugging.
-================
-*/
-void idGameLocal::CheckAutoMachinegunImpact( void ) {
-	const bool autoMachinegunImpact = g_autoMachinegunImpact.GetBool();
-	const bool autoMachinegunImpactCvar = cvarSystem->GetCVarBool( "g_autoMachinegunImpact" );
-	const bool wantAutoMachinegunImpact = autoMachinegunImpact || autoMachinegunImpactCvar;
-
-	if ( wantAutoMachinegunImpact ) {
-		if ( !autoMachinegunImpactPending ) {
-			autoMachinegunImpactPending = true;
-			autoMachinegunImpactStartTime = Sys_Milliseconds();
-		}
-	} else if ( autoMachinegunImpactPending ) {
-		autoMachinegunImpactPending = false;
-	}
-
-	if ( !autoMachinegunImpactPending ) {
-		return;
-	}
-
-	const int nowMs = Sys_Milliseconds();
-	const int delayMs = g_autoMachinegunImpactDelayMs.GetInteger();
-	if ( delayMs > 0 && ( nowMs - autoMachinegunImpactStartTime ) < delayMs ) {
-		return;
-	}
-
-	idPlayer *player = GetLocalPlayer();
-	if ( !player ) {
-		return;
-	}
-
-	const idDecl *effect = NULL;
-	const char *overrideEffectName = g_autoMachinegunImpactEffect.GetString();
-	if ( overrideEffectName && *overrideEffectName ) {
-		effect = ( const idDecl * )declManager->FindEffect( overrideEffectName, false );
-	}
-
-	idStr hitscanDefName;
-	const idDeclEntityDef *weaponDef = FindEntityDef( "weapon_machinegun", false );
-	if ( weaponDef ) {
-		hitscanDefName = weaponDef->dict.GetString( "def_hitscan" );
-	}
-	const idDeclEntityDef *hitscanDef = ( !hitscanDefName.IsEmpty() ) ? FindEntityDef( hitscanDefName.c_str(), false ) : NULL;
-	const rvDeclMatType *metalType = declManager->FindMaterialType( "metal", false );
-
-	if ( !effect && hitscanDef ) {
-		effect = GetEffect( hitscanDef->dict, "fx_impact", metalType );
-		if ( !effect ) {
-			effect = GetEffect( hitscanDef->dict, "fx_impact", NULL );
-		}
-	}
-	if ( !effect && weaponDef ) {
-		effect = GetEffect( weaponDef->dict, "fx_impact", metalType );
-		if ( !effect ) {
-			effect = GetEffect( weaponDef->dict, "fx_impact", NULL );
-		}
-	}
-
-	idVec3 viewOrigin;
-	idMat3 viewAxis;
-	player->GetViewPos( viewOrigin, viewAxis );
-
-	const float distance = idMath::ClampFloat( 64.0f, 4096.0f, g_autoMachinegunImpactDistance.GetFloat() );
-	const idVec3 traceEnd = viewOrigin + viewAxis[ 0 ] * distance;
-
-	trace_t tr;
-	TracePoint( player, tr, viewOrigin, traceEnd, MASK_SHOT_RENDERMODEL | CONTENTS_WATER | CONTENTS_PROJECTILE, player );
-
-	idVec3 impactPos = tr.endpos;
-	idMat3 impactAxis = viewAxis;
-	if ( tr.fraction < 1.0f ) {
-		impactPos = tr.c.point - ( tr.c.normal * tr.c.point - tr.c.dist ) * tr.c.normal;
-		impactPos += tr.c.normal * 0.5f;
-		impactAxis = tr.c.normal.ToMat3();
-	}
-
-	if ( effect ) {
-		PlayEffect( effect, impactPos, impactAxis, false, traceEnd, false, false, EC_IMPACT );
-		common->Printf( "AutoMachinegunImpact: played '%s' frac=%.3f pos=(%.1f %.1f %.1f) elapsed=%dms\n",
-			effect->GetName(),
-			tr.fraction,
-			impactPos.x, impactPos.y, impactPos.z,
-			nowMs - autoMachinegunImpactStartTime );
-	} else {
-		common->Printf( "AutoMachinegunImpact: unable to resolve machinegun fx_impact (def_hitscan='%s', override='%s')\n",
-			hitscanDefName.c_str(),
-			overrideEffectName ? overrideEffectName : "" );
-	}
-
-	autoMachinegunImpactPending = false;
-	g_autoMachinegunImpact.SetBool( false );
-	cvarSystem->SetCVarBool( "g_autoMachinegunImpact", false );
-}
-
-/*
-================
-idGameLocal::CheckAutoScreenshot
-
-Take a one-shot screenshot after map load, for automated diagnostics.
-================
-*/
-void idGameLocal::CheckAutoScreenshot( void ) {
-	const bool gAutoScreenshot = g_autoScreenshot.GetBool();
-	const bool gAutoScreenshotCvar = cvarSystem->GetCVarBool( "g_autoScreenshot" );
-	const bool comAutoScreenshot = cvarSystem->GetCVarBool( "com_autoScreenshot" );
-	const bool wantAutoScreenshot = gAutoScreenshot || gAutoScreenshotCvar || comAutoScreenshot;
-
-	if ( wantAutoScreenshot ) {
-		if ( !autoScreenshotPending ) {
-			autoScreenshotPending = true;
-			autoScreenshotStartTime = Sys_Milliseconds();
-		}
-	} else if ( autoScreenshotPending ) {
-		autoScreenshotPending = false;
-	}
-
-	if ( !autoScreenshotPending ) {
-		return;
-	}
-
-	const int nowMs = Sys_Milliseconds();
-	const int delayMs = g_autoScreenshotDelayMs.GetInteger();
-	if ( delayMs > 0 && ( nowMs - autoScreenshotStartTime ) < delayMs ) {
-		return;
-	}
-
-	idStr shotName;
-	shotName = va( "screenshots/auto_%d.tga", nowMs );
-	// Log basic render diagnostics before capture.
-	int numLights = 0;
-	int numLightDefs = 0;
-	int numAmbientLights = 0;
-	for ( int i = 0; i < MAX_GENTITIES; ++i ) {
-		idEntity *ent = entities[ i ];
-		if ( !ent ) {
-			continue;
-		}
-		if ( ent->IsType( idLight::Type ) ) {
-			idLight *light = static_cast<idLight *>( ent );
-			numLights++;
-			if ( light->GetLightDefHandle() != -1 ) {
-				numLightDefs++;
-			}
-			if ( light->IsAmbient() ) {
-				numAmbientLights++;
-			}
-		}
-	}
-	common->Printf( "AutoScreenshot: lights total=%d defs=%d ambient=%d r_skipRender=%d r_skipInteractions=%d r_skipAmbient=%d r_skipDiffuse=%d r_forceAmbient=%d\n",
-		numLights, numLightDefs, numAmbientLights,
-		cvarSystem->GetCVarBool( "r_skipRender" ) ? 1 : 0,
-		cvarSystem->GetCVarBool( "r_skipInteractions" ) ? 1 : 0,
-		cvarSystem->GetCVarBool( "r_skipAmbient" ) ? 1 : 0,
-		cvarSystem->GetCVarBool( "r_skipDiffuse" ) ? 1 : 0,
-		cvarSystem->GetCVarBool( "r_forceAmbient" ) ? 1 : 0 );
-	if ( developer.GetBool() ) {
-		idPlayer *localPlayer = GetLocalPlayer();
-		const renderView_t *view = localPlayer ? localPlayer->GetRenderView() : NULL;
-		if ( view && gameRenderWorld ) {
-			const int areaNum = gameRenderWorld->PointInArea( view->vieworg );
-			common->Printf( "AutoScreenshot: vieworg=(%.1f %.1f %.1f) area=%d numAreas=%d numPortals=%d\n",
-				view->vieworg.x, view->vieworg.y, view->vieworg.z,
-				areaNum,
-				gameRenderWorld->NumAreas(),
-				gameRenderWorld->NumPortals() );
-		} else {
-			common->Printf( "AutoScreenshot: vieworg unavailable (player=%p view=%p renderWorld=%p)\n",
-				localPlayer, view, gameRenderWorld );
-		}
-		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "listRenderLightDefs\nlistRenderEntityDefs\n" );
-	}
-
-	renderSystem->CaptureRenderToFile( shotName.c_str(), true );
-	common->Printf( "AutoScreenshot: wrote %s at %d ms\n", shotName.c_str(), nowMs - autoScreenshotStartTime );
-	if ( g_autoScreenshotQuit.GetBool() ) {
-		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
-	}
-
-	autoScreenshotPending = false;
-	g_autoScreenshot.SetBool( false );
-	cvarSystem->SetCVarBool( "g_autoScreenshot", false );
-	cvarSystem->SetCVarBool( "com_autoScreenshot", false );
 }
 
 /*
@@ -4226,17 +2952,6 @@ idGameLocal::HandleESC
 ================
 */
 escReply_t idGameLocal::HandleESC( idUserInterface **gui ) {
-
-//RAVEN BEGIN
-//asalmon: xbox dedicated server needs to bring up a special menu
-#ifdef _XBOX
-	if( cvarSystem->GetCVarBool( "net_serverDedicated" ))
-	{
-		return ESC_MAIN;
-	}
-#endif
-//RAVEN END
-
 	if ( isMultiplayer ) {
 		*gui = StartMenu();
 		// we may set the gui back to NULL to hide it
@@ -4255,23 +2970,6 @@ escReply_t idGameLocal::HandleESC( idUserInterface **gui ) {
 
 /*
 ================
-idGameLocal::UpdatePlayerPostMainMenu
-================
-*/
-void idGameLocal::UpdatePlayerPostMainMenu()	{
-	idPlayer* player = GetLocalPlayer();
-
-	//dedicated server?
-	if( !player)	{
-		return;
-	}	
-	
-	//crosshair may have changed
-	player->UpdateHudWeapon();
-}
-
-/*
-================
 idGameLocal::StartMenu
 ================
 */
@@ -4280,41 +2978,6 @@ idUserInterface* idGameLocal::StartMenu( void ) {
 		return NULL;
 	}
 	return mpGame.StartMenu();
-}
-
-/*
-================
-idGameLocal::GetClientStats
-================
-*/
-void idGameLocal::GetClientStats( int clientNum, char *data, const int len ) {
-	mpGame.PlayerStats( clientNum, data, len );
-}
-
-/*
-================
-idGameLocal::SwitchTeam
-================
-*/
-void idGameLocal::SwitchTeam( int clientNum, int team ) {
-
-	idPlayer *   player;
-	player = clientNum >= 0 ? static_cast<idPlayer *>( gameLocal.entities[ clientNum ] ) : NULL;
-
-	if ( !player ) {
-		return;
-	}
-
-	int oldTeam = player->team;
-
-	// Put in spectator mode
-	if ( team == -1 ) {
-		static_cast< idPlayer * >( entities[ clientNum ] )->Spectate( true );
-	}
-	// Switch to a team
-	else {
-		mpGame.SwitchToTeam ( clientNum, oldTeam, team );
-	}
 }
 
 /*
@@ -4331,98 +2994,13 @@ const char* idGameLocal::HandleGuiCommands( const char *menuCommand ) {
 
 /*
 ================
-idGameLocal::HandleMainMenuCommands
-================
-*/
-void idGameLocal::HandleMainMenuCommands( const char *menuCommand, idUserInterface *gui ) {
-	if ( !idStr::Icmp( menuCommand, "initCreateServerSettings" ) ) {
-		int	guiValue = 0;
-
-		switch ( mpGame.GameTypeToVote( si_gameType.GetString() ) ) {
-			case idMultiplayerGame::VOTE_GAMETYPE_DM:
-				guiValue = 0;
-				break;
-			case idMultiplayerGame::VOTE_GAMETYPE_TOURNEY:
-				guiValue = 1;
-				break;
-			case idMultiplayerGame::VOTE_GAMETYPE_TDM:
-				guiValue = 2;
-				break;
-			case idMultiplayerGame::VOTE_GAMETYPE_CTF:
-				guiValue = 3;
-				break;
-			case idMultiplayerGame::VOTE_GAMETYPE_ARENA_CTF:
-				guiValue = 4;
-				break;
-			case idMultiplayerGame::VOTE_GAMETYPE_DEADZONE:
-				guiValue = 5;
-				break;
-		}
-
-		gui->SetStateInt( "currentGametype", guiValue );
-	} else if ( !idStr::Icmp( menuCommand, "filterByNextMod" ) ) {
-		BuildModList();
-
-		if ( modList.Num() > 0 && (filterMod < 0 || filterMod >= modList.Num()) ) {
-			filterMod = 0;
-			networkSystem->UseSortFunction( filterByMod, true );
-			gui->SetStateString( "filterMod", modList[ filterMod ].c_str() );
-		} else {
-			++filterMod;
-			if ( filterMod < modList.Num() ) {
-				networkSystem->UseSortFunction( filterByMod, true );
-				gui->SetStateString( "filterMod", modList[ filterMod ].c_str() );
-			} else {
-				filterMod = -1;
-				networkSystem->UseSortFunction( filterByMod, false );
-				gui->SetStateString( "filterMod", common->GetLocalizedString( "#str_123008" ) );
-			}
-		}
-	} else if ( !idStr::Icmp( menuCommand, "filterByPrevMod" ) ) {
-		BuildModList();
-
-		if ( modList.Num() > 0 && (filterMod < 0 || filterMod >= modList.Num()) ) {
-			filterMod = modList.Num() - 1;
-			networkSystem->UseSortFunction( filterByMod, true );
-			gui->SetStateString( "filterMod", modList[ filterMod ].c_str() );
-		} else {
-			--filterMod;
-			if ( filterMod >= 0 ) {
-				networkSystem->UseSortFunction( filterByMod, true );
-				gui->SetStateString( "filterMod", modList[ filterMod ].c_str() );
-			} else {
-				filterMod = -1;
-				networkSystem->UseSortFunction( filterByMod, false );
-				gui->SetStateString( "filterMod", common->GetLocalizedString( "#str_123008" ) );
-			}
-		}
-	} else if ( !idStr::Icmp( menuCommand, "updateFilterByMod" ) ) {
-		if ( filterMod < 0 || filterMod >= modList.Num() ) {
-			gui->SetStateString( "filterMod", common->GetLocalizedString( "#str_123008" ) );
-		} else {
-			gui->SetStateString( "filterMod", modList[ filterMod ].c_str() );
-		}
-	} else if ( !idStr::Icmp( menuCommand, "server_clearSort" ) ) {
-		filterMod = -1;
-		gui->SetStateString( "filterMod", common->GetLocalizedString( "#str_123008" ) );
-	}
-
-	return;
-}
-
-/*
-================
 idGameLocal::GetLevelMap
 
   should only be used for in-game level editing
 ================
 */
 idMapFile *idGameLocal::GetLevelMap( void ) {
-// RAVEN BEGIN
-// rhummer: Added the HasBeenResolved check, if resolve has been run then it doesn't have func_groups.
-//			Which we probably don't want, so force the map to be reloaded.
-	if ( mapFile && mapFile->HasPrimitiveData() && !mapFile->HasBeenResloved() ) {
-// RAVEN END
+	if ( mapFile && mapFile->HasPrimitiveData()) {
 		return mapFile;
 	}
 	if ( !mapFileName.Length() ) {
@@ -4456,15 +3034,6 @@ const char *idGameLocal::GetMapName( void ) const {
 idGameLocal::CallFrameCommand
 ================
 */
-void idGameLocal::CallFrameCommand( idEntity* ent, const char* frameCommand ) {
-	const function_t *func = program.FindFunction( frameCommand );
-	if ( !func ) {
-		Warning( "Script function '%s' not found.", frameCommand );
-		return;
-	}
-	CallFrameCommand ( ent, func );
-}
-
 void idGameLocal::CallFrameCommand( idEntity *ent, const function_t *frameCommand ) {
 	frameCommandThread->CallFunction( ent, frameCommand, true );
 	frameCommandThread->Execute();
@@ -4480,10 +3049,7 @@ void idGameLocal::CallObjectFrameCommand( idEntity *ent, const char *frameComman
 
 	func = ent->scriptObject.GetFunction( frameCommand );
 	if ( !func ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( !ent->IsType( idTestModel::GetClassType() ) ) {
-// RAVEN END
+		if ( !ent->IsType( idTestModel::Type ) ) {
 			Error( "Unknown function '%s' called for frame command on entity '%s'", frameCommand, ent->name.c_str() );
 		}
 	} else {
@@ -4551,12 +3117,105 @@ void idGameLocal::ShowTargets( void ) {
 	}
 }
 
+//HUMANHEAD rww
+void idGameLocal::GetAPUserInfo(idDict &dict, int clientNum) {
+	static const char *apNames[8] = {
+		"i have spaces in my name",
+		"DIX",
+		"j0sh",
+		"mpl",
+		"Boris",
+		"Big H",
+		"fr3d",
+		"sho"
+	};
+	if (clientNum >= 0 && clientNum < 8) {
+		dict.Set("ui_name", apNames[clientNum]);
+	}
+	else {
+		dict.Set("ui_name", va("Johnny McMuffins %i", clientNum));
+	}
+	dict.Set("ui_ready", "Ready");
+	dict.Set("ui_spectate", "Play");
+	dict.SetInt("ui_modelNum", clientNum);
+}
+
+void idGameLocal::SpawnArtificialPlayer(void) {
+	idEntity	*ent;
+	idDict		dict;
+	idDict		apUI;
+	const int	maxClients = serverInfo.GetInt( "si_maxPlayers" );
+	const char	*classname = "player_artificial_mp";
+	int			clientNum;
+
+	for (clientNum = 0; clientNum < maxClients; clientNum++) {
+		if (!entities[clientNum]) {
+			break;
+		}
+	}
+	if (clientNum == maxClients) {
+		Printf("No free player slots.\n");
+		return;
+	}
+
+	dict.Set( "classname", "player_artificial_mp" );
+	dict.SetInt( "spawn_entnum", clientNum );
+	dict.Set( "name", va( "player%d", clientNum + 1 ) );
+
+	if (!SpawnEntityDef( dict, &ent )) {
+		Warning("Couldn't spawn entityDef '%s' for artificial player.\n", classname);
+		return;
+	}
+
+	if ( clientNum >= numClients ) {
+		numClients = clientNum + 1;
+	}
+
+	GetAPUserInfo(apUI, clientNum);
+	SetUserInfo(clientNum, apUI, false, false);
+	mpGame.SpawnPlayer( clientNum );
+}
+//HUMANHEAD END
+
 /*
 ================
 idGameLocal::RunDebugInfo
 ================
 */
 void idGameLocal::RunDebugInfo( void ) {
+#if GOLD //HUMANHEAD rww
+	if (!developer.GetBool()) {
+		return;
+	}
+#endif //HUMANHEAD END
+
+	//HUMANHEAD rww
+	if (isMultiplayer && isServer && g_artificialPlayerCount.GetInteger() > 0) {
+		int numExistingAP = 0;
+		int numClients = 0;
+		bool anyNonAP = false;
+		const int maxClients = serverInfo.GetInt( "si_maxPlayers" );
+
+		for (int i = 0; i < maxClients; i++) {
+			if (entities[i]) {
+				if (entities[i]->IsType(hhPlayer::Type)) {
+					if (entities[i]->IsType(hhArtificialPlayer::Type)) {
+						numExistingAP++;
+					}
+					else {
+						anyNonAP = true;
+					}
+					numClients++;
+				}
+			}
+		}
+
+		if (anyNonAP && numClients < maxClients && numExistingAP < g_artificialPlayerCount.GetInteger()) { //if we have room and want more, spawn one this frame
+			SpawnArtificialPlayer();
+		}
+	}
+	//HUMANHEAD END
+
 	idEntity *ent;
 	idPlayer *player;
 
@@ -4568,6 +3227,8 @@ void idGameLocal::RunDebugInfo( void ) {
 	const idVec3 &origin = player->GetPhysics()->GetOrigin();
 
 	if ( g_showEntityInfo.GetBool() ) {
+		idMat3		axis = player->viewAngles.ToMat3();
+		idVec3		up = axis[ 2 ] * 5.0f;
 		idBounds	viewTextBounds( origin );
 		idBounds	viewBounds( origin );
 
@@ -4579,10 +3240,30 @@ void idGameLocal::RunDebugInfo( void ) {
 				continue;
 			}
 
-// RAVEN BEGIN
-// rjohnson: moved entity info out of idGameLocal into its own function
-			ent->DrawDebugEntityInfo(&viewBounds, &viewTextBounds);
-// RAVEN END
+			// skip if the entity is very far away
+			if ( !viewBounds.IntersectsBounds( ent->GetPhysics()->GetAbsBounds() ) ) {
+				continue;
+			}
+
+			const idBounds &entBounds = ent->GetPhysics()->GetAbsBounds();
+			int contents = ent->GetPhysics()->GetContents();
+			if ( contents & CONTENTS_BODY ) {
+				gameRenderWorld->DebugBounds( colorCyan, entBounds );
+			} else if ( contents & CONTENTS_TRIGGER ) {
+				gameRenderWorld->DebugBounds( colorOrange, entBounds );
+			} else if ( contents & CONTENTS_SOLID ) {
+				gameRenderWorld->DebugBounds( colorGreen, entBounds );
+			} else {
+				if ( !entBounds.GetVolume() ) {
+					gameRenderWorld->DebugBounds( colorMdGrey, entBounds.Expand( 8.0f ) );
+				} else {
+					gameRenderWorld->DebugBounds( colorMdGrey, entBounds );
+				}
+			}
+			if ( viewTextBounds.IntersectsBounds( entBounds ) ) {
+				gameRenderWorld->DrawText( ent->name.c_str(), entBounds.GetCenter(), 0.1f, colorWhite, axis, 1 );
+				gameRenderWorld->DrawText( va( "#%d", ent->entityNumber ), entBounds.GetCenter() + up, 0.1f, colorWhite, axis, 1 );
+			}
 		}
 	}
 
@@ -4602,16 +3283,6 @@ void idGameLocal::RunDebugInfo( void ) {
 		}
 	}
 
-// RAVEN BEGIN
-// bdube: client entities
-	if ( cl_showEntityInfo.GetBool ( ) ) {
-		rvClientEntity* cent;
-		for( cent = clientSpawnedEntities.Next(); cent != NULL; cent = cent->spawnNode.Next() ) {
-			cent->DrawDebugInfo ( );
-		}				
-	}
-// RAVEN END
-
 	if ( g_showTargets.GetBool() ) {
 		ShowTargets();
 	}
@@ -4621,7 +3292,7 @@ void idGameLocal::RunDebugInfo( void ) {
 	}
 
 	if ( ai_showCombatNodes.GetBool() ) {
-//		idCombatNode::DrawDebugInfo();
+		idCombatNode::DrawDebugInfo();
 	}
 
 	if ( ai_showPaths.GetBool() ) {
@@ -4629,44 +3300,53 @@ void idGameLocal::RunDebugInfo( void ) {
 	}
 
 	if ( g_editEntityMode.GetBool() ) {
-		if ( gameLocal.isMultiplayer ) 	{
-			g_editEntityMode.SetInteger(0);
-			Printf( "Not allowed in multiplayer.\n" );
-		} else {
-			editEntities->DisplayEntities();
-		}
+		editEntities->DisplayEntities();
 	}
 
-	if ( g_showCollisionWorld.GetBool() ) {
-		// use g_maxShowDistance value instead of 128.0f
-		collisionModelManager->DrawModel( clip[0]->GetWorldCollisionModel(), vec3_origin, mat3_identity, origin, mat3_identity, g_maxShowDistance.GetFloat() );
+	if ( g_showCollisionWorld.GetBool() || ai_debugPath.GetInteger() == 1 ) {
+		collisionModelManager->DrawModel( 0, vec3_origin, mat3_identity, origin, 128.0f );
 	}
 
 	if ( g_showCollisionModels.GetBool() ) {
-		if( g_showCollisionModels.GetInteger() == 2 ) {
-			clip[ 0 ]->DrawClipModels( player->GetEyePosition(), g_maxShowDistance.GetFloat(), pm_thirdPerson.GetBool() ? NULL : player, &idPlayer::GetClassType() );
-		} else {
-			clip[ 0 ]->DrawClipModels( player->GetEyePosition(), g_maxShowDistance.GetFloat(), pm_thirdPerson.GetBool() ? NULL : player );
-		}
-		
+		clip.DrawClipModels( player->GetEyePosition(), g_maxShowDistance.GetFloat(), pm_thirdPerson.GetBool() ? NULL : player );
 	}
 
 	if ( g_showCollisionTraces.GetBool() ) {
-		clip[ 0 ]->PrintStatistics();
+		clip.PrintStatistics();
 	}
 
 	if ( g_showPVS.GetInteger() ) {
 		pvs.DrawPVS( origin, ( g_showPVS.GetInteger() == 2 ) ? PVS_ALL_PORTALS_OPEN : PVS_NORMAL );
 	}
 
-// RAVEN BEGIN
-// rjohnson: added debug hud
-	if ( gameDebug.IsHudActive ( DBGHUD_PHYSICS ) )	{
-		clip[ 0 ]->DebugHudStatistics();
+	// HUMANHEAD pdm: game portal support
+#if GAMEPORTAL_PVS
+	if ( g_showGamePortals.GetInteger() ) {
+		gameRenderWorld->DrawGamePortals(g_showGamePortals.GetInteger(), gameLocal.GetLocalPlayer()->viewAngles.ToMat3());
 	}
+#endif
+#if GAMEPORTAL_SOUND
+	if ( g_showValidSoundAreas.GetInteger() ) {
+		gameRenderWorld->DrawValidSoundAreas(origin, gameLocal.GetLocalPlayer()->viewAngles.ToMat3());
+	}
+#endif
 
-	clip[ 0 ]->ClearStatistics();
-// RAVEN END
+	if (g_showEntityCount.GetBool() || g_maxEntitiesWarning.GetInteger()) {
+		int count = 0;
+		for (int ix=0; ix<MAX_GENTITIES; ix++) {
+			if (entities[ix]) {
+				count++;
+			}
+		}
+		// Display warning if over the entity limit
+		if (g_maxEntitiesWarning.GetInteger() > 0 && count > g_maxEntitiesWarning.GetInteger()) {
+			Warning("%d entity slots used!  g_maxEntitiesWarning=%d\n", count, g_maxEntitiesWarning.GetInteger());
+		}
+		else if (g_showEntityCount.GetBool()) {
+			Printf("%d entity slots used\n", count);
+		}
+	}
+	// HUMANHEAD END
 
 	if ( aas_test.GetInteger() >= 0 ) {
 		idAAS *aas = GetAAS( aas_test.GetInteger() );
@@ -4676,39 +3356,12 @@ void idGameLocal::RunDebugInfo( void ) {
 				idVec3 velocity;
 				predictedPath_t path;
 
-				velocity.x = idMath::Cos( DEG2RAD( player->viewAngles.yaw ) ) * 100.0f;
-				velocity.y = idMath::Sin( DEG2RAD( player->viewAngles.yaw ) ) * 100.0f;
+				velocity.x = cos( DEG2RAD( player->viewAngles.yaw ) ) * 100.0f;
+				velocity.y = sin( DEG2RAD( player->viewAngles.yaw ) ) * 100.0f;
 				velocity.z = 0.0f;
 				idAI::PredictPath( player, aas, origin, velocity, 1000, 100, SE_ENTER_OBSTACLE | SE_BLOCKED | SE_ENTER_LEDGE_AREA, path );
 			}
 		}
-// RAVEN BEGIN 
-// rjohnson: added more debug drawing
-		if ( aas_showAreas.GetInteger() == 3 ) {
-			for( int i=0; i<aasNames.Num(); i++ ) {
-				aas = GetAAS( i );
-				if ( !aas || !aas->IsValid() ) {
-					continue;
-				}
-
-				if ( aas->GetSettings()->debugDraw ) {
-					aas->ShowAreas( origin );
-				}
-			}
-		}
-		if ( aas_showProblemAreas.GetInteger() == 3 ) {
-			for( int i=0; i<aasNames.Num(); i++ ) {
-				aas = GetAAS( i );
-				if ( !aas || !aas->IsValid() ) {
-					continue;
-				}
-
-				if ( aas->GetSettings()->debugDraw ) {
-					aas->ShowAreas( origin, true );
-				}
-			}
-		}
-// RAVEN END
 	}
 
 	if ( ai_showObstacleAvoidance.GetInteger() == 2 ) {
@@ -4722,28 +3375,8 @@ void idGameLocal::RunDebugInfo( void ) {
 		}
 	}
 
-// collision map debug output
-// jmarshall - debug output
+	// collision map debug output
 	collisionModelManager->DebugOutput( player->GetEyePosition() );
-// jmarshall end
-
-// RAVEN BEGIN
-// jscott: for debugging playbacks
-	if( g_showPlayback.GetInteger() ) {
-		gameEdit->DrawPlaybackDebugInfo();
-	}
-// RAVEN END
-
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
-	if ( g_showClipSectors.GetBool() ) {
-		clip[ 0 ]->DrawClipSectors();
-	}
-
-	if ( g_showAreaClipSectors.GetFloat() ) {
-		clip[ 0 ]->DrawAreaClipSectors( g_showAreaClipSectors.GetFloat() );
-	}
-// RAVEN END
 }
 
 /*
@@ -4851,34 +3484,6 @@ void idGameLocal::RemoveAllAASObstacles( void ) {
 	}
 }
 
-// RAVEN BEGIN
-// mwhitlock: added entity memory usage stuff.
-/*
-==================
-idGameLocal::GetEntityMemoryUsage
-
-Compute combined total memory footprint of server and client entity storage.
-==================
-*/
-
-size_t idGameLocal::GetEntityMemoryUsage ( void ) const {
-
-	// Server ents.
-	size_t serverEntitiesSize = 0;
-	for( idEntity *ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-		 serverEntitiesSize += sizeof( idEntity );
-	}
-	
-	// Client ents.
-	size_t clientEntitiesSize = 0;
-	for( rvClientEntity *ent = gameLocal.clientSpawnedEntities.Next() ; ent != NULL; ent = ent->spawnNode.Next() ) {
-		 clientEntitiesSize += ent->Size();
-	}
-	
-	return serverEntitiesSize + clientEntitiesSize;
-}
-// RAVEN END
-
 /*
 ==================
 idGameLocal::CheatsOk
@@ -4887,7 +3492,7 @@ idGameLocal::CheatsOk
 bool idGameLocal::CheatsOk( bool requirePlayer ) {
 	idPlayer *player;
 
-	if ( isMultiplayer && !( cvarSystem->GetCVarBool( "sv_cheats" ) || cvarSystem->GetCVarBool( "net_allowCheats" ) ) ) {
+	if ( isMultiplayer && !cvarSystem->GetCVarBool( "net_allowCheats" ) ) {
 		Printf( "Not allowed in multiplayer.\n" );
 		return false;
 	}
@@ -4897,7 +3502,7 @@ bool idGameLocal::CheatsOk( bool requirePlayer ) {
 	}
 
 	player = GetLocalPlayer();
-	if ( !requirePlayer || ( player && ( player->health > 0 ) ) ) {
+	if ( !requirePlayer || ( player && !player->IsDead() ) ) { // HUMANHEAD cjr: allow cheats when deathwalking
 		return true;
 	}
 
@@ -4911,27 +3516,54 @@ bool idGameLocal::CheatsOk( bool requirePlayer ) {
 idGameLocal::RegisterEntity
 ===================
 */
+extern void Cmd_EntityList(const idStr &match); //HUMANHEAD rww
 void idGameLocal::RegisterEntity( idEntity *ent ) {
 	int spawn_entnum;
 
-	if ( spawnCount >= ( 1 << ( 32 - GENTITYNUM_BITS ) ) ) {
+	if ( spawnCount >= ( 1 << ( 32 - GENTITYNUM_BITS_PLUSCENT ) ) ) { //HUMANHEAD rww cent bits
+		//HUMANHEAD rww
 		Error( "idGameLocal::RegisterEntity: spawn count overflow" );
+		//this should be a safe way to handle this, since entities will still be in different slots,
+		//even if they happen to share the same spawn id.
+		//in theory you should need a server up for a very long time for this to happen, but with enough
+		//fx and projectiles it is conceivable.
+		//spawnCount = gameLocal.GetMapSpawnCount()+1;
+		//addendum - actually, seems like this may be causing trouble with really damn old safe entity pointers.
+		//HUMANHEAD END
 	}
 
-	firstFreeIndex = Max( minSpawnIndex, firstFreeIndex );
-
-	if ( !spawnArgs.GetInt( "spawn_entnum", "0", spawn_entnum ) ) {
-		while ( entities[firstFreeIndex] && firstFreeIndex < ENTITYNUM_MAX_NORMAL ) {
-			firstFreeIndex++;
+	//HUMANHEAD rww - client entities
+	if (ent->fl.clientEntity) {
+		int clientIndex = MAX_GENTITIES;
+		if ( !spawnArgs.GetInt( "spawn_entnum", "0", spawn_entnum ) ) {
+			while( entities[clientIndex] && clientIndex < (MAX_GENTITIES+MAX_CENTITIES) ) {
+				clientIndex++;
+			}
+			if ( clientIndex >= (MAX_GENTITIES+MAX_CENTITIES) ) {
+				Error( "no free client entities" );
+			}
+			spawn_entnum = clientIndex;
 		}
-		if ( firstFreeIndex >= ENTITYNUM_MAX_NORMAL ) {
-			Error( "no free entities" );
+		else {
+			spawn_entnum += MAX_GENTITIES;
 		}
-		spawn_entnum = firstFreeIndex++;
-	} else {
-		assert( spawn_entnum < MAX_CLIENTS || spawn_entnum >= minSpawnIndex );
+	}
+	else
+	{
+	//END HUMANHEAD
+		if ( !spawnArgs.GetInt( "spawn_entnum", "0", spawn_entnum ) ) {
+			while( entities[firstFreeIndex] && firstFreeIndex < ENTITYNUM_MAX_NORMAL ) {
+				firstFreeIndex++;
+			}
+			if ( firstFreeIndex >= ENTITYNUM_MAX_NORMAL ) {
+				Cmd_EntityList(""); //HUMANHEAD rww
+				Error( "no free entities" );
+			}
+			spawn_entnum = firstFreeIndex++;
+		}
 	}
 
+	assert(!entities[ spawn_entnum ]); //HUMANHEAD rww - this can happen if something decides to do something dumb like spawn a new entity with an existing dict that includes a spawn_entnum
 	entities[ spawn_entnum ] = ent;
 	spawnIds[ spawn_entnum ] = spawnCount++;
 	ent->entityNumber = spawn_entnum;
@@ -4941,11 +3573,6 @@ void idGameLocal::RegisterEntity( idEntity *ent ) {
 	if ( spawn_entnum >= num_entities ) {
 		num_entities++;
 	}
-
-// RAVEN BEGIN
-// bdube: keep track of last time an entity was registered	
-	entityRegisterTime = time;
-// RAVEN END
 }
 
 /*
@@ -4962,30 +3589,16 @@ void idGameLocal::UnregisterEntity( idEntity *ent ) {
 
 	if ( ( ent->entityNumber != ENTITYNUM_NONE ) && ( entities[ ent->entityNumber ] == ent ) ) {
 		ent->spawnNode.Remove();
+		//ent->snapshotNode.Remove(); //HUMANHEAD rww - testing to see if this fixes mysterious prediction crash
 		entities[ ent->entityNumber ] = NULL;
 		spawnIds[ ent->entityNumber ] = -1;
-		if ( ent->entityNumber >= MAX_CLIENTS && ent->entityNumber < firstFreeIndex ) {
+		//HUMANHEAD rww - don't set this for client ents
+		//if ( ent->entityNumber >= MAX_CLIENTS && ent->entityNumber < firstFreeIndex ) {
+		if ( ent->entityNumber >= MAX_CLIENTS && ent->entityNumber < firstFreeIndex && ent->entityNumber < MAX_GENTITIES ) {
+		//HUMANHEAD END
 			firstFreeIndex = ent->entityNumber;
 		}
 		ent->entityNumber = ENTITYNUM_NONE;
-	}
-
-// RAVEN BEGIN
-// bdube: keep track of last time an entity was registered	
-	entityRegisterTime = time;
-// RAVEN END
-}
-
-/*
-===============
-idGameLocal::SkipEntityIndex
-===============
-*/
-void idGameLocal::SkipEntityIndex( void ) {
-	assert( entities[ firstFreeIndex ] == NULL );
-	firstFreeIndex++;
-	if ( firstFreeIndex >= ENTITYNUM_MAX_NORMAL ) {
-		Error( "no free entities" );
 	}
 }
 
@@ -4997,18 +3610,39 @@ idGameLocal::SpawnEntityType
 idEntity *idGameLocal::SpawnEntityType( const idTypeInfo &classdef, const idDict *args, bool bIsClientReadSnapshot ) {
 	idClass *obj;
 
-#ifdef _DEBUG
+//HUMANHEAD rww
+#if !GOLD
+	if (isClient && !bIsClientReadSnapshot) {
+		Error( "Attempted to spawn non-client entity '%s' on client", classdef.classname );
+	}
+#endif
+	/*
+#if _DEBUG
 	if ( isClient ) {
 		assert( bIsClientReadSnapshot );
 	}
 #endif
+	*/
+//HUMANHEAD END
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !classdef.IsType( idEntity::GetClassType() ) ) {
-// RAVEN END
+	if ( !classdef.IsType( idEntity::Type ) ) {
 		Error( "Attempted to spawn non-entity class '%s'", classdef.classname );
 	}
+
+	//HUMANHEAD rww - keep track of layered spawning
+#if !GOLD
+	layeredSpawn++;
+	if (gameLocal.isMultiplayer) {
+		if (spawnPopulating && layeredSpawn > 1) {
+			const char *typeName = classdef.classname;
+			if (!typeName) {
+				typeName = "unknown";
+			}
+			gameLocal.Error("layeredSpawn says an entity is spawning an entity (type '%s') in idGameLocal::SpawnEntityType!\n", typeName);
+		}
+	}
+#endif
+	//HUMANHEAD END
 
 	try {
 		if ( args ) {
@@ -5019,7 +3653,50 @@ idEntity *idGameLocal::SpawnEntityType( const idTypeInfo &classdef, const idDict
 		obj = classdef.CreateInstance();
 		obj->CallSpawn();
 	}
-	
+
+	catch( idAllocError & ) {
+		obj = NULL;
+	}
+	spawnArgs.Clear();
+
+	//HUMANHEAD rww - keep track of layered spawning
+#if !GOLD
+	layeredSpawn--;
+#endif
+	//HUMANHEAD END
+
+	return static_cast<idEntity *>(obj);
+}
+
+//HUMANHEAD rww
+/*
+================
+idGameLocal::SpawnEntityTypeClient
+================
+*/
+idEntity *idGameLocal::SpawnEntityTypeClient( const idTypeInfo &classdef, const idDict *args ) {
+	idClass *obj;
+
+	if ( !classdef.IsType( idEntity::Type ) ) {
+		Error( "Attempted to spawn non-entity class '%s'", classdef.classname );
+	}
+
+	try {
+		if ( args ) {
+			spawnArgs = *args;
+		} else {
+			spawnArgs.Clear();
+		}
+		obj = classdef.CreateInstance();
+
+		if (gameLocal.isClient) {
+			idEntity *objEnt = static_cast<idEntity *>(obj);
+			objEnt->fl.clientEntity = true;
+		}
+
+		obj->CallSpawn();
+	}
+
 	catch( idAllocError & ) {
 		obj = NULL;
 	}
@@ -5027,83 +3704,7 @@ idEntity *idGameLocal::SpawnEntityType( const idTypeInfo &classdef, const idDict
 
 	return static_cast<idEntity *>(obj);
 }
-
-/*
-===================
-idGameLocal::SpawnClientEntityDef
-
-Finds the spawn function for the client entity and calls it,
-returning false if not found
-===================
-*/
-bool idGameLocal::SpawnClientEntityDef( const idDict &args, rvClientEntity **cent, bool setDefaults, const char* spawn ) {
-	const char	*classname;
-	idTypeInfo	*cls;
-	idClass		*obj;
-	idStr		error;
-	const char  *name;
-
-	if ( cent ) {
-		*cent = NULL;
-	}
-
-	spawnArgs = args;
-
-	if ( spawnArgs.GetBool( "nospawn" ) ){
-		//not meant to actually spawn, just there for some compiling process
-		return false;
-	}
-
-	if ( spawnArgs.GetString( "name", "", &name ) ) {
-		error = va( " on '%s'", name );
-	}
-
-	spawnArgs.GetString( "classname", NULL, &classname );
-
-	const idDeclEntityDef *def = FindEntityDef( classname, false );
-	if ( !def ) {
-		// RAVEN BEGIN
-		// jscott: a NULL classname would crash Warning()
-		if( classname ) {
-			Warning( "Unknown classname '%s'%s.", classname, error.c_str() );
-		}
-		// RAVEN END
-		return false;
-	}
-
-	spawnArgs.SetDefaults( &def->dict );
-
-	// check if we should spawn a class object
-	if( spawn == NULL ) {
-		spawnArgs.GetString( "spawnclass", NULL, &spawn );
-	}
-
-	if ( spawn ) {
-
-		cls = idClass::GetClass( spawn );
-		if ( !cls ) {
-			Warning( "Could not spawn '%s'.  Class '%s' not found%s.", classname, spawn, error.c_str() );
-			return false;
-		}
-
-		obj = cls->CreateInstance();
-		if ( !obj ) {
-			Warning( "Could not spawn '%s'. Instance could not be created%s.", classname, error.c_str() );
-			return false;
-		}
-
-		obj->CallSpawn();
-
-		if ( cent && obj->IsType( rvClientEntity::GetClassType() ) ) {
-			*cent = static_cast<rvClientEntity*>(obj);
-		}
-
-		return true;
-	}
-
-	Warning( "%s doesn't include a spawnfunc%s.", classname, error.c_str() );
-	return false;
-}
+//HUMANHEAD END
 
 /*
 ===================
@@ -5113,99 +3714,50 @@ Finds the spawn function for the entity and calls it,
 returning false if not found
 ===================
 */
-bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDefaults ) {
+bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDefaults, bool clientEntity, bool bIsClientReadSnapshot ) {
 	const char	*classname;
 	const char	*spawn;
 	idTypeInfo	*cls;
 	idClass		*obj;
 	idStr		error;
 	const char  *name;
-	static int	s_lightSpawnDefLogCount = 0;
 
-	TIME_THIS_SCOPE( __FUNCLINE__);
-	
 	if ( ent ) {
 		*ent = NULL;
 	}
 
 	spawnArgs = args;
 
-	if ( spawnArgs.GetBool( "nospawn" ) )
-	{//not meant to actually spawn, just there for some compiling process
-		return false;
+	if ( spawnArgs.GetString( "name", "", &name ) ) {
+		sprintf( error, " on '%s'", name);
 	}
 
-	if ( spawnArgs.GetString( "name", "", &name ) ) {
-// RAVEN BEGIN
-// jscott: fixed sprintf to idStr
-		error = va( " on '%s'", name );
-// RAVEN END
-	}
 	spawnArgs.GetString( "classname", NULL, &classname );
-	const bool isLight = ( classname && !idStr::Icmpn( classname, "light", 5 ) );
 
 	const idDeclEntityDef *def = FindEntityDef( classname, false );
+
 	if ( !def ) {
-// RAVEN BEGIN
-// jscott: a NULL classname would crash Warning()
-		if( classname ) {
-			Warning( "Unknown classname '%s'%s.", classname, error.c_str() );
-		}
-// RAVEN END
-		if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-			common->Printf( "LightSpawnEntityDef: name='%s' classname='%s' def=missing\n", name ? name : "", classname ? classname : "<null>" );
-			++s_lightSpawnDefLogCount;
-		}
+		Warning( "Unknown classname '%s'%s.", classname, error.c_str() );
 		return false;
 	}
 
 	spawnArgs.SetDefaults( &def->dict );
-	if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-		common->Printf( "LightSpawnEntityDef: name='%s' classname='%s' def=ok\n", name ? name : "", classname ? classname : "<null>" );
-		++s_lightSpawnDefLogCount;
-	}
-
-// RAVEN BEGIN
-// rjohnson: entity usage stats
-	if ( g_keepEntityStats.GetBool() ) {
-		if ( idStr::Icmp( classname, "func_spawner" ) == 0 || 
-			 idStr::Icmp( classname, "func_spawner_enemy" ) == 0 ) {
-			// special case for spawners
-			for( int i = 1; ; i++ ) {
-				char		tempSpawn[128];
-				const char	*tempClassname;
-
-				sprintf( tempSpawn, "def_spawn_type%d", i );
-				tempClassname = spawnArgs.GetString( tempSpawn, NULL );
-				if ( tempClassname ) {
-					const idDeclEntityDef *tempDef = FindEntityDef( tempClassname, false );
-
-					if ( tempDef ) {
-						idDict	tempArgs = tempDef->dict;
-
-						tempArgs.Set( "mapFileName", mapFileNameStripped );
-						entityUsageList.Insert( tempArgs );
-					}
-				} else {
-					break;
-				}
-			}
-		}
-		else if ( def->dict.GetBool( "report_stats" ) ) {
-			idDict	tempArgs = spawnArgs;
-			tempArgs.Set( "mapFileName", mapFileNameStripped );
-			entityUsageList.Insert( tempArgs );
-		}
-	}
-// RAVEN END
 
 	// check if we should spawn a class object
 	spawnArgs.GetString( "spawnclass", NULL, &spawn );
 	if ( spawn ) {
-		if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-			common->Printf( "LightSpawnEntityDef: name='%s' spawnclass='%s'\n", name ? name : "", spawn );
-			++s_lightSpawnDefLogCount;
+
+		//HUMANHEAD rww
+#if !GOLD
+		if (isClient && !clientEntity && !bIsClientReadSnapshot) {
+			const char *typeName = classname;
+			if (!typeName) {
+				typeName = "unknown";
+			}
+			Error("idGameLocal::SpawnEntityDef: '%s' trying to spawn on client but not a client ent", typeName);
 		}
+#endif
+		//HUMANHEAD END
 
 		cls = idClass::GetClass( spawn );
 		if ( !cls ) {
@@ -5219,12 +3771,37 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 			return false;
 		}
 
+		//HUMANHEAD rww - client entities
+		if (clientEntity) {
+			idEntity *objEnt = static_cast<idEntity *>(obj);
+			objEnt->fl.clientEntity = true;
+		}
+		//END HUMANHEAD
+
+		//HUMANHEAD rww - keep track of layered spawning
+#if !GOLD
+		layeredSpawn++;
+		if (gameLocal.isMultiplayer) {
+			if (spawnPopulating && layeredSpawn > 1) {
+				const char *typeName = classname;
+				if (!typeName) {
+					typeName = "unknown";
+				}
+				gameLocal.Error("layeredSpawn says an entity is spawning an entity (type '%s') in idGameLocal::SpawnEntityDef!\n", typeName);
+			}
+		}
+#endif
+		//HUMANHEAD END
+
 		obj->CallSpawn();
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent && obj->IsType( idEntity::GetClassType() ) ) {
-// RAVEN END
+		//HUMANHEAD rww - keep track of layered spawning
+#if !GOLD
+		layeredSpawn--;
+#endif
+		//HUMANHEAD END
+
+		if ( ent && obj->IsType( idEntity::Type ) ) {
 			*ent = static_cast<idEntity *>(obj);
 		}
 
@@ -5234,10 +3811,6 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 	// check if we should call a script function to spawn
 	spawnArgs.GetString( "spawnfunc", NULL, &spawn );
 	if ( spawn ) {
-		if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-			common->Printf( "LightSpawnEntityDef: name='%s' spawnfunc='%s'\n", name ? name : "", spawn );
-			++s_lightSpawnDefLogCount;
-		}
 		const function_t *func = program.FindFunction( spawn );
 		if ( !func ) {
 			Warning( "Could not spawn '%s'.  Script function '%s' not found%s.", classname, spawn, error.c_str() );
@@ -5245,46 +3818,12 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 		}
 		idThread *thread = new idThread( func );
 		thread->DelayedStart( 0 );
-
 		return true;
 	}
 
-	if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-		common->Printf( "LightSpawnEntityDef: name='%s' no spawnclass/spawnfunc\n", name ? name : "" );
-		++s_lightSpawnDefLogCount;
-	}
 	Warning( "%s doesn't include a spawnfunc or spawnclass%s.", classname, error.c_str() );
 	return false;
 }
-
-// abahr:
-idEntity* idGameLocal::SpawnEntityDef( const char* entityDefName, const idDict* additionalArgs ) {
-	idDict			finalArgs;
-	const idDict*	entityDict = NULL;
-	idEntity*		entity = NULL;
-	
-	TIME_THIS_SCOPE( __FUNCLINE__);
-
-	if( !entityDefName ) {
-		return NULL;
-	}
-
-	entityDict = FindEntityDefDict( entityDefName, false );
-	if( !entityDict ) {
-		return NULL;
-	}
-
-	if( !additionalArgs ) {
-		SpawnEntityDef( *entityDict, &entity );
-	} else {
-		finalArgs.Copy( *entityDict );
-		finalArgs.Copy( *additionalArgs );
-		SpawnEntityDef( finalArgs, &entity );
-	}
-
-	return entity;
-}
-// RAVEN END
 
 /*
 ================
@@ -5292,13 +3831,30 @@ idGameLocal::FindEntityDef
 ================
 */
 const idDeclEntityDef *idGameLocal::FindEntityDef( const char *name, bool makeDefault ) const {
-	TIME_THIS_SCOPE( __FUNCLINE__);
 	const idDecl *decl = NULL;
 	if ( isMultiplayer ) {
-		decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_mp", name ), false );
+#if GERMAN_VERSION
+		decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_mp_nogore", name ), false );
+		if ( !decl ) // Fall through to normal mp decls below
+#else if !GOLD // For testing the german defs
+		if ( g_nogore.GetBool() ) {
+			decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_mp_nogore", name ), false );
+		}
+		if ( !decl ) // Fall through to normal mp decls below
+#endif 
+			decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_mp", name ), false );
 	}
 	if ( !decl ) {
-		decl = declManager->FindType( DECL_ENTITYDEF, name, makeDefault );
+#if GERMAN_VERSION
+		decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_nogore", name ), false );
+		if ( !decl )
+#else if !GOLD // For testing the german defs
+		if ( g_nogore.GetBool() ) {
+			decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_nogore", name ), false );
+		}
+		if ( !decl ) // Fall through to normal mp decls below
+#endif // Fall through to normal decls
+			decl = declManager->FindType( DECL_ENTITYDEF, name, makeDefault );
 	}
 	return static_cast<const idDeclEntityDef *>( decl );
 }
@@ -5309,7 +3865,6 @@ idGameLocal::FindEntityDefDict
 ================
 */
 const idDict *idGameLocal::FindEntityDefDict( const char *name, bool makeDefault ) const {
-	TIME_THIS_SCOPE( __FUNCLINE__);
 	const idDeclEntityDef *decl = FindEntityDef( name, makeDefault );
 	return decl ? &decl->dict : NULL;
 }
@@ -5322,31 +3877,17 @@ idGameLocal::InhibitEntitySpawn
 bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 	
 	bool result = false;
-	static int	s_lightInhibitLogCount = 0;
-	const char *entClassname = spawnArgs.GetString( "classname" );
-	const bool isLight = ( entClassname && !idStr::Icmpn( entClassname, "light", 5 ) );
-	const char *lightReason = NULL;
 
 	if ( isMultiplayer ) {
 		spawnArgs.GetBool( "not_multiplayer", "0", result );
-		if ( result ) {
-			lightReason = "not_multiplayer";
-		}
-	} else if ( g_skill.GetInteger() == 0 ) {
+	}
+/* HUMANHEAD pdm: not used
+	else if ( g_skill.GetInteger() == 0 ) {
 		spawnArgs.GetBool( "not_easy", "0", result );
-		if ( result ) {
-			lightReason = "not_easy";
-		}
 	} else if ( g_skill.GetInteger() == 1 ) {
 		spawnArgs.GetBool( "not_medium", "0", result );
-		if ( result ) {
-			lightReason = "not_medium";
-		}
 	} else {
 		spawnArgs.GetBool( "not_hard", "0", result );
-		if ( result ) {
-			lightReason = "not_hard";
-		}
 	}
 
 	const char *name;
@@ -5359,58 +3900,14 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 	}
 #endif
 
-// RAVEN BEGIN
-// bdube: suppress ents that don't match the entity filter
-	const char* entityFilter;
-	if ( serverInfo.GetString( "si_entityFilter", "", &entityFilter ) && *entityFilter ) {
-		if ( spawnArgs.MatchPrefix ( "filter_" ) && !spawnArgs.GetBool ( va("filter_%s", entityFilter) ) ) {
-			if ( isLight && s_lightInhibitLogCount < 32 ) {
-				common->Printf( "LightInhibit: reason=filter_%s\n", entityFilter );
-				++s_lightInhibitLogCount;
-			}
-			return true;
+	if ( gameLocal.isMultiplayer ) {
+		name = spawnArgs.GetString( "classname" );
+		if ( idStr::Icmp( name, "weapon_bfg" ) == 0 || idStr::Icmp( name, "weapon_soulcube" ) == 0 ) {
+			result = true;
 		}
 	}
-// RAVEN END
+*/
 
-// RITUAL BEGIN
-// squirrel: suppress ents that aren't supported in Buying modes (if that's the mode we're in)
-	if ( mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
-		if ( spawnArgs.GetBool( "disableSpawnInBuying", "0" ) ) {
-			if ( isLight && s_lightInhibitLogCount < 32 ) {
-				common->Printf( "LightInhibit: reason=disableSpawnInBuying\n" );
-				++s_lightInhibitLogCount;
-			}
-			return true;
-		}
-
-		/// Don't spawn weapons or armor vests or ammo in Buying modes
-		idStr classname = spawnArgs.GetString( "classname" );
-		if( idStr::FindText( classname, "weapon_" ) == 0 || 
-			idStr::FindText( classname, "item_armor_small" ) == 0 ||
-			idStr::FindText( classname, "ammo_" ) == 0 ||
-			idStr::FindText( classname, "item_armor_large" ) == 0 )
-		{
-			if ( isLight && s_lightInhibitLogCount < 32 ) {
-				common->Printf( "LightInhibit: reason=buyingModeSuppression\n" );
-				++s_lightInhibitLogCount;
-			}
-			return true;
-		}
-	}
-// RITUAL END
-
-	// suppress deadzone triggers if we're not running DZ
-	if ( idStr::Icmp( serverInfo.GetString( "si_gameType" ), "DeadZone" ) != 0 ) {
-		if ( idStr::Icmp( spawnArgs.GetString( "classname" ), "trigger_controlzone" ) == 0 ) {
-			return true;
-		}
-	}
-
-	if ( isLight && s_lightInhibitLogCount < 32 ) {
-		common->Printf( "LightInhibit: result=%d reason=%s\n", result ? 1 : 0, lightReason ? lightReason : ( result ? "other" : "none" ) );
-		++s_lightInhibitLogCount;
-	}
 	return result;
 }
 
@@ -5419,7 +3916,12 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 idGameLocal::SetSkill
 ================
 */
+/*	HUMANHEAD pdm: not used
 void idGameLocal::SetSkill( int value ) {
+	if (gameLocal.isMultiplayer) {
+		return;
+	}
+
 	int skill_level;
 
 	if ( value < 0 ) {
@@ -5432,6 +3934,7 @@ void idGameLocal::SetSkill( int value ) {
 
 	g_skill.SetInteger( skill_level );
 }
+*/
 
 /*
 ==============
@@ -5451,192 +3954,53 @@ idGameLocal::SpawnMapEntities
 Parses textual entity definitions out of an entstring and spawns gentities.
 ==============
 */
-// RAVEN BEGIN
-// ddynerman: multiple game instances
-void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, unsigned short* entityNumOut, int* startSpawnCount ) {
-// RAVEN END
+void idGameLocal::SpawnMapEntities( void ) {
 	int			i;
 	int			num;
 	int			inhibit;
-	int			latchedSpawnCount = -1;
 	idMapEntity	*mapEnt;
 	int			numEntities;
 	idDict		args;
-	idDict		items;
-
-	bool		proto69 = ( GetCurrentDemoProtocol() == 69 );
 
 	Printf( "Spawning entities\n" );
-	
-	TIME_THIS_SCOPE( __FUNCLINE__);
 
 	if ( mapFile == NULL ) {
 		Printf("No mapfile present\n");
 		return;
 	}
 
-	SetSkill( g_skill.GetInteger() );
+//	SetSkill( g_skill.GetInteger() );		// HUMANHEAD pdm: not used
 
 	numEntities = mapFile->GetNumEntities();
 	if ( numEntities == 0 ) {
 		Error( "...no entities" );
 	}
 
-// RAVEN BEGIN
-// ddynerman:	on the server, perform world-initialization when spawning instance 0 only and while starting up
-//				on the client, perform world-init when spawning while starting up, as client main instance may not be ID 0
-//				always spawn world-init in single-player
-	num = inhibit = 0;
-
 	// the worldspawn is a special that performs any global setup
 	// needed by a level
-	if ( ( gameLocal.isServer && instance == 0 && gamestate == GAMESTATE_STARTUP ) || ( gameLocal.isClient && gamestate == GAMESTATE_STARTUP ) || !gameLocal.isMultiplayer ) { 
-		mapEnt = mapFile->GetEntity( 0 );
-		args = mapEnt->epairs;
-		args.SetInt( "spawn_entnum", ENTITYNUM_WORLD );
-		
-		// on the client, spawnCount won't always start at INITIAL_SPAWN_COUNT (see rvInstance::Populate())
-		// make sure the world and physics ent get the right spawn id
-		if( gameLocal.isClient && spawnCount != INITIAL_SPAWN_COUNT ) {
-			latchedSpawnCount = spawnCount;
-			spawnCount = INITIAL_SPAWN_COUNT;
-		}
-
-// abahr: precache stuff on worldSpawn like player def and other misc things
-		CacheDictionaryMedia( &args );
-// jnewquist: Use accessor for static class type
-		if ( !SpawnEntityDef( args ) || !entities[ ENTITYNUM_WORLD ] || !entities[ ENTITYNUM_WORLD ]->IsType( idWorldspawn::GetClassType() ) ) {
-			Error( "Problem spawning world entity" );
-		}
-		num++;
-
-// bdube: dummy entity for client entities with physics
-		args.Clear();
-		args.SetInt( "spawn_entnum", ENTITYNUM_CLIENT );
-// jnewquist: Use accessor for static class type 
-		if ( !SpawnEntityType( rvClientPhysics::GetClassType(), &args, true ) || !entities[ ENTITYNUM_CLIENT ] ) {	
-			Error( "Problem spawning client physics entity" );
-		}
-
-		if( gameLocal.isClient && latchedSpawnCount != -1 ) {
-			spawnCount = latchedSpawnCount;
-		}
-
-		isMapEntity[ ENTITYNUM_CLIENT ] = true;
-		isMapEntity[ ENTITYNUM_WORLD ] = true;
-// RAVEN END
+	mapEnt = mapFile->GetEntity( 0 );
+	args = mapEnt->epairs;
+	args.SetInt( "spawn_entnum", ENTITYNUM_WORLD );
+	//HUMANHEAD rww - ok on client
+	if ( !SpawnEntityDef( args, NULL, true, false, true ) || !entities[ ENTITYNUM_WORLD ] || !entities[ ENTITYNUM_WORLD ]->IsType( idWorldspawn::Type ) ) {
+		Error( "Problem spawning world entity" );
 	}
 
-	// capture spawn count of start of map entities (after we've spawned in the physics ents)
-	if ( startSpawnCount ) {
-		(*startSpawnCount) = spawnCount;
-	}
+	num = 1;
+	inhibit = 0;
 
 	for ( i = 1 ; i < numEntities ; i++ ) {
-
 		mapEnt = mapFile->GetEntity( i );
 		args = mapEnt->epairs;
 
-// RAVEN BEGIN
-// ddynerman: merge the dicts ahead of SpawnEntityDef() so we can inhibit using merged info
-		const idDeclEntityDef* entityDef = FindEntityDef( args.GetString( "classname" ), false );
-		
-		if( entityDef == NULL ) {
-			gameLocal.Error( "idGameLocal::SpawnMapEntities() - Unknown entity classname '%s'\n", args.GetString( "classname" ) );
-			return;
-		}
-		args.SetDefaults( &(entityDef->dict) );
-// RAVEN END
-
 		if ( !InhibitEntitySpawn( args ) ) {
-
-			if( args.GetBool( "inv_item" ) ) {
-				if( !items.GetBool( args.GetString( "inv_icon" ) ) ) {
-					networkSystem->AddLoadingIcon( args.GetString( "inv_icon" ) );
-					networkSystem->SetLoadingText( common->GetLocalizedString( args.GetString( "inv_name" ) ) );
-					items.SetBool( args.GetString( "inv_icon" ), true );
-				}
-			}
-
 			// precache any media specified in the map entity
 			CacheDictionaryMedia( &args );
-// RAVEN BEGIN
-			if ( instance != 0 ) {
-// ddynerman: allow this function to be called multiple-times to respawn map entities in other instances
-				args.SetInt( "instance", instance );
-				args.Set( "name", va( "%s_instance%d", args.GetString( "name" ), instance ) );
-				//gameLocal.Printf( "Instance %d: Spawning %s (class: %s)\n", instance, args.GetString( "name" ), args.GetString( "classname" ) ); 
-				
-				// need a better way to do this - map entities that target other map entities need
-				// to target the ones in the correct instance.  
-				idStr target;
-				if( args.GetString( "target", "", target ) ) {
-					args.Set( "target", va( "%s_instance%d", target.c_str(), instance ) );
-				}
 
-				// and also udpate binds on a per-instance bases
-				idStr bind;
-				if( args.GetString( "bind", "", bind ) ) {
-					args.Set( "bind", va( "%s_instance%d", bind.c_str(), instance ) );
-				}
-
-				// and also door triggers
-				idStr triggerOnOpen;
-				if( args.GetString( "triggerOnOpen", "", triggerOnOpen ) ) {
-					args.Set( "triggerOnOpen", va( "%s_instance%d", triggerOnOpen.c_str(), instance ) );
-				}
-
-				idStr triggerOpened;
-				if( args.GetString( "triggerOpened", "", triggerOpened ) ) {
-					args.Set( "triggerOpened", va( "%s_instance%d", triggerOpened.c_str(), instance ) );
-				}
-			}
-
-			// backward compatible 1.2 playback: proto69 reads the entity mapping list from the server
-			// only 1.2 backward replays should get passed a != NULL entityNumIn
-			assert( entityNumIn == NULL || proto69 );
-			if ( proto69 && entityNumIn ) {
-				assert( gameLocal.isClient );
-				if ( entityNumIn[ i ] < 0 || entityNumIn[ i ] >= MAX_GENTITIES ) {
-					// this entity was not spawned in on the server, ignore it here
-					// this is one of the symptoms of net corruption <= 1.2 - fix here acted as a band aid
-					// if you replay a 1.2 netdemo and hit this, it's likely other things will go wrong in the replay
-					common->Warning( "entity inhibited on server not properly inhibited on client - map ent %d ( %s )", i, args.GetString( "name" ) );
-					inhibit++;
-					continue;
-				}
-				args.SetInt( "spawn_entnum", entityNumIn[ i ] );
-			}
-
-			idEntity* ent = NULL;
-			SpawnEntityDef( args, &ent );
-			//common->Printf( "pop: spawn map ent %d at %d ( %s )\n", i, ent->entityNumber, args.GetString( "name" ) );
-	
-			if ( ent && entityNumOut ) {
-				entityNumOut[ i ] = ent->entityNumber;
-			}
-
-			if ( gameLocal.GetLocalPlayer() && ent && gameLocal.isServer && instance != gameLocal.GetLocalPlayer()->GetInstance() ) {
-				// if we're spawning entities not in our instance, tell them not to draw
-				ent->BecomeInactive( TH_UPDATEVISUALS );
-			}
-
-			if ( ent ) {
-				isMapEntity[ ent->entityNumber ] = true;
-			}
-// RAVEN END
+			//HUMANHEAD rww - ok on client
+			SpawnEntityDef( args, NULL, true, false, true );
 			num++;
 		} else {
-			if ( !proto69 ) {
-				// keep counting and leave an empty slot in the entity list for inhibited entities
-				// this so we maintain the same layout as the server and don't change it across restarts with different inhibit schemes
-				//common->Printf( "pop: skip map ent %d at index %d ( %s )\n", i, firstFreeIndex, args.GetString( "name" ) );
-				SkipEntityIndex();
-			} else {
-				// backward 1.2 netdemo replay compatibility - no skipping
-				// they might net corrupt but there's no fix client side
-				assert( isClient );
-			}
 			inhibit++;
 		}
 	}
@@ -5741,18 +4105,30 @@ void idGameLocal::ArgCompletion_EntityName( const idCmdArgs &args, void(*callbac
 	}
 }
 
-/*
-=============
-idGameLocal::ArgCompletion_AIName
-
-Argument completion for idAI entity names
-=============
-*/
-void idGameLocal::ArgCompletion_AIName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
+// HUMANHEAD pdm
+void idGameLocal::ArgCompletion_ClassName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
 	int i;
+	idTypeInfo *type;
 
+	int numTypes = idClass::GetNumTypes();
+	for( i = 0; i < numTypes; i++ ) {
+		type = idClass::GetType(i);
+		callback( va( "%s %s", args.Argv( 0 ), type->classname ) );
+	}
+}
+
+// HUMANHEAD pdm
+void idGameLocal::ArgCompletion_EntityOrClassName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
+	int i;
+	idTypeInfo *type;
+
+	int numTypes = idClass::GetNumTypes();
+	for( i = 0; i < numTypes; i++ ) {
+		type = idClass::GetType(i);
+		callback( va( "%s %s", args.Argv( 0 ), type->classname ) );
+	}
 	for( i = 0; i < gameLocal.num_entities; i++ ) {
-		if ( gameLocal.entities[ i ] && gameLocal.entities[ i ]->IsType( idAI::GetClassType() ) ) {
+		if ( gameLocal.entities[ i ] ) {
 			callback( va( "%s %s", args.Argv( 0 ), gameLocal.entities[ i ]->name.c_str() ) );
 		}
 	}
@@ -5853,6 +4229,11 @@ int idGameLocal::EntitiesWithinRadius( const idVec3 org, float radius, idEntity 
 	for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
 		if ( ent->GetPhysics()->GetAbsBounds().IntersectsBounds( bo ) ) {
 			entityList[entCount++] = ent;
+			// HUMANHEAD mdl:  maxCount was being ignored
+			if ( entCount == maxCount ) {
+				return entCount;
+			}
+			// HUMANHEAD END
 		}
 	}
 
@@ -5881,10 +4262,7 @@ void idGameLocal::KillBox( idEntity *ent, bool catch_teleport ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	num = ClipModelsTouchingBounds( ent, phys->GetAbsBounds(), phys->GetClipMask(), clipModels, MAX_GENTITIES );
-// RAVEN END
+	num = clip.ClipModelsTouchingBounds( phys->GetAbsBounds(), phys->GetClipMask(), clipModels, MAX_GENTITIES );
 	for ( i = 0; i < num; i++ ) {
 		cm = clipModels[ i ];
 
@@ -5895,6 +4273,7 @@ void idGameLocal::KillBox( idEntity *ent, bool catch_teleport ) {
 
 		hit = cm->GetEntity();
 		if ( ( hit == ent ) || !hit->fl.takedamage ) {
+			hit->SquishedByDoor( ent ); // HUMANHEAD CJR: Squish certain objects when a KillBox is applied
 			continue;
 		}
 
@@ -5903,10 +4282,7 @@ void idGameLocal::KillBox( idEntity *ent, bool catch_teleport ) {
 		}
 
 		// nail it
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( hit->IsType( idPlayer::GetClassType() ) && static_cast< idPlayer * >( hit )->IsInTeleport() ) {
-// RAVEN END
+		if ( hit->IsType( idPlayer::Type ) && static_cast< idPlayer * >( hit )->IsInTeleport() ) {
 			static_cast< idPlayer * >( hit )->TeleportDeath( ent->entityNumber );
 		} else if ( !catch_teleport ) {
 			hit->Damage( ent, ent, vec3_origin, "damage_telefrag", 1.0f, INVALID_JOINT );
@@ -5919,19 +4295,69 @@ void idGameLocal::KillBox( idEntity *ent, bool catch_teleport ) {
 	}
 }
 
+//HUMANHEAD PCF rww 05/15/06 - use a custom clipmask killbox (seperated due to pcf paranoia)
+/*
+================
+idGameLocal::KillBoxMasked
+================
+*/
+void idGameLocal::KillBoxMasked( idEntity *ent, int clipMask, bool catch_teleport ) {
+	int			i;
+	int			num;
+	idEntity *	hit;
+	idClipModel *cm;
+	idClipModel *clipModels[ MAX_GENTITIES ];
+	idPhysics	*phys;
+
+	phys = ent->GetPhysics();
+	if ( !phys->GetNumClipModels() ) {
+		return;
+	}
+
+	num = clip.ClipModelsTouchingBounds( phys->GetAbsBounds(), clipMask, clipModels, MAX_GENTITIES );
+	for ( i = 0; i < num; i++ ) {
+		cm = clipModels[ i ];
+
+		// don't check render entities
+		if ( cm->IsRenderModel() ) {
+			continue;
+		}
+
+		hit = cm->GetEntity();
+		if ( ( hit == ent ) || !hit->fl.takedamage ) {
+			hit->SquishedByDoor( ent ); // HUMANHEAD CJR: Squish certain objects when a KillBox is applied
+			continue;
+		}
+
+		if ( !phys->ClipContents( cm ) ) {
+			continue;
+		}
+
+		// nail it
+		if ( hit->IsType( idPlayer::Type ) && static_cast< idPlayer * >( hit )->IsInTeleport() ) {
+			static_cast< idPlayer * >( hit )->TeleportDeath( ent->entityNumber );
+		} else if ( !catch_teleport ) {
+			hit->Damage( ent, ent, vec3_origin, "damage_telefrag", 1.0f, INVALID_JOINT );
+		}
+
+		if ( !gameLocal.isMultiplayer ) {
+			// let the mapper know about it
+			Warning( "'%s' telefragged '%s'", ent->name.c_str(), hit->name.c_str() );
+		}
+	}
+}
+//HUMANHEAD END
+
 /*
 ================
 idGameLocal::RequirementMet
 ================
 */
-bool idGameLocal::RequirementMet( idEntity *activator, const idStr &requirement, int removeItem ) {
-	if ( requirement.Length() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( activator->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+bool idGameLocal::RequirementMet( idEntity *activator, const idStr &requirements, int removeItem ) {
+	if ( requirements.Length() ) {
+		if ( activator->IsType( idPlayer::Type ) ) {
 			idPlayer *player = static_cast<idPlayer *>(activator);
-			idDict *item = player->FindInventoryItem( requirement );
+			idDict *item = player->FindInventoryItem( requirements );
 			if ( item ) {
 				if ( removeItem ) {
 					player->RemoveInventoryItem( item );
@@ -5946,106 +4372,26 @@ bool idGameLocal::RequirementMet( idEntity *activator, const idStr &requirement,
 	return true;
 }
 
-
-/*
-================
-idGameLocal::IsWeaponsStayOn
-================
-*/
-bool idGameLocal::IsWeaponsStayOn( void ) {
-	/// Override weapons stay when buying is active
-	if( isMultiplayer && mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
-		return false;
-	}
-
-	return serverInfo.GetBool( "si_weaponStay" );
-}
-
-/*
-===================
-idGameLocal::AlertBots
-===================
-*/
-// jmarshall
-void idGameLocal::AlertBots(idPlayer* player, idVec3 alert_position)
-{
-	for (int i = 0; i < MAX_CLIENTS; i++)
-	{
-		rvmBot* bot = NULL;
-
-		if (entities[i] == NULL)
-		{
-			continue;
-		}
-
-		bot = entities[i]->Cast<rvmBot>();
-		if (bot == NULL)
-		{
-			continue;
-		}
-
-		trace_t tr;
-		Trace(tr, alert_position, bot->GetRenderEntity()->origin, CONTENTS_SOLID, 0);
-
-		if (tr.fraction == 1.0f)
-		{
-			bot->SetEnemy(player, player->GetOrigin());
-		}
-	}
-}
-// jmarshall end
-
 /*
 ============
 idGameLocal::AlertAI
 ============
 */
 void idGameLocal::AlertAI( idEntity *ent ) {
-// RAVEN BEGIN
-// bdube: merged
-	if ( ent ) {
-// jmarshall
-		// Alert any bots near were we just exploded.
-		if (gameLocal.IsMultiplayer() && gameLocal.isServer)
-		{
-			idPlayer* player = ent->Cast<idPlayer>();
-			if (player)
-			{
-				AlertBots(player, ent->GetOrigin());
-			}
-
-		}
-// jmarshall end
-
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent->IsType( idActor::GetClassType() ) ) {
-// RAVEN END
-			// alert them for the next frame
-			lastAIAlertActorTime = time + GetMSec();
-			lastAIAlertActor = static_cast<idActor *>( ent );
-		} else {
-			lastAIAlertEntityTime = time + GetMSec();
-			lastAIAlertEntity = ent;
-		}
-	} else {
-		lastAIAlertEntityTime = 0;
-		lastAIAlertActorTime = 0;
-		lastAIAlertEntity = NULL;
-		lastAIAlertActor = NULL;
+	if ( ent && ent->IsType( idActor::Type ) ) {
+		// alert them for the next frame
+		lastAIAlertTime = time + msec;
+		lastAIAlertEntity = static_cast<idActor *>( ent );
 	}
-// RAVEN END
 }
 
-// RAVEN BEGIN
-// bdube: alert entity returns an entity, alert actor a an actor
 /*
 ============
 idGameLocal::GetAlertEntity
 ============
 */
-idEntity *idGameLocal::GetAlertEntity( void ) {
-	if ( lastAIAlertEntityTime >= time ) {
+idActor *idGameLocal::GetAlertEntity( void ) {
+	if ( lastAIAlertTime >= time ) {
 		return lastAIAlertEntity.GetEntity();
 	}
 
@@ -6054,51 +4400,18 @@ idEntity *idGameLocal::GetAlertEntity( void ) {
 
 /*
 ============
-idGameLocal::GetAlertActor
-============
-*/
-idActor *idGameLocal::GetAlertActor( void ) {
-	if ( lastAIAlertActorTime >= time ) {
-		return lastAIAlertActor.GetEntity();
-	}
-
-	return NULL;
-}
-// RAVEN END
-
-/*
-============
-SortClipModelsByEntity
-============
-*/
-static int SortClipModelsByEntity( const void* left, const void* right ) {
-	idEntity* leftEntity  = left  ? (*((const idClipModel**)left))->GetEntity() : NULL;
-	idEntity* rightEntity = right ? (*((const idClipModel**)right))->GetEntity() : NULL;
-
-	int entityNumLeft = (leftEntity) ? leftEntity->entityNumber : 0;
-	int entityNumRight = (rightEntity) ? rightEntity->entityNumber : 0;
-
-	return entityNumLeft - entityNumRight;
-}
-
-// RAVEN BEGIN
-/*
-============
 idGameLocal::RadiusDamage
-Returns the number of actors damaged
 ============
 */
-// abahr: changed to work with deathPush
-void idGameLocal::RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEntity *attacker, idEntity *ignoreDamage, idEntity *ignorePush, const char *damageDefName, float dmgPower, int* hitCount ) {
+void idGameLocal::RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEntity *attacker, idEntity *ignoreDamage, idEntity *ignorePush, const char *damageDefName, float dmgPower ) {
+/*	HUMANHEAD pdm: OVERRIDDEN
 	float		dist, damageScale, attackerDamageScale, attackerPushScale;
-	idEntity*	ent = NULL;
-	idEntity*	lastEnt = NULL;
-	idClipModel* clipModel = NULL;
-	idClipModel* clipModelList[ MAX_GENTITIES ];
-	int			numListedClipModels;
-	modelTrace_t	result;
+	idEntity *	ent;
+	idEntity *	entityList[ MAX_GENTITIES ];
+	int			numListedEntities;
+	idBounds	bounds;
 	idVec3 		v, damagePoint, dir;
-	int			i, damage, radius, push;
+	int			i, e, damage, radius, push;
 
 	const idDict *damageDef = FindEntityDefDict( damageDefName, false );
 	if ( !damageDef ) {
@@ -6110,58 +4423,55 @@ void idGameLocal::RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEnt
 	damageDef->GetInt( "radius", "50", radius );
 	damageDef->GetInt( "push", va( "%d", damage * 100 ), push );
 	damageDef->GetFloat( "attackerDamageScale", "0.5", attackerDamageScale );
-	if( gameLocal.isMultiplayer ) {
-		damageDef->GetFloat( "attackerPushScale", "2", attackerPushScale );
-	} else {
-		damageDef->GetFloat( "attackerPushScale", "0", attackerPushScale );
-	}
+	damageDef->GetFloat( "attackerPushScale", "0", attackerPushScale );
 
 	if ( radius < 1 ) {
 		radius = 1;
 	}
 
+	bounds = idBounds( origin ).Expand( radius );
 
-// ddynerman: multiple clip worlds
-	numListedClipModels = ClipModelsTouchingBounds( inflictor, idBounds(origin).Expand(radius), MASK_ALL, clipModelList, MAX_GENTITIES );
-	if( numListedClipModels > 0 ) {
-		//Sort list by unique entities for easier searching
-		qsort( clipModelList, numListedClipModels, sizeof(clipModelList[0]), SortClipModelsByEntity );
+	// get all entities touching the bounds
+	numListedEntities = clip.EntitiesTouchingBounds( bounds, -1, entityList, MAX_GENTITIES );
+
+	if ( inflictor && inflictor->IsType( idAFAttachment::Type ) ) {
+		inflictor = static_cast<idAFAttachment*>(inflictor)->GetBody();
+	}
+	if ( attacker && attacker->IsType( idAFAttachment::Type ) ) {
+		attacker = static_cast<idAFAttachment*>(attacker)->GetBody();
+	}
+	if ( ignoreDamage && ignoreDamage->IsType( idAFAttachment::Type ) ) {
+		ignoreDamage = static_cast<idAFAttachment*>(ignoreDamage)->GetBody();
 	}
 
-	if ( inflictor ) {
-		inflictor = inflictor->GetDamageEntity ( );
-	}
-	if ( attacker ) {
-		attacker = attacker->GetDamageEntity ( );
-	}
-	if ( ignoreDamage ) {
-		ignoreDamage = ignoreDamage->GetDamageEntity ( );
-	}
+	// apply damage to the entities
+	for ( e = 0; e < numListedEntities; e++ ) {
+		ent = entityList[ e ];
+		assert( ent );
 
-	for( int c = 0; c < numListedClipModels; ++c ) {
-		clipModel = clipModelList[ c ];
-		assert( clipModel );
-
-		ent = clipModel->GetEntity();
-		
-		// Skip all entitys that arent primary damage entities
-		if ( !ent || ent != ent->GetDamageEntity ( ) ) {
+		if ( !ent->fl.takedamage ) {
 			continue;
 		}
 
-		// Dont damage inflictor or the ignore entity
-		if( ent == inflictor || ent == ignoreDamage ) {
+		if ( ent == inflictor || ( ent->IsType( idAFAttachment::Type ) && static_cast<idAFAttachment*>(ent)->GetBody() == inflictor ) ) {
 			continue;
 		}
 
-		idBounds absBounds = clipModel->GetAbsBounds();
+		if ( ent == ignoreDamage || ( ent->IsType( idAFAttachment::Type ) && static_cast<idAFAttachment*>(ent)->GetBody() == ignoreDamage ) ) {
+			continue;
+		}
+
+		// don't damage a dead player
+		if ( isMultiplayer && ent->entityNumber < MAX_CLIENTS && ent->IsType( idPlayer::Type ) && static_cast< idPlayer * >( ent )->health < 0 ) {
+			continue;
+		}
 
 		// find the distance from the edge of the bounding box
 		for ( i = 0; i < 3; i++ ) {
-			if ( origin[ i ] < absBounds[0][ i ] ) {
-				v[ i ] = absBounds[0][ i ] - origin[ i ];
-			} else if ( origin[ i ] > absBounds[1][ i ] ) {
-				v[ i ] = origin[ i ] - absBounds[1][ i ];
+			if ( origin[ i ] < ent->GetPhysics()->GetAbsBounds()[0][ i ] ) {
+				v[ i ] = ent->GetPhysics()->GetAbsBounds()[0][ i ] - origin[ i ];
+			} else if ( origin[ i ] > ent->GetPhysics()->GetAbsBounds()[1][ i ] ) {
+				v[ i ] = origin[ i ] - ent->GetPhysics()->GetAbsBounds()[1][ i ];
 			} else {
 				v[ i ] = 0;
 			}
@@ -6172,53 +4482,28 @@ void idGameLocal::RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEnt
 			continue;
 		}
 
-		if( gameRenderWorld->FastWorldTrace(result, origin, absBounds.GetCenter()) ) {
-			continue;
-		}
-		
-		RadiusPushClipModel ( inflictor, origin, push, clipModel );
-
-		// Only damage unique entities.  This works because we have a sorted list
-		if( lastEnt == ent ) {
-			continue;
-		}
-
-		lastEnt = ent;
-
-		if ( ent->CanDamage( origin, damagePoint, ignoreDamage ) ) {						
+		if ( ent->CanDamage( origin, damagePoint ) ) {
 			// push the center of mass higher than the origin so players
 			// get knocked into the air more
-			if( gameLocal.isMultiplayer ) {
-				// fudge the direction in MP to account for player height difference and origin shift
-				// 31.875 = origin is 23.875 units lower in Q4 than Q3 + player is 8 units taller in Q4
-				dir = ( ent->GetPhysics()->GetOrigin() + idVec3( 0.0f, 0.0f, 31.875f ) ) - origin;
-			} else {
-				dir = ent->GetPhysics()->GetOrigin() - origin;
-			}		
-			
-			dir[2] += 24;
- 
- 			// get the damage scale
+			dir = ent->GetPhysics()->GetOrigin() - origin;
+			dir[ 2 ] += 24;
+
+			// get the damage scale
 			damageScale = dmgPower * ( 1.0f - dist / radius );
-			
-			if ( ent == attacker ) {
+			if ( ent == attacker || ( ent->IsType( idAFAttachment::Type ) && static_cast<idAFAttachment*>(ent)->GetBody() == attacker ) ) {
 				damageScale *= attackerDamageScale;
 			}
 
-			dir.Normalize();
-			ent->Damage( inflictor, attacker, dir, damageDefName, damageScale, CLIPMODEL_ID_TO_JOINT_HANDLE(ent->GetPhysics()->GetClipModel()->GetId()) );
-
-			// for stats, count the first 
-			if( attacker && attacker->IsType( idPlayer::GetClassType() ) && inflictor && inflictor->IsType( idProjectile::GetClassType() ) && ent->IsType( idPlayer::GetClassType() ) && hitCount ) {
-				// with splash damage projectiles, one projectile fire can damage multiple people.  If anyone is hit, 
-				// the shot counts as a hit but only report accuracy on the first one to avoid accuracies > 100%
-				statManager->WeaponHit( (const idActor*)attacker, ent, ((idProjectile*)inflictor)->methodOfDeath, (*hitCount) == 0 );
-				(*hitCount)++;
-			}
+			ent->Damage( inflictor, attacker, dir, damageDefName, damageScale, INVALID_JOINT );
 		} 
 	}
+
+	// push physics objects
+	if ( push ) {
+		RadiusPush( origin, radius, push * dmgPower, attacker, ignorePush, attackerPushScale, false );
+	}
+*/
 }
-// RAVEN END
 
 /*
 ==============
@@ -6226,6 +4511,7 @@ idGameLocal::RadiusPush
 ==============
 */
 void idGameLocal::RadiusPush( const idVec3 &origin, const float radius, const float push, const idEntity *inflictor, const idEntity *ignore, float inflictorScale, const bool quake ) {
+/*	HUMANHEAD pdm: OVERRIDDEN
 	int i, numListedClipModels;
 	idClipModel *clipModel;
 	idClipModel *clipModelList[ MAX_GENTITIES ];
@@ -6235,26 +4521,19 @@ void idGameLocal::RadiusPush( const idVec3 &origin, const float radius, const fl
 	idEntity *ent;
 	float scale;
 
-// RAVEN BEGIN
-// abahr: need to use gravity instead of assuming z is up
-	dir = -GetCurrentGravity( const_cast<idEntity*>(inflictor) ).ToNormal();
-// RAVEN END
+	dir.Set( 0.0f, 0.0f, 1.0f );
 
 	bounds = idBounds( origin ).Expand( radius );
 
 	// get all clip models touching the bounds
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	numListedClipModels = ClipModelsTouchingBounds( inflictor, bounds, -1, clipModelList, MAX_GENTITIES );
+	numListedClipModels = clip.ClipModelsTouchingBounds( bounds, -1, clipModelList, MAX_GENTITIES );
 
-// bdube: getdamageentity
-	if ( inflictor ) {
-		inflictor = ((idEntity*)inflictor)->GetDamageEntity ( );
+	if ( inflictor && inflictor->IsType( idAFAttachment::Type ) ) {
+		inflictor = static_cast<const idAFAttachment*>(inflictor)->GetBody();
 	}
-	if ( ignore ) {
-		ignore = ((idEntity*)ignore)->GetDamageEntity ( );
+	if ( ignore && ignore->IsType( idAFAttachment::Type ) ) {
+		ignore = static_cast<const idAFAttachment*>(ignore)->GetBody();
 	}
-// RAVEN END
 
 	// apply impact to all the clip models through their associated physics objects
 	for ( i = 0; i < numListedClipModels; i++ ) {
@@ -6267,31 +4546,19 @@ void idGameLocal::RadiusPush( const idVec3 &origin, const float radius, const fl
 		}
 
 		ent = clipModel->GetEntity();
-// RAVEN BEGIN
-// bdube: damage entity		
-		if ( !ent || ent != ent->GetDamageEntity ( ) ) {
-			continue;
-		}
-// RAVEN END
-		
+
 		// never push projectiles
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent->IsType( idProjectile::GetClassType() ) ) {
-// RAVEN END
+		if ( ent->IsType( idProjectile::Type ) ) {
 			continue;
 		}
 
 		// players use "knockback" in idPlayer::Damage
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent->IsType( idPlayer::GetClassType() ) && !quake ) {
-// RAVEN END
+		if ( ent->IsType( idPlayer::Type ) && !quake ) {
 			continue;
 		}
 
 		// don't push the ignore entity
-		if ( ent == ignore ) {
+		if ( ent == ignore || ( ent->IsType( idAFAttachment::Type ) && static_cast<idAFAttachment*>(ent)->GetBody() == ignore ) ) {
 			continue;
 		}
 
@@ -6300,7 +4567,7 @@ void idGameLocal::RadiusPush( const idVec3 &origin, const float radius, const fl
 		}
 
 		// scale the push for the inflictor
-		if ( ent == inflictor ) {
+		if ( ent == inflictor || ( ent->IsType( idAFAttachment::Type ) && static_cast<idAFAttachment*>(ent)->GetBody() == inflictor ) ) {
 			scale = inflictorScale;
 		} else {
 			scale = 1.0f;
@@ -6309,12 +4576,10 @@ void idGameLocal::RadiusPush( const idVec3 &origin, const float radius, const fl
 		if ( quake ) {
 			clipModel->GetEntity()->ApplyImpulse( world, clipModel->GetId(), clipModel->GetOrigin(), scale * push * dir );
 		} else {
-// RAVEN BEGIN
-// bdube: inflictor
-			RadiusPushClipModel( (idEntity*)inflictor, origin, scale * push, clipModel );
-// RAVEN END
+			RadiusPushClipModel( origin, scale * push, clipModel );
 		}
 	}
+*/
 }
 
 /*
@@ -6322,10 +4587,7 @@ void idGameLocal::RadiusPush( const idVec3 &origin, const float radius, const fl
 idGameLocal::RadiusPushClipModel
 ==============
 */
-// RAVEN BEGIN
-// bdube: inflictor
-void idGameLocal::RadiusPushClipModel( idEntity* inflictor, const idVec3 &origin, const float push, const idClipModel *clipModel ) {
-// RAVEN END
+void idGameLocal::RadiusPushClipModel( const idVec3 &origin, const float push, const idClipModel *clipModel ) {
 	int i, j;
 	float dot, dist, area;
 	const idTraceModel *trm;
@@ -6337,12 +4599,8 @@ void idGameLocal::RadiusPushClipModel( idEntity* inflictor, const idVec3 &origin
 	if ( !trm || 1 ) {
 		impulse = clipModel->GetAbsBounds().GetCenter() - origin;
 		impulse.Normalize();
-// RAVEN BEGIN
-// abahr: removed because z isn't always up
-		//impulse.z += 1.0f;
-		//impulse = idVec3( 0.0, 0.0, 1.0 );
-		clipModel->GetEntity()->ApplyImpulse( inflictor, clipModel->GetId(), clipModel->GetOrigin(), push * impulse, true );
-// RAVEN END
+		impulse.z += 1.0f;
+		clipModel->GetEntity()->ApplyImpulse( world, clipModel->GetId(), clipModel->GetOrigin(), push * impulse );
 		return;
 	}
 
@@ -6377,10 +4635,11 @@ void idGameLocal::RadiusPushClipModel( idEntity* inflictor, const idVec3 &origin
 		// impulse is applied to the center of the polygon
 		center = clipModel->GetOrigin() + center * clipModel->GetAxis();
 
-// RAVEN BEGIN
-// bdube: inflictor
-		clipModel->GetEntity()->ApplyImpulse( inflictor, clipModel->GetId(), center, impulse );
-// RAVEN END
+		if (g_debugImpulse.GetBool()) {
+			gameRenderWorld->DebugArrow(colorRed, center, center + impulse, 25, 2000);
+		}
+
+		clipModel->GetEntity()->ApplyImpulse( world, clipModel->GetId(), center, impulse );
 	}
 }
 
@@ -6406,14 +4665,6 @@ void idGameLocal::ProjectDecal( const idVec3 &origin, const idVec3 &dir, float d
 		return;
 	}
 
-// RAVEN BEGIN
-// rjohnson: no decals on dedicated server
-	if ( isMultiplayer && !isClient && !isListenServer ) {
-		// no decals on dedicated server
-		return;
-	}
-// RAVEN END
-
 	// randomly rotate the decal winding
 	idMath::SinCos16( ( angle ) ? angle : random.RandomFloat() * idMath::TWO_PI, s, c );
 
@@ -6438,6 +4689,15 @@ void idGameLocal::ProjectDecal( const idVec3 &origin, const idVec3 &dir, float d
 	winding += idVec5( windingOrigin + ( axis * decalWinding[1] ) * size, idVec2( 0, 1 ) );
 	winding += idVec5( windingOrigin + ( axis * decalWinding[2] ) * size, idVec2( 0, 0 ) );
 	winding += idVec5( windingOrigin + ( axis * decalWinding[3] ) * size, idVec2( 1, 0 ) );
+
+	// HUMANHEAD pdm
+	if (g_debugProjections.GetBool()) {
+		idVec4 color = parallel ? colorRed : colorYellow;
+		gameRenderWorld->DebugWinding(color, winding, vec3_origin, mat3_identity, 3000, false);
+		gameRenderWorld->DebugArrow(color, projectionOrigin, winding.GetCenter(), 5, 3000);
+	}
+	// HUMANHEAD END
+
 	gameRenderWorld->ProjectDecalOntoWorld( winding, projectionOrigin, parallel, depth * 0.5f, declManager->FindMaterial( material ), time );
 }
 
@@ -6446,39 +4706,25 @@ void idGameLocal::ProjectDecal( const idVec3 &origin, const idVec3 &dir, float d
 idGameLocal::BloodSplat
 ==============
 */
-// RAVEN BEGIN
-// ddynerman: multiple collision models
-void idGameLocal::BloodSplat( const idEntity* ent, const idVec3 &origin, const idVec3 &dirArg, float size, const char *material ) {
-
+void idGameLocal::BloodSplat( const idVec3 &origin, const idVec3 &dir, float size, const char *material ) {
 	float halfSize = size * 0.5f;
 	idVec3 verts[] = {	idVec3( 0.0f, +halfSize, +halfSize ),
 						idVec3( 0.0f, +halfSize, -halfSize ),
 						idVec3( 0.0f, -halfSize, -halfSize ),
 						idVec3( 0.0f, -halfSize, +halfSize ) };
-	idVec3 dir = dirArg;
 	idTraceModel trm;
 	idClipModel mdl;
 	trace_t results;
 
-// RAVEN BEGIN
-// mekberg: changed from g_bloodEffects to g_decals
-	if ( !g_decals.GetBool() ) {
+	// FIXME: get from damage def
+	if ( !g_bloodEffects.GetBool() ) {
 		return;
 	}
-// RAVEN END
 
 	size = halfSize + random.RandomFloat() * halfSize;
 	trm.SetupPolygon( verts, 4 );
-	mdl.LoadModel( trm, NULL );
-
-	// I don't want dir to be axis aligned, as it is more likely to streak them (because most architecture is axis aligned
-	dir.Set( dirArg.x*.1f, dirArg.y*.1f, -1 );
-	dir.Normalize();
-
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	Translation( ent, results, origin, origin + dir * 72.0f, &mdl, mat3_identity, CONTENTS_SOLID, NULL );
-// RAVEN END
+	mdl.LoadModel( trm );
+	clip.Translation( results, origin, origin + dir * 64.0f, &mdl, mat3_identity, CONTENTS_SOLID, NULL );
 	ProjectDecal( results.endpos, dir, 2.0f * size, true, size, material );
 }
 
@@ -6494,16 +4740,13 @@ void idGameLocal::SetCamera( idCamera *cam ) {
 
 	// this should fix going into a cinematic when dead.. rare but happens
 	idPlayer *client = GetLocalPlayer();
-	if ( cam && client && ( client->health <= 0 || client->pfl.dead ) ) {
+	if ( client->health <= 0 || client->AI_DEAD ) {
 		return;
 	}
 
 	camera = cam;
 	if ( camera ) {
-// RAVEN BEGIN
-// bdube: tool support
 		inCinematic = true;
-// RAVEN END
 
 		if ( skipCinematic && camera->spawnArgs.GetBool( "disconnect" ) ) {
 			camera->spawnArgs.SetBool( "disconnect", false );
@@ -6536,19 +4779,13 @@ void idGameLocal::SetCamera( idCamera *cam ) {
 					continue;
 				}
 				
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-				if ( ent->IsType( idAI::GetClassType() ) ) {
-// RAVEN END
+				if ( ent->IsType( idAI::Type ) ) {
 					ai = static_cast<idAI *>( ent );
 					if ( !ai->GetEnemy() || !ai->IsActive() ) {
 						// no enemy, or inactive, so probably safe to ignore
 						continue;
 					}
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-				} else if ( ent->IsType( idProjectile::GetClassType() ) ) {
-// RAVEN END
+				} else if ( ent->IsType( idProjectile::Type ) ) {
 					// remove all projectiles
 				} else if ( ent->spawnArgs.GetBool( "cinematic_remove" ) ) {
 					// remove anything marked to be removed during cinematics
@@ -6579,32 +4816,6 @@ void idGameLocal::SetCamera( idCamera *cam ) {
 		}
 	}
 }
-
-// RAVEN BEGIN
-// jscott: for portal skies
-/*
-=============
-idGameLocal::GetPortalSky
-=============
-*/
-idCamera *idGameLocal::GetPortalSky( void ) const
-{
-	if( !portalSkyVisible ) {
-
-		return( NULL );
-	}
-	return( portalSky );
-}
-/*
-=============
-idGameLocal::SetPortalSky
-=============
-*/
-void idGameLocal::SetPortalSky( idCamera *cam ) 
-{
-	portalSky = cam;
-}
-// RAVEN END
 
 /*
 =============
@@ -6645,598 +4856,6 @@ bool idGameLocal::SkipCinematic( void ) {
 	return true;
 }
 
-// RAVEN BEGIN
-/*
-======================
-idGameLocal::StartViewEffect
-
-For passing in an effect triggered view effect
-======================
-*/
-void idGameLocal::StartViewEffect( int type, float time, float scale )
-{
-	idPlayer		*player;
-	idPlayerView	*view;
-
-	player = GetLocalPlayer();
-	if( player )
-	{
-		view = &player->playerView;
-
-		switch( type )
-		{
-		case VIEWEFFECT_DOUBLEVISION:
-			view->SetDoubleVisionParms( time, scale );
-			break;
-
-		case VIEWEFFECT_SHAKE:
-			if( !gameLocal.isMultiplayer ) {
-				view->SetShakeParms( time, scale );
-			}
-			break;
-
-		case VIEWEFFECT_TUNNEL:
-			view->SetTunnelParms( time, scale );
-			break;
-
-		default:
-			gameLocal.Warning( "Invalid view effect" );
-			break;
-		}
-	}
-}
-
-/*
-======================
-idGameLocal::GetPlayerView
-======================
-*/
-void idGameLocal::GetPlayerView( idVec3 &origin, idMat3 &axis )
-{
-	idPlayer		*player;
-	renderView_t	*view;
-
-	player = GetLocalPlayer();
-	if( player )
-	{
-		view = player->GetRenderView();
-		origin = view->vieworg;
-		axis = view->viewaxis;
-	}
-	else
-	{
-		origin = vec3_origin;
-		axis = mat3_identity;
-	}
-}
-
-/*
-======================
-idGameLocal::Translation
-
-small portion of physics required for the effects system
-======================
-*/
-void idGameLocal::Translation( trace_t &trace, idVec3 &source, idVec3 &dest, idTraceModel *trm, int clipMask ) {	
-
-	if( !trm ) {
-		// HACK
-		clip[0]->Translation( trace, source, dest, NULL, mat3_identity, clipMask, NULL, NULL );
-	}
-	else {
-		idClipModel		cm;
-	
-		cm.LoadModel( *trm, NULL );
-		// HACK
-		clip[0]->Translation( trace, source, dest, &cm, mat3_identity, clipMask, NULL, NULL );
-	}
-}
-
-/*
-======================
-idGameLocal::SpawnClientMoveable
-======================
-*/
-void idGameLocal::SpawnClientMoveable( const char* name, int lifetime, const idVec3& origin, const idMat3& axis, const idVec3& velocity, const idVec3& angular_velocity ) {
-	// find the debris def
-	const idDict* args = gameLocal.FindEntityDefDict( name, false );
-	if ( !args ) {
-		return;
-	}
-
-	// Ensure client moveables never last forever
-	if ( lifetime <= 0 ) {
-		lifetime = SEC2MS(args->GetFloat( "duration", "5" ));
-	}
-	int burn_time = idMath::ClampInt( 0, lifetime, SEC2MS(args->GetFloat( "burn_time", "2.5" )) );
-	
-	// Spawn the debris
-	
-	rvClientMoveable* cent = NULL;
-	// force the args to spawn a rvClientMoveable
-	SpawnClientEntityDef( *args, (rvClientEntity**)(&cent), false, "rvClientMoveable" );
-	
-	if( !cent ) {
-		return;
-	}
- 
-	cent->SetOrigin( origin );
-	cent->SetAxis( axis );
-		
-	cent->GetPhysics()->SetLinearVelocity( velocity );
-	cent->GetPhysics()->SetAngularVelocity( angular_velocity );
-
-	if ( !burn_time ) {
-		//just disappear
-		cent->PostEventMS( &EV_Remove, lifetime );	
-	} else {
-		cent->PostEventMS( &CL_FadeOut, lifetime-burn_time, burn_time );
-	}
-}
-
-/*
-======================
-idGameLocal::DebugSet
-======================
-*/
-void idGameLocal::DebugSetString( const char* name, const char* value ) {
-	gameDebug.SetString( name, value );
-}
-void idGameLocal::DebugSetFloat( const char* name, float value ) {
-	gameDebug.SetFloat( name, value );
-}
-void idGameLocal::DebugSetInt( const char* name, int value ) {
-	gameDebug.SetInt( name, value );
-}
-
-/*
-======================
-idGameLocal::DebugGetStat
-======================
-*/
-const char* idGameLocal::DebugGetStatString ( const char* name ) {
-	return gameDebug.GetStatString( name );
-}
-
-int idGameLocal::DebugGetStatInt ( const char* name ) {
-	return gameDebug.GetStatInt( name );
-}
-
-float idGameLocal::DebugGetStatFloat ( const char* name ) {
-	return gameDebug.GetStatFloat( name );
-}
-
-/*
-======================
-idGameLocal::IsDebugHudActive
-======================
-*/
-bool idGameLocal::IsDebugHudActive ( void ) const {
-	return gameDebug.IsHudActive( DBGHUD_ANY );
-}
-
-
-// rjohnson: added player info support for note taking system
-/*
-======================
-idGameLocal::GetPlayerInfo
-======================
-*/
-bool idGameLocal::GetPlayerInfo( idVec3 &origin, idMat3 &axis, int PlayerNum, idAngles *deltaViewAngles, int reqClientNum ) {
-	idPlayer	*player;
-
-	if ( PlayerNum == -1 ) {
-		player = GetLocalPlayer();
-	} else {
-		player = GetClientByNum( PlayerNum );
-	}
-
-	if( reqClientNum != -1 ) {
-		idPlayer* reqClient = GetClientByNum( reqClientNum );
-		if( reqClient && player ) {
-			if( reqClient->GetInstance() != player->GetInstance() ) {
-				return false;
-			}
-		}
-	}
-
-	if ( !player ) {
-		return false;
-	}
-
-	player->GetViewPos( origin, axis );
-	origin = player->GetPhysics()->GetOrigin();
-
-	if ( deltaViewAngles ) {
-		*deltaViewAngles = player->GetDeltaViewAngles();
-	}
-
-	return true;
-};
-
-/*
-======================
-idGameLocal::SetCurrentPlayerInfo
-======================
-*/
-void idGameLocal::SetPlayerInfo( idVec3 &origin, idMat3 &axis, int PlayerNum ) {
-	idPlayer	*player;
-
-	if ( PlayerNum == -1 ) {
-		player = GetLocalPlayer();
-	} else {
-		player = GetClientByNum( PlayerNum );
-	}
-
-	if ( !player ) {
-		return;
-	}
-
-	player->Teleport( origin, axis.ToAngles(), NULL );
-// RAVEN BEGIN
-// ddynerman: save the current thinking entity for instance-dependent
-	currentThinkingEntity = player;
-	player->CalculateFirstPersonView();
-	player->CalculateRenderView();
-	currentThinkingEntity = NULL;
-// RAVEN END
-
-	return;
-};
-
-bool idGameLocal::PlayerChatDisabled( int clientNum ) {
-	if( clientNum < 0 || clientNum >= MAX_CLIENTS || !entities[ clientNum ] ) {
-		return false;
-	}
-
-	return !( ((idPlayer*)entities[ clientNum ])->isChatting || ((idPlayer*)entities[ clientNum ])->pfl.dead );
-}
-
-void idGameLocal::SetViewComments( const char *text ) {
-	idPlayer	*player;
-
-	player = GetLocalPlayer();
-
-	if ( !player ) {
-		return;
-	}
-
-	if ( text ) {
-		player->hud->SetStateString( "viewcomments", text );
-		player->hud->HandleNamedEvent( "showViewComments" );
-	}
-	else {
-		player->hud->SetStateString( "viewcomments", "" );
-		player->hud->HandleNamedEvent( "hideViewComments" );
-	}
-}
-
-/*
-===================
-idGameLocal::GetNumGravityAreas
-===================
-*/
-int	idGameLocal::GetNumGravityAreas() const {
-	return gravityInfo.Num();
-}
-
-/*
-===================
-idGameLocal::GetGravityInfo
-===================
-*/
-const rvGravityArea* idGameLocal::GetGravityInfo( int index ) const {
-	return gravityInfo[ index ];
-}
-
-/*
-===================
-idGameLocal::SetGravityArea
-===================
-*/
-void idGameLocal::SetGravityInfo( int index, rvGravityArea* info ) {
-	gravityInfo[ index ] = info;
-}
-
-/*
-===================
-idGameLocal::AddUniqueGravityInfo
-===================
-*/
-void idGameLocal::AddUniqueGravityInfo( rvGravityArea* info ) {
-	gravityInfo.AddUnique( info );
-}
-
-/*
-===================
-idGameLocal::GetCurrentGravityInfoIndex
-===================
-*/
-int idGameLocal::GetCurrentGravityInfoIndex( const idVec3& origin ) const {
-	int numGravityAreas = GetNumGravityAreas();
-	if( !numGravityAreas ) {
-		return -1;
-	}
-
-	int areaNum = gameRenderWorld->PointInArea( origin );
-
-	for( int ix = 0; ix < numGravityAreas; ++ix ) {
-		if( !gameRenderWorld->AreasAreConnected(GetGravityInfo(ix)->GetArea(), areaNum, PS_BLOCK_GRAVITY) ) {
-			continue;
-		}
-		 
-		return ix;
-	}
-
-	return -1;
-}
-
-/*
-===================
-idGameLocal::InGravityArea
-===================
-*/
-bool idGameLocal::InGravityArea( idEntity* entity ) const {
-	return GetCurrentGravityInfoIndex( entity ) >= 0;
-}
-
-/*
-===================
-idGameLocal::GetCurrentGravityInfoIndex
-===================
-*/
-int idGameLocal::GetCurrentGravityInfoIndex( idEntity* entity ) const {
-	return GetCurrentGravityInfoIndex( entity->GetPhysics()->GetOrigin() );
-}
-
-/*
-===================
-idGameLocal::GetCurrentGravity
-===================
-*/
-const idVec3 idGameLocal::GetCurrentGravity( idEntity* entity ) const {
-	int index = GetCurrentGravityInfoIndex( entity );
-	return (index >= 0) ? gravityInfo[ index ]->GetGravity(entity) : GetGravity();
-}
-
-/*
-===================
-idGameLocal::GetCurrentGravity
-===================
-*/
-const idVec3 idGameLocal::GetCurrentGravity( const idVec3& origin, const idMat3& axis ) const {
-	int index = GetCurrentGravityInfoIndex( origin );
-	return (index >= 0) ? gravityInfo[ index ]->GetGravity(origin, axis, MASK_SOLID, NULL) : GetGravity();
-}
-
-/*
-===================
-idGameLocal::InGravityArea
-===================
-*/
-bool idGameLocal::InGravityArea( rvClientEntity* entity ) const {
-	return GetCurrentGravityInfoIndex( entity ) >= 0;
-}
-
-/*
-===================
-idGameLocal::GetCurrentGravityInfoIndex
-===================
-*/
-int idGameLocal::GetCurrentGravityInfoIndex( rvClientEntity* entity ) const {
-	return GetCurrentGravityInfoIndex( entity->GetPhysics()->GetOrigin() );
-}
-
-/*
-===================
-idGameLocal::GetCurrentGravity
-===================
-*/
-const idVec3 idGameLocal::GetCurrentGravity( rvClientEntity* entity ) const {
-	int index = GetCurrentGravityInfoIndex( entity );
-	return (index >= 0) ? gravityInfo[ index ]->GetGravity(entity) : GetGravity();
-}
-
-/*
-===================
-idGameLocal::ReferenceScriptObjectProxy
-===================
-*/
-idEntity* idGameLocal::ReferenceScriptObjectProxy( const char* scriptObjectName ) {
-	idEntity*		proxy = NULL;
-	idEntityPtr<idEntity> safeProxy;
-	idDict			args;
-	idScriptObject* object = NULL;
-
-	for( int ix = 0; ix < scriptObjectProxies.Num(); ++ix ) {
-		proxy = scriptObjectProxies[ ix ].GetEntity();
-		assert( proxy );
-		
-		object = &proxy->scriptObject;
-		if( !object->data ) {
-			object->SetType( scriptObjectName );
-			proxy->ConstructScriptObject();
-			return proxy;
-		}
-	}
-
-	args.Set( "classname", "func_static" );
-	args.Set( "scriptobject", scriptObjectName );
-	args.SetBool( "noclipmodel", true );
-	bool spawned = SpawnEntityDef(args, &proxy);
-	if ( !spawned ) {
-		assert( 0 );
-	}
-	safeProxy = proxy;
-	scriptObjectProxies.AddUnique( safeProxy );
-	return proxy;
-}
-
-/*
-===================
-idGameLocal::ReleaseScriptObjectProxy
-===================
-*/
-void idGameLocal::ReleaseScriptObjectProxy( const char* proxyName ) {
-	idScriptObject* object = NULL;
-	idEntity*		entity = NULL;
-
-	for( int ix = 0; ix < scriptObjectProxies.Num(); ++ix ) {
-		entity = scriptObjectProxies[ ix ].GetEntity();
-		if( entity && !idStr::Icmp(entity->GetName(), proxyName) ) {
-			object = &entity->scriptObject;
-			if( !object ) {
-				continue;
-			}
-			
-			entity->DeconstructScriptObject();
-			object->Free();
-		}
-	}
-}
-
-// RAVEN BEGIN
-// rjohnson: entity usage stats
-void idGameLocal::ListEntityStats( const idCmdArgs &args ) {
-	int				i, j;
-	idStr			currentMap;
-	idList<idStr>	uniqueMapNames;
-
-
-	for( i = 1; i < args.Argc(); i++ ) {
-		if ( idStr::Icmp( args.Argv( i ), "clear" ) == 0 ) {
-			entityUsageList.Clear();
-			common->Printf("Entity stats cleared.\n");
-			return;
-		}
-	}
-
-	for( i = 0; i < entityUsageList.Num(); i++ ) {
-		entityUsageList[ i ].SetInt( "reported_stat", false );
-	}
-
-	for( i = 0; i < entityUsageList.Num(); i++ ) {
-		idStr	mapFileName, className;
-		int		count;
-
-		if ( entityUsageList[ i ].GetInt( "reported_stat" ) ) {
-			continue;
-		}
-
-		entityUsageList[ i ].GetString( "mapFileName", "none", mapFileName );
-		if ( currentMap != mapFileName )
-		{
-			if ( i ) {
-				common->Printf( "\n" );
-			}
-			common->Printf( "================ %s ================\n", mapFileName.c_str() );
-			currentMap = mapFileName;
-			uniqueMapNames.Insert( mapFileName );
-		}
-
-		entityUsageList[ i ].GetString( "classname", "none", className );
-		count = 0;
-
-		for( j = i; j < entityUsageList.Num(); j++ ) {
-			idStr	checkMapFileName, checkClassName;
-
-			entityUsageList[ j ].GetString( "mapFileName", "none", checkMapFileName );
-			if ( checkMapFileName != mapFileName ) {
-				break;
-			}
-
-			entityUsageList[ j ].GetString( "classname", "none", checkClassName );
-
-			if ( checkClassName == className ) {
-				entityUsageList[ j ].SetInt( "reported_stat", 1 );
-				count++;
-			}
-		}
-
-		common->Printf("%d\t%s\n", count, className.c_str() );
-	}
-
-	common->Printf( "\n" );
-	common->Printf( "\n" );
-	common->Printf( "================ OVERALL ================\n" );
-
-	for( i = 0; i < entityUsageList.Num(); i++ ) {
-		idStr	mapFileName, className;
-		int		count;
-
-		if ( entityUsageList[ i ].GetInt( "reported_stat" ) == 2 ) {
-			continue;
-		}
-
-		entityUsageList[ i ].GetString( "classname", "none", className );
-		count = 0;
-
-		for( j = i; j < entityUsageList.Num(); j++ ) {
-			idStr	checkClassName;
-
-			entityUsageList[ j ].GetString( "classname", "none", checkClassName );
-
-			if ( checkClassName == className ) {
-				entityUsageList[ j ].SetInt( "reported_stat", 2 );
-				count++;
-			}
-		}
-
-		common->Printf("%d\t%s\n", count, className.c_str() );
-	}
-
-	idFile *FH = fileSystem->OpenFileWrite( "EntityStats.csv" );
-	if ( FH ) {
-		int	size = sizeof( int ) * uniqueMapNames.Num();
-		int	*count = ( int * )_alloca( size );
-
-		FH->Printf("\"Definition\"");
-		for( i = 0; i < uniqueMapNames.Num(); i++ ) {
-			FH->Printf( ",\"%s\"", uniqueMapNames[ i ].c_str() );
-		}
-		FH->Printf(",Total\n");
-
-		for( i = 0; i < entityUsageList.Num(); i++ ) {
-			idStr	className;
-			int		total;
-
-			if ( entityUsageList[ i ].GetInt( "reported_stat" ) == 3 ) {
-				continue;
-			}
-
-			entityUsageList[ i ].GetString( "classname", "none", className );
-
-			memset( count, 0, size );
-			for( j = i; j < entityUsageList.Num(); j++ )
-			{
-				idStr	checkMapFileName, checkClassName;
-
-				entityUsageList[ j ].GetString( "classname", "none", checkClassName );
-
-				if ( checkClassName == className ) {
-					entityUsageList[ j ].SetInt( "reported_stat", 3 );
-					entityUsageList[ j ].GetString( "mapFileName", "none", checkMapFileName );
-
-					int loc = uniqueMapNames.FindIndex( checkMapFileName );
-					if ( loc >= 0 ) {
-						count[ loc ]++;
-					}
-				}
-			}
-
-			total = 0;
-			FH->Printf( "\"%s\"", className.c_str() );
-			for( j = 0; j < uniqueMapNames.Num(); j++ ) {
-				FH->Printf( ",%d", count[ j ] );
-				total += count[ j ];
-			}
-			FH->Printf( ",%d\n", total );
-		}
-
-		fileSystem->CloseFile( FH );
-	}
-}
-// RAVEN END
 
 /*
 ======================
@@ -7248,12 +4867,6 @@ Now that everything has been spawned, associate areas with location entities
 void idGameLocal::SpreadLocations() {
 	idEntity *ent;
 
-// RAVEN BEGIN
-	if( !gameRenderWorld ) {
-		common->Error( "GameRenderWorld is NULL!" );
-	}
-// RAVEN END
-
 	// allocate the area table
 	int	numAreas = gameRenderWorld->NumAreas();
 	locationEntities = new idLocationEntity *[ numAreas ];
@@ -7261,10 +4874,7 @@ void idGameLocal::SpreadLocations() {
 
 	// for each location entity, make pointers from every area it touches
 	for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( !ent->IsType( idLocationEntity::GetClassType() ) ) {
-// RAVEN END
+		if ( !ent->IsType( idLocationEntity::Type ) ) {
 			continue;
 		}
 		idVec3	point = ent->spawnArgs.GetVector( "origin" );
@@ -7277,7 +4887,7 @@ void idGameLocal::SpreadLocations() {
 			Error( "idGameLocal::SpreadLocations: areaNum >= gameRenderWorld->NumAreas()" );
 		}
 		if ( locationEntities[areaNum] ) {
-			Warning( "location entity '%s' overlaps '%s'", ent->spawnArgs.GetString( "name" ),
+			DPrintf( "location entity '%s' overlaps '%s'\n", ent->spawnArgs.GetString( "name" ),
 				locationEntities[areaNum]->spawnArgs.GetString( "name" ) );
 			continue;
 		}
@@ -7293,43 +4903,31 @@ void idGameLocal::SpreadLocations() {
 			}
 		}
 	}
-}
 
-/*
-===================
-idGameLocal::AddLocation
-===================
-*/
-idLocationEntity* idGameLocal::AddLocation( const idVec3& point, const char* name ) {
-	int areaNum = gameRenderWorld->PointInArea( point );
-	if ( areaNum < 0 ) {
-		Warning ( "idGameLocal::AddLocation: cannot add location entity '%s' at '%g %g %g'\n", name, point.x, point.y, point.z );
-		return NULL;
-	}
-	if ( areaNum >= gameRenderWorld->NumAreas() ) {
-		Error( "idGameLocal::AddLocation: areaNum >= gameRenderWorld->NumAreas()" );
-	}
-	if ( locationEntities[areaNum] ) {
-		Warning ( "idGameLocal::AddLocation: location '%s' already exists at '%g %g %g'\n", locationEntities[areaNum]->GetName(), point.x, point.y, point.z );
-		return NULL;
-	}
-
-	// Spawn the new location entity
-	idDict args;
-	args.Set ( "location", name );
-	locationEntities[areaNum] = static_cast<idLocationEntity*>(SpawnEntityType ( idLocationEntity::GetClassType(), &args ));
-
-	// spread to all other connected areas
-	for ( int i = gameRenderWorld->NumAreas() - 1 ; i >= 0 ; i-- ) {
-		if ( i == areaNum ) {
-			continue;
+	// HUMANHEAD pdm: print area -> location mappings for efx integration
+	if ( g_printlocations.GetBool() ) {
+		idLocationEntity *ent;
+#if 1
+		idFile *areaFile = fileSystem->OpenFileWrite( va("%s_areas.txt", gameLocal.GetMapName()) );
+		if (areaFile) {
+			for (int ix=0; ix<numAreas; ix++) {
+				ent = locationEntities[ix];
+				areaFile->Printf( "%4d: %s\n", ix, ent ? ent->GetLocation() : "<No Location>" );
+			}
+			fileSystem->CloseFile( areaFile );
 		}
-		if ( gameRenderWorld->AreasAreConnected( areaNum, i, PS_BLOCK_LOCATION ) ) {
-			locationEntities[i] = static_cast<idLocationEntity *>(locationEntities[areaNum]);
+#else
+		idFile *areaFile = fileSystem->OpenFileWrite( va("%s_areas.csv", gameLocal.GetMapName()) );
+		if (areaFile) {
+			for (int ix=0; ix<numAreas; ix++) {
+				ent = locationEntities[ix];
+				idStr out = va("%d,%s\n", ix, ent ? ent->GetLocation() : "<No Location>");
+				areaFile->Write( out.c_str(), out.Length() );
+			}
+			fileSystem->CloseFile( areaFile );
 		}
+#endif
 	}
-	
-	return locationEntities[areaNum];
 }
 
 /*
@@ -7396,250 +4994,202 @@ int idGameLocal::sortSpawnPoints( const void *ptr1, const void *ptr2 ) {
 	}
 }
 
-// RAVEN BEGIN
-// ddynerman: new gametype specific spawn code
-// TODO this should be moved to idMultiplayerGame
 /*
 ===========
-idGameLocal::InitializeSpawns
+idGameLocal::RandomizeInitialSpawns
 randomize the order of the initial spawns
 prepare for a sequence of initial player spawns
 ============
 */
-void idGameLocal::InitializeSpawns( void ) {
-	idEntity* spot = NULL;
+void idGameLocal::RandomizeInitialSpawns( void ) {
+	spawnSpot_t	spot;
+	int i, j;
+	idEntity *ent;
 
-	// initialize the spawns for clients as well, need them for free fly demo replays
-	if ( !isMultiplayer ) {
+	if ( !isMultiplayer || isClient ) {
 		return;
 	}
-
 	spawnSpots.Clear();
+	initialSpots.Clear();
+	spot.dist = 0;
 
-	for( int i = 0; i < TEAM_MAX; i++ ) {
-		teamSpawnSpots[i].Clear();
-	}
-	
-	spot = FindEntityUsingDef( NULL, "info_player_team" );
-	while( spot ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if( spot->IsType ( idPlayerStart::GetClassType() ) ) {
-// RAVEN END
-			if( !idStr::Icmp(spot->spawnArgs.GetString("team"), "strogg") ) {
-				teamSpawnSpots[TEAM_STROGG].Append( static_cast<idPlayerStart*>(spot) );
-			} else if( !idStr::Icmp(spot->spawnArgs.GetString("team"), "marine") ) {
-				teamSpawnSpots[TEAM_MARINE].Append( static_cast<idPlayerStart*>(spot) );
+	// HUMANHEAD pdm: Coop
+	if (isMultiplayer && IsCooperative()) {
+		spot.ent = FindEntityUsingDef( NULL, "info_player_coop" );
+		while( spot.ent ) {
+			spawnSpots.Append( spot );
+			if ( spot.ent->spawnArgs.GetBool( "initial" ) ) {
+				initialSpots.Append( spot.ent );
 			}
-
-			// spawnSpots contains info_player_team as well as info_player_deathmatch
-			spawnSpots.Append ( static_cast<idPlayerStart*>(spot) );
-			
+			spot.ent = FindEntityUsingDef( spot.ent, "info_player_coop" );
 		}
-
-		spot = FindEntityUsingDef( spot, "info_player_team" );
 	}
+	else {
+	// HUMANHEAD END
 
-	spot = FindEntityUsingDef( NULL, "info_player_deathmatch" );
-	while( spot ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if( spot->IsType ( idPlayerStart::GetClassType() ) ) {
-// RAVEN END
-			spawnSpots.Append ( static_cast<idPlayerStart*>(spot) );
+	spot.ent = FindEntityUsingDef( NULL, "info_player_deathmatch" );
+	while( spot.ent ) {
+		spawnSpots.Append( spot );
+		if ( spot.ent->spawnArgs.GetBool( "initial" ) ) {
+			initialSpots.Append( spot.ent );
 		}
-		spot = FindEntityUsingDef( spot, "info_player_deathmatch" );
+		spot.ent = FindEntityUsingDef( spot.ent, "info_player_deathmatch" );
 	}
 
-	while( spot ) {
-		// RAVEN BEGIN
-		// jnewquist: Use accessor for static class type 
-		if( spot->IsType ( idPlayerStart::GetClassType() ) ) {
-			// RAVEN END
-			if( !idStr::Icmp(spot->spawnArgs.GetString("team"), "strogg") ) {
-				teamSpawnSpots[TEAM_STROGG].Append( static_cast<idPlayerStart*>(spot) );
-			} else if( !idStr::Icmp(spot->spawnArgs.GetString("team"), "marine") ) {
-				teamSpawnSpots[TEAM_MARINE].Append( static_cast<idPlayerStart*>(spot) );
-			}
-
-			// spawnSpots contains info_player_team as well as info_player_deathmatch
-			spawnSpots.Append ( static_cast<idPlayerStart*>(spot) );
-
+	}	// HUMANHEAD PDM
+	if ( !spawnSpots.Num() ) {
+		common->Warning( "no info_player_deathmatch in map" );
+		return;
+	}
+	common->Printf( "%d spawns (%d initials)\n", spawnSpots.Num(), initialSpots.Num() );
+	// if there are no initial spots in the map, consider they can all be used as initial
+	if ( !initialSpots.Num() ) {
+		//HUMANHEAD rww - we don't actually care.
+		//common->Warning( "no info_player_deathmatch entities marked initial in map" );
+		for ( i = 0; i < spawnSpots.Num(); i++ ) {
+			initialSpots.Append( spawnSpots[ i ].ent );
 		}
-
-		spot = FindEntityUsingDef( spot, "info_player_team" );
 	}
-
-	if( IsFlagGameType() && ( teamSpawnSpots[ TEAM_STROGG ].Num() == 0 || teamSpawnSpots[ TEAM_MARINE ].Num() == 0 ) ) {
-		Error( "InitializeSpawns() - Map must have at least one Marine and one Strogg spawn for CTF gametype.");
+	for ( i = 0; i < initialSpots.Num(); i++ ) {
+		j = random.RandomInt( initialSpots.Num() );
+		ent = initialSpots[ i ];
+		initialSpots[ i ] = initialSpots[ j ];
+		initialSpots[ j ] = ent;
 	}
-
-	if( spawnSpots.Num() == 0 ) {
-		Error( "InitializeSpawns() - Map must have a spawn spot." );
-	}
-
-	common->Printf( "%d general spawns\n", spawnSpots.Num() );
-	common->Printf( "%d team spawns (%d strogg/%d marine)\n", teamSpawnSpots[TEAM_STROGG].Num() + teamSpawnSpots[TEAM_MARINE].Num(),
-														 teamSpawnSpots[TEAM_STROGG].Num(), teamSpawnSpots[TEAM_MARINE].Num());
+	// reset the counter
+	currentInitialSpot = 0;
 }
 
 /*
 ===========
-idGameLocal::UpdateForwardSpawn
-ddynerman: Updates forward spawn lists
-===========
+idGameLocal::SelectInitialSpawnPoint
+spectators are spawned randomly anywhere
+in-game clients are spawned based on distance to active players (randomized on the first half)
+upon map restart, initial spawns are used (randomized ordered list of spawns flagged "initial")
+  if there are more players than initial spots, overflow to regular spawning
+============
 */
-void idGameLocal::UpdateForwardSpawns( rvCTFAssaultPlayerStart* point, int team ) {
-	teamForwardSpawnSpots[ team ].Append( point );
-}
+idEntity *idGameLocal::SelectInitialSpawnPoint( idPlayer *player ) {
+	int				i, j, which;
+	spawnSpot_t		spot;
+	idVec3			pos;
+	float			dist;
+	bool			alone;
 
-/*
-===========
-idGameLocal::ClearForwardSpawn
-ddynerman: Clears forward spawn lists
-===========
-*/
-void idGameLocal::ClearForwardSpawns( void ) {
-	for( int i = 0; i < TEAM_MAX; i++ ) {
-		teamForwardSpawnSpots[ i ].Clear();
-	}
-}
-
-/*
-===========
-idGameLocal::SpotWouldTelefrag
-===========
-*/
-bool idGameLocal::SpotWouldTelefrag( idPlayer* player, idPlayerStart* spawn ) {
-	idPlayer*	playerList[ MAX_CLIENTS ];
-	idBounds	bound = player->GetPhysics()->GetBounds();
-
-	bound.TranslateSelf( spawn->GetPhysics()->GetOrigin() );
-	int numEntities = PlayersTouchingBounds( player, bound, CONTENTS_BODY, playerList, MAX_CLIENTS );
-
-	return !( numEntities == 0 );
-}
-
-/*
-===========
-idGameLocal::SelectSpawnSpot
-ddynerman: Selects a spawn spot randomly from spots furthest from the player
-			This is taken from q3
-===========
-*/
-idEntity* idGameLocal::SelectSpawnPoint( idPlayer* player ) {
-	if( !isMultiplayer ) {
-		idEntity* ent = FindEntityUsingDef( NULL, "info_player_start" );
-		if ( !ent ) {
+	if ( !isMultiplayer || !spawnSpots.Num() ) {
+		spot.ent = FindEntityUsingDef( NULL, "info_player_start" );
+		if ( !spot.ent ) {
 			Error( "No info_player_start on map.\n" );
 		}
-		return ent;
+		player->MPLastSpawnSpot = NULL; //HUMANHEAD rww
+		return spot.ent;
 	}
-
-	if ( player == NULL ) {
-		return NULL;
-	}
-
-	// Give spectators any old random spot
-	if ( player->team < 0 || player->team >= TEAM_MAX || player->spectating ) {
-		common->DPrintf("Returning a random spot\n");
-		return spawnSpots[ random.RandomInt( spawnSpots.Num() ) ];
-	}
-
-	idList<spawnSpot_t> weightedSpawns;
-	idList<idPlayerStart*>* spawnArray = NULL;
-
-	// Pick which spawns to use based on gametype
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
-	if( gameLocal.gameType == GAME_DM || gameLocal.gameType == GAME_TDM || gameLocal.gameType == GAME_TOURNEY ) {
-		spawnArray = &spawnSpots;
-	} 
-	else if( IsFlagGameType() || gameLocal.gameType == GAME_DEADZONE ) {	
-		if( teamForwardSpawnSpots[ player->team ].Num() ) {
-			spawnArray = &teamForwardSpawnSpots[ player->team ];
-		} else {
-			spawnArray = &teamSpawnSpots[ player->team ];
-		}
-	}
-// RITUAL END
-
-	if ( spawnArray == NULL ) {
-		Error( "SelectSpawnPoint() - invalid spawn list." );
-		return NULL;
-	}
-
-	idVec3 refPos;
-	if ( player->lastKiller != NULL && !player->lastKiller->spectating && player->lastKiller->GetInstance() == player->GetInstance() ) {
-		refPos = player->lastKiller->GetPhysics()->GetOrigin();
+	if ( player->spectating ) {
+		// plain random spot, don't bother
+		player->MPLastSpawnSpot = NULL; //HUMANHEAD rww
+		return spawnSpots[ random.RandomInt( spawnSpots.Num() ) ].ent;
+	} else if ( player->useInitialSpawns && currentInitialSpot < initialSpots.Num() ) {
+		player->MPLastSpawnSpot = NULL; //HUMANHEAD rww
+		return initialSpots[ currentInitialSpot++ ];
 	} else {
-		refPos = player->GetPhysics()->GetOrigin();
-	}
-
-	for ( int i = 0; i < spawnArray->Num(); i++ ) {
-		idPlayerStart* spot = (*spawnArray)[i];
-
-		if ( spot->GetInstance() != player->GetInstance() || SpotWouldTelefrag( player, spot ) ) {
-			continue;
+		// check if we are alone in map
+		alone = true;
+		for ( j = 0; j < MAX_CLIENTS; j++ ) {
+			if ( entities[ j ] && entities[ j ] != player ) {
+				alone = false;
+				break;
+			}
+		}
+		if ( alone ) {
+			// don't do distance-based
+			player->MPLastSpawnSpot = NULL; //HUMANHEAD rww
+			return spawnSpots[ random.RandomInt( spawnSpots.Num() ) ].ent;
 		}
 
-		idVec3	pos = spot->GetPhysics()->GetOrigin();
-		float	dist = ( pos - refPos ).LengthSqr();
+		//HUMANHEAD rww
+		idStaticList<spawnSpot_t *, 32> distantSpawnSpots;
+		//HUMANHEAD END
 
-		spawnSpot_t	newSpot;
-		
-		newSpot.dist = dist;
-		newSpot.ent = (*spawnArray)[ i ];
-		weightedSpawns.Append( newSpot );
+		// find the distance to the closest active player for each spawn spot
+		for( i = 0; i < spawnSpots.Num(); i++ ) {
+			pos = spawnSpots[ i ].ent->GetPhysics()->GetOrigin();
+			spawnSpots[ i ].dist = 0x7fffffff;
+			for( j = 0; j < MAX_CLIENTS; j++ ) {
+				if ( !entities[ j ] || !entities[ j ]->IsType( idPlayer::Type )
+					|| entities[ j ] == player
+					|| static_cast< idPlayer * >( entities[ j ] )->spectating ) {
+					continue;
+				}
+				
+				dist = ( pos - entities[ j ]->GetPhysics()->GetOrigin() ).LengthSqr();
+				if ( dist < spawnSpots[ i ].dist ) {
+					spawnSpots[ i ].dist = dist;
+				}
+			}
+
+			//HUMANHEAD rww
+			if ((!player->MPLastSpawnSpot.IsValid() || player->MPLastSpawnSpot.GetEntity() != spawnSpots[i].ent) && spawnSpots[i].dist > (128.0f*128.0f) && distantSpawnSpots.Num() < 32) {
+				distantSpawnSpots.Append(&spawnSpots[i]);
+			}
+			//HUMANHEAD END
+		}
+
+		//HUMANHEAD rww - take all spots > 128 units from another player and just pick a completely random one out of those
+		if (distantSpawnSpots.Num() > 0) {
+			spot = *distantSpawnSpots[random.RandomInt(distantSpawnSpots.Num())];
+		}
+		else {
+		//HUMANHEAD END
+			// sort the list
+			qsort( ( void * )spawnSpots.Ptr(), spawnSpots.Num(), sizeof( spawnSpot_t ), ( int (*)(const void *, const void *) )sortSpawnPoints );
+
+	#if 0
+			// choose a random one in the top half
+			which = random.RandomInt( spawnSpots.Num() / 2 );
+	#else //HUMANHEAD rww - always pick the absolute farthest
+			which = 0;
+	#endif //HUMANHEAD END
+			spot = spawnSpots[ which ];
+		}
 	}
-
-	if ( weightedSpawns.Num() == 0 ) {
-		// no spawns avaialable, spawn randomly
-		common->DPrintf("no spawns avaialable, spawn randomly\n");
-		return (*spawnArray)[ random.RandomInt( spawnArray->Num() ) ];
-	}
-
-	qsort( ( void * )weightedSpawns.Ptr(), weightedSpawns.Num(), sizeof( spawnSpot_t ), ( int (*)(const void *, const void *) )sortSpawnPoints );
-
-	int rnd = rvRandom::flrand( 0.0, 1.0 ) * (weightedSpawns.Num() / 2);
-	return weightedSpawns[ rnd ].ent;
+	player->MPLastSpawnSpot = spot.ent; //HUMANHEAD rww
+	return spot.ent;
 }
+
 /*
 ================
 idGameLocal::UpdateServerInfoFlags
 ================
 */
-// RAVEN BEGIN
-// ddynerman: new gametype strings
-void idGameLocal::SetGameType( void ) {
-	idStr gameTypeName = serverInfo.GetString("si_gameType");
+void idGameLocal::UpdateServerInfoFlags() {
 	gameType = GAME_SP;
+	if ( ( idStr::Icmp( serverInfo.GetString( "si_gameType" ), "deathmatch" ) == 0 ) ) {
+		gameType = GAME_DM;
+	} else if ( ( idStr::Icmp( serverInfo.GetString( "si_gameType" ), "notsupported1" ) == 0 ) ) { //HUMANHEAD rww
+		gameType = GAME_TOURNEY;
+	} else if ( ( idStr::Icmp( serverInfo.GetString( "si_gameType" ), "Team DM" ) == 0 ) ) {
+		gameType = GAME_TDM;
+	} else if ( ( idStr::Icmp( serverInfo.GetString( "si_gameType" ), "notsupported2" ) == 0 ) ) {  //HUMANHEAD rww
+		gameType = GAME_LASTMAN;
+	}
+	// HUMANHEAD pdm
+	else if ( ( idStr::Icmp( serverInfo.GetString( "si_gameType" ), "notsupported3" ) == 0 ) ) {  //HUMANHEAD rww (was coop)
+		isCoop = idStr::Icmp( serverInfo.GetString( "si_gameType" ), "notsupported3" ) == 0;
+	}
+	// HUMANHEAD END
 
-	if ( gameTypeName != "singleplayer") {
-		mpGame.SetGameType();
+	if ( gameType == GAME_LASTMAN ) {
+		if ( !serverInfo.GetInt( "si_warmup" ) ) {
+			common->Warning( "Last Man Standing - forcing warmup on" );
+			serverInfo.SetInt( "si_warmup", 1 );
+		}
+		if ( serverInfo.GetInt( "si_fraglimit" ) <= 0 ) {
+			common->Warning( "Last Man Standing - setting fraglimit 1" );
+			serverInfo.SetInt( "si_fraglimit", 1 );
+		}
 	}
 }
-// RAVEN END
 
-/*
-================
-idGameLocal::ResetSpecialEffects
-================
-*/
-void idGameLocal::ResetSpecialEffects() {
-	specialEffectsEnabled = 0;
-	memset( specialEffectParms, 0, sizeof( specialEffectParms ) );
-
-	// Stock Quake 4 blur defaults from rvBlurTexture.
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][0] = 0.694f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][1] = 0.694f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][2] = 0.694f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][3] = 1.0f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][4] = 4.0f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][5] = 0.31f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][6] = 0.5f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][7] = 500.0f;
-}
 
 /*
 ================
@@ -7661,74 +5211,12 @@ const idMaterial *idGameLocal::GetGlobalMaterial() {
 
 /*
 ================
-idGameLocal::SetSpecialEffect
-================
-*/
-void idGameLocal::SetSpecialEffect( ESpecialEffectType which, bool enabled ) {
-	if ( which <= SPECIAL_EFFECT_NONE || which >= SPECIAL_EFFECT_MAX ) {
-		return;
-	}
-
-	if ( enabled ) {
-		specialEffectsEnabled |= which;
-	} else {
-		specialEffectsEnabled &= ~which;
-	}
-}
-
-/*
-================
-idGameLocal::SetSpecialEffectParm
-================
-*/
-void idGameLocal::SetSpecialEffectParm( ESpecialEffectType which, int parm, float value ) {
-	if ( which <= SPECIAL_EFFECT_NONE || which >= SPECIAL_EFFECT_MAX ) {
-		return;
-	}
-	if ( parm < 0 || parm >= MAX_ENTITY_SHADER_PARMS ) {
-		return;
-	}
-
-	specialEffectParms[ which ][ parm ] = value;
-}
-
-/*
-================
-idGameLocal::IsSpecialEffectEnabled
-================
-*/
-bool idGameLocal::IsSpecialEffectEnabled( ESpecialEffectType which ) const {
-	if ( which <= SPECIAL_EFFECT_NONE || which >= SPECIAL_EFFECT_MAX ) {
-		return false;
-	}
-
-	return ( specialEffectsEnabled & which ) != 0;
-}
-
-/*
-================
-idGameLocal::ApplySpecialEffectsToRenderView
-================
-*/
-void idGameLocal::ApplySpecialEffectsToRenderView( renderView_t *view ) const {
-	if ( view == NULL ) {
-		return;
-	}
-
-	if ( IsSpecialEffectEnabled( SPECIAL_EFFECT_BLUR ) ) {
-		for ( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ ) {
-			view->shaderParms[ i ] = specialEffectParms[ SPECIAL_EFFECT_BLUR ][ i ];
-		}
-	}
-}
-
-/*
-================
 idGameLocal::GetSpawnId
 ================
 */
 int idGameLocal::GetSpawnId( const idEntity* ent ) const {
-	return ( gameLocal.spawnIds[ ent->entityNumber ] << GENTITYNUM_BITS ) | ent->entityNumber;
+	//HUMANHEAD rww - take cent bits into account
+	return ( gameLocal.spawnIds[ ent->entityNumber ] << GENTITYNUM_BITS_PLUSCENT ) | ent->entityNumber;
 }
 
 /*
@@ -7742,18 +5230,27 @@ void idGameLocal::ThrottleUserInfo( void ) {
 
 /*
 ===========
-idGameLocal::ValidateServerSettings
+idGameLocal::SelectTimeGroup
 ============
 */
-bool idGameLocal::ValidateServerSettings( const char* map, const char* gametype ) {
-	// PickMap uses si_map directly
-	// PickMap returns wether we would have to change the maps, which means settings are invalid
-	assert( !idStr::Icmp( si_map.GetString(), map ) );
-	if ( mpGame.PickMap( gametype, true ) ) {
-		common->Printf( "map '%s' and gametype '%s' are not compatible\n", map, gametype );
-		return false;
-	}
-	return true;
+void idGameLocal::SelectTimeGroup( int timeGroup ) { }
+
+/*
+===========
+idGameLocal::GetTimeGroupTime
+============
+*/
+int idGameLocal::GetTimeGroupTime( int timeGroup ) {
+	return gameLocal.time;
+}
+
+/*
+===========
+idGameLocal::GetBestGameType
+============
+*/
+idStr idGameLocal::GetBestGameType( const char* map, const char* gametype ) {
+	return gametype;
 }
 
 /*
@@ -7775,1376 +5272,129 @@ bool idGameLocal::NeedRestart() {
 			return true;
 		}
 		// a select set of si_ changes will cause a full restart of the server
-		if ( keyval->GetValue().Icmp( keyval2->GetValue() ) && ( !keyval->GetKey().Icmp( "si_pure" ) || !keyval->GetKey().Icmp( "si_map" ) ) ) {
+		//HUMANHEAD rww - seems appropriate to restart for spectator toggle too
+		if ( keyval->GetValue().Cmp( keyval2->GetValue() ) && ( !keyval->GetKey().Cmp( "si_pure" ) || !keyval->GetKey().Cmp( "si_map" ) || !keyval->GetKey().Cmp( "si_spectators" ) ) ) {
 			return true;
 		}
 	}
 	return false;
 }
 
-// RAVEN BEGIN
-// jshepard: update player hud to alert to end of level
-/*
-===================
-idGameLocal::UpdateEndLevel
-===================
-*/
-void idGameLocal::UpdateEndLevel()	{
-	idPlayer * player = GetLocalPlayer();
-
-	if( player && player->GetHud() ) {
-		player->GetHud()->HandleNamedEvent( "showExit" );
-	}
-}
-
-
-// bdube: added
 /*
 ================
-idGameLocal::GetEffect
-
-Get the handle of the effect with the given name
+idGameLocal::GetClientStats
 ================
 */
-const idDecl *idGameLocal::GetEffect ( const idDict& args, const char* effectName, const rvDeclMatType* materialType ) {
-	const char *effectFile = NULL;
-	const rvDeclEffect *resolvedEffect = NULL;
-
-	float chance = args.GetFloat ( idStr("effectchance ") + effectName, "1" );	
-	if ( random.RandomFloat ( ) > chance ) {
-		return NULL;
-	}
-
-	// we should ALWAYS be playing sounds from the def.
-	// hardcoded sounds MUST be avoided at all times because they won't get precached.
-	assert( !idStr::Icmpn( effectName, "fx_", 3 ) );
-
-	if ( materialType )	{
-		idStr		temp;
-		const char*	result = NULL;
-		
-		temp = effectName;
-		temp += "_";
-		temp += materialType->GetName();
-	
-		// See if the given material effect is specified
-		if ( isMultiplayer ) {
-			idStr	testMP = temp;
-			testMP += "_mp";
-
-			result = args.GetString( testMP );
-		}
-		if ( !result || !*result ) {
-			result = args.GetString( temp );
-		}
-		if ( result && *result ) {
-			resolvedEffect = declManager->FindEffect( result, false );
-			if ( resolvedEffect ) {
-				return ( const idDecl * )resolvedEffect;
-			}
-		}
-	}	
-
-	// grab the non material effect name
-	if ( isMultiplayer ) {
-		idStr	testMP = effectName;
-		testMP += "_mp";
-
-		effectFile = args.GetString( testMP );
-		if ( effectFile && *effectFile ) {
-			resolvedEffect = declManager->FindEffect( effectFile, false );
-			if ( resolvedEffect ) {
-				return ( const idDecl * )resolvedEffect;
-			}
-		}
-	}
-
-	effectFile = args.GetString( effectName );
-
-	if ( !effectFile || !*effectFile ) {
-		return NULL;
-	}
-
-	return ( const idDecl * )declManager->FindEffect( effectFile, false );
+void idGameLocal::GetClientStats( int clientNum, char *data, const int len ) {
+	mpGame.PlayerStats( clientNum, data, len );
 }
+
 
 /*
 ================
-idGameLocal::PlayEffect
-
-Plays an effect at the given origin using the given direction
+idGameLocal::SwitchTeam
 ================
 */
-rvClientEffect* idGameLocal::PlayEffect( 
-	const idDecl			*effect, 
-	const idVec3&			origin, 
-	const idMat3&			axis, 
-	bool					loop, 
-	const idVec3&			endOrigin, 
-	bool					broadcast,
-	bool					predictBit,
-	effectCategory_t		category,
-	const idVec4&			effectTint ) {
+void idGameLocal::SwitchTeam( int clientNum, int team ) {
 
-	if ( !effect ) {
-		return NULL;
+	idPlayer *   player;
+	player = clientNum >= 0 ? static_cast<idPlayer *>( gameLocal.entities[ clientNum ] ) : NULL;
+
+	if ( !player )
+		return;
+
+	int oldTeam = player->team;
+
+	// Put in spectator mode
+	if ( team == -1 ) {
+		static_cast< idPlayer * >( entities[ clientNum ] )->Spectate( true );
 	}
-
-	if ( !gameLocal.isNewFrame ) {
-		return NULL;
+	// Switch to a team
+	else {
+		mpGame.SwitchToTeam ( clientNum, oldTeam, team );
 	}
-
-	if ( isServer && broadcast ) {
-		idBitMsg	msg;
-		byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
-		idCQuat		quat;
-
-		quat = axis.ToCQuat();
-		msg.Init( msgBuf, sizeof( msgBuf ) );
-		msg.BeginWriting();
-		msg.WriteByte( GAME_UNRELIABLE_MESSAGE_EFFECT );
-		idGameLocal::WriteDecl( msg, effect );
-		msg.WriteFloat( origin.x );
-		msg.WriteFloat( origin.y );
-		msg.WriteFloat( origin.z );
-		msg.WriteFloat( quat.x );
-		msg.WriteFloat( quat.y );
-		msg.WriteFloat( quat.z );
-		msg.WriteBits( loop, 1 );
-		msg.WriteFloat( endOrigin.x );
-		msg.WriteFloat( endOrigin.y );
-		msg.WriteFloat( endOrigin.z );
-		msg.WriteByte( category );
-
-		// send to everyone who has start or end in it's PVS
-		SendUnreliableMessagePVS( msg, currentThinkingEntity, pvs.GetPVSArea( origin ), pvs.GetPVSArea( endOrigin ) );
-	}
-
-	if ( isServer && localClientNum < 0 ) {
-		// no effects on dedicated server
-		return NULL;
-	}
-
-	if ( bse->Filtered( effect->GetName(), category ) ) {
-		// Effect filtered out
-		return NULL;
-	}
-// RAVEN END
-
-	if ( gameLocal.isListenServer && currentThinkingEntity && gameLocal.GetLocalPlayer() ) {
-		if ( currentThinkingEntity->GetInstance() != gameLocal.GetLocalPlayer()->GetInstance() ) {
-			return NULL;
-		}
-	}
-	
-	// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_SYS_HEAP_ID(RV_HEAP_ID_MULTIPLE_FRAME);
-	rvClientEffect* clientEffect = new rvClientEffect( effect );
-	RV_POP_HEAP();
-
-	if( !clientEffect ) {
-		common->Warning( "Failed to create effect \'%s\'\n", effect->GetName() );
-		return NULL;
-	}
-
-	if( clientEffect->entityNumber == -1 ) {
-		common->Warning( "Failed to spawn effect \'%s\'\n", effect->GetName() );
-		delete clientEffect;
-		return NULL;
-	}
-
-	clientEffect->SetOrigin( origin );
-	clientEffect->SetAxis( axis );
-	clientEffect->SetGravity( GetCurrentGravity( origin, axis ) );
-	if ( !clientEffect->Play( gameLocal.time, loop, endOrigin ) ) {
-		delete clientEffect;
-		return NULL;
-	}
-
-	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_RED ]		= effectTint[ 0 ];
-	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_GREEN ]	= effectTint[ 1 ];
-	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_BLUE ]		= effectTint[ 2 ];
-	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_ALPHA ]	= effectTint[ 3 ];
-
-	return clientEffect;
 }
 
-void idGameLocal::CheckPlayerWhizzBy( idVec3 start, idVec3 end, idEntity* hitEnt, idEntity *attacker )
-{
-	//FIXME: make this client-side?  Work in MP?
-	if ( gameLocal.isMultiplayer ) {
-		return;
+
+// HUMANHEAD mdl
+void idGameLocal::RegisterUniqueObject( idClass *object ) {
+	HH_ASSERT( uniqueObjects.FindIndex( object ) < 0 );
+	HH_ASSERT( object->GetType() != &idClass::Type );
+	uniqueObjects.Append( object );
+}
+
+void idGameLocal::UnregisterUniqueObject( idClass *object ) {
+	if( !uniqueObjects.Remove( object ) ) {
+		Warning("idGameLocal::UnregisterUniqueObject:  Object not found.");
 	}
-	idPlayer* player = gameLocal.GetLocalPlayer();
-	if ( !player ) {
-		return;
+}
+//HUMANHEAD END
+
+//HUMANHEAD rww - if a gui is actually getting deleted, make sure no player has it in focus.
+void idGameLocal::FocusGUICleanup(idUserInterface *gui) {
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		if (entities[i] && entities[i]->IsType(hhPlayer::Type)) {
+			hhPlayer *pl = static_cast<hhPlayer *>(entities[i]);
+			if (pl->ActiveGui() == gui) {
+				pl->ClearFocus();
+			}
+		}
 	}
-	if ( player->IsHidden() ) {
-		return;
-	}
-	if ( player == attacker ) {
-		return;
-	}
-	if ( player == hitEnt ) {
-		return;
-	}
-	idVec3 center = player->firstPersonViewOrigin;
-	idVec3 diff = end-center;
-	if ( diff.Length() < 64.0f ) {
-		//hit too close - didn't actually pass by, will hear impact sound instead
-		return;
-	}
-	idVec3 closestPoint = player->firstPersonViewOrigin;
-	if ( closestPoint.ProjectToLineSeg( start, end ) ) {
-		//on line seg
-		diff = closestPoint-center;
-		if ( diff.Length() < 48.0f ) {
-			//close enough to hear whizz-by
-			idVec3 dir = end-start;
-			dir.Normalize();
-			idVec3 fxStart = closestPoint+dir*-32.0f;
-			idVec3 fxEnd = closestPoint+dir*32.0f;
-			player->PlayEffect( "fx_whizby", fxStart, player->firstPersonViewAxis, false, fxEnd );
+}
+//HUMANHEAD END
+
+// HUMANHEAD pdm: print game side memory statistics
+void idGameLocal::PrintMemInfo( MemInfo_t *mi ) {
+	animationLib.PrintMemInfo( mi );
+
+	//TODO: Add collision models, AAS
+}
+
+// HUMANHEAD pdm: Register locations for eax
+void idGameLocal::RegisterLocationsWithSoundWorld() {
+	int numAreas = gameRenderWorld->NumAreas();
+	gameSoundWorld->ClearAreaLocations();
+	for (int ix=0; ix<numAreas; ix++) {
+		if (locationEntities[ix]) {
+			gameSoundWorld->RegisterLocation(ix, locationEntities[ix]->GetLocation());
 		}
 	}
 }
 
-/*
-================
-idGameLocal::HitScan
-
-Run a hitscan trace from the given origin and direction
-================
-*/
-idEntity* idGameLocal::HitScan( 
-	const idDict&	hitscanDict, 
-	const idVec3&	origOrigin, 
-	const idVec3&	origDir, 
-	const idVec3&	origFxOrigin, 
-	idEntity*		owner, 
-	bool			noFX,
-	float			damageScale,
-// twhitaker: added additionalIgnore parameter
-	idEntity*		additionalIgnore,
-	int				areas[ 2 ]
-	) {
-
-	idVec3		dir;
-	idVec3		origin;
-	idVec3		fxOrigin;
-	idVec3		fxDir;
-	idVec3		impulse;
-	idVec4		hitscanTint( 1.0f, 1.0f, 1.0f, 1.0f );
-	int			reflect;
-	float		tracerChance;
-	idEntity*	ignore;
-	float		penetrate;
-
-	if ( areas ) {
-		areas[ 0 ] = pvs.GetPVSArea( origFxOrigin );
-		areas[ 1 ] = -1;
-	}
-
-	ignore    = owner;
-	penetrate = hitscanDict.GetFloat( "penetrate" );
-
-	if( hitscanDict.GetBool( "hitscanTint" ) && owner->IsType( idPlayer::GetClassType() ) ) {
-		hitscanTint = ((idPlayer*)owner)->GetHitscanTint();
-	}
-
-	// twhitaker: additionalIgnore parameter
-	if ( !additionalIgnore ) {
-		additionalIgnore = ignore;
-	}	
-
-	origin		 = origOrigin;
-	fxOrigin	 = origFxOrigin;
-	dir			 = origDir;
-	tracerChance = ((g_perfTest_weaponNoFX.GetBool())?0:hitscanDict.GetFloat( "tracerchance", "0" ));
-
-	// Apply player powerups
-	if ( owner && owner->IsType( idPlayer::GetClassType() ) ) {
-		damageScale *= static_cast<idPlayer*>(owner)->PowerUpModifier(PMOD_PROJECTILE_DAMAGE);
-	}
-	
-	// Run reflections
-	for ( reflect = hitscanDict.GetFloat( "reflect", "0" ); reflect >= 0; reflect-- ) {	
-		idVec3		start;
-		idVec3		end;
-		idEntity*	ent;
-		idEntity*	actualHitEnt;
-		trace_t		tr;
-		int			contents;
-		int			collisionArea;
-		idVec3		collisionPoint;
-		bool		tracer;
-		
-		// Calculate the end point of the trace
-		start    = origin;
-		if ( g_perfTest_hitscanShort.GetBool() ) {
-			end		 = start + (dir.ToMat3() * idVec3(idMath::ClampFloat(0,2048,hitscanDict.GetFloat ( "range", "2048" )),0,0));
-		} else {
-			end		 = start + (dir.ToMat3() * idVec3(hitscanDict.GetFloat ( "range", "40000" ),0,0));
+// HUMANHEAD pdm: call sound system to set the spiritwalk effects
+void idGameLocal::SpiritWalkSoundMode(bool active) {
+	if (gameSoundWorld) {
+		if (active) {
+			gameSoundWorld->FadeSoundClasses( SOUNDCLASS_NORMAL, -8.0f, 1.0f );
+			gameSoundWorld->SetSpiritWalkEffect( true );
 		}
-		if ( g_perfTest_hitscanBBox.GetBool() ) {
-			contents = MASK_SHOT_BOUNDINGBOX|CONTENTS_PROJECTILE;
-		} else {
-			contents = MASK_SHOT_RENDERMODEL|CONTENTS_WATER|CONTENTS_PROJECTILE;
+		else {
+			gameSoundWorld->FadeSoundClasses( SOUNDCLASS_NORMAL, 0.0f, 0.5f );
+			gameSoundWorld->SetSpiritWalkEffect( false );
 		}
-		
-		// Loop the traces to handle cases where something can be shot through
-		while ( 1 ) {				
-			// Trace to see if we hit any entities
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			if ( hitscanDict.GetFloat( "trace_size", "0" ) > 0.0f )
-			{
-				float range = hitscanDict.GetFloat ( "range", "1024" );
-				if ( range > 4096.0f )
-				{
-					assert( !(range > 4096.0f) );
-					Warning( "idGameLocal::HitScan: hitscan def (%s) with trace_size must have max range of 4096!", hitscanDict.GetString( "classname" ) );
-					range = idMath::ClampFloat( 0.0f, 4096.0f, range );
-				}
-				end	= start + (dir * range);
-
-				idBounds traceBounds;
-				traceBounds.Zero();
-				traceBounds.ExpandSelf( hitscanDict.GetFloat( "trace_size", "0" ) );
-				// twhitaker: additionalIgnore parameter
-				TraceBounds( owner, tr, start, end, traceBounds, contents, additionalIgnore );
-			}
-			else
-			{
-				// twhitaker: additionalIgnore parameter
-				TracePoint( owner, tr, start, end, contents, additionalIgnore );
-			}
-			if (tr.c.materialType) {
-				tr.c.materialType = tr.c.materialType;
-			}
-
-			//gameRenderWorld->DebugArrow( colorRed, start, end, 10, 5000 );
-// RAVEN END
-			
-			// If the hitscan hit a no impact surface we can just return out
-			//assert( tr.c.material );
-			if ( tr.fraction >= 1.0f || (tr.c.material && tr.c.material->GetSurfaceFlags() & SURF_NOIMPACT) ) {					
-				PlayEffect( hitscanDict, "fx_path", fxOrigin, dir.ToMat3(), false, tr.endpos, false, EC_IGNORE, hitscanTint );	
-				if ( random.RandomFloat( ) < tracerChance ) {
-					PlayEffect( hitscanDict, "fx_tracer", fxOrigin, dir.ToMat3(), false, tr.endpos );
-					tracer = true;
-				} else {
-					tracer = false;
-				}
-
-				if ( areas ) {
-					collisionArea = pvs.GetPVSArea( tr.endpos );
-					if ( collisionArea != areas[0] ) {
-						areas[1] = collisionArea;
-					}
-				}
-
-				return NULL;
-			}
-
-			// computing the collisionArea from the collisionPoint fails sometimes
-			if ( areas ) {
-				collisionArea  = pvs.GetPVSArea( tr.c.point );
-				if ( collisionArea != areas[0] ) {
-					areas[1] = collisionArea;
-				}
-			}
-			collisionPoint = tr.c.point - ( tr.c.normal * tr.c.point - tr.c.dist ) * tr.c.normal;
-			ent			   = entities[ tr.c.entityNum ];
-			actualHitEnt   = NULL;
-			start		   = collisionPoint;
-
-			// Keep tracing if we hit water
-			if ( (ent->GetPhysics()->GetContents() & CONTENTS_WATER) || (tr.c.material && (tr.c.material->GetContentFlags() & CONTENTS_WATER)) ) {
-				// Apply force to the water entity that was hit
-				ent->ApplyImpulse( owner, tr.c.id, tr.c.point, -(hitscanDict.GetFloat( "push", "5000" )) * tr.c.normal );
-				// Continue on excluding water
-				contents &= (~CONTENTS_WATER);
-
-				if ( !g_perfTest_weaponNoFX.GetBool() ) {
-					if ( ent->CanPlayImpactEffect( owner, ent ) ) {
-						if ( ent->IsType( idMover::GetClassType( ) ) ) {
-							ent->PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, EC_IMPACT, hitscanTint );
-						} else {
-							gameLocal.PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
-						}
-					}
-				}
-
-				continue;
-			// Reflect off a bounce target?
-			} else if ( (tr.c.material->GetSurfaceFlags ( ) & SURF_BOUNCE) && !hitscanDict.GetBool ( "noBounce" ) ) {
-				reflect++;
-			}
-
-			// If the hit entity is bound to an actor use the actor instead
-			if ( ent->fl.takedamage && ent->GetTeamMaster( ) && ent->GetTeamMaster( )->IsType ( idActor::GetClassType() ) ) {
-				actualHitEnt = ent;
-				ent = ent->GetTeamMaster( );
-			}
-
-			if ( !gameLocal.isClient ) {
-
-				// Apply force to the entity that was hit
-				ent->ApplyImpulse( owner, tr.c.id, tr.c.point, -tr.c.normal, &hitscanDict );
-
-				// Handle damage to the entity
-				if ( ent->fl.takedamage && !(( tr.c.material != NULL ) && ( tr.c.material->GetSurfaceFlags() & SURF_NODAMAGE )) ) {		
-					const char*	damage;
-				
-					damage    = NULL;
-
-					// RAVEN BEGIN
-					// jdischler: code from the other project..to ensure that if an attached head is hit, the body will use the head joint
-					//	otherwise damage zones for head attachments no-worky
-					int hitJoint = CLIPMODEL_ID_TO_JOINT_HANDLE(tr.c.id);
-					if ( ent->IsType(idActor::GetClassType()) )
-						{
-							idActor* entActor = static_cast<idActor*>(ent);
-							if ( entActor && entActor->GetHead() && entActor->GetHead()->IsType(idAFAttachment::GetClassType()) )
-								{
-									idAFAttachment* headEnt = static_cast<idAFAttachment*>(entActor->GetHead());
-									if ( headEnt && headEnt->entityNumber == tr.c.entityNum )
-										{//hit ent's head, get the proper joint for the head
-											hitJoint = entActor->GetAnimator()->GetJointHandle("head");
-										}
-								}
-						}	
-					// RAVEN END
-					// Inflict damage
-					if ( tr.c.materialType ) {
-						damage = hitscanDict.GetString( va("def_damage_%s", tr.c.materialType->GetName()) );
-					}
-					if ( !damage || !*damage ) {
-						damage = hitscanDict.GetString ( "def_damage" );
-					}
-
-					if ( damage && damage[0] ) {
-						// RAVEN BEGIN
-						// ddynerman: stats
-						if( owner->IsType( idPlayer::GetClassType() ) && ent->IsType( idActor::GetClassType() ) && ent != owner && !((idPlayer*)owner)->pfl.dead ) {
-							statManager->WeaponHit( (idActor*)owner, ent, ((idPlayer*)owner)->GetCurrentWeapon() );
-						}
-						// RAVEN END
-						ent->Damage( owner, owner, dir, damage, damageScale, hitJoint );
-					}
-
-					// Let the entity add its own damage effect
-					if ( !g_perfTest_weaponNoFX.GetBool() ) {
-						ent->AddDamageEffect ( tr, dir, damage, owner );
-					}
-				} else { 
-					if ( actualHitEnt
-						 && actualHitEnt != ent
-						 && (tr.c.material->GetSurfaceFlags ( ) & SURF_BOUNCE)
-						 && actualHitEnt->spawnArgs.GetBool( "takeBounceDamage" ) )
-						{//bleh...
-							const char*	damage = NULL;
-							// Inflict damage
-							if ( tr.c.materialType ) {
-								damage = hitscanDict.GetString( va("def_damage_%s", tr.c.materialType->GetName()) );
-							}
-							if ( !damage || !*damage ) {
-								damage = hitscanDict.GetString ( "def_damage" );
-							}
-							if ( damage && damage[0] ) {
-								actualHitEnt->Damage( owner, owner, dir, damage, damageScale, CLIPMODEL_ID_TO_JOINT_HANDLE( tr.c.id ) );
-							}
-						}
-					if ( !g_perfTest_weaponNoFX.GetBool() ) {
-						ent->AddDamageEffect( tr, dir, hitscanDict.GetString ( "def_damage" ), owner );
-					}
-				}
-			}
-
-
-			// Pass through actors
-			if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f ) {			
-				start = collisionPoint;
-				additionalIgnore = ent;
-				damageScale *= penetrate;
-				continue;
-			}
-			break;
-		}
-			
-		// Path effect 
-		fxDir = collisionPoint - fxOrigin;
-		fxDir.Normalize( );
-		PlayEffect( hitscanDict, "fx_path", fxOrigin, fxDir.ToMat3(), false, collisionPoint, false, EC_IGNORE, hitscanTint );	
-		if ( !ent->fl.takedamage && random.RandomFloat ( ) < tracerChance ) {
-			PlayEffect( hitscanDict, "fx_tracer", fxOrigin, fxDir.ToMat3(), false, collisionPoint );
-			tracer = true;
-		} else {
-			tracer = false;
-		}
-
-		if ( !reflect ) {
-			//on initial trace only
-			if ( hitscanDict.GetBool( "doWhizz" ) ) {
-				//play whizz-by sound if trace is close to player's head
-				CheckPlayerWhizzBy( origin, collisionPoint, ent, owner );
-			}
-		}
-
-		// Play a different effect when reflecting
-		if ( !reflect || ent->fl.takedamage ) {
-			idMat3 axis;
-			
-			// Effect axis when hitting actors is along the direction of impact because actor models are 
-			// very detailed.
-			if ( ent->IsType ( idActor::GetClassType() ) ) {
-				axis = ((-dir + tr.c.normal) * 0.5f).ToMat3();
-			} else {
-				axis = tr.c.normal.ToMat3();
-			}
-			
-			if ( !g_perfTest_weaponNoFX.GetBool() ) {
-				if ( ent->CanPlayImpactEffect( owner, ent ) ) {
-					if ( ent->IsType( idMover::GetClassType( ) ) ) {
-						ent->PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, axis, false, vec3_origin, false, EC_IMPACT, hitscanTint );					
-					} else {
-						gameLocal.PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, axis, false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
-					}
-				}
-			}
-			
-			// End of reflection
-			return ent;
-		} else {
-			PlayEffect( GetEffect( hitscanDict, "fx_reflect", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3() );
-		}
-		
-		// Calc new diretion based on bounce
-		origin = start;
-		fxOrigin = start;
-		dir = ( dir - ( 2.0f * DotProduct( dir, tr.c.normal ) * tr.c.normal ) );
-		dir.Normalize( );
-
-		// Increase damage scale on reflect		
-		damageScale += hitscanDict.GetFloat( "reflect_powerup", "0" );
-	}	
-	
-	assert( false );
-	
-	return NULL;
-}
-
-/*
-===================
-idGameLocal::RegisterClientEntity
-===================
-*/
-void idGameLocal::RegisterClientEntity( rvClientEntity *cent ) {
-	int entityNumber;
-
-	assert ( cent );
-
-	if ( clientSpawnCount >= ( 1 << ( 32 - CENTITYNUM_BITS ) ) ) {
-//		Error( "idGameLocal::RegisterClientEntity: spawn count overflow" );
-		clientSpawnCount = INITIAL_SPAWN_COUNT;
-	}
-
-	// Find a free entity index to use
-	while( clientEntities[firstFreeClientIndex] && firstFreeClientIndex < MAX_CENTITIES ) {
-		firstFreeClientIndex++;
-	}
-
-	if ( firstFreeClientIndex >= MAX_CENTITIES ) {
-		cent->PostEventMS ( &EV_Remove, 0 );
-		Warning( "idGameLocal::RegisterClientEntity: no free client entities" );
-		return;
-	}
-
-	entityNumber = firstFreeClientIndex++;
-
-	// Add the client entity to the lists
-	clientEntities[ entityNumber ] = cent;
-	clientSpawnIds[ entityNumber ] = clientSpawnCount++;
-	cent->entityNumber = entityNumber;
-	cent->spawnNode.AddToEnd( clientSpawnedEntities );
-	cent->spawnArgs.TransferKeyValues( spawnArgs );
-
-	if ( entityNumber >= num_clientEntities ) {
-		num_clientEntities++;
 	}
 }
 
-/*
-===================
-idGameLocal::UnregisterClientEntity
-===================
-*/
-void idGameLocal::UnregisterClientEntity( rvClientEntity* cent ) {
-	assert( cent );
-	
-	// No entity number then it failed to register
-	if ( cent->entityNumber == -1 ) {
-		return;
-	}
-	
-	cent->spawnNode.Remove ( );
-	cent->bindNode.Remove ( );
-
-	if ( clientEntities [ cent->entityNumber ] == cent ) {
-		clientEntities [ cent->entityNumber ] = NULL;
-		clientSpawnIds[ cent->entityNumber ] = -1;
-		if ( cent->entityNumber < firstFreeClientIndex ) {
-			firstFreeClientIndex = cent->entityNumber;
-		}
-		cent->entityNumber = -1;
+void idGameLocal::DialogSoundMode(bool active) {
+	if (gameSoundWorld) {
+		gameSoundWorld->SetVoiceDucker(active);
 	}
 }
 
-// RAVEN BEGIN
-// ddynerman: idClip wrapper functions
-
-/*
-===================
-idGameLocal::Translation
-===================
-*/
-bool idGameLocal::Translation( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, const idEntity *passEntity2 ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->Translation( results, start, end, mdl, trmAxis, contentMask, passEntity, passEntity2 );
-	} 
-	
+bool idGameLocal::PlayerIsDeathwalking(void) {
 	return false;
 }
 
-/*
-===================
-idGameLocal::Rotation
-===================
-*/
-bool idGameLocal::Rotation( const idEntity* ent, trace_t &results, const idVec3 &start, const idRotation &rotation, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->Rotation( results, start, rotation, mdl, trmAxis, contentMask, passEntity );
-	}
-
-	return false;
-}
-
-/*
-===================
-idGameLocal::Motion
-===================
-*/
-bool idGameLocal::Motion( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idRotation &rotation, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->Motion( results, start, end, rotation, mdl, trmAxis, contentMask, passEntity );
-	}
-
-	return false;
-}
-
-
-/*
-===================
-idGameLocal::Contacts
-===================
-*/
-int idGameLocal::Contacts( const idEntity* ent, contactInfo_t *contacts, const int maxContacts, const idVec3 &start, const idVec6 &dir, const float depth, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->Contacts( contacts, maxContacts, start, dir, depth, mdl, trmAxis, contentMask, passEntity );
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::Contents
-===================
-*/
-int idGameLocal::Contents( const idEntity* ent, const idVec3 &start, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, idEntity **touchedEntity ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->Contents( start, mdl, trmAxis, contentMask, passEntity, touchedEntity );
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::TracePoint
-===================
-*/
-bool idGameLocal::TracePoint( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, int contentMask, const idEntity *passEntity ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->TracePoint( results, start, end, contentMask, passEntity );
-	}
-
-	return false;
-}
-
-/*
-===================
-idGameLocal::TraceBounds
-===================
-*/
-bool idGameLocal::TraceBounds( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idBounds &bounds, int contentMask, const idEntity *passEntity ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->TraceBounds( results, start, end, bounds, contentMask, passEntity );
-	}
-
-	return false;
-}
-
-/*
-===================
-idGameLocal::TranslationModel
-===================
-*/
-void idGameLocal::TranslationModel( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		clipWorld->TranslationModel( results, start, end, mdl, trmAxis, contentMask, model, modelOrigin, modelAxis );
-	}
-}
-
-/*
-===================
-idGameLocal::RotationModel
-===================
-*/
-void idGameLocal::RotationModel( const idEntity* ent, trace_t &results, const idVec3 &start, const idRotation &rotation, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		clipWorld->RotationModel( results, start, rotation, mdl, trmAxis, contentMask, model, modelOrigin, modelAxis );
-	}
-}
-
-/*
-===================
-idGameLocal::ContactsModel
-===================
-*/
-int idGameLocal::ContactsModel( const idEntity* ent, contactInfo_t *contacts, const int maxContacts, const idVec3 &start, const idVec6 &dir, const float depth, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->ContactsModel( contacts, maxContacts, start, dir, depth, mdl, trmAxis, contentMask, model, modelOrigin, modelAxis );
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::ContentsModel
-===================
-*/
-int idGameLocal::ContentsModel( const idEntity* ent, const idVec3 &start, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->ContentsModel( start, mdl, trmAxis, contentMask, model, modelOrigin, modelAxis );
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::TranslationEntities
-===================
-*/	
-void idGameLocal::TranslationEntities( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, const idEntity *passEntity2 ) {
-	idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		clipWorld->TranslationEntities( results, start, end, mdl, trmAxis, contentMask, passEntity, passEntity2 );
-	}
-}
-
-/*
-===================
-idGameLocal::GetModelContactFeature
-===================
-*/
-bool idGameLocal::GetModelContactFeature( const idEntity* ent, const contactInfo_t &contact, const idClipModel *clipModel, idFixedWinding &winding ) const {
-	const idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->GetModelContactFeature( contact, clipModel, winding );
-	}
-
-	return false;
-}
-
-/*
-===================
-idGameLocal::EntitiesTouchingBounds
-===================
-*/
-int idGameLocal::EntitiesTouchingBounds	( const idEntity* ent, const idBounds &bounds, int contentMask, idEntity **entityList, int maxCount ) const {
-	const idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->EntitiesTouchingBounds( bounds, contentMask, entityList, maxCount );
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::ClipModelsTouchingBounds
-===================
-*/
-int idGameLocal::ClipModelsTouchingBounds( const idEntity* ent, const idBounds &bounds, int contentMask, idClipModel **clipModelList, int maxCount ) const {
-	const idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		int count = clipWorld->ClipModelsTouchingBounds( bounds, contentMask, clipModelList, maxCount );
-
-		// OpenQ4 has multi-instance clip worlds; retail behavior is effectively world 0 only.
-		// If we're querying triggers and found nothing in a non-zero clip world, fall back to
-		// world 0 so instance routing doesn't starve door/trigger touches.
-		if ( count == 0 && ent && ent->GetClipWorld() != 0 && ( contentMask & CONTENTS_TRIGGER ) != 0 &&
-			 clip.Num() > 0 && clip[0] != NULL && clipWorld != clip[0] ) {
-			idClipModel *fallbackList[ MAX_GENTITIES ];
-			const int fallbackCount = clip[0]->ClipModelsTouchingBounds( bounds, contentMask, fallbackList, MAX_GENTITIES );
-
-			for ( int i = 0; i < fallbackCount && count < maxCount; i++ ) {
-				idClipModel *cm = fallbackList[i];
-				bool duplicate = false;
-
-				for ( int j = 0; j < count; j++ ) {
-					if ( clipModelList[j] == cm ) {
-						duplicate = true;
-						break;
-					}
-				}
-
-				if ( !duplicate ) {
-					clipModelList[count++] = cm;
-				}
-			}
-		}
-
-		return count;
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::PlayersTouchingBounds
-===================
-*/
-int idGameLocal::PlayersTouchingBounds	( const idEntity* ent, const idBounds &bounds, int contentMask, idPlayer **entityList, int maxCount ) const {
-	const idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if( clipWorld ) {
-		return clipWorld->PlayersTouchingBounds( bounds, contentMask, entityList, maxCount );
-	}
-
-	return 0;
-}
-
-/*
-===================
-idGameLocal::GetWorldBounds
-===================
-*/
-const idBounds& idGameLocal::GetWorldBounds( const idEntity* ent ) const {
-	const idClip* clipWorld = GetEntityClipWorld( ent );
-	
-	if ( clipWorld ) {
-		return clipWorld->GetWorldBounds();
-	}
-
-	return clip[ 0 ]->GetWorldBounds();
-}
-
-/*
-===================
-idGameLocal::GetEntityClipWorld
-===================
-*/
-idClip* idGameLocal::GetEntityClipWorld( const idEntity* ent ) {
-	if( ent == NULL ) {
-		return clip[ 0 ];
-	}
-
-	if( ent->GetClipWorld() < 0 || ent->GetClipWorld() >= clip.Num() ) {
-		Warning( "idGameLocal::GetEntityClipWorld() - invalid clip world %d on entity %s (valid range: 0 - %d)\n", ent->GetClipWorld(), ent->GetClassname(), clip.Num() - 1 );
-		return NULL;
-	}
-	return clip[ ent->GetClipWorld() ];
-}
-
-/*
-===================
-idGameLocal::GetEntityClipWorld
-===================
-*/
-const idClip* idGameLocal::GetEntityClipWorld( const idEntity* ent ) const {
-	if( ent == NULL ) {
-		return clip[ 0 ];
-	}
-
-	if( ent->GetClipWorld() < 0 || ent->GetClipWorld() >= clip.Num() ) {
-		Warning( "idGameLocal::GetEntityClipWorld() - invalid clip world %d on entity %s (valid range: 0 - %d)\n", ent->GetClipWorld(), ent->GetClassname(), clip.Num() - 1  );
-		return NULL;
-	}
-	return clip[ ent->GetClipWorld() ];
-}
-
-/*
-===================
-idGameLocal::AddClipWorld
-===================
-*/
-int idGameLocal::AddClipWorld( int id ) {
-	if( id >= clip.Num() ) {
-		// if we want an index higher in the list, fill the intermediate indices with empties
-		for( int i = clip.Num(); i <= id; i++ ) {
-			clip.Append( NULL );
-		}
-	}
-
-	if( clip[ id ] == NULL ) {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_PUSH_SYS_HEAP_ID(RV_HEAP_ID_LEVEL);
-// RAVEN END
-		clip[ id ] = new idClip();
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_POP_HEAP();
-// RAVEN END
-		clip[ id ]->Init();
-	}
-	return id;
-}
-
-/*
-===================
-idGameLocal::RemoveClipWorld
-===================
-*/
-void idGameLocal::RemoveClipWorld( int id ) {
-	assert( id >= 0 && id < clip.Num() );
-
-	clip[ id ]->Shutdown();
-	delete clip[ id ];
-	clip[ id ] = NULL;
-}
-
-/*
-===================
-idGameLocal::ShutdownInstances
-===================
-*/
-void idGameLocal::ShutdownInstances( void ) {
-	if( gamestate == GAMESTATE_UNINITIALIZED ) {
-		return;
-	}
-
-	instances.DeleteContents( true );
-
-	// free the trace model used for the defaultClipModel
-	idClip::FreeDefaultClipModel();
-}
-
-/*
-===================
-idGameLocal::AddInstance
-===================
-*/
-int idGameLocal::AddInstance( int id, bool deferPopulate ) {
-	if ( id == -1 ) {
-		id = instances.Num();
-	}
-
-	if ( id >= instances.Num() ) {
-		// if we want an index higher in the list, fill the intermediate indices with empties
-		for( int i = instances.Num(); i <= id; i++ ) {
-			instances.Append( NULL );
-		}
-	}
-
-	if ( instances[ id ] == NULL ) {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_PUSH_SYS_HEAP_ID(RV_HEAP_ID_LEVEL);
-		instances[ id ] = new rvInstance( id, deferPopulate );
-		RV_POP_HEAP();
-// RAVEN END
-
-		if ( !deferPopulate ) {
-			// keep track of the high watermark
-			ServerSetEntityIndexWatermark( id );
-		}
-
-		common->DPrintf( "idGameLocal::AddInstance(): Adding instance %d\n", instances[ id ]->GetInstanceID() );
+unsigned int idGameLocal::GetTimePlayed(void) {
+	if (playTimeStart == (unsigned int) -1) {
+		return playTime;
 	} else {
-		common->DPrintf( "idGameLocal::AddInstance(): Instance %d already exists\n", instances[ id ]->GetInstanceID() );
-	}
-	
-	// keep the min spawn index correctly set
-	ServerSetMinSpawnIndex();
-	
-	return instances[ id ]->GetInstanceID();
-}
-
-/*
-===================
-idGameLocal::RemoveInstance
-===================
-*/
-void idGameLocal::RemoveInstance( int id ) {
-	delete instances[ id ];
-	instances[ id ] = NULL;
-}
-
-/*
-===================
-idGameLocal::GetPlayerName
-Returns the specified player name, max of 64 chars
-===================
-*/
-void idGameLocal::GetPlayerName( int clientNum, char* name ) {
-	if( !gameLocal.entities[ clientNum ] ) {
-		return;
-	}
-
-	strncpy( name, gameLocal.GetUserInfo( clientNum )->GetString( "ui_name" ), 64 );
-	name[ 63 ] = 0;
-}
-
-/*
-===================
-idGameLocal::GetPlayerClan
-Returns the specified player clan, max of 64 chars
-===================
-*/
-void idGameLocal::GetPlayerClan( int clientNum, char* clan ) {
-	if( !gameLocal.entities[ clientNum ] ) {
-		return;
-	}
-
-	strncpy( clan, gameLocal.GetUserInfo( clientNum )->GetString( "ui_clan" ), 64 );
-	clan[ 63 ] = 0;
-}
-
-/*
-===================
-idGameLocal::SetFriend
-===================
-*/
-void idGameLocal::SetFriend( int clientNum, bool isFriend ) {
-	if( !gameLocal.GetLocalPlayer() ) {
-		Warning( "idGameLocal::SetFriend() - SetFriend() called with NULL local player\n" );
-		return;
-	}
-
-	gameLocal.GetLocalPlayer()->SetFriend( clientNum, isFriend );
-}
-
-/*
-===================
-idGameLocal::GetLongGametypeName
-===================
-*/
-const char*	idGameLocal::GetLongGametypeName( const char* gametype ) {
-	return mpGame.GetLongGametypeName( gametype );
-}
-
-void idGameLocal::Cmd_PrintMapEntityNumbers_f( const idCmdArgs& args ) {
-	int instance = 0;
-
-	if ( args.Argc() > 1 ) {
-		instance = atoi( args.Argv( 1 ) );
-	} 
-
-	if( gameLocal.instances[ instance ] ) {
-		gameLocal.instances[ instance ]->PrintMapNumbers();
+		return playTime + (gameLocal.time - playTimeStart);
 	}
 }
 
-void idGameLocal::Cmd_PrintSpawnIds_f( const idCmdArgs& args ) {
-	for( int i = 0; i < MAX_GENTITIES; i++ ) {
-		if( gameLocal.entities[ i ] ) {
-			gameLocal.Printf( "Spawn id %d: %d\n", i, gameLocal.spawnIds[ i ] );
-		}
-	}
+void idGameLocal::ClearTimePlayed( void ) {
+	playTime = 0;
+	playTimeStart = -1;
 }
-
-/*
-===============
-idGameLocal::GetDemoHud
-===============
-*/
-idUserInterface	*idGameLocal::GetDemoHud( void ) {
-	if ( !demo_hud ) {
-		demo_hud = uiManager->FindGui( "guis/hud.gui", true, false, true );
-		assert( demo_hud );
-	}
-	return demo_hud;
-}
-
-/*
-===============
-idGameLocal::GetDemoMphud
-===============
-*/
-idUserInterface	*idGameLocal::GetDemoMphud( void ) {
-	if ( !demo_mphud ) {
-		demo_mphud = uiManager->FindGui( "guis/mphud.gui", true, false, true );
-		assert( demo_mphud );
-	}
-	return demo_mphud;
-}
-
-/*
-===============
-idGameLocal::GetDemoCursor
-===============
-*/
-idUserInterface *idGameLocal::GetDemoCursor( void ) {
-	if ( !demo_cursor ) {
-		demo_cursor = uiManager->FindGui( "guis/cursor.gui", true, false, true );	   
-		assert( demo_cursor );
-	}
-	return demo_cursor;
-}
-
-/*
-===============
-idGameLocal::IsTeamPowerups
-===============
-*/
-bool idGameLocal::IsTeamPowerups( void ) {
-	if ( !serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
-		return false;
-	}
-	if ( !IsTeamGameType() ) {
-		return false;
-	}
-	return ( gameType != GAME_ARENA_CTF );
-}
-
-/*
-===============
-idGameLocal::GetRandomBotName
-===============
-*/
-void idGameLocal::GetRandomBotName(int clientNum, idStr& name) {
-	name = "Quake4Bot";
-}
-
-/*
-===============
-idGameLocal::Trace
-===============
-*/
-void idGameLocal::Trace(trace_t& results, const idVec3& start, const idVec3& end, int contentMask, int passEntity)
-{
-	idMat3 axis;
-	axis.Identity();
-
-	if (passEntity == -1)
-	{
-		clip[0]->Translation(results, start, end, NULL, axis, CONTENTS_SOLID, NULL);
-	}
-	else
-	{
-		clip[0]->Translation(results, start, end, NULL, axis, CONTENTS_SOLID, entities[passEntity]);
-	}
-}
-
-
-/*
-================
-idGameLocal::TravelTimeToGoal
-================
-*/
-int idGameLocal::TravelTimeToGoal( const idVec3& origin, const idVec3& goal )
-{
-	idAAS* aas = GetBotAAS();
-
-	if( aas == NULL )
-	{
-		gameLocal.Error( "idGameLocal::TraveTimeToGoal: No AAS loaded...\n" );
-		return NULL;
-	}
-	//int originArea = aas->PointAreaNum(origin);
-	//idVec3 _goal = goal;
-	//int goalArea = aas->AdjustPositionAndGetArea(_goal);
-	//return aas->TravelTimeToGoalArea(originArea, origin, goalArea, TFL_WALK);
-
-	idVec3 org = origin;
-	int curAreaNum = aas->AdjustPositionAndGetArea( org );
-	int goalArea = aas->PointAreaNum( goal );
-	int travelTime;
-	idReachability* reach;
-	if( !aas->RouteToGoalArea( curAreaNum, org, goalArea, TFL_WALK | TFL_AIR, travelTime, &reach ) )
-	{
-		return NULL;
-	}
-
-	//int goalArea = aas->PointAreaNum(goal);
-	//aas->ShowWalkPath(origin, goalArea, goal);
-
-	return travelTime;
-}
-
-/*
-===============
-idGameLocal::GetBotItemEntry
-===============
-*/
-int idGameLocal::GetBotItemEntry( const char* name )
-{
-	if ( !name || !name[0] ) {
-		return 9;
-	}
-	if ( !botItemTable ) {
-		gameLocal.Warning( "GetBotItemEntry: bot_itemtable missing, returning default for %s\n", name );
-		return 9;
-	}
-
-	const idKeyValue* keyvalue = botItemTable->dict.FindKey( name );
-	if( !keyvalue )
-	{
-		gameLocal.Warning( "GetBotItemModelIndex: Doesn't have key %s\n", name );
-		return 9;
-	}
-
-	return botItemTable->dict.GetInt( name );
-}
-
-/*
-======================
-idGameLocal::AddBot
-======================
-*/
-void idGameLocal::AddBot(const char *botName) {
-	int clientNum;
-
-	if (aasList.Num() == 0) {
-		common->Warning("idGameLocal::AddBot: No AAS file loaded for map\n");
-		return;
-	}
-
-	clientNum = networkSystem->AllocateClientSlotForBot(botName,  8);
-	if (clientNum == -1) {
-		return;
-	}
-
-	//	idPlayer* newPlayer = gameLocal.GetClient(clientNum);
-}
-
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-/*
-===================
-idGameLocal::FlushBeforelevelLoad
-===================
-*/
-void idGameLocal::FlushBeforelevelLoad( void )
-{
-	TIME_THIS_SCOPE( __FUNCLINE__);
-
-#ifndef _XENON
-	MapShutdown();
-#else
-	mpGame.Clear();
-#endif
-	for(int i = 0; i < aasNames.Num(); i++)
-	{
-		aasList[i]->Shutdown();
-	}
-}
-#endif
-// RAVEN END
-
-// dluetscher: moved the overloaded new/delete to sys_local.cpp and Game_local.cpp (from Heap.h)
-//			   so that the tools.dll will link.
-#if !defined(_XBOX) && (defined(ID_REDIRECT_NEWDELETE) || defined(_RV_MEM_SYS_SUPPORT))
-
-#undef new
-#undef delete
-#undef Mem_Alloc
-#undef Mem_Free
-
-#ifdef ID_DEBUG_MEMORY
-void *operator new( size_t s, int t1, int t2, char *fileName, int lineNumber ) {
-	return Mem_Alloc( s, fileName, lineNumber, MemScopedTag_GetTopTag() );
-}
-
-void operator delete( void *p, int t1, int t2, char *fileName, int lineNumber ) {
-	Mem_Free( p, fileName, lineNumber );
-}
-
-void *operator new[]( size_t s, int t1, int t2, char *fileName, int lineNumber ) {
-	return Mem_Alloc( s, fileName, lineNumber, MemScopedTag_GetTopTag() );
-}
-
-void operator delete[]( void *p, int t1, int t2, char *fileName, int lineNumber ) {
-	Mem_Free( p, fileName, lineNumber );
-}
-
-void *operator new( size_t s ) {
-	return Mem_Alloc( s, "", 0, MemScopedTag_GetTopTag() );
-}
-
-void operator delete( void *p ) {
-	Mem_Free( p, "", 0 );
-}
-
-void *operator new[]( size_t s ) {
-	return Mem_Alloc( s, "", 0, MemScopedTag_GetTopTag() );
-}
-
-void operator delete[]( void *p ) {
-	Mem_Free( p, "", 0 );
-}
-
-#else	// #ifdef ID_DEBUG_MEMORY
-
-void *operator new( size_t s ) {
-	return Mem_Alloc( s, MemScopedTag_GetTopTag() );
-}
-
-void operator delete( void *p ) {
-	Mem_Free( p );
-}
-
-void *operator new[]( size_t s ) {
-	return Mem_Alloc( s, MemScopedTag_GetTopTag() );
-}
-
-void operator delete[]( void *p ) {
-	Mem_Free( p );
-}
-#endif	// #else #ifdef ID_DEBUG_MEMORY
-#endif	// #if defined(ID_REDIRECT_NEWDELETE) || defined(_RV_MEM_SYS_SUPPORT)
-// RAVEN END
+// HUMANHEAD END

@@ -1,12 +1,10 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
-// RAVEN BEGIN
-// nmckenzie:
-#include "AI.h"
-// RAVEN END
 
 /*
 ===============================================================================
@@ -38,7 +36,6 @@ typedef struct obstacle_s {
 	idVec2				bounds[2];
 	idWinding2D			winding;
 	idEntity *			entity;
-	bool				fakePlayerForwardObstacle;
 } obstacle_t;
 
 typedef struct pathNode_s {
@@ -65,10 +62,8 @@ void pathNode_s::Init() {
 	parent = children[0] = children[1] = next = NULL;
 }
 
-// RAVEN BEGIN
-// jnewquist: Mark memory tags for idBlockAlloc
-idBlockAlloc<pathNode_t, 128, MA_AI>	pathNodeAllocator;
-// RAVEN END
+idBlockAlloc<pathNode_t, 128>	pathNodeAllocator;
+
 
 /*
 ============
@@ -102,14 +97,10 @@ bool LineIntersectsPath( const idVec2 &start, const idVec2 &end, const pathNode_
 PointInsideObstacle
 ============
 */
-int PointInsideObstacle( const obstacle_t *obstacles, const int numObstacles, const idVec2 &point, bool skipFakePlayerForwardObstacles = false ) {
+int PointInsideObstacle( const obstacle_t *obstacles, const int numObstacles, const idVec2 &point ) {
 	int i;
 
 	for ( i = 0; i < numObstacles; i++ ) {
-		if ( skipFakePlayerForwardObstacles && obstacles[i].fakePlayerForwardObstacle ) {
-			//don't care if we're inside of these
-			continue;
-		}
 
 		const idVec2 *bounds = obstacles[i].bounds;
 		if ( point.x < bounds[0].x || point.y < bounds[0].y || point.x > bounds[1].x || point.y > bounds[1].y ) {
@@ -119,7 +110,7 @@ int PointInsideObstacle( const obstacle_t *obstacles, const int numObstacles, co
 		if ( !obstacles[i].winding.PointInside( point, 0.1f ) ) {
 			continue;
 		}
-		
+
 		return i;
 	}
 
@@ -290,8 +281,8 @@ bool GetFirstBlockingObstacle( const obstacle_t *obstacles, int numObstacles, in
 GetObstacles
 ============
 */
-int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *aas, const idEntity *ignore, int areaNum, const idVec3 &startPos, const idVec3 &seekPos, obstacle_t *obstacles, int maxObstacles, idBounds &clipBounds ) {
-	int i, j, numListedClipModels, numObstacles, numVerts, clipMask, blockingObstacle, blockingEdgeNum, numIterations, extrude;
+int GetObstacles( const idPhysics *physics, const idAAS *aas, const idEntity *ignore, int areaNum, const idVec3 &startPos, const idVec3 &seekPos, obstacle_t *obstacles, int maxObstacles, idBounds &clipBounds ) {
+	int i, j, numListedClipModels, numObstacles, numVerts, clipMask, blockingObstacle, blockingEdgeNum;
 	int wallEdges[MAX_AAS_WALL_EDGES], numWallEdges, verts[2], lastVerts[2], nextVerts[2];
 	float stepHeight, headHeight, blockingScale, min, max;
 	idVec3 seekDelta, silVerts[32], start, end, nextStart, nextEnd;
@@ -302,33 +293,6 @@ int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *a
 	idEntity *obEnt;
 	idClipModel *clipModel;
 	idClipModel *clipModelList[ MAX_GENTITIES ];
-	idVec3	extrudeVec;
-	idPlayer* player = gameLocal.GetLocalPlayer();
-	bool extrudePlayer = false;
-
-	if ( player && owner->team == player->team ) {
-		if ( player->HasEnemies() 
-			|| (player->weapon && player->weapon->lastAttack > gameLocal.GetTime() - 2000)
-			|| (owner->IsType( idAI::GetClassType() ) && ((idAI*)owner)->GetEnemy()) ) {
-
-			extrudeVec = player->firstPersonViewAxis[0];
-			extrudeVec[2] = 0;
-			extrudeVec.Normalize();
-			idVec3 myMoveDir = (seekPos-startPos);
-			/*
-			myMoveDir.z = 0;
-			if ( myMoveDir * extrudeVec > 200.0f )
-			{//I'm already moving out away from him in the direction he's moving... (he's following me?)
-			}
-			else
-			{//we are heading into his line of sight, stop
-			*/
-				extrudePlayer = true;
-				extrudeVec *= (player->GetPhysics()->GetBounds()[1][0]-player->GetPhysics()->GetBounds()[0][0]);
-			//}
-			//FIXME: keep moving if already inside this cone?  Otherwise, we'll stop in our tracks?
-		}
-	}
 
 	numObstacles = 0;
 
@@ -346,10 +310,7 @@ int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *a
 	clipMask = physics->GetClipMask();
 
 	// find all obstacles touching the clip bounds
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	numListedClipModels = gameLocal.ClipModelsTouchingBounds( owner, clipBounds, clipMask, clipModelList, MAX_GENTITIES );
-// RAVEN END
+	numListedClipModels = gameLocal.clip.ClipModelsTouchingBounds( clipBounds, clipMask, clipModelList, MAX_GENTITIES );
 
 	for ( i = 0; i < numListedClipModels && numObstacles < MAX_OBSTACLES; i++ ) {
 		clipModel = clipModelList[i];
@@ -359,35 +320,28 @@ int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *a
 			continue;
 		}
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( obEnt->IsType( idActor::GetClassType() ) ) {
-// RAVEN END
+		if ( obEnt->IsType( idActor::Type ) ) {
 			obPhys = obEnt->GetPhysics();
 			// ignore myself, my enemy, and dead bodies
 			if ( ( obPhys == physics ) || ( obEnt == ignore ) || ( obEnt->health <= 0 ) ) {
 				continue;
 			}
 			// if the actor is moving
-		// cdr: Alternate Routes Bug
-		//	idVec3 v1 = obPhys->GetLinearVelocity();
-		//	if ( v1.LengthSqr() > Square( 10.0f ) ) {
-		//		idVec3 v2 = physics->GetLinearVelocity();
-		//		if ( v2.LengthSqr() > Square( 10.0f ) ) {
-		//			// if moving in about the same direction
-		//			if ( v1 * v2 > 0.0f ) {
-		//				continue;
-		//			}
-		//		}
-		//	}
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-// cdr: Ignore Pushable objects
-		} else if (obEnt->GetPhysics()->IsPushable()) {
-			continue;
-		} else if ( obEnt->IsType( idMoveable::GetClassType() ) ) {
-// RAVEN END
+			idVec3 v1 = obPhys->GetLinearVelocity();
+			if ( v1.LengthSqr() > Square( 10.0f ) ) {
+				idVec3 v2 = physics->GetLinearVelocity();
+				if ( v2.LengthSqr() > Square( 10.0f ) ) {
+					// if moving in about the same direction
+					if ( v1 * v2 > 0.0f ) {
+						continue;
+					}
+				}
+			}
+		} else if ( obEnt->IsType( idMoveable::Type ) ) {
 			// moveables are considered obstacles
+#ifdef HUMANHEAD
+		} else if ( obEnt->IsType( hhVehicle::Type ) ) {
+#endif
 		} else {
 			// ignore everything else
 			continue;
@@ -400,43 +354,30 @@ int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *a
 			continue;
 		}
 
-		numIterations = 1;
-		if ( extrudePlayer && obEnt == player )
-		{//do magic
-			numIterations = 3;
-		}
-		for ( extrude = 0; extrude < numIterations; extrude++ ) {
-			// project a box containing the obstacle onto the floor plane
-			box = idBox( clipModel->GetBounds(), extrude?clipModel->GetOrigin()+(extrude*extrudeVec):clipModel->GetOrigin(), clipModel->GetAxis() );
-			numVerts = box.GetParallelProjectionSilhouetteVerts( physics->GetGravityNormal(), silVerts );
+		// project a box containing the obstacle onto the floor plane
+		box = idBox( clipModel->GetBounds(), clipModel->GetOrigin(), clipModel->GetAxis() );
+		numVerts = box.GetParallelProjectionSilhouetteVerts( physics->GetGravityNormal(), silVerts );
 
-			// create a 2D winding for the obstacle;
-			obstacle_t &obstacle = obstacles[numObstacles++];
-			obstacle.winding.Clear();
+		// create a 2D winding for the obstacle;
+		obstacle_t &obstacle = obstacles[numObstacles++];
+		obstacle.winding.Clear();
+		for ( j = 0; j < numVerts; j++ ) {
+			obstacle.winding.AddPoint( silVerts[j].ToVec2() );
+		}
+
+		if ( ai_showObstacleAvoidance.GetBool() ) {
 			for ( j = 0; j < numVerts; j++ ) {
-				obstacle.winding.AddPoint( silVerts[j].ToVec2() );
+				silVerts[j].z = startPos.z;
 			}
-
-			if ( owner->DebugFilter(ai_showObstacleAvoidance) ) {
-				for ( j = 0; j < numVerts; j++ ) {
-					silVerts[j].z = startPos.z;
-				}
-				for ( j = 0; j < numVerts; j++ ) {
-					gameRenderWorld->DebugArrow( colorWhite, silVerts[j], silVerts[(j+1)%numVerts], 4 );
-				}
-			}
-
-			// expand the 2D winding for collision with a 2D box
-			obstacle.winding.ExpandForAxialBox( expBounds );
-			obstacle.winding.GetBounds( obstacle.bounds );
-			obstacle.entity = obEnt;
-			if ( extrudePlayer && obEnt == player && extrude > 0 ) {
-				//don't care if we're inside one of these, because that would just make us stop where we are, anyway!
-				obstacle.fakePlayerForwardObstacle = true;
-			} else {
-				obstacle.fakePlayerForwardObstacle = false;
+			for ( j = 0; j < numVerts; j++ ) {
+				gameRenderWorld->DebugArrow( colorWhite, silVerts[j], silVerts[(j+1)%numVerts], 4 );
 			}
 		}
+
+		// expand the 2D winding for collision with a 2D box
+		obstacle.winding.ExpandForAxialBox( expBounds );
+		obstacle.winding.GetBounds( obstacle.bounds );
+		obstacle.entity = obEnt;
 	}
 
 	// if there are no dynamic obstacles the path should be through valid AAS space
@@ -445,7 +386,7 @@ int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *a
 	}
 
 	// if the current path doesn't intersect any dynamic obstacles the path should be through valid AAS space
-	if ( PointInsideObstacle( obstacles, numObstacles, startPos.ToVec2(), true ) == -1 ) {
+	if ( PointInsideObstacle( obstacles, numObstacles, startPos.ToVec2() ) == -1 ) {
 		if ( !GetFirstBlockingObstacle( obstacles, numObstacles, -1, startPos.ToVec2(), seekDelta.ToVec2(), blockingScale, blockingObstacle, blockingEdgeNum ) ) {
 			return 0;
 		}
@@ -496,16 +437,13 @@ int GetObstacles( const idActor* owner, const idPhysics *physics, const idAAS *a
 			obstacle.winding.GetBounds( obstacle.bounds );
 			obstacle.entity = NULL;
 
-// RAVEN BEGIN
-// JSinger: Changed to call optimized memcpy
-			SIMDProcessor->Memcpy( lastVerts, verts, sizeof( lastVerts ) );
-// RAVEN END
+			memcpy( lastVerts, verts, sizeof( lastVerts ) );
 			lastEdgeNormal = edgeNormal;
 		}
 	}
 
 	// show obstacles
-	if ( owner->DebugFilter(ai_showObstacleAvoidance) ) {
+	if ( ai_showObstacleAvoidance.GetBool() ) {
 		for ( i = 0; i < numObstacles; i++ ) {
 			obstacle_t &obstacle = obstacles[i];
 			for ( j = 0; j < obstacle.winding.GetNumPoints(); j++ ) {
@@ -633,10 +571,8 @@ pathNode_t *BuildPathTree( const obstacle_t *obstacles, int numObstacles, const 
 	int blockingEdgeNum, blockingObstacle, obstaclePoints, bestNumNodes = MAX_OBSTACLE_PATH;
 	float blockingScale;
 	pathNode_t *root, *node, *child;
+	idQueueTemplate<pathNode_t, (int)&(((pathNode_t *)NULL)->next)> pathNodeQueue, treeQueue;
 
-	// gcc 4.0
-	idQueueTemplate<pathNode_t, offsetof( pathNode_t, next ) > pathNodeQueue, treeQueue;
-	
 	root = pathNodeAllocator.Alloc();
 	root->Init();
 	root->pos = startPos;
@@ -667,11 +603,6 @@ pathNode_t *BuildPathTree( const obstacle_t *obstacles, int numObstacles, const 
 			if ( path.firstObstacle == NULL ) {
 				path.firstObstacle = obstacles[blockingObstacle].entity;
 			}
-			// RAVEN BEGIN
-			// cdr: Alternate Routes Bug
-			path.allObstacles.AddUnique(obstacles[blockingObstacle].entity);
-			// RAVEN END
-
 
 			node->delta *= blockingScale;
 
@@ -799,9 +730,6 @@ int OptimizePath( const pathNode_t *root, const pathNode_t *leafNode, const obst
 	float scale1, scale2, curLength;
 
 	optimizedPath[0] = root->pos;
-// BDUBE: FIXME - Added this line because quite a few places in the code count on there being at least 2 items in that array
-	optimizedPath[1] = root->pos;
-	
 	numPathPoints = 1;
 
 	for ( nextNode = curNode = root; curNode != leafNode; curNode = nextNode ) {
@@ -879,7 +807,7 @@ FindOptimalPath
   Returns true if there is a path all the way to the goal.
 ============
 */
-bool FindOptimalPath( const idActor* owner, const pathNode_t *root, const obstacle_t *obstacles, int numObstacles, const float height, const idVec3 &curDir, idVec3 &seekPos ) {
+bool FindOptimalPath( const pathNode_t *root, const obstacle_t *obstacles, int numObstacles, const float height, const idVec3 &curDir, idVec3 &seekPos ) {
 	int i, numPathPoints, bestNumPathPoints;
 	const pathNode_t *node, *lastNode, *bestNode;
 	idVec2 optimizedPath[MAX_OBSTACLE_PATH];
@@ -944,17 +872,20 @@ bool FindOptimalPath( const idActor* owner, const pathNode_t *root, const obstac
 	}
 
 	if ( !pathToGoalExists ) {
-		if ( root->children[0] ) {
-			seekPos.ToVec2() = root->children[0]->pos;
-		} else if ( root->children[1] ) {
-			seekPos.ToVec2() = root->children[1]->pos;
+		//HUMANHEAD rww
+		if (!root->children[0]) {
+			seekPos.ToVec2() = root->pos;
 		}
+		else {
+			seekPos.ToVec2() = root->children[0]->pos;
+		}
+		//HUMANHEAD END
 	} else if ( !optimizedPathCalculated ) {
 		OptimizePath( root, bestNode, obstacles, numObstacles, optimizedPath );
 		seekPos.ToVec2() = optimizedPath[1];
 	}
 
-	if ( owner->DebugFilter(ai_showObstacleAvoidance) ) {
+	if ( ai_showObstacleAvoidance.GetBool() ) {
 		idVec3 start, end;
 		start.z = end.z = height + 4.0f;
 		numPathPoints = OptimizePath( root, bestNode, obstacles, numObstacles, optimizedPath );
@@ -977,7 +908,7 @@ idAI::FindPathAroundObstacles
 */
 bool idAI::FindPathAroundObstacles( const idPhysics *physics, const idAAS *aas, const idEntity *ignore, const idVec3 &startPos, const idVec3 &seekPos, obstaclePath_t &path ) {
 	int numObstacles, areaNum, insideObstacle;
-	static obstacle_t obstacles[MAX_OBSTACLES];
+	obstacle_t obstacles[MAX_OBSTACLES];
 	idBounds clipBounds;
 	idBounds bounds;
 	pathNode_t *root;
@@ -990,16 +921,9 @@ bool idAI::FindPathAroundObstacles( const idPhysics *physics, const idAAS *aas, 
 	path.seekPosOutsideObstacles = seekPos;
 	path.seekPosObstacle = NULL;
 
-	// RAVEN BEGIN
-	// cdr: Alternate Routes Bug
-	path.allObstacles.Clear();
-	// RAVEN END
-
 	if ( !aas ) {
 		return true;
 	}
-	idActor* owner = dynamic_cast<idActor*>(physics->GetSelf());
-
 
 	bounds[1] = aas->GetSettings()->boundingBoxes[0][1];
 	bounds[0] = -bounds[1];
@@ -1010,26 +934,18 @@ bool idAI::FindPathAroundObstacles( const idPhysics *physics, const idAAS *aas, 
 	aas->PushPointIntoAreaNum( areaNum, path.startPosOutsideObstacles );
 
 	// get all the nearby obstacles
-	numObstacles = GetObstacles( owner, physics, aas, ignore, areaNum, path.startPosOutsideObstacles, path.seekPosOutsideObstacles, obstacles, MAX_OBSTACLES, clipBounds );
+	numObstacles = GetObstacles( physics, aas, ignore, areaNum, path.startPosOutsideObstacles, path.seekPosOutsideObstacles, obstacles, MAX_OBSTACLES, clipBounds );
 
 	// get a source position outside the obstacles
 	GetPointOutsideObstacles( obstacles, numObstacles, path.startPosOutsideObstacles.ToVec2(), &insideObstacle, NULL );
 	if ( insideObstacle != -1 ) {
 		path.startPosObstacle = obstacles[insideObstacle].entity;
-		// RAVEN BEGIN
-		// cdr: Alternate Routes Bug
-		path.allObstacles.AddUnique(path.startPosObstacle);
-		// RAVEN END
 	}
 
 	// get a goal position outside the obstacles
 	GetPointOutsideObstacles( obstacles, numObstacles, path.seekPosOutsideObstacles.ToVec2(), &insideObstacle, NULL );
 	if ( insideObstacle != -1 ) {
 		path.seekPosObstacle = obstacles[insideObstacle].entity;
-		// RAVEN BEGIN
-		// cdr: Alternate Routes Bug
-		path.allObstacles.AddUnique(path.seekPosObstacle);
-		// RAVEN END
 	}
 
 	// if start and destination are pushed to the same point, we don't have a path around the obstacle
@@ -1043,7 +959,7 @@ bool idAI::FindPathAroundObstacles( const idPhysics *physics, const idAAS *aas, 
 	root = BuildPathTree( obstacles, numObstacles, clipBounds, path.startPosOutsideObstacles.ToVec2(), path.seekPosOutsideObstacles.ToVec2(), path );
 
 	// draw the path tree
-	if ( owner->DebugFilter(ai_showObstacleAvoidance) ) {
+	if ( ai_showObstacleAvoidance.GetBool() ) {
 		DrawPathTree( root, physics->GetOrigin().z );
 	}
 
@@ -1051,7 +967,15 @@ bool idAI::FindPathAroundObstacles( const idPhysics *physics, const idAAS *aas, 
 	PrunePathTree( root, path.seekPosOutsideObstacles.ToVec2() );
 
 	// find the optimal path
-	pathToGoalExists = FindOptimalPath( owner, root, obstacles, numObstacles, physics->GetOrigin().z, physics->GetLinearVelocity(), path.seekPos );
+#ifdef HUMANHEAD //jsh if pitch/roll is rotated, don't change seekPos based on monster's current height 
+	if ( physics->GetAxis().ToAngles().pitch != 0.0 || physics->GetAxis().ToAngles().pitch != 0.0 ) {
+		pathToGoalExists = FindOptimalPath( root, obstacles, numObstacles, path.seekPos.z, physics->GetLinearVelocity(), path.seekPos );
+	} else {
+		pathToGoalExists = FindOptimalPath( root, obstacles, numObstacles, physics->GetOrigin().z, physics->GetLinearVelocity(), path.seekPos );
+	}
+#else
+	pathToGoalExists = FindOptimalPath( root, obstacles, numObstacles, physics->GetOrigin().z, physics->GetLinearVelocity(), path.seekPos );
+#endif
 
 	// free the tree
 	FreePathTree_r( root );
@@ -1080,7 +1004,7 @@ void idAI::FreeObstacleAvoidanceNodes( void ) {
 ===============================================================================
 */
 
-const float OVERCLIP			= 1.001f;
+//const float OVERCLIP			= 1.001f;
 const int MAX_FRAME_SLIDE		= 5;
 
 typedef struct pathTrace_s {
@@ -1097,22 +1021,16 @@ PathTrace
   Returns true if a stop event was triggered.
 ============
 */
-// RAVEN BEGIN
-// nmckenzie: Adding ignoreent parm
-bool PathTrace( const idEntity *ent, const idAAS *aas, const idVec3 &start, const idVec3 &end, int stopEvent, struct pathTrace_s &trace, predictedPath_t &path, const idEntity *ignore = NULL ) {
-// RAVEN BEGIN
+bool PathTrace( const idEntity *ent, const idAAS *aas, const idVec3 &start, const idVec3 &end, int stopEvent, struct pathTrace_s &trace, predictedPath_t &path ) {
 	trace_t clipTrace;
 	aasTrace_t aasTrace;
 
 	memset( &trace, 0, sizeof( trace ) );
 
 	if ( !aas || !aas->GetSettings() ) {
-// RAVEN BEGIN
-// nmckenzie: Added ignore ent
-// ddynerman: multiple clip worlds
-		gameLocal.Translation( ent, clipTrace, start, end, ent->GetPhysics()->GetClipModel(),
-									ent->GetPhysics()->GetClipModel()->GetAxis(), MASK_MONSTERSOLID, ent, ignore );
-// RAVEN END
+
+		gameLocal.clip.Translation( clipTrace, start, end, ent->GetPhysics()->GetClipModel(),
+									ent->GetPhysics()->GetClipModel()->GetAxis(), MASK_MONSTERSOLID, ent );
 
 		// NOTE: could do (expensive) ledge detection here for when there is no AAS file
 
@@ -1131,11 +1049,8 @@ bool PathTrace( const idEntity *ent, const idAAS *aas, const idVec3 &start, cons
 
 		aas->Trace( aasTrace, start, end );
 
-// RAVEN BEGIN
-// nmckenzie: Added ignore ent.
-		gameLocal.TranslationEntities( ent, clipTrace, start, aasTrace.endpos, ent->GetPhysics()->GetClipModel(),
-											ent->GetPhysics()->GetClipModel()->GetAxis(), MASK_MONSTERSOLID, ent, ignore );
-// RAVEN END
+		gameLocal.clip.TranslationEntities( clipTrace, start, aasTrace.endpos, ent->GetPhysics()->GetClipModel(),
+											ent->GetPhysics()->GetClipModel()->GetAxis(), MASK_MONSTERSOLID, ent );
 
 		if ( clipTrace.fraction >= 1.0f ) {
 
@@ -1152,7 +1067,7 @@ bool PathTrace( const idEntity *ent, const idAAS *aas, const idVec3 &start, cons
 						path.endEvent = SE_ENTER_LEDGE_AREA;
 						path.blockingEntity = trace.blockingEntity;
 
-						if ( ai_debugMove.GetBool() ) { // PathTrace
+						if ( ai_debugMove.GetBool() ) {
 							gameRenderWorld->DebugLine( colorRed, start, aasTrace.endpos );
 						}
 						return true;
@@ -1165,7 +1080,7 @@ bool PathTrace( const idEntity *ent, const idAAS *aas, const idVec3 &start, cons
 						path.endEvent = SE_ENTER_OBSTACLE;
 						path.blockingEntity = trace.blockingEntity;
 
-						if ( ai_debugMove.GetBool() ) {// PathTrace
+						if ( ai_debugMove.GetBool() ) {
 							gameRenderWorld->DebugLine( colorRed, start, aasTrace.endpos );
 						}
 						return true;
@@ -1194,10 +1109,7 @@ idAI::PredictPath
   Can also be used when there is no AAS file available however ledges are not detected.
 ============
 */
-// RAVEN BEGIN
-// nmckenzie: Added ignore ent parm.
-bool idAI::PredictPath( const idEntity *ent, const idAAS *aas, const idVec3 &start, const idVec3 &velocity, int totalTime, int frameTime, int stopEvent, predictedPath_t &path, const idEntity *ignore ) {
-// RAVEN END
+bool idAI::PredictPath( const idEntity *ent, const idAAS *aas, const idVec3 &start, const idVec3 &velocity, int totalTime, int frameTime, int stopEvent, predictedPath_t &path ) {
 	int i, j, step, numFrames, curFrameTime;
 	idVec3 delta, curStart, curEnd, curVelocity, lastEnd, stepUp, tmpStart;
 	idVec3 gravity, gravityDir, invGravityDir;
@@ -1250,10 +1162,7 @@ bool idAI::PredictPath( const idEntity *ent, const idAAS *aas, const idVec3 &sta
 			for ( step = 0; step < 3; step++ ) {
 
 				curEnd = curStart + delta;
-// RAVEN BEGIN
-// nmckenzie: Added ignore ent
-				if ( PathTrace( ent, aas, curStart, curEnd, stopEvent, trace, path, ignore ) ) {
-// RAVEN END
+				if ( PathTrace( ent, aas, curStart, curEnd, stopEvent, trace, path ) ) {
 					return true;
 				}
 
@@ -1262,12 +1171,9 @@ bool idAI::PredictPath( const idEntity *ent, const idAAS *aas, const idVec3 &sta
 					// step down at end point
 					tmpStart = trace.endPos;
 					curEnd = tmpStart - stepUp;
-// RAVEN BEGIN
-// nmckenzie: Added ignore ent
-					if ( PathTrace( ent, aas, tmpStart, curEnd, stopEvent, trace, path, ignore ) ) {
+					if ( PathTrace( ent, aas, tmpStart, curEnd, stopEvent, trace, path ) ) {
 						return true;
 					}
-// RAVEN END
 
 					// if not moved any further than without stepping up, or if not on a floor surface
 					if ( (lastEnd - start).LengthSqr() > (trace.endPos - start).LengthSqr() - 0.1f ||
@@ -1302,17 +1208,14 @@ bool idAI::PredictPath( const idEntity *ent, const idAAS *aas, const idVec3 &sta
 
 				// step up
 				stepUp = invGravityDir * maxStepHeight;
-// RAVEN BEGIN
-// nmckenzie: Added ignore ent
-				if ( PathTrace( ent, aas, curStart, curStart + stepUp, stopEvent, trace, path, ignore ) ) {
+				if ( PathTrace( ent, aas, curStart, curStart + stepUp, stopEvent, trace, path ) ) {
 					return true;
 				}
-// RAVEN END
 				stepUp *= trace.fraction;
 				curStart = trace.endPos;
 			}
 
-			if ( ai_debugMove.GetBool() ) {//PredictPath
+			if ( ai_debugMove.GetBool() ) {
 				gameRenderWorld->DebugLine( colorRed, lineStart, curStart );
 			}
 
@@ -1405,8 +1308,8 @@ static int Ballistics( const idVec3 &start, const idVec3 &end, float speed, floa
 			continue;
 		}
 		d = idMath::Sqrt( p[i] );
-		bal[n].angle = idMath::ATan( 0.5f * ( 2.0f * y * p[i] - gravity ) / d, d * x );
-		bal[n].time = x / ( idMath::Cos( bal[n].angle ) * speed );
+		bal[n].angle = atan2( 0.5f * ( 2.0f * y * p[i] - gravity ) / d, d * x );
+		bal[n].time = x / ( cos( bal[n].angle ) * speed );
 		bal[n].angle = idMath::AngleNormalize180( RAD2DEG( bal[n].angle ) );
 		n++;
 	}
@@ -1421,10 +1324,7 @@ HeightForTrajectory
 Returns the maximum hieght of a given trajectory
 =====================
 */
-// RAVEN BEGIN
-// nmckenzie: Removing static for this one.
-float HeightForTrajectory( const idVec3 &start, float zVel, float gravity ) {
-// RAVEN END
+static float HeightForTrajectory( const idVec3 &start, float zVel, float gravity ) {
 	float maxHeight, t;
 
 	t = zVel / gravity;
@@ -1496,10 +1396,7 @@ bool idAI::TestTrajectory( const idVec3 &start, const idVec3 &end, float zVel, f
 
 	result = true;
 	for ( i = 0; i < numSegments; i++ ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.Translation( NULL, trace, points[i], points[i+1], clip, mat3_identity, clipmask, ignore );
-// RAVEN END
+		gameLocal.clip.Translation( trace, points[i], points[i+1], clip, mat3_identity, clipmask, ignore );
 		if ( trace.fraction < 1.0f ) {
 			if ( gameLocal.GetTraceEntity( trace ) == targetEntity ) {
 				result = true;
@@ -1553,12 +1450,20 @@ bool idAI::PredictTrajectory( const idVec3 &firePos, const idVec3 &target, float
 	if ( projectileSpeed <= 0.0f || projGravity == vec3_origin ) {
 
 		aimDir = target - firePos;
+#if HUMANHEAD // jsh - do a point trace if trace distance is large
+		if ( aimDir.LengthSqr() > CM_MAX_TRACE_DIST*CM_MAX_TRACE_DIST ) {
+			aimDir.Normalize();
+			gameLocal.clip.Translation( trace, firePos, target, NULL, mat3_identity, clipmask, ignore );	
+		} else {
+			aimDir.Normalize();
+			gameLocal.clip.Translation( trace, firePos, target, clip, mat3_identity, clipmask, ignore );
+		}
+#else
+		aimDir = target - firePos;
 		aimDir.Normalize();
 
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.Translation( NULL, trace, firePos, target, clip, mat3_identity, clipmask, ignore );
-// RAVEN END
+		gameLocal.clip.Translation( trace, firePos, target, clip, mat3_identity, clipmask, ignore );
+#endif
 
 		if ( drawtime ) {
 			gameRenderWorld->DebugLine( colorRed, firePos, target, drawtime );
@@ -1605,10 +1510,7 @@ bool idAI::PredictTrajectory( const idVec3 &firePos, const idVec3 &target, float
 			for ( j = 1; j < 100; j++ ) {
 				pos += velocity * t;
 				velocity += projGravity * t;
-// RAVEN BEGIN
-// nmckenzie: Added time parm to debugline so I can actually see it.
-				gameRenderWorld->DebugLine( colorCyan, lastPos, pos, drawtime );
-// RAVEN END
+				gameRenderWorld->DebugLine( colorCyan, lastPos, pos );
 				lastPos = pos;
 			}
 		}

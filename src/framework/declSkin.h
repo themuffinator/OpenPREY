@@ -43,7 +43,25 @@ public:
 	void					GetSkinTargetsList(idList<const idMaterial*>& outList) const;
 #endif
 // RAVEN END
+#ifdef GAME_DLL
+	ID_INLINE const idMaterial *	RemapShaderBySkin( const idMaterial *shader ) const {
+		if ( !shader ) {
+			return NULL;
+		}
+
+		for ( int i = 0; i < mappings.Num(); i++ ) {
+			const skinMapping_t *map = &mappings[ i ];
+			// NULL = wildcard match.
+			if ( !map->from || map->from == shader ) {
+				return map->to;
+			}
+		}
+
+		return shader;
+	}
+#else
 	const idMaterial *		RemapShaderBySkin( const idMaterial *shader ) const;
+#endif
 
 							// model associations are just for the preview dialog in the editor
 // RAVEN BEGIN

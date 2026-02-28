@@ -197,6 +197,7 @@ float	BigFloat( float l );
 float	LittleFloat( float l );
 void	BigRevBytes( void *bp, int elsize, int elcount );
 void	LittleRevBytes( void *bp, int elsize, int elcount );
+void	LittleBitField( void *bp, int elsize );
 void	Swap_Init( void );
 
 bool	Swap_IsBigEndian( void );
@@ -254,6 +255,8 @@ bool IsSignedType(const _type_ t) {
 #include "math/Polynomial.h"
 #include "math/Extrapolate.h"
 #include "math/Interpolate.h"
+#include "math/prey_interpolate.h"
+#include "math/prey_math.h"
 #include "math/Curve.h"
 #include "math/Ode.h"
 #include "math/Lcp.h"
@@ -308,6 +311,7 @@ bool IsSignedType(const _type_ t) {
 #include "containers/StrPool.h"
 #include "containers/VectorSet.h"
 #include "containers/PlaneSet.h"
+#include "containers/PreyStack.h"
 #include "containers/rvBlockPool.h"
 // RAVEN BEGIN
 // ddynerman: a pair

@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -134,20 +136,6 @@ idPhysics_Base::GetMass
 float idPhysics_Base::GetMass( int id ) const {
 	return 0.0f;
 }
-
-// RAVEN BEGIN
-// bdube: Added center mass call
-/*
-================
-idPhysics_Base::GetCenterMass
-
-default center of mass is origin
-================
-*/
-idVec3 idPhysics_Base::GetCenterMass ( int id ) const {
-	return GetOrigin();
-}
-// RAVEN END
 
 /*
 ================
@@ -295,13 +283,6 @@ idPhysics_Base::IsPushable
 bool idPhysics_Base::IsPushable( void ) const {
 	return true;
 }
-
-// RAVEN BEGIN
-// bdube: water interraction
-bool idPhysics_Base::IsInWater ( void ) const {
-	return false;
-}
-// RAVEN END	
 
 /*
 ================
@@ -582,41 +563,6 @@ void idPhysics_Base::RemoveContactEntity( idEntity *e ) {
 	}
 }
 
-// RAVEN BEGIN
-// abahr:
-/*
-================
-idPhysics_Base::GetContactNormal
-================
-*/
-const idVec3 idPhysics_Base::GetContactNormal() const {
-	idVec3 normal( vec3_zero );
-
-	for( int ix = 0; ix < GetNumContacts(); ++ix ) {
-		normal += GetContact( ix ).normal;
-	}
-
-	return normal.ToNormal();
-}
-
-/*
-================
-idPhysics_Base::GetContactNormal
-================
-*/
-const idVec3 idPhysics_Base::GetGroundContactNormal() const {
-	idVec3 normal( vec3_zero );
-
-	for( int ix = 0; ix < GetNumContacts(); ++ix ) {
-		if ( GetContact(ix).normal * -gravityNormal > 0.0f ) {
-			normal += GetContact( ix ).normal;
-		}
-	}
-
-	return normal.ToNormal();
-}
-// RAVEN END
-
 /*
 ================
 idPhysics_Base::HasGroundContacts
@@ -663,6 +609,38 @@ bool idPhysics_Base::IsGroundClipModel( int entityNum, int id ) const {
 		}
 	}
 	return false;
+}
+
+/*
+================
+idPhysics_Base::HasContacts
+
+HUMANHEAD: aob
+================
+*/
+bool idPhysics_Base::HasContacts( void ) const {
+	return contacts.Num() > 0;
+}
+
+/*
+================
+idPhysics_Base::GetGroundContactNormal
+
+HUMANHEAD: aob
+================
+*/
+idVec3 idPhysics_Base::GetGroundContactNormal() const {
+	idVec3 contactNormal;
+
+	// HUMANHEAD PCF pdm 05-10-06: Bugfix from Venom, Initialize before use
+	contactNormal.Zero();
+
+	for( int ix = contacts.Num() - 1; ix >= 0; --ix ) {
+		contactNormal += contacts[ix].normal;
+	}
+	contactNormal.Normalize();
+
+	return contactNormal;
 }
 
 /*
@@ -749,11 +727,8 @@ void idPhysics_Base::AddGroundContacts( const idClipModel *clipModel ) {
 
 	dir.SubVec3(0) = gravityNormal;
 	dir.SubVec3(1) = vec3_origin;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	num = gameLocal.Contacts( self, &contacts[index], 10, clipModel->GetOrigin(),
+	num = gameLocal.clip.Contacts( &contacts[index], 10, clipModel->GetOrigin(),
 					dir, CONTACT_EPSILON, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
 	contacts.SetNum( index + num, false );
 }
 
@@ -799,10 +774,7 @@ idPhysics_Base::IsOutsideWorld
 ================
 */
 bool idPhysics_Base::IsOutsideWorld( void ) const {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	if ( !gameLocal.GetWorldBounds( self ).Expand( 128.0f ).IntersectsBounds( GetAbsBounds() ) ) {
-// RAVEN END
+	if ( !gameLocal.clip.GetWorldBounds().Expand( 128.0f ).IntersectsBounds( GetAbsBounds() ) ) {
 		return true;
 	}
 	return false;

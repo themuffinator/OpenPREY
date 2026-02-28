@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __ANIM_TESTMODEL_H__
 #define __ANIM_TESTMODEL_H__
@@ -46,10 +48,7 @@ public:
 	static void 			TestModelPrevFrame_f( const idCmdArgs &args );
 
 private:
-// RAVEN BEGIN
-// ddynerman: new head system
-	idEntityPtr<idAFAttachment>	head;
-// RAVEN END
+	idEntityPtr<idEntity>	head;
 	idAnimator				*headAnimator;
 	idAnim					customAnim;
 	idPhysics_Parametric	physicsObj;

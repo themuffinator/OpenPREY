@@ -1616,9 +1616,24 @@ void idCollisionModelManagerLocal::Rotation( trace_t *results, const idVec3 &sta
 
 	memset( results, 0, sizeof( *results ) );
 
-	// If the model is NULL then assume we are checking the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	// Legacy game code may pass NULL to indicate the world model.
+	if ( model == NULL && models != NULL && numModels > 0 ) {
+		model = models[0];
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		results->fraction = 1.0f;
+		results->endpos = start;
+		results->endAxis = trmAxis;
+		results->c.type = CONTACT_NONE;
+		results->c.contents = 0;
+		results->c.material = NULL;
+		results->c.materialType = NULL;
+		return;
 	}
 
 	// if special position test

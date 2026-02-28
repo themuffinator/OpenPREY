@@ -238,11 +238,13 @@ public:
 	virtual idFile *		OpenFileAppend( const char *filename, bool sync = false, const char *basePath = "fs_basepath" ) = 0;
 							// Opens a file for reading, writing, or appending depending on the value of mode.
 	virtual idFile *		OpenFileByMode( const char *relativePath, fsMode_t mode ) = 0;
-							// Opens a file for reading from a full OS path.
+	// Opens a file for reading from a full OS path.
 	virtual idFile *		OpenExplicitFileRead( const char *OSPath ) = 0;
-							// Opens a file for writing to a full OS path.
+	// Opens a file for writing to a full OS path.
 	virtual idFile *		OpenExplicitFileWrite( const char *OSPath ) = 0;
-							// Closes a file.
+	// Opens a file for appending to a full OS path.
+	virtual idFile *		OpenExplicitFileAppend( const char *OSPath ) = 0;
+	// Closes a file.
 	virtual void			CloseFile( idFile *f ) = 0;
 							// Returns immediately, performing the read from a background thread.
 	virtual void			BackgroundDownload( backgroundDownload_t *bgl ) = 0;

@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 /*
 sys_event.h
 
@@ -17,14 +19,12 @@ Event are used for scheduling tasks and for linking script commands.
 #define D_EVENT_ENTITY				'e'
 #define	D_EVENT_ENTITY_NULL			'E'			// event can handle NULL entity pointers
 #define D_EVENT_TRACE				't'
-// jmarshall - 64bit
-#define D_EVENT_INTEGER64bit		'y'
-// jmarshall end
 
-#define MAX_EVENTS					8192		// Upped from 4096
+#define MAX_EVENTS					4096
 
-// stack size of idVec3, aligned to native pointer size
-#define E_EVENT_SIZEOF_VEC			((sizeof(idVec3) + (sizeof(intptr_t) - 1)) & ~(sizeof(intptr_t) - 1))
+//HUMANHEAD: aob - needed for networking to send the least amount of bits
+extern const int MAX_EVENTS_NUM_BITS;
+//HUMANHEAD END
 
 class idClass;
 class idTypeInfo;
@@ -59,6 +59,10 @@ public:
 	static int					NumEventCommands( void );
 	static const idEventDef		*GetEventCommand( int eventnum );
 	static const idEventDef		*FindEvent( const char *name );
+
+	//HUMANHEAD: aob
+	static const idEventDef		*FindEvent( int eventId );
+	//HUMANHEAD END
 };
 
 class idSaveGame;
@@ -74,15 +78,14 @@ private:
 
 	idLinkList<idEvent>			eventNode;
 
-	static idDynamicBlockAlloc<byte, 16 * 1024, 256, MA_EVENT> eventDataAllocator;
+	static idDynamicBlockAlloc<byte, 16 * 1024, 256> eventDataAllocator;
 
 
 public:
 	static bool					initialized;
 
 								~idEvent();
-	
-	static void					WriteDebugInfo( void );
+
 	static idEvent				*Alloc( const idEventDef *evdef, int numargs, va_list args );
 	static void					CopyArgs( const idEventDef *evdef, int numargs, va_list args, intptr_t data[ D_EVENT_MAXARGS ]  );
 	
@@ -90,11 +93,11 @@ public:
 	void						Schedule( idClass *object, const idTypeInfo *cls, int time );
 	byte						*GetData( void );
 
+	// HUMANHEAD pdm
+	static int					NumQueuedEvents( const idClass *obj, const idEventDef *evdef = NULL );
+	// HUMANHEAD END
+
 	static void					CancelEvents( const idClass *obj, const idEventDef *evdef = NULL );
-// RAVEN BEGIN
-// abahr:
-	static bool					EventIsPosted( const idClass *obj, const idEventDef *evdef );
-// RAVEN END
 	static void					ClearEventList( void );
 	static void					ServiceEvents( void );
 	static void					Init( void );
@@ -103,6 +106,9 @@ public:
 	// save games
 	static void					Save( idSaveGame *savefile );					// archives object for save game file
 	static void					Restore( idRestoreGame *savefile );				// unarchives object from save game file
+	static void					SaveTrace( idSaveGame *savefile, const trace_t &trace );
+	static void					RestoreTrace( idRestoreGame *savefile, trace_t &trace );
+	
 };
 
 /*

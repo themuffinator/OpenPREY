@@ -1,13 +1,16 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
 CLASS_DECLARATION( idPhysics_Actor, idPhysics_Monster )
 END_CLASS
 
-const float OVERCLIP = 1.001f;
+// HUMANHEAD PDM: This now declared in physics_player.h, so not needed here
+//const float OVERCLIP = 1.001f;
 
 /*
 =====================
@@ -15,7 +18,8 @@ idPhysics_Monster::CheckGround
 =====================
 */
 void idPhysics_Monster::CheckGround( monsterPState_t &state ) {
-	trace_t groundTrace;
+// HUMANHEAD aob: groundTrace is now stored on object
+//	trace_t groundTrace;
 	idVec3 down;
 
 	if ( gravityNormal == vec3_zero ) {
@@ -25,10 +29,7 @@ void idPhysics_Monster::CheckGround( monsterPState_t &state ) {
 	}
 
 	down = state.origin + gravityNormal * CONTACT_EPSILON;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	gameLocal.Translation( self, groundTrace, state.origin, down, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
+	gameLocal.clip.Translation( groundTrace, state.origin, down, clipModel, clipModel->GetAxis(), clipMask, self );
 
 	if ( groundTrace.fraction == 1.0f ) {
 		state.onGround = false;
@@ -63,7 +64,7 @@ void idPhysics_Monster::CheckGround( monsterPState_t &state ) {
 idPhysics_Monster::SlideMove
 =====================
 */
-monsterMoveResult_t idPhysics_Monster::SlideMove( idVec3 &start, idVec3 &velocity, const idVec3 &delta ) {
+monsterMoveResult_t idPhysics_Monster::SlideMove( idVec3 &start, idVec3 &velocity, const idVec3 &delta, idList<int> *touched ) {
 	int i;
 	trace_t tr;
 	idVec3 move;
@@ -71,10 +72,7 @@ monsterMoveResult_t idPhysics_Monster::SlideMove( idVec3 &start, idVec3 &velocit
 	blockingEntity = NULL;
 	move = delta;
 	for( i = 0; i < 3; i++ ) {
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-		gameLocal.Translation( self, tr, start, start + move, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
+		gameLocal.clip.Translation( tr, start, start + move, clipModel, clipModel->GetAxis(), clipMask, self );
 
 		start = tr.endpos;
 
@@ -111,6 +109,7 @@ monsterMoveResult_t idPhysics_Monster::StepMove( idVec3 &start, idVec3 &velocity
 	monsterMoveResult_t result1, result2;
 	float	stepdist;
 	float	nostepdist;
+	idList<int>			noStepEntities, stepEntities;	// HUMANHEAD nla
 
 	if ( delta == vec3_origin ) {
 		return MM_OK;
@@ -119,23 +118,19 @@ monsterMoveResult_t idPhysics_Monster::StepMove( idVec3 &start, idVec3 &velocity
 	// try to move without stepping up
 	noStepPos = start;
 	noStepVel = velocity;
-	result1 = SlideMove( noStepPos, noStepVel, delta );
+	result1 = SlideMove( noStepPos, noStepVel, delta, &noStepEntities );
 	if ( result1 == MM_OK ) {
+		AddTouchEntList( noStepEntities );		// HUMANHEAD nla
 		velocity = noStepVel;
-// RAVEN BEGIN
-// bdube: dont step when there is no gravity
-		if ( gravityNormal == vec3_zero || forceDeltaMove ) {
-// RAVEN END		
+		if ( gravityNormal == vec3_zero ) {
 			start = noStepPos;
 			return MM_OK;
 		}
 
+		//! Check block below for requirment of any touch entities
 		// try to step down so that we walk down slopes and stairs at a normal rate
 		down = noStepPos + gravityNormal * maxStepHeight;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.Translation( self, tr, noStepPos, down, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
+		gameLocal.clip.Translation( tr, noStepPos, down, clipModel, clipModel->GetAxis(), clipMask, self );
 		if ( tr.fraction < 1.0f ) {
 			start = tr.endpos;
 			return MM_STEPPED;
@@ -145,16 +140,10 @@ monsterMoveResult_t idPhysics_Monster::StepMove( idVec3 &start, idVec3 &velocity
 		}
 	}
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( blockingEntity && blockingEntity->IsType( idActor::GetClassType() ) ) {
-// RAVEN END
+	if ( blockingEntity && blockingEntity->IsType( idActor::Type ) ) {
 		// try to step down in case walking into an actor while going down steps
 		down = noStepPos + gravityNormal * maxStepHeight;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.Translation( self, tr, noStepPos, down, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
+		gameLocal.clip.Translation( tr, noStepPos, down, clipModel, clipModel->GetAxis(), clipMask, self );
 		start = tr.endpos;
 		velocity = noStepVel;
 		return MM_BLOCKED;
@@ -166,14 +155,17 @@ monsterMoveResult_t idPhysics_Monster::StepMove( idVec3 &start, idVec3 &velocity
 
 	// try to step up
 	up = start - gravityNormal * maxStepHeight;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	gameLocal.Translation( self, tr, start, up, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END	
+	gameLocal.clip.Translation( tr, start, up, clipModel, clipModel->GetAxis(), clipMask, self );
 	if ( tr.fraction == 0.0f ) {
+		AddTouchEntList( noStepEntities );		// HUMANHEAD nla
 		start = noStepPos;
 		velocity = noStepVel;
 		return result1;
+	}
+
+	//HUMANHEAD nla - Add the entity touched
+	if (tr.fraction < 1.0f) {
+		stepEntities.Append( tr.c.entityNum );
 	}
 
 	// try to move at the stepped up position
@@ -181,6 +173,7 @@ monsterMoveResult_t idPhysics_Monster::StepMove( idVec3 &start, idVec3 &velocity
 	stepVel = velocity;
 	result2 = SlideMove( stepPos, stepVel, delta );
 	if ( result2 == MM_BLOCKED ) {
+		AddTouchEntList( noStepEntities );		// HUMANHEAD nla
 		start = noStepPos;
 		velocity = noStepVel;
 		return result1;
@@ -188,21 +181,25 @@ monsterMoveResult_t idPhysics_Monster::StepMove( idVec3 &start, idVec3 &velocity
 
 	// step down again
 	down = stepPos + gravityNormal * maxStepHeight;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	gameLocal.Translation( self, tr, stepPos, down, clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
+	gameLocal.clip.Translation( tr, stepPos, down, clipModel, clipModel->GetAxis(), clipMask, self );
 	stepPos = tr.endpos;
+
+	//HUMANHEAD nla - Add the entity touched
+	if (tr.fraction < 1.0f) {
+		stepEntities.Append( tr.c.entityNum );
+	}
 
 	// if the move is further without stepping up, or the slope is too steap, don't step up
 	nostepdist = ( noStepPos - start ).LengthSqr();
 	stepdist = ( stepPos - start ).LengthSqr();
 	if ( ( nostepdist >= stepdist ) || ( ( tr.c.normal * -gravityNormal ) < minFloorCosine ) ) {
+		AddTouchEntList( noStepEntities );		// HUMANHEAD nla
 		start = noStepPos;
 		velocity = noStepVel;
 		return MM_SLIDING;
 	}
 
+	AddTouchEntList( stepEntities );		// HUMANHEAD nla
 	start = stepPos;
 	velocity = stepVel;
 
@@ -251,7 +248,7 @@ idPhysics_Monster::idPhysics_Monster( void ) {
 	saved = current;
 	
 	delta.Zero();
-	maxStepHeight = 18.0f;
+	maxStepHeight = 22.0f; // JRM CHANGED FROM 18
 	minFloorCosine = 0.7f;
 	moveResult = MM_OK;
 	forceDeltaMove = false;
@@ -267,14 +264,12 @@ idPhysics_Monster_SavePState
 ================
 */
 void idPhysics_Monster_SavePState( idSaveGame *savefile, const monsterPState_t &state ) {
-	savefile->WriteInt( state.atRest );
-	savefile->WriteBool( state.onGround );
 	savefile->WriteVec3( state.origin );
 	savefile->WriteVec3( state.velocity );
 	savefile->WriteVec3( state.localOrigin );
 	savefile->WriteVec3( state.pushVelocity );
-
-	savefile->WriteVec3( state.lastPushVelocity );	// cnicholson: Added unsaved var
+	savefile->WriteBool( state.onGround );
+	savefile->WriteInt( state.atRest );
 }
 
 /*
@@ -283,14 +278,12 @@ idPhysics_Monster_RestorePState
 ================
 */
 void idPhysics_Monster_RestorePState( idRestoreGame *savefile, monsterPState_t &state ) {
-	savefile->ReadInt( state.atRest );
-	savefile->ReadBool( state.onGround );
 	savefile->ReadVec3( state.origin );
 	savefile->ReadVec3( state.velocity );
 	savefile->ReadVec3( state.localOrigin );
 	savefile->ReadVec3( state.pushVelocity );
-
-	savefile->ReadVec3( state.lastPushVelocity );	// cnicholson: Added unrestored var
+	savefile->ReadBool( state.onGround );
+	savefile->ReadInt( state.atRest );
 }
 
 /*
@@ -446,7 +439,9 @@ void idPhysics_Monster::DisableImpact( void ) {
 idPhysics_Monster::Evaluate
 ================
 */
+// HUMANHEAD AOB: PERSISTANT NOTIFY
 bool idPhysics_Monster::Evaluate( int timeStepMSec, int endTimeMSec ) {
+	PROFILE_SCOPE("Monster", PROFMASK_PHYSICS);
 	idVec3 masterOrigin, oldOrigin;
 	idMat3 masterAxis;
 	float timeStep;
@@ -461,10 +456,7 @@ bool idPhysics_Monster::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	if ( masterEntity ) {
 		self->GetMasterPosition( masterOrigin, masterAxis );
 		current.origin = masterOrigin + current.localOrigin * masterAxis;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, clipModel->GetAxis() );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 		current.velocity = ( current.origin - oldOrigin ) / timeStep;
 		masterDeltaYaw = masterYaw;
 		masterYaw = masterAxis[0].ToYaw();
@@ -474,7 +466,7 @@ bool idPhysics_Monster::Evaluate( int timeStepMSec, int endTimeMSec ) {
 
 	// if the monster is at rest
 	if ( current.atRest >= 0 ) {
-		return true;
+		return false;
 	}
 
 	ActivateContactEntities();
@@ -524,40 +516,26 @@ bool idPhysics_Monster::Evaluate( int timeStepMSec, int endTimeMSec ) {
 			Rest();
 		} else {
 			// try moving into the desired direction
-// RAVEN BEGIN
-// jshepard: flying creatures, even if not using fly move, shouldn't use step move
-			if( self->IsType( idAI::GetClassType() ) && ((idAI*)self)->move.moveType == MOVETYPE_FLY ) {
-				moveResult = idPhysics_Monster::SlideMove( current.origin, current.velocity, delta );
-			} else {
-				moveResult = idPhysics_Monster::StepMove( current.origin, current.velocity, delta );
-			}
+			moveResult = idPhysics_Monster::StepMove( current.origin, current.velocity, delta );
 			delta.Zero();
-// RAVEN END
-			current.velocity -= ( current.velocity * gravityNormal ) * gravityNormal;
 		}
 	}
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	clipModel->Link( self, 0, current.origin, clipModel->GetAxis() );
-// RAVEN END
+
+	clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 
 	// get all the ground contacts
 	EvaluateContacts();
 
 	// move the monster velocity back into the world frame
 	current.velocity += current.pushVelocity;
-	current.lastPushVelocity = current.pushVelocity;
 	current.pushVelocity.Zero();
-	
+
 	if ( IsOutsideWorld() ) {
 		gameLocal.Warning( "clip model outside world bounds for entity '%s' at (%s)", self->name.c_str(), current.origin.ToString(0) );
 		Rest();
 	}
 
-// RAVEN BEGIN
-// bdube: determine if we moved this frame
-	return true;
-// RAVEN END
+	return ( current.origin != oldOrigin );
 }
 
 /*
@@ -636,10 +614,8 @@ idPhysics_Monster::RestoreState
 */
 void idPhysics_Monster::RestoreState( void ) {
 	current = saved;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	clipModel->Link( self, 0, current.origin, clipModel->GetAxis() );
-// RAVEN END
+
+	clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 
 	EvaluateContacts();
 }
@@ -661,10 +637,7 @@ void idPhysics_Monster::SetOrigin( const idVec3 &newOrigin, int id ) {
 	else {
 		current.origin = newOrigin;
 	}
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	clipModel->Link( self, 0, newOrigin, clipModel->GetAxis() );
-// RAVEN END
+	clipModel->Link( gameLocal.clip, self, 0, newOrigin, clipModel->GetAxis() );
 	Activate();
 }
 
@@ -674,10 +647,7 @@ idPhysics_Player::SetAxis
 ================
 */
 void idPhysics_Monster::SetAxis( const idMat3 &newAxis, int id ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	clipModel->Link( self, 0, clipModel->GetOrigin(), newAxis );
-// RAVEN END
+	clipModel->Link( gameLocal.clip, self, 0, clipModel->GetOrigin(), newAxis );
 	Activate();
 }
 
@@ -690,10 +660,7 @@ void idPhysics_Monster::Translate( const idVec3 &translation, int id ) {
 
 	current.localOrigin += translation;
 	current.origin += translation;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	clipModel->Link( self, 0, current.origin, clipModel->GetAxis() );
-// RAVEN END
+	clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 	Activate();
 }
 
@@ -714,10 +681,7 @@ void idPhysics_Monster::Rotate( const idRotation &rotation, int id ) {
 	else {
 		current.localOrigin = current.origin;
 	}
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	clipModel->Link( self, 0, current.origin, clipModel->GetAxis() * rotation.ToMat3() );
-// RAVEN END
+	clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() * rotation.ToMat3() );
 	Activate();
 }
 
@@ -756,7 +720,7 @@ idPhysics_Monster::GetPushedLinearVelocity
 ================
 */
 const idVec3 &idPhysics_Monster::GetPushedLinearVelocity( const int id ) const {
-	return current.lastPushVelocity;
+	return current.pushVelocity;
 }
 
 /*
@@ -787,6 +751,13 @@ void idPhysics_Monster::SetMaster( idEntity *master, const bool orientated ) {
 		}
 	}
 }
+
+// HUMANHEAD pdm: weren't implemented before, just stubbed out
+void idPhysics_Monster::SetMinFloorCosine( const float newMinFloorCosine ) {
+	minFloorCosine = newMinFloorCosine;
+}
+// HUMANHEAD END
+
 
 const float	MONSTER_VELOCITY_MAX			= 4000;
 const int	MONSTER_VELOCITY_TOTAL_BITS		= 16;

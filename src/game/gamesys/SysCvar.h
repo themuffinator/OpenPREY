@@ -1,33 +1,87 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __SYS_CVAR_H__
 #define __SYS_CVAR_H__
+
+// HUMANHEAD
+extern idCVar	g_tips;
+extern idCVar	g_jawflap;
+extern idCVar	g_wicked;
+extern idCVar	g_casino;
+extern idCVar	g_roadhouseCompleted;
+extern idCVar	g_precache;
+extern idCVar	g_debugProjections;
+extern idCVar	g_showProjectileLaunchPoint;
+extern idCVar	p_tripwireDebug;
+extern idCVar	p_playerPhysicsDebug;
+extern idCVar	p_camRotRateScale;
+extern idCVar	p_camInterpDebug;
+extern idCVar	p_iterRotMoveNumIterations;
+extern idCVar	p_iterRotMoveTransDist;
+extern idCVar	p_disableCamInterp;
+extern idCVar	p_mountedGunDebug;
+extern idCVar	g_mbNumBlurs;
+extern idCVar	g_mbFrameSpan;
+extern idCVar	g_postEventsDebug;
+extern idCVar	g_debugger;
+extern idCVar	g_nodormant;
+extern idCVar	g_robustDormantAll;
+extern idCVar	g_dormanttests;
+extern idCVar	pm_wallwalkstepsize;
+extern idCVar	g_vehicleDebug;
+extern idCVar	sys_SavedPosition;
+extern idCVar	g_crosshair;
+extern idCVar	g_springConstant;
+extern idCVar	g_debugAFs;
+extern idCVar	g_debugFX;
+extern idCVar	ai_debugActions;
+extern idCVar	ai_debugBrain;
+extern idCVar	ai_printSpeech;
+extern idCVar	ai_talonAttack;
+extern idCVar	ai_debugPath;
+extern idCVar	ai_hideSkipThink;
+extern idCVar	g_showDormant;
+extern idCVar	ai_showNoAAS;
+extern idCVar	ai_skipSpeech;
+extern idCVar	ai_skipThink;
+extern idCVar	g_useDDA;
+extern idCVar	g_printDDA;
+extern idCVar	g_trackDDA;
+extern idCVar	g_dumpDDA;
+extern idCVar	g_debugMatter;
+extern idCVar	g_debugImpulse;
+extern idCVar	sys_forceCache;		//mdc - added for forcing caching even if developer is set
+extern idCVar	g_showGamePortals;
+extern idCVar	g_showValidSoundAreas;
+extern idCVar	g_testModelPitch;
+extern idCVar	g_maxEntitiesWarning;
+extern idCVar	g_showEntityCount;
+extern idCVar	g_expensiveMS;
+extern idCVar	g_nogore;
+extern idCVar	g_runMapCycle;
+extern idCVar	g_forceSingleSmokeView;
+//HUMANHEAD END
 
 extern idCVar	developer;
 
 extern idCVar	g_cinematic;
 extern idCVar	g_cinematicMaxSkipTime;
 
-// RAVEN BEGIN
-// jnewquist: vertical stretch for letterboxed cinematics authored for 4:3 aspect
-extern idCVar	g_fixedHorizFOV;
-// RAVEN END
+extern idCVar	r_aspectRatio;
 
 extern idCVar	g_monsters;
 extern idCVar	g_decals;
 extern idCVar	g_knockback;
-extern idCVar	g_skill;
+//extern idCVar	g_skill;				// HUMANHEAD pdm: not used
 extern idCVar	g_gravity;
-extern idCVar	g_mp_gravity;
 extern idCVar	g_skipFX;
 extern idCVar	g_skipParticles;
+extern idCVar	g_bloodEffects;
 extern idCVar	g_projectileLights;
 extern idCVar	g_doubleVision;
 extern idCVar	g_muzzleFlash;
-extern idCVar	g_nailTrail;
-extern idCVar	g_grenadeTrail;
-extern idCVar	g_rocketTrail;
-extern idCVar	g_railTrail;
-extern idCVar	g_napalmTrail;
+extern idCVar	g_ragdollDecals;
 
 extern idCVar	g_disasm;
 extern idCVar	g_debugBounds;
@@ -39,29 +93,14 @@ extern idCVar	g_debugScript;
 extern idCVar	g_debugMover;
 extern idCVar	g_debugTriggers;
 extern idCVar	g_debugCinematic;
-// RAVEN BEGIN
-// bdube: added
-extern idCVar	g_debugState;
 extern idCVar	g_stopTime;
-extern idCVar	g_armorProtection;
-extern idCVar	g_armorProtectionMP;
-//extern idCVar	g_damageScale;
-// jsinger: added to support binary read/write
-extern idCVar	com_BinaryRead;
-#ifdef RV_BINARYDECLS
-extern idCVar	com_BinaryDeclRead;
-#endif
-// jsinger: added to support loading all decls from a single file
-#ifdef RV_SINGLE_DECL_FILE
-extern idCVar	com_SingleDeclFile;
-extern idCVar	com_WriteSingleDeclFile;
-#endif
-extern idCVar	com_BinaryWrite;
-// RAVEN END
-extern idCVar	g_useDynamicProtection;
-extern idCVar	g_healthTakeTime;
-extern idCVar	g_healthTakeAmt;
-extern idCVar	g_healthTakeLimit;
+//extern idCVar	g_armorProtection;			// HUMANHEAD pdm: not used
+//extern idCVar	g_armorProtectionMP;		// HUMANHEAD pdm: not used
+//extern idCVar	g_damageScale;				// HUMANHEAD pdm: not used
+//extern idCVar	g_useDynamicProtection;		// HUMANHEAD pdm: not used
+//extern idCVar	g_healthTakeTime;			// HUMANHEAD pdm: not used
+//extern idCVar	g_healthTakeAmt;			// HUMANHEAD pdm: not used
+//extern idCVar	g_healthTakeLimit;			// HUMANHEAD pdm: not used
 
 extern idCVar	g_showPVS;
 extern idCVar	g_showTargets;
@@ -69,73 +108,27 @@ extern idCVar	g_showTriggers;
 extern idCVar	g_showCollisionWorld;
 extern idCVar	g_showCollisionModels;
 extern idCVar	g_showCollisionTraces;
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
-extern idCVar	g_showClipSectors;
-extern idCVar	g_showClipSectorFilter;
-extern idCVar	g_showAreaClipSectors;
-// RAVEN END
 extern idCVar	g_maxShowDistance;
 extern idCVar	g_showEntityInfo;
 extern idCVar	g_showviewpos;
-extern idCVar	g_debugYawHud;
 extern idCVar	g_showcamerainfo;
 extern idCVar	g_showTestModelFrame;
 extern idCVar	g_showActiveEntities;
 extern idCVar	g_showEnemies;
+
+extern idCVar	g_artificialPlayerCount; //HUMANHEAD rww
+
 extern idCVar	g_frametime;
 extern idCVar	g_timeentities;
-
-// RAVEN BEGIN
-// bdube: new debug cvar
-extern idCVar	g_debugVehicle;
-extern idCVar	g_showFrameCmds;
-extern idCVar	g_showGodDamage;
-// RAVEN END
-
-// RAVEN BEGIN
-// twhitaker: debug cvars for rvVehicleDriver
-extern idCVar	g_debugVehicleDriver;
-extern idCVar	g_debugVehicleAI;
-extern idCVar	g_vehicleMode;
-// RAVEN END
-extern idCVar	g_allowVehicleGunOverheat;
 
 extern idCVar	ai_debugScript;
 extern idCVar	ai_debugMove;
 extern idCVar	ai_debugTrajectory;
-extern idCVar	ai_debugTactical;
-extern idCVar	ai_debugFilterString;
 extern idCVar	ai_testPredictPath;
 extern idCVar	ai_showCombatNodes;
 extern idCVar	ai_showPaths;
 extern idCVar	ai_showObstacleAvoidance;
 extern idCVar	ai_blockedFailSafe;
-extern idCVar	ai_debugSquad;
-extern idCVar	ai_debugStealth;
-extern idCVar	ai_allowTacticalRush;
-
-// RAVEN BEGIN
-// nmckenzie: added speeds and freeze
-extern idCVar	ai_speeds;
-extern idCVar	ai_freeze;
-extern idCVar	ai_animShow;
-extern idCVar	ai_showCover;
-extern idCVar	ai_showTacticalFeatures;
-extern idCVar	ai_disableEntTactical;
-extern idCVar	ai_disableAttacks;
-extern idCVar	ai_disableSimpleThink;
-extern idCVar	ai_disableCover;
-extern idCVar	ai_debugHelpers;
-// cdr: added new master move type
-extern idCVar	ai_useRVMasterMove;
-//jshepard: allow old AAS files
-extern idCVar	ai_allowOldAAS;
-// twhitaker: debugging support for eye focus
-extern idCVar	ai_debugEyeFocus;
-//mcg: always allow player to push buddies, unless scripted
-extern idCVar	ai_playerPushAlways;
-// RAVEN END
 
 extern idCVar	g_dvTime;
 extern idCVar	g_dvAmplitude;
@@ -148,13 +141,6 @@ extern idCVar	g_blobSize;
 
 extern idCVar	g_testHealthVision;
 extern idCVar	g_editEntityMode;
-// RAVEN BEGIN
-extern idCVar	g_editEntityDistance;
-// rhummer: Allow to customize the distance the text is drawn for edit entities, Zack request.
-extern idCVar	g_editEntityTextDistance;
-// rjohnson: entity usage stats
-extern idCVar	g_keepEntityStats;
-// RAVEN END
 extern idCVar	g_dragEntity;
 extern idCVar	g_dragDamping;
 extern idCVar	g_dragShowSelection;
@@ -162,6 +148,11 @@ extern idCVar	g_dropItemRotation;
 
 extern idCVar	g_vehicleVelocity;
 extern idCVar	g_vehicleForce;
+extern idCVar	g_vehicleSuspensionUp;
+extern idCVar	g_vehicleSuspensionDown;
+extern idCVar	g_vehicleSuspensionKCompress;
+extern idCVar	g_vehicleSuspensionDamping;
+extern idCVar	g_vehicleTireFriction;
 
 extern idCVar	ik_enable;
 extern idCVar	ik_debug;
@@ -207,12 +198,8 @@ extern idCVar	rb_showActive;
 extern idCVar	pm_jumpheight;
 extern idCVar	pm_stepsize;
 extern idCVar	pm_crouchspeed;
-// RAVEN BEGIN
-extern idCVar	pm_speed;
 extern idCVar	pm_walkspeed;
-extern idCVar	pm_zoomedSlow;
-extern idCVar 	pm_isZoomed;
-// RAVEN END
+extern idCVar	pm_runspeed;
 extern idCVar	pm_noclipspeed;
 extern idCVar	pm_spectatespeed;
 extern idCVar	pm_spectatebbox;
@@ -244,84 +231,18 @@ extern idCVar	pm_thirdPersonAngle;
 extern idCVar	pm_thirdPersonClip;
 extern idCVar	pm_thirdPerson;
 extern idCVar	pm_thirdPersonDeath;
+extern idCVar	pm_thirdPersonDeathMP; //HUMANHEAD rww
 extern idCVar	pm_modelView;
 extern idCVar	pm_airTics;
 
-// RAVEN BEGIN
-// asalmon: parameters for aim assistance on Xenon
-#ifdef _XBOX
-extern idCVar pm_AimAssist;
-extern idCVar pm_AimAssistDistance;
-extern idCVar pm_AimAssistThreshold;
-extern idCVar pm_AimAssistFOV;
-extern idCVar pm_AimAssistBump;
-extern idCVar pm_AimAssistShow;
-extern idCVar pm_AimAssistSlow;
-
-extern idCVar pm_ThumbstickConfig;
-extern idCVar pm_ButtonConfig;
-
-extern idCVar pm_RocketJumpAutocenter;
-extern idCVar pm_IAmACheater;
-
-
-#endif
-// nmckenzie: added ability to try alternate accelerations.
-extern idCVar	pm_acceloverride;
-extern idCVar	pm_frictionoverride;
-extern idCVar	pm_forcespectatormove;
-extern idCVar	pm_thirdPersonTarget;
-// bdube: vehicle
-extern idCVar	pm_vehicleLean;
-extern idCVar	pm_vehicleCameraSnap;
-extern idCVar	pm_vehicleCameraScaleMax;
-extern idCVar	pm_vehicleSoundLerpScale;
-extern idCVar	pm_vehicleCameraSpeedScale;
-extern idCVar	pm_vehicleCameraMinDist;
-// RAVEN END
-
+extern idCVar	g_showAimHealth; //HUMANHEAD rww
 extern idCVar	g_showPlayerShadow;
-
-extern idCVar	g_skipPlayerShadowsMP;
-extern idCVar	g_skipItemShadowsMP;
-
-extern idCVar	g_simpleItems;
 extern idCVar	g_showHud;
-// RAVEN BEGIN
-extern idCVar	g_crosshairColor;
-// cnicholson: Custom Crosshair 
-extern idCVar	g_crosshairCustom;
-extern idCVar	g_crosshairCustomFile;
-extern idCVar	g_crosshairCharInfoFar;
-// bdube: hud popups
-extern idCVar	g_showHudPopups;
-// bdube: range
-extern idCVar	g_showRange;
-// bdube: debug hud
-extern idCVar	g_showDebugHud;
-// RAVEN END
 extern idCVar	g_showProjectilePct;
-// RAVEN BEGIN
-// bdube: brass time
-extern idCVar	g_brassTime;
-// RAVEN END
+extern idCVar	g_showBrass;
 extern idCVar	g_gun_x;
 extern idCVar	g_gun_y;
 extern idCVar	g_gun_z;
-extern idCVar	cl_gun_x;
-extern idCVar	cl_gun_y;
-extern idCVar	cl_gun_z;
-// RAVEN BEGIN
-// bdube: cvar for messing with foreshortening
-extern idCVar	g_gun_pitch;
-extern idCVar	g_gun_yaw;
-extern idCVar	g_gun_roll;
-// abahr:
-extern idCVar	g_gunViewStyle;
-// jscott: for playbacks
-extern idCVar	g_showPlayback;
-extern idCVar	g_currentPlayback;
-// RAVEN END
 extern idCVar	g_viewNodalX;
 extern idCVar	g_viewNodalZ;
 extern idCVar	g_fov;
@@ -331,39 +252,17 @@ extern idCVar   g_mpWeaponAngleScale;
 
 extern idCVar	g_testParticle;
 extern idCVar	g_testParticleName;
-// RAVEN BEGIN
-// bdube: more rigid body debug
-extern idCVar	rb_showContacts;
-// RAVEN END
 
 extern idCVar	g_testPostProcess;
-extern idCVar	g_autoScreenshot;
-extern idCVar	g_autoScreenshotDelayMs;
-extern idCVar	g_autoScreenshotQuit;
-extern idCVar	g_autoMachinegunImpact;
-extern idCVar	g_autoMachinegunImpactDelayMs;
-extern idCVar	g_autoMachinegunImpactDistance;
-extern idCVar	g_autoMachinegunImpactEffect;
 
 extern idCVar	g_testModelRotate;
 extern idCVar	g_testModelAnimate;
 extern idCVar	g_testModelBlend;
-
-extern idCVar	g_forceModel;
-extern idCVar	g_forceStroggModel;
-extern idCVar	g_forceMarineModel;
-
-// RAVEN BEGIN
-// bdube: test scoreboard
-extern idCVar	g_testScoreboard;
-extern idCVar	g_testPlayer;
-// RAVEN END
 extern idCVar	g_exportMask;
 extern idCVar	g_flushSave;
 
 extern idCVar	aas_test;
 extern idCVar	aas_showAreas;
-extern idCVar	aas_showAreaBounds;
 extern idCVar	aas_showPath;
 extern idCVar	aas_showFlyPath;
 extern idCVar	aas_showWallEdges;
@@ -372,70 +271,24 @@ extern idCVar	aas_pullPlayer;
 extern idCVar	aas_randomPullPlayer;
 extern idCVar	aas_goalArea;
 extern idCVar	aas_showPushIntoArea;
-// RAVEN BEGIN
-// rjohnson: added aas help
-extern idCVar	aas_showProblemAreas;
-// cdr: added rev reach
-extern idCVar	aas_showRevReach;
-// RAVEN END
 
 extern idCVar	net_clientPredictGUI;
 
-extern idCVar	si_voteFlags;
+extern idCVar	g_voteFlags;
 extern idCVar	g_mapCycle;
-// RAVEN BEGIN
-// shouchard:  g_balanceTDM->g_balanceTeams so we can also use it for CTF
-extern idCVar	si_autobalance;
-// RAVEN END
-
-// RITUAL BEGIN
-// squirrel: Mode-agnostic buymenus
-extern idCVar	si_isBuyingEnabled;
-extern idCVar	si_dropWeaponsInBuyingModes;
-extern idCVar	si_controlTime;
-// RITUAL END
+extern idCVar	g_balanceTDM;
 
 extern idCVar	si_timeLimit;
 extern idCVar	si_fragLimit;
 extern idCVar	si_gameType;
 extern idCVar	si_map;
-extern idCVar	si_mapCycle;
 extern idCVar	si_spectators;
-extern idCVar	si_minPlayers;
-// RAVEN BEGIN
-// shouchard:  CTF
-extern idCVar	si_captureLimit;
-// shouchard:  Tourney
-extern idCVar	si_tourneyLimit;
-// RAVEN END
+
+extern idCVar	net_clientSelfSmoothing;
+extern idCVar	net_clientLagOMeter;
 
 extern const char *si_gameTypeArgs[];
 
-// RAVEN BEGIN
-// bdube: client entities
-extern idCVar	g_gamelog;
-extern idCVar	cl_showEntityInfo;
-// jnewquist: Option to force undying state
-extern idCVar	g_forceUndying;
-// mcg: combat performance testing cvars
-extern idCVar g_perfTest_weaponNoFX;
-extern idCVar g_perfTest_hitscanShort;
-extern idCVar g_perfTest_hitscanBBox;
-extern idCVar g_perfTest_aiStationary;
-extern idCVar g_perfTest_aiNoDodge;
-extern idCVar g_perfTest_aiNoRagdoll;
-extern idCVar g_perfTest_aiNoObstacleAvoid;
-extern idCVar g_perfTest_aiUndying;
-extern idCVar g_perfTest_aiNoVisTrace;
-extern idCVar g_perfTest_noJointTransform;
-extern idCVar g_perfTest_noPlayerFocus;
-extern idCVar g_perfTest_noProjectiles;
-// RAVEN END
-
-extern idCVar g_clientProjectileCollision;
-
-extern idCVar net_clientLagOMeter;
-
-extern idCVar net_warnStale;
+//extern const char *ui_skinArgs[];	// HUMANHEAD pdm: removed
 
 #endif /* !__SYS_CVAR_H__ */

@@ -403,6 +403,7 @@ public:
 	virtual int		StartSound( const idSoundShader* shader, const s_channelType channel, float diversity = 0, int shaderFlags = 0, bool allowSlow = true );
 
 	virtual void	ModifySound( const s_channelType channel, const soundShaderParms_t* parms );
+	virtual soundShaderParms_t *GetSoundParms( idSoundShader *shader, const s_channelType channel );
 	virtual void	StopSound( const s_channelType channel );
 
 	virtual void	FadeSound( const s_channelType channel, float to, float over );
@@ -410,6 +411,8 @@ public:
 	virtual bool	CurrentlyPlaying( const s_channelType channel = SCHANNEL_ANY ) const;
 
 	virtual	float	CurrentAmplitude();
+	virtual	float	CurrentAmplitude( const s_channelType channel );
+	virtual	float	CurrentVoiceAmplitude( const s_channelType channel );
 
 	virtual	int		Index() const;
 

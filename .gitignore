@@ -49,3 +49,4 @@ _tmp_*
 /.tmp/
 /.home/
 *.pdb
+$dst/

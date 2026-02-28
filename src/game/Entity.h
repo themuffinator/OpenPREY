@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_ENTITY_H__
 #define __GAME_ENTITY_H__
@@ -9,6 +11,61 @@
 
 ===============================================================================
 */
+
+// HUMANHEAD
+
+// forward declarations
+class hhZone;
+class hhFxInfo;
+class hhEntityFx;
+class hhReaction;
+
+#define SAFE_REMOVE(pPtr) { if((pPtr) != NULL){ (pPtr)->PostEventMS(&EV_Remove, 0); (pPtr) = NULL; }}
+#define SAFE_DELETE_PTR(pPtr) { if((pPtr) != NULL){ delete (pPtr); (pPtr) = NULL; }}
+#define SAFE_DELETE_ARRAY_PTR(pPtr) { if((pPtr) != NULL){ delete [](pPtr); (pPtr) = NULL; }}
+#define SAFE_FREELIGHT(handle) { if((handle) > -1){ gameRenderWorld->FreeLightDef(handle); (handle) = -1; }}
+
+extern void AddRenderGui( const char *name, idUserInterface **gui, const idDict *args );
+extern void SetDeformationOnRenderEntity(renderEntity_t *renderEntity, int deformType, float parm1, float parm2);
+//HUMANHEAD END
+
+//HUMANHEAD
+extern const idEventDef EV_SetSkinByName;
+extern const idEventDef EV_Deactivate;
+extern const idEventDef EV_GlobalBeginState;
+extern const idEventDef EV_GlobalTicker;
+extern const idEventDef EV_GlobalEndState;
+extern const idEventDef EV_GlobalDeactivate;
+extern const idEventDef EV_GlobalActivate;
+extern const idEventDef EV_DeadBeginState;
+extern const idEventDef EV_DeadTicker;
+extern const idEventDef EV_DeadEndState;
+extern const idEventDef EV_StartSound;
+extern const idEventDef EV_StopSound;
+extern const idEventDef EV_StartFx;
+extern const idEventDef EV_SetSoundTrigger;
+extern const idEventDef EV_Gib;
+extern const idEventDef EV_ResetGravity;
+extern const idEventDef EV_MoveToJoint;
+extern const idEventDef EV_MoveToJointWeighted;
+extern const idEventDef EV_MoveJointToJoint;
+extern const idEventDef EV_MoveJointToJointOffset;
+extern const idEventDef EV_SpawnDebris;
+extern const idEventDef EV_DamageEntity;
+extern const idEventDef EV_DelayDamageEntity;
+extern const idEventDef EV_Dispose;
+extern const idEventDef EV_LoadReactions;
+extern const idEventDef EV_UpdateCameraTarget;
+extern const idEventDef EV_SetDeformation;
+extern const idEventDef EV_SpawnBind;
+extern const idEventDef EV_Broadcast_AssignFx;
+extern const idEventDef EV_Broadcast_AppendFxToList;
+extern const idEventDef EV_SetFloatKey;
+extern const idEventDef EV_SetVectorKey;
+extern const idEventDef EV_SetEntityKey;
+extern const idEventDef EV_PlayerCanSee;
+extern const idEventDef EV_KillBox;
+//HUMANHEAD END
 
 static const int DELAY_DORMANT_TIME = 3000;
 
@@ -32,31 +89,6 @@ extern const idEventDef EV_StartSoundShader;
 extern const idEventDef EV_StopSound;
 extern const idEventDef EV_CacheSoundShader;
 
-// RAVEN BEGIN
-extern const idEventDef EV_CallFunction;
-extern const idEventDef EV_SetGuiParm;
-extern const idEventDef EV_SetGuiFloat;
-extern const idEventDef EV_ClearSkin;
-// bdube: more global events for idEntity
-extern const idEventDef EV_GetFloatKey;
-extern const idEventDef EV_HideSurface;
-extern const idEventDef EV_ShowSurface;
-extern const idEventDef EV_GuiEvent;
-extern const idEventDef EV_StopAllEffects;
-extern const idEventDef EV_PlayEffect;
-extern const idEventDef EV_Earthquake;
-extern const idEventDef EV_GuiEvent;
-extern const idEventDef EV_SetKey;
-// jscott:
-extern const idEventDef EV_PlaybackCallback;
-// jshepard:
-extern const idEventDef EV_UnbindTargets;
-// twhitaker:
-extern const idEventDef EV_ApplyImpulse;
-// RAVEN END
-
-class idGuidedProjectile;
-
 // Think flags
 enum {
 	TH_ALL					= -1,
@@ -64,6 +96,14 @@ enum {
 	TH_PHYSICS				= 2,		// run physics each frame
 	TH_ANIMATE				= 4,		// update animation each frame
 	TH_UPDATEVISUALS		= 8,		// update renderEntity
+	TH_UPDATEPARTICLES		= 16,
+	// HUMANHEAD pdm: new think flags
+	TH_TICKER				= 32,		// Run the ticker function
+	TH_COMBATMODEL			= 64,		// Update the combat model
+	TH_MISC1				= 128,		// Misc
+	TH_MISC2				= 256,
+	TH_MISC3				= 512
+	// HUMANHEAD END
 };
 
 //
@@ -83,13 +123,6 @@ typedef enum {
 	SIG_MOVER_1TO2,			// mover changing from position 1 to 2
 	SIG_MOVER_2TO1,			// mover changing from position 2 to 1
 
-// RAVEN BEGIN
-// kfuller: added signals
-	// WARNING: these entries are mirrored in scripts/defs.script so make sure if they move
-	//          here that they move there as well
-	SIG_REACHED,			// object reached it's rotation/motion destination
-// RAVEN END
-
 	NUM_SIGNALS
 } signalNum_t;
 
@@ -106,6 +139,7 @@ class signalList_t {
 public:
 	idList<signal_t> signal[ NUM_SIGNALS ];
 };
+
 
 class idEntity : public idClass {
 public:
@@ -136,18 +170,32 @@ public:
 
 	int						health;					// FIXME: do all objects really need health?
 
-// RAVEN BEGIN
-// ddynerman: optional pre-prediction
-	int						predictTime;
-// bdube: client entities
-	idLinkList<rvClientEntity>	clientEntities;
-
-// rjohnson: will now draw entity info for long thinkers
-	int						mLastLongThinkTime;
-	idVec4					mLastLongThinkColor;
-// RAVEN END
-
 	struct entityFlags_s {
+		// HUMANHEAD
+		bool				noRemoveWhenUnbound	:1;	// Will not be removed when RemoveBinds is called
+		bool				refreshReactions	:1;	// This entity wants an update for notifying AI
+		bool				touchTriggers		:1;	// This entity touches triggers each frame
+		bool				robustDormant		:1;	// More complex dormant test, that tests all possible pvs areas of the entity against all the player
+		bool				canBeTractored		:1;	// Tractor beam can attach to it
+		bool				tooHeavyForTractor	:1;	// Used on actors that are too heavy to pick up
+		bool				isTractored			:1; // rww - entity is currently held by a tractor beam
+		bool				onlySpiritWalkTouch	:1;	// Can only be touched in spiritwalk
+		bool				allowSpiritWalkTouch:1;	// Can be touched in spiritwalk or not
+		bool				applyDamageEffects	:1; // Will have damage effects applied to it
+		bool				clientEntity		:1; //this entity should think on the client, and exists only on the client. -rww
+		bool				clientEvents		:1; //allows events to be queued on the client -rww
+		bool				clientZombie		:1; //an entity which has exited the pvs but still exists on the client -rww
+		bool				disposed			:1;	// has been disposed
+		bool				ignoreGravityZones	:1;	// do not obey gravity zones no matter what
+		bool				noPortal			:1; // cjr:  do not allow this entity to portal
+		bool				noJawFlap			:1;	// Never allow jaw flap, optimization
+		bool				acceptsWounds		:1;	// entity accepts decals, overlays, and wounds
+		bool				accurateGuiTrace	:1; // forces more expensive/accurate gui trace (set on console)
+		//HUMANHEAD PCF rww 05/27/06 - force pusher sort
+		bool				forcePusherSort		:1; //forces entity to be sorted as a pusher, ignoring status as a bindmaster
+						//no more bits left!
+		//HUMANHEAD END
+		//HUMANHEAD END
 		bool				notarget			:1;	// if true never attack or target this entity
 		bool				noknockback			:1;	// if true no knockback from hits
 		bool				takedamage			:1;	// if true this entity can be damaged
@@ -160,36 +208,40 @@ public:
 		bool				isDormant			:1;	// if true the entity is dormant
 		bool				hasAwakened			:1;	// before a monster has been awakened the first time, use full PVS for dormant instead of area-connected
 		bool				networkSync			:1; // if true the entity is synchronized over the network
-
-// RAVEN BEGIN
-// bdube: added			
-		bool				networkStale		:1; // was in the snapshot but isnt anymore
-// bgeisler: added block
-		bool				triggerAnim			:1;
-		bool				usable				:1;	// if true the entity is usable by the player
-// cdr: Obstacle Avoidance
-		bool				isAIObstacle		:1; // if true, this entity will add itself to the obstacles list in each aas area it touches
-// RAVEN END
-
-// RAVEN BEGIN
-// ddynerman: exclude this entity from instance-purging
-	// twhitaker: moved variable to be within the bit flags
-		bool				persistAcrossInstances	:1;
-// twhitaker: exited vehicle already?
-		bool				exitedVehicle			:1;
-// twhitaker: blinking
-		bool				allowAutoBlink			:1;
-// jshepard: instant burnout when destroyed
-		bool				quickBurn				:1;
-
-// RAVEN END
 	} fl;
+
+	// HUMANHEAD Variables 
+public:
+	
+	idDict *			 	lastTimeSoundPlayed;	// nla - To prevent the same sound from being played too often
+	int						spawnHealth;			// jrm - the initial health we were spawned with
+	int						lastDamageTime;			// jrm - time stamp of the last time this entity received damage
+	int						lastHealTime;			// jrm - time stamp of the last time this entity received health	
+	mutable int				nextCallbackTime;		// pdm - for deforms, only needed on rendered entities
+	deferredEntityCallback_t	animCallback;		// pdm - original md5 callback, used when deform is present
+
+	float					thinkMS;				// MS spent thinking (for dormancy comparison and profiling)
+	float					dormantMS;				// MS spent checking for dormancy (temp for profiling dormancy)
+	
+	bool					pushes;
+	float					pushCosine;
+
+	int						GetNumReactions(void)				const	{return reactions.Num();}
+	hhReaction*				GetReaction(int i)							{return reactions[i];}	
+protected:
+	void					LoadReactions();	// HUMANHEAD JRM: Load this entity's reactions - called from spawn
+	idList<hhReaction*>		reactions;			// HUMANHEAD JRM: All of the reactions this entity can send
+
+	hhWoundManagerRenderEntity* woundManager;
+	virtual hhWoundManagerRenderEntity* CreateWoundManager() const { return new hhWoundManagerRenderEntity(this); }
+	virtual hhWoundManagerRenderEntity* GetWoundManager() { if(!woundManager) { woundManager = CreateWoundManager(); } return woundManager; }
+	// HUMANHEAD END
 
 public:
 	ABSTRACT_PROTOTYPE( idEntity );
 
 							idEntity();
-							~idEntity();
+	virtual					~idEntity();
 
 	void					Spawn( void );
 
@@ -205,57 +257,148 @@ public:
 							// cameras have custom code, and everything else just uses the axis orientation
 	virtual renderView_t *	GetRenderView();
 
+	// HUMANHEAD Methods
+	virtual void			LockedGuiReleased(hhPlayer *player) {}
+	virtual void			SquishedByDoor(idEntity *door);
+	void					ActivatePrefixed(const char *prefix, idEntity *activator);
+	virtual void			GetMasterDefaultPosition( idVec3 &masterOrigin, idMat3 &masterAxis ) const;
+	void					MoveToJoint( idEntity *master, const char *bonename );  // nla
+	void					MoveToJointWeighted( idEntity *master, const char *bonename, idVec3 &weight );  // nla
+	void					MoveJointToJoint( const char *ourBone, idEntity *master, const char *masterBone );  // nla
+	void					MoveJointToJointOffset( const char *ourBone, idEntity *master, const char *masterBone, idVec3 &offset ); // nla
+	void					AlignToJoint( idEntity *master, const char *bonename );  // nla
+	void					AlignJointToJoint( const char *ourBone, idEntity *master, const char *masterBone );  // nla
+	void					SetSkinByName( const char *skinname );
+	virtual void			Ticker(void);							//  HUMANHEAD pdm
+	virtual void			DrawDebug(int page);					// HUMANHEAD pdm: to do custom debug drawing when selected
+	virtual void			FillDebugVars(idDict *args, int page);	// HUMANHEAD pdm: to show debug variables when selected (GAMEINFO)
+	virtual idVec3			GetPortalPoint( void ) { return GetPhysics()->GetOrigin(); } // HUMANHEAD cjr:  The entity will portal when this point crosses the portal plane.  Origin for most, eye location for players
+	virtual void			Portalled(idEntity *portal);			// HUMANHEAD:  This entity was just portalled 
+	virtual bool			CheckPortal( const idEntity *other, int contentMask ); // HUMANHEAD CJR
+	virtual bool			CheckPortal( const idClipModel *mdl, int contentMask ); // HUMANHEAD CJR
+	virtual void			CollideWithPortal( const idEntity *other ); // HUMANHEAD CJR PCF 04/26/06
+	virtual void			CollideWithPortal( const idClipModel *mdl ); // HUMANHEAD CJR PCF 04/26/06
+
+	int						ModelTraceAttach(idVec3 start, idVec3 direction, idVec3 &hitPoint, idVec3 &hitNormal);
+
+	bool					IsDamaged()		{	return health < GetMaxHealth();	}
+	virtual int				GetMaxHealth()	{	return spawnHealth;	}
+	int						GetHealth()		{	return health;		}
+	virtual void			SetHealth( const int newHealth );
+	virtual float			GetHealthLevel();
+	virtual float			GetWoundLevel();
+	virtual const idMat3&	GetAxis( int id = 0 ) const { return GetPhysics()->GetAxis( id ); }
+	virtual const idVec3&	GetOrigin( int id = 0 ) const { return GetPhysics()->GetOrigin( id ); }
+	virtual void			SetGravity( const idVec3 &newGravity ) { GetPhysics()->SetGravity( newGravity ); }
+	virtual const idVec3&	GetGravity() const { return GetPhysics()->GetGravity(); }
+	bool					SwapBindInfo(idEntity *ent2);	// pdm
+	virtual bool			AllowCollision(const trace_t &collision);
+
+	idEntity*				GetTeamChain() const { return teamChain; }
+	virtual bool			ShouldTouchTrigger( idEntity* entity ) const { return true; }
+	bool					IsActive( int flags ) const { return (thinkFlags & flags) != 0; }
+	virtual idVec3 			GetAimPosition() const;
+	virtual int 			GetChannelForAnim( const char *anim ) const;		// nla
+	virtual int				ChannelName2Num( const char *channelName ) const;
+	virtual const char *	GetChannelNameForAnim( const char *animName ) const;
+	virtual //HUMANHEAD jsh made virtual
+	bool					Pushes( ) { return( pushes ); };
+	float					PushCosine() { return( pushCosine ); };			
+	virtual void			RestoreGUI( const char* guiKey, idUserInterface** gui );
+	virtual void			RestoreGUIs();
+	virtual void			StartDisposeCountdown();
+	idEntity*				PickRandomTarget();
+	void					SetSoundMinDistance( float minDistance, const s_channelType channel=SND_CHANNEL_ANY );
+	void					SetSoundMaxDistance( float maxDistance, const s_channelType channel=SND_CHANNEL_ANY );
+	void					HH_SetSoundVolume( float volume, const s_channelType channel=SND_CHANNEL_ANY );
+	float					GetVolume( const s_channelType channel=SND_CHANNEL_ANY );
+	void					SetSoundShakes( float shakes, const s_channelType channel=SND_CHANNEL_ANY );
+	void					SetSoundShaderFlags( int flags, const s_channelType channel=SND_CHANNEL_ANY );
+	void					FadeSoundShader( int to, int over, const s_channelType channel=SND_CHANNEL_ANY );
+	virtual void			ConsoleActivated()	{}
+	virtual void			ClearTalonTargetType() {}; // CJR - called when a gui is used
+	idDict *				GetLastTimeSoundPlayed() { if ( !lastTimeSoundPlayed ) { lastTimeSoundPlayed = new idDict(); } return( lastTimeSoundPlayed ); }		// nla
+	void					SetDeformation(int deformType, float parm1, float parm2=0.0f);
+	void					SetDeformCallback();
+	static bool				MSCallback( renderEntity_s *renderEntity, const renderView_t *renderView, int ms);
+	static bool				TenHertzCallback( renderEntity_s *renderEntity, const renderView_t *renderView );
+	static bool				TwentyHertzCallback( renderEntity_s *renderEntity, const renderView_t *renderView );
+	static bool				ThirtyHertzCallback( renderEntity_s *renderEntity, const renderView_t *renderView );
+	static bool				SixtyHertzCallback( renderEntity_s *renderEntity, const renderView_t *renderView );
+	bool					IsScaled();
+	float					GetScale();
+	void					CallNamedEvent(const char *eventName);
+	float					GetDoorShaderParm(bool locked, bool startup);
+
+	//Generic Spawn interfaces
+	//HUMANHEAD rww - added forceClient
+	virtual //HUMANHEAD jsh made virtual
+	hhEntityFx*				SpawnFxLocal( const char *fxName, const idVec3 &origin, const idMat3& axis = mat3_identity, const hhFxInfo* const fxInfo = NULL, bool forceClient = false );
+	void					SpawnFXPrefixLocal( const idDict* dict, const char* fxKeyPrefix, const idVec3& origin, const idMat3& axis, const hhFxInfo* const fxInfo = NULL, const idEventDef* eventDef = NULL );
+	virtual void			BroadcastEventDef( const idEventDef& eventDef );
+	virtual void			BroadcastDecl( declType_t type, const char* defName, const idEventDef& eventDef );
+	virtual void			BroadcastFx( const char* defName, const idEventDef& eventDef );
+	virtual void			BroadcastEntityDef( const char* defName, const idEventDef& eventDef );
+	virtual void			BroadcastBeam( const char* defName, const idEventDef& eventDef );
+	virtual void			BroadcastFxInfo( const char* fx, const idVec3& origin, const idMat3& axis, const hhFxInfo* const fxInfo = NULL, const idEventDef* eventDef = NULL, bool broadcast = true ); //HUMANHEAD rww - added broadcast
+	virtual void			BroadcastFxInfoPrefixed( const char *fxPrefix, const idVec3 &origin, const idMat3& axis = mat3_identity, const hhFxInfo* const fxInfo = NULL, const idEventDef* eventDef = NULL, bool broadcast = true ); // aob
+	virtual void			BroadcastFxInfoPrefixedRandom( const char *fxPrefix, const idVec3 &origin, const idMat3& axis = mat3_identity, const hhFxInfo* const fxInfo = NULL, const idEventDef* eventDef = NULL ); // aob
+	virtual void			BroadcastFxPrefixedRandom( const char *fxPrefix, const idEventDef &eventDef ); // cjr
+
+	// HH pdm - matter based impact routines
+	virtual void			AddLocalMatterWound( jointHandle_t jointNum, const idVec3 &localOrigin, const idVec3 &localNormal, const idVec3 &localDir, int damageDefIndex, const idMaterial *collisionMaterial );
+	const char *			DetermineImpactSound(int flags);
+	int						PlayImpactSound( const idDict* dict, const idVec3 &origin, surfTypes_t type );
+
+	// HH EVENTS
+	//	void					Event_StartSound( const char *action, bool notifyAI = true );
+	void					Event_MoveToJoint( idEntity *master, const char *bonename );  // nla
+	void					Event_MoveToJointWeighted( idEntity *master, const char *bonename, idVec3 &weight );  // nla
+	void					Event_MoveJointToJoint( const char *ourBone, idEntity *master, const char *masterBone );  // nla
+	void					Event_MoveJointToJointOffset( const char *ourBone, idEntity *master, const char *masterBone, idVec3 &offset ); // nla
+	void					Event_SetSkinByName( const char *skinname );	
+	void					Event_SpawnDebris(const char *debrisKey);	
+	virtual void			Event_DamageEntity( idEntity *target, const char *damageDefName );// HUMANHEAD JRM
+	virtual void			Event_DelayDamageEntity( idEntity *target, const char *damageDefName, float secs );//HUMANHEAD JRM	
+	virtual void			Event_Dispose();	
+	virtual void			Event_ResetGravity();
+	void					Event_LoadReactions();
+	void					Event_SetDeformation(int deformType, float parm1, float parm2);
+	void					Event_SetFloatKey( const char* key, float value );
+	void					Event_SetVectorKey( const char* key, const idVec3& value );
+	void					Event_SetEntityKey( const char* key, const idEntity* value );
+	void					Event_PlayerCanSee();
+	void					Event_SetContents(int contents);
+	void					Event_SetClipmask(int clipmask);
+	void					Event_SetPortalCollision( int collide ); // cjr
+	void					Event_KillBox( void );
+	void					Event_Remove( void ); //HUMANHEAD rww
+
+protected:
+	void					InitCoreStateInfo();
+public:
+	// HUMANHEAD END Methods
+
 	// thinking
 	virtual void			Think( void );
 	bool					CheckDormant( void );	// dormant == on the active list, but out of PVS
 	virtual	void			DormantBegin( void );	// called when entity becomes dormant
 	virtual	void			DormantEnd( void );		// called when entity wakes from being dormant
 	bool					IsActive( void ) const;
+	virtual // HUMANHEAD
 	void					BecomeActive( int flags );
 	void					BecomeInactive( int flags );
 	void					UpdatePVSAreas( const idVec3 &pos );
 
-// jmarshall
-	idVec3					GetOrigin(void);
-	float					GetFloat(const char* key);
-	const char*				GetKey(const char* key);
-	int						GetInt(const char* key);
-	bool					GetBool(const char* key);
-
-	virtual void			InflictedDamageEvent(idEntity* target) { }
-// jmarshall end
-
-// RAVEN BEGIN
-// abahr:
-	bool					IsActive( int flags ) const { return (flags & thinkFlags) > 0; }
-	const char*				GetEntityDefClassName() const { return spawnArgs.GetString("classname"); }
-	bool					IsEntityDefClass( const char* className ) const { return !idStr::Icmp(className, GetEntityDefClassName()); }
-	virtual void			GetPosition( idVec3& origin, idMat3& axis ) const;
-// kfuller: added methods
-	virtual void			GetLocalAngles(idAngles &localAng);
-// RAVEN END
-
 	// visuals
 	virtual void			Present( void );
-	// instance visuals
-	virtual void			InstanceJoin( void );
-	virtual void			InstanceLeave( void );
-// RAVEN BEGIN
-// bdube: removed virtual so it could be inlined
-	renderEntity_t *		GetRenderEntity( void );
-	int						GetModelDefHandle( void );
-// RAVEN END
+	virtual renderEntity_t *GetRenderEntity( void );
+	virtual int				GetModelDefHandle( void );
 	virtual void			SetModel( const char *modelname );
+	virtual //HUMANHEAD
 	void					SetSkin( const idDeclSkin *skin );
 	const idDeclSkin *		GetSkin( void ) const;
-
-// RAVEN BEGIN
-// bdube: surfaces
-	void					HideSurface ( const char* surface );
-	void					ShowSurface ( const char* surface );
-	void					ClearSkin( void );
-// RAVEN END
-
+	virtual //HUMANHEAD
 	void					SetShaderParm( int parmnum, float value );
 	virtual void			SetColor( float red, float green, float blue );
 	virtual void			SetColor( const idVec3 &color );
@@ -268,14 +411,10 @@ public:
 	virtual void			Show( void );
 	bool					IsHidden( void ) const;
 	void					UpdateVisuals( void );
+	virtual //HUMANHEAD: aob
 	void					UpdateModel( void );
-// RAVEN BEGIN
-// abahr: added virtual to UpdateModelTransform
-	virtual
+	virtual //HUMANHEAD: aob
 	void					UpdateModelTransform( void );
-	virtual void			UpdateRenderEntityCallback();
-	virtual const idAnimator *	GetAnimator( void ) const { return NULL; }	// returns animator object used by this entity
-// RAVEN END
 	virtual void			ProjectOverlay( const idVec3 &origin, const idVec3 &dir, float size, const char *material );
 	int						GetNumPVSAreas( void );
 	const int *				GetPVSAreas( void );
@@ -284,44 +423,28 @@ public:
 
 	// animation
 	virtual bool			UpdateAnimationControllers( void );
-	bool					UpdateRenderEntity( renderEntity_s *renderEntity, const renderView_t *renderView );
+	virtual		// HUMANHEAD nla - Used to test which anims are played in the hand
+	bool					UpdateRenderEntity( renderEntity_s *renderEntity, const renderView_t *renderView ) const;
 	static bool				ModelCallback( renderEntity_s *renderEntity, const renderView_t *renderView );
-	virtual idAnimator *	GetAnimator( void );	// returns animator object used by this entity
+	// HUMANHEAD nla - Made return type hhAnimator
+	virtual hhAnimator *	GetAnimator( void );	// returns animator object used by this entity
+	// aob - made const version
+	virtual const hhAnimator *	GetAnimator( void ) const;
+	// HUMANHEAD END
 
 	// sound
 	virtual bool			CanPlayChatterSounds( void ) const;
-	bool					StartSound( const char *soundName, const s_channelType channel, int soundShaderFlags, bool broadcast, int *length );
-	bool					StartSoundShader( const idSoundShader *shader, const s_channelType channel, int soundShaderFlags, bool broadcast, int *length );
-	void					StopSound( const s_channelType channel, bool broadcast );	// pass SND_CHANNEL_ANY to stop all sounds
+	virtual//HUMANHEAD: aob
+	bool					StartSound( const char *soundName, const s_channelType channel, int soundShaderFlags = 0, bool broadcast = false, int *length = NULL );
+	virtual//HUMANHEAD: aob
+	bool					StartSoundShader( const idSoundShader *shader, const s_channelType channel, int soundShaderFlags = 0, bool broadcast = false, int *length = NULL );
+	virtual//HUMANHEAD: aob
+	void					StopSound( const s_channelType channel, bool broadcast = false);	// pass SND_CHANNEL_ANY to stop all sounds
 	void					SetSoundVolume( float volume );
 	void					UpdateSound( void );
 	int						GetListenerId( void ) const;
-// RAVEN BEGIN
-	int						GetSoundEmitter( void ) const;
-// RAVEN END
+	idSoundEmitter *		GetSoundEmitter( void ) const;
 	void					FreeSoundEmitter( bool immediate );
-
-// RAVEN BEGIN
-// bdube: added effect functions
-	// effects
-	rvClientEffect*			PlayEffect		( const char* effectName, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect		( const idDecl *effect, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect		( const char* effectName, jointHandle_t joint, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-
-	rvClientEffect*			PlayEffect		( const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect		( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	void					StopEffect		( const char* effectName, bool destroyParticles = false );
-	void					StopEffect		( const idDecl *effect, bool destroyParticles = false );
-	void					StopAllEffects	( bool destroyParticles = false );
-	void					UpdateEffects	( void );
-
-	float					DistanceTo		( idEntity* ent );
-	float					DistanceTo		( const idVec3& pos ) const;
-	float					DistanceTo2d	( idEntity* ent );
-	float					DistanceTo2d	( const idVec3& pos ) const;
-
-	virtual bool			CanTakeDamage	( void ) const;
-// RAVEN END
 
 	// entity binding
 	virtual void			PreBind( void );
@@ -335,40 +458,35 @@ public:
 	void					BindToBody( idEntity *master, int bodyId, bool orientated );
 	void					Unbind( void );
 	bool					IsBound( void ) const;
-// RAVEN BEGIN
-// abahr: added const so it can be called from const functions
-	bool					IsBoundTo( const idEntity *master ) const;
-// RAVEN END
+	bool					IsBoundTo( idEntity *master ) const;
+	virtual			//HUMANHEAD jsh
 	idEntity *				GetBindMaster( void ) const;
 	jointHandle_t			GetBindJoint( void ) const;
 	int						GetBindBody( void ) const;
 	idEntity *				GetTeamMaster( void ) const;
 	idEntity *				GetNextTeamEntity( void ) const;
-// RAVEN BEGIN
-// abahr: added virtual
-	virtual
 	void					ConvertLocalToWorldTransform( idVec3 &offset, idMat3 &axis );
-// RAVEN END
 	idVec3					GetLocalVector( const idVec3 &vec ) const;
 	idVec3					GetLocalCoordinates( const idVec3 &vec ) const;
 	idVec3					GetWorldVector( const idVec3 &vec ) const;
 	idVec3					GetWorldCoordinates( const idVec3 &vec ) const;
-
-	virtual	bool			GetMasterPosition( idVec3 &masterOrigin, idMat3 &masterAxis ) const;
+	bool					GetMasterPosition( idVec3 &masterOrigin, idMat3 &masterAxis ) const;
 	void					GetWorldVelocities( idVec3 &linearVelocity, idVec3 &angularVelocity ) const;
 
 	// physics
 							// set a new physics object to be used by this entity
 	void					SetPhysics( idPhysics *phys );
 							// get the physics object used by this entity
-	idPhysics *				GetPhysics( void ) const;
+	ID_INLINE idPhysics *	GetPhysics( void ) const { return physics; } // HUMANHEAD mdl:  Made inline
 							// restore physics pointer for save games
 	void					RestorePhysics( idPhysics *phys );
 							// run the physics for this entity
+	virtual		// HUMANHEAD nla
 	bool					RunPhysics( void );
 							// set the origin of the physics object (relative to bindMaster if not NULL)
 	void					SetOrigin( const idVec3 &org );
 							// set the axis of the physics object (relative to bindMaster if not NULL)
+	virtual //HUMANHEAD: aob
 	void					SetAxis( const idMat3 &axis );
 							// use angles to set the axis of the physics object (relative to bindMaster if not NULL)
 	void					SetAngles( const idAngles &ang );
@@ -380,11 +498,10 @@ public:
 	virtual bool			GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis );
 							// called from the physics object when colliding, should return true if the physics simulation should stop
 	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity );
-	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity, bool &hitTeleporter ) { hitTeleporter = false; return Collide(collision, velocity); }
 							// retrieves impact information, 'ent' is the entity retrieving the info
 	virtual void			GetImpactInfo( idEntity *ent, int id, const idVec3 &point, impactInfo_t *info );
 							// apply an impulse to the physics object, 'ent' is the entity applying the impulse
-	virtual void			ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse, bool splash = false );
+	virtual void			ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse );
 							// add a force to the physics object, 'ent' is the entity adding the force
 	virtual void			AddForce( idEntity *ent, int id, const idVec3 &point, const idVec3 &force );
 							// activate the physics object, 'ent' is the entity activating this entity
@@ -398,37 +515,14 @@ public:
 							// remove a touching entity
 	virtual void			RemoveContactEntity( idEntity *ent );
 
-// RAVEN BEGIN
-// kfuller: added blocked methods
-	virtual void			LastBlockedBy(int blockedEntNum) {}
-	virtual int				GetLastBlocker(void) { return -1; }
-// rjohnson: moved entity info out of idGameLocal into its own function
-	virtual void			DrawDebugEntityInfo( idBounds *viewBounds = 0, idBounds *viewTextBounds = 0, idVec4 *overrideColor = 0 );
-// nmckenzie: Adding ability for non-Actors to be enemies for AI characters.  Rename this function at some point, most likely.
-	virtual idVec3			GetEyePosition( void ) const { return GetPhysics()->GetOrigin(); }
-// abahr:
-	virtual bool			SkipImpulse( idEntity *ent, int id );
-	virtual void			ApplyImpulse( idEntity* ent, int id, const idVec3& point, const idVec3& dir, const idDict* damageDef );
-// RAVEN END
-
 	// damage
-// RAVEN BEGIN
-	// twhitaker:			// Sets the damage enitty 
-	void					SetDamageEntity ( idEntity * forward ) { forwardDamageEnt = forward; }
-
-	// bdube: added ignore entity
-							// Returns the entity that should take damage for this entity
-	virtual idEntity*		GetDamageEntity ( void );
-
 							// returns true if this entity can be damaged from the given origin
-	virtual bool			CanDamage( const idVec3 &origin, idVec3 &damagePoint, idEntity* ignoreEnt = NULL ) const;
-// RAVEN END
+	virtual bool			CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const;
 							// applies damage to this entity
 	virtual	void			Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location );
 							// adds a damage effect like overlays, blood, sparks, debris etc.
-	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, idEntity* inflictor );
-	virtual bool			CanPlayImpactEffect ( idEntity* attacker, idEntity* target );
-							// callback function for when another entity recieved damage from this entity.  damage can be adjusted and returned to the caller.
+	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, bool broadcast = false ); //HUMANHEAD rww - added broadcast
+							// callback function for when another entity received damage from this entity.  damage can be adjusted and returned to the caller.
 	virtual void			DamageFeedback( idEntity *victim, idEntity *inflictor, int &damage );
 							// notifies this entity that it is in pain
 	virtual bool			Pain( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
@@ -452,40 +546,27 @@ public:
 	virtual bool			HandleSingleGuiCommand( idEntity *entityGui, idLexer *src );
 
 	// targets
-// RAVEN BEGIN
-// abahr: made virtual
-	virtual
 	void					FindTargets( void );
-	virtual
 	void					RemoveNullTargets( void );
-	virtual
+	virtual	// HUMANHEAD: made virtual
 	void					ActivateTargets( idEntity *activator ) const;
-// jshepard: unbind targets
-	void					UnbindTargets( idEntity *activator ) const;
-// RAVEN END
-
-// RAVEN BEGIN
-// twhitaker: Add to the list of targets (usually from script)
-	int						AppendTarget( idEntity *appendMe );
-	void					RemoveTarget( idEntity *removeMe );
-	void					RemoveTargets( bool destroyContents );
-// RAVEN END
+	virtual void			DeactivateTargetsType( const idTypeInfo &classdef ) const;	//HUMANHEAD jsh
 
 	// misc
 	virtual void			Teleport( const idVec3 &origin, const idAngles &angles, idEntity *destination );
-	bool					TouchTriggers( const idTypeInfo* ownerType = NULL ) const;
+	bool					TouchTriggers( void ) const;
 	idCurve_Spline<idVec3> *GetSpline( void ) const;
 	virtual void			ShowEditingDialog( void );
 
 	enum {
 		EVENT_STARTSOUNDSHADER,
 		EVENT_STOPSOUNDSHADER,
-// RAVEN BEGIN		
-// bdube: new events
-		EVENT_PLAYEFFECT,
-		EVENT_PLAYEFFECT_JOINT,
-		EVENT_STOPEFFECT,
-// RAVEN END
+		//HUMANHEAD: aob
+		EVENT_ADD_WOUND,
+		EVENT_PROJECT_DECAL, //rww added - needs to always be done on the client.
+		EVENT_EVENTDEF,
+		EVENT_DECL,
+		//HUMANEHAD END
 		EVENT_MAXEVENTS
 	};
 
@@ -494,14 +575,10 @@ public:
 	virtual void			ReadFromSnapshot( const idBitMsgDelta &msg );
 	virtual bool			ServerReceiveEvent( int event, int time, const idBitMsg &msg );
 	virtual bool			ClientReceiveEvent( int event, int time, const idBitMsg &msg );
-// RAVEN BEGIN
-	// the entity was not in the snapshot sent by server. means it either went out of PVS, or was deleted server side
-	// return true if the entity wishes to be deleted locally
-	// depending on the entity, understanding stale as just another state, or a removal is best
-	// ( by default, idEntity keeps the entity around after a little cleanup )
-	virtual bool			ClientStale( void );
-	virtual void			ClientUnstale( void );
-// RAVEN END
+	//HUMANHEAD rww
+	virtual void			NetZombify(void);
+	virtual void			NetResurrect(void);
+	//HUMANHEAD END
 
 	void					WriteBindToSnapshot( idBitMsgDelta &msg ) const;
 	void					ReadBindFromSnapshot( const idBitMsgDelta &msg );
@@ -510,38 +587,27 @@ public:
 	void					WriteGUIToSnapshot( idBitMsgDelta &msg ) const;
 	void					ReadGUIFromSnapshot( const idBitMsgDelta &msg );
 
-	void					ServerSendEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient ) const;
-	void					ServerSendInstanceEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient ) const;
-	void					ClientSendEvent( int eventId, const idBitMsg *msg ) const;
+	//HUMANHEAD rww
+	void					ServerSendPVSEvent( int eventId, const idBitMsg *msg, const idVec3 &pvsPoint ) const;
 
-// RAVEN BEGIN
-// bdube: debugging
-	virtual void			GetDebugInfo( debugInfoProc_t proc, void* userData );
-// mwhitlock: memory profiling
-	virtual size_t			Size( void ) const;
-// ddynerman: multiple arenas (for MP)
-	virtual void			SetInstance( int newInstance );
-	virtual int				GetInstance( void ) const;
-// ddynerman: multiple clip world support
-	virtual int				GetClipWorld( void ) const;
-	virtual void			SetClipWorld( int newCW );
-// scork: accessors so sound editor can indicate current-highlit ent
-	virtual int				GetRefSoundShaderFlags( void ) const;
-	virtual void			SetRefSoundShaderFlags( int iFlags );
-// twhitaker: guided projectiles
-	virtual void			GuidedProjectileIncoming( idGuidedProjectile * projectile ) { }
-// RAVEN END
+	//HUMANHEAD rww - added singleClient and unreliable
+	void					ServerSendEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient, int singleClient = -1, bool unreliable = false ) const;
+	void					ClientSendEvent( int eventId, const idBitMsg *msg ) const;
 
 protected:
 	renderEntity_t			renderEntity;						// used to present a model to the renderer
 	int						modelDefHandle;						// handle to static renderer model
 	refSound_t				refSound;							// used to present sound to the audio engine
-	idEntityPtr< idEntity >	forwardDamageEnt;					// damage applied to the invoking object will be forwarded to this entity
-	idEntityPtr< idEntity > bindMaster;							// entity bound to if unequal NULL
-	jointHandle_t			bindJoint;							// joint bound to if unequal INVALID_JOINT
-private:
+
+	//HUMANHEAD: aob
+	void					BroadcastEventReroute( int eventId, const idBitMsg *msg, bool saveEvent = false, int excludeClient = -1 );
+	//HUMANHEAD END
+
+protected://HUMANHEAD
 	idPhysics_Static		defaultPhysicsObj;					// default physics object
 	idPhysics *				physics;							// physics used for this entity
+	idEntity *				bindMaster;							// entity bound to if unequal NULL
+	jointHandle_t			bindJoint;							// joint bound to if unequal INVALID_JOINT
 	int						bindBody;							// body bound to if unequal -1
 	idEntity *				teamMaster;							// master of the physics team
 	idEntity *				teamChain;							// next entity in physics team
@@ -552,24 +618,17 @@ private:
 	signalList_t *			signals;
 
 	int						mpGUIState;							// local cache to avoid systematic SetStateInt
-// RAVEN BEGIN
-// abahr: changed to protected for access in children classes
-protected:
-// ddynerman: multiple game instances
-	int						instance;
-// ddynerman: multiple collision worlds
-	int						clipWorld;
-// RAVEN END
 
-// RAVEN BEGIN
-// bdube: made virtual
-	virtual bool			DoDormantTests( void );				// dormant == on the active list, but out of PVS
-// RAVEN END
+protected://HUMANHEAD
+	void					FixupLocalizedStrings();
+
+	bool					DoDormantTests( void );				// dormant == on the active list, but out of PVS
 
 	// physics
 							// initialize the default physics
 	void					InitDefaultPhysics( const idVec3 &origin, const idMat3 &axis );
 							// update visual position from the physics
+	virtual	// HUMANHEAD made virtual
 	void					UpdateFromPhysics( bool moveBack );
 
 	// entity binding
@@ -579,11 +638,6 @@ protected:
 	void					QuitTeam( void );					// leave the current team
 
 	void					UpdatePVSAreas( void );
-
-// RAVEN BEGIN
-// bdube: client entities
-	void					RemoveClientEntities ( void );		// deletes any client entities bound to this object
-// RAVEN END
 
 	// events
 	void					Event_GetName( void );
@@ -648,88 +702,13 @@ protected:
 	void					Event_Wait( float time );
 	void					Event_HasFunction( const char *name );
 	void					Event_CallFunction( const char *name );
+	virtual // HUMANHEAD jsh
 	void					Event_SetNeverDormant( int enable );
-
-// RAVEN BEGIN
-// kfuller: added events
-	void					Event_SetContents				( int contents );
-	void					Event_GetLastBlocker			( idThread *thread );
-// begisler: added
-	void					Event_ClearSkin					( void );
-// bdube: effect events
-	void					Event_PlayEffect				( const char* effectName, const char* boneName, bool loop );
-	void					Event_StopEffect				( const char* effectName );
-	void					Event_StopAllEffects			( void );
-	void					Event_GetHealth					( void );
-// bdube: mesh events
-	void					Event_ShowSurface				( const char* surface );
-	void					Event_HideSurface				( const char* surface );
-// bdube: gui events
-	void					Event_GuiEvent					( const char* eventName );
-// jscott:
-	void					Event_PlaybackCallback			( int type, int changed, int impulse );
-// nmckenzie: get bind master
-	void					Event_GetBindMaster				( void );
-	void					Event_ApplyImpulse				( idEntity *source, const idVec3 &point, const idVec3 &impulse );
-// jshepard: unbind all targets
-	void					Event_UnbindTargets				( idEntity *activator);
-// abahr:
-	void					Event_RemoveNullTargets			();
-	void					Event_IsA						( const char* entityDefName );
-	void					Event_IsSameTypeAs				( const idEntity* ent );
-	void					Event_MatchPrefix				( const char *prefix, const char* previousKey );
-	void					Event_ClearTargetList			( float destroyContents );
-// twhitaker: added - to add targets from script
-	void					Event_AppendTarget				( idEntity *appendMe );
-	void					Event_RemoveTarget				( idEntity *removeMe );
-// mekberg: added
-	void					Event_SetHealth					( float newHealth );
-// RAVEN END
+#if GAMEPAD_SUPPORT	// VENOM BEGIN
+	void					Event_PlayRumbleEffect( int effect );
+	void					Event_StopRumbleEffect( void );
+#endif // VENOM END
 };
-
-// RAVEN BEGIN
-// bdube: added inlines
-ID_INLINE rvClientEffect* idEntity::PlayEffect( const char* effectName, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, 
-												 bool broadcast, effectCategory_t category, const idVec4& effectTint ) { 
-	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), origin, axis, loop, endOrigin, broadcast, category, effectTint );
-}
-
-ID_INLINE rvClientEffect* idEntity::PlayEffect( const char* effectName, jointHandle_t jointHandle, bool loop, const idVec3& endOrigin, 
-												bool broadcast, effectCategory_t category, const idVec4& effectTint ) { 
-	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), jointHandle, vec3_origin, mat3_identity, loop, endOrigin, broadcast, category, effectTint );
-}
-
-ID_INLINE rvClientEffect* idEntity::PlayEffect( const char* effectName, jointHandle_t jointHandle, const idVec3& originOffset, const idMat3& axisOffset, bool loop, const idVec3& endOrigin, 
-												bool broadcast, effectCategory_t category, const idVec4& effectTint ) { 
-	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), jointHandle, originOffset, axisOffset, loop, endOrigin, broadcast, category, effectTint );
-}
-
-
-ID_INLINE idPhysics *idEntity::GetPhysics( void ) const {
-	return physics;
-}
-
-ID_INLINE renderEntity_t *idEntity::GetRenderEntity( void ) {
-	return &renderEntity;
-}
-
-ID_INLINE int idEntity::GetModelDefHandle( void ) {
-	return modelDefHandle;
-}
-
-// scork: accessors so sound editor can indicate current-highlit ent
-ID_INLINE int idEntity::GetRefSoundShaderFlags( void ) const
-{
-	return refSound.parms.soundShaderFlags;
-}
-
-ID_INLINE void idEntity::SetRefSoundShaderFlags( int iFlags )
-{
-	refSound.parms.soundShaderFlags = iFlags;
-}
-
-
-// RAVEN END
 
 /*
 ===============================================================================
@@ -744,14 +723,13 @@ typedef struct damageEffect_s {
 	idVec3					localOrigin;
 	idVec3					localNormal;
 	int						time;
-// RAVEN BEGIN
-// jscott: not using
-//	const idDeclParticle*	type;
-// RAVEN END
+	const idDeclParticle*	type;
 	struct damageEffect_s *	next;
 } damageEffect_t;
 
-class idAnimatedEntity : public idEntity {
+//HUMANHEAD: aob - changed inheritance to hhRenderEntity
+#include "../prey/game_renderentity.h"
+class idAnimatedEntity : public hhRenderEntity {
 public:
 	CLASS_PROTOTYPE( idAnimatedEntity );
 
@@ -764,25 +742,24 @@ public:
 	virtual void			ClientPredictionThink( void );
 	virtual void			Think( void );
 
+	virtual	//HUMANHEAD jsh
 	void					UpdateAnimation( void );
 
-	virtual idAnimator *	GetAnimator( void );
+	// HUMANHEAD nla - Make it return our animator
+	virtual hhAnimator *	GetAnimator( void );
+	// HUMANHEAD END
 	virtual void			SetModel( const char *modelname );
 
+	virtual // HUMANHEAD: aob
 	bool					GetJointWorldTransform( jointHandle_t jointHandle, int currentTime, idVec3 &offset, idMat3 &axis );
 	bool					GetJointTransformForAnim( jointHandle_t jointHandle, int animNum, int currentTime, idVec3 &offset, idMat3 &axis ) const;
 
 	virtual int				GetDefaultSurfaceType( void ) const;
-	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, idEntity* inflictor );
-	virtual void			ProjectHeadOverlay( const idVec3 &point, const idVec3 &dir, float size, const char *decal ) {}
+	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, bool broadcast = false ); //HUMANHEAD rww - added broadcast
+	void					AddLocalDamageEffect( jointHandle_t jointNum, const idVec3 &localPoint, const idVec3 &localNormal, const idVec3 &localDir, const idDeclEntityDef *def, const idMaterial *collisionMaterial );
+	void					UpdateDamageEffects( void );
 
 	virtual bool			ClientReceiveEvent( int event, int time, const idBitMsg &msg );
-
-// RAVEN BEGIN
-// abahr:
-	virtual const idAnimator *	GetAnimator( void ) const { return &animator; }
-	virtual void			UpdateRenderEntityCallback();
-// RAVEN BEGIN
 
 	enum {
 		EVENT_ADD_DAMAGE_EFFECT = idEntity::EVENT_MAXEVENTS,
@@ -790,13 +767,14 @@ public:
 	};
 
 protected:
+// HUMANHEAD nla - Make it our animator
+#ifdef HUMANHEAD
+	hhAnimator				animator;
+#else
 	idAnimator				animator;
+#endif
+// HUMANHEAD END
 	damageEffect_t *		damageEffects;
-
-// RAVEN BEGIN
-// jshepard:
-	void					Event_ClearAnims				( void );
-// RAVEN END
 
 private:
 	void					Event_GetJointHandle( const char *jointname );
@@ -806,54 +784,6 @@ private:
 	void 					Event_SetJointAngle( jointHandle_t jointnum, jointModTransform_t transform_type, const idAngles &angles );
 	void 					Event_GetJointPos( jointHandle_t jointnum );
 	void 					Event_GetJointAngle( jointHandle_t jointnum );
-
-// RAVEN BEGIN
-// bdube: programmer controlled joint events
-	void					Event_SetJointAngularVelocity	( const char* jointName, float pitch, float yaw, float roll, int blendTime );
-	void					Event_CollapseJoints			( const char* jointnames, const char* collapseTo );
-
-
-
-// RAVEN END
 };
 
-// RAVEN BEGIN
-void UpdateGuiParms( idUserInterface *gui, const idDict *args );
-// RAVEN END
-
-ID_INLINE float idEntity::DistanceTo ( idEntity* ent ) {
-	return DistanceTo ( ent->GetPhysics()->GetOrigin() ); 
-}
-
-ID_INLINE float idEntity::DistanceTo ( const idVec3& pos ) const {
-	return (pos - GetPhysics()->GetOrigin()).LengthFast ( ); 
-}
-
-ID_INLINE float idEntity::DistanceTo2d ( idEntity* ent ) {
-	return DistanceTo2d ( ent->GetPhysics()->GetOrigin() ); 
-}
-
-ID_INLINE bool idEntity::CanTakeDamage ( void ) const {
-	return fl.takedamage;
-}
-
-// RAVEN BEGIN
-// ddynerman: MP arena stuff
-ID_INLINE int idEntity::GetInstance( void ) const {
-	return instance;
-}
-
-// ddynerman: multiple collision worlds
-ID_INLINE int idEntity::GetClipWorld( void ) const {
-	return clipWorld;
-}
-
-ID_INLINE void idEntity::SetClipWorld( int newCW ) {
-	clipWorld = newCW;
-	if( GetPhysics() ) {
-		GetPhysics()->UnlinkClip();
-		GetPhysics()->LinkClip();
-	}
-}
-// RAVEN END
 #endif /* !__GAME_ENTITY_H__ */

@@ -666,7 +666,7 @@ the renderSystem is initialized
 */
 void idConsoleLocal::LoadGraphics() {
 // jmarshall
-	charSetShader = declManager->FindMaterial( "fonts/english/bigchars" );
+	charSetShader = declManager->FindMaterial( "textures/bigchars" );
 // jmarshall end
 	whiteShader = declManager->FindMaterial( "_white" );
 	consoleShader = declManager->FindMaterial( "console" );

@@ -310,12 +310,12 @@ void idAsyncServer::ExecuteMapChange( void ) {
 
 	serverTime = 0;
 
-	// OpenQ4 dev/staging runs from directory overrides (fs_cdpath). Keep
+	// OpenPrey dev/staging runs from directory overrides (fs_cdpath). Keep
 	// multiplayer server startup non-pure to avoid pure-lockdown failures.
 	if ( sessLocal.mapSpawnData.serverInfo.GetInt( "si_pure" ) ) {
 		sessLocal.mapSpawnData.serverInfo.SetInt( "si_pure", 0 );
 		cvarSystem->SetCVarBool( "si_pure", false );
-		common->Printf( "OpenQ4: forcing si_pure 0 for local server startup\n" );
+		common->Printf( "OpenPrey: forcing si_pure 0 for local server startup\n" );
 	}
 
 	// initialize game id and time
@@ -703,7 +703,7 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	}
 
 	// let the game know a player connected
-	game->ServerClientConnect( clientNum, client.guid );
+	game->ServerClientConnect( clientNum );
 }
 
 /*
@@ -739,8 +739,8 @@ idAsyncServer::BeginLocalClient
 */
 void idAsyncServer::BeginLocalClient( void ) {
 	game->SetLocalClient( localClientNum );
-	game->SetUserInfo( localClientNum, sessLocal.mapSpawnData.userInfo[localClientNum], false );
-	game->ServerClientBegin( localClientNum, false, NULL );
+	game->SetUserInfo( localClientNum, sessLocal.mapSpawnData.userInfo[localClientNum], false, true );
+	game->ServerClientBegin( localClientNum );
 }
 
 /*
@@ -921,7 +921,7 @@ void idAsyncServer::SendUserInfoBroadcast( int userInfoNum, const idDict &info, 
 	const idDict	*gameInfo;
 	bool			gameModifiedInfo;
 
-	gameInfo = game->SetUserInfo( userInfoNum, info, false );
+	gameInfo = game->SetUserInfo( userInfoNum, info, false, true );
 	if ( gameInfo ) {
 		gameModifiedInfo = true;
 	} else {
@@ -1179,7 +1179,7 @@ bool idAsyncServer::SendSnapshotToClient( int clientNum ) {
 	idBitMsg	msg;
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 	usercmd_t *	last;
-	dword		clientInPVS[MAX_ASYNC_CLIENTS >> 3];
+	byte		clientInPVS[MAX_ASYNC_CLIENTS >> 3];
 
 	serverClient_t &client = clients[clientNum];
 
@@ -1205,7 +1205,7 @@ bool idAsyncServer::SendSnapshotToClient( int clientNum ) {
 	msg.WriteShort( idMath::ClampShort( client.clientAheadTime ) );
 
 	// write the game snapshot
-	game->ServerWriteSnapshot( clientNum, client.snapshotSequence, msg, clientInPVS, MAX_ASYNC_CLIENTS, 0 );
+	game->ServerWriteSnapshot( clientNum, client.snapshotSequence, msg, clientInPVS, MAX_ASYNC_CLIENTS );
 
 	// write the latest user commands from the other clients in the PVS to the snapshot
 	for ( last = NULL, i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
@@ -1310,7 +1310,7 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 		SendEnterGameToClient( clientNum );
 
 		// get the client running in the game
-		game->ServerClientBegin( clientNum, false, NULL );
+		game->ServerClientBegin( clientNum );
 
 		// write any reliable messages to initialize the client game state
 		game->ServerWriteInitialReliableMessages( clientNum );
@@ -1804,7 +1804,7 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 	// but meanwhile, the max players may have been reached
 	msg.ReadString( password, sizeof( password ) );
 	char reason[MAX_STRING_CHARS];
-	allowReply_t reply = game->ServerAllowClient(clientId, numClients, Sys_NetAdrToString( from ), guid, password, password, reason );
+	allowReply_t reply = game->ServerAllowClient( numClients, Sys_NetAdrToString( from ), guid, password, reason );
 	if ( reply != ALLOW_YES ) {
 		common->DPrintf( "game denied connection for %s\n", Sys_NetAdrToString( from ) );
 
@@ -2490,7 +2490,7 @@ void idAsyncServer::RunFrame( void ) {
 		DuplicateUsercmds( gameFrame, gameTime );
 
 		// advance game
-		gameReturn_t ret = game->RunFrame( userCmds[gameFrame & ( MAX_USERCMD_BACKUP - 1 ) ], 0, true, gameFrame );
+		gameReturn_t ret = game->RunFrame( userCmds[gameFrame & ( MAX_USERCMD_BACKUP - 1 ) ] );
 
 		idAsyncNetwork::ExecuteSessionCommand( ret.sessionCommand );
 
@@ -2925,7 +2925,7 @@ int idAsyncServer::AllocOpenClientSlotForAI(const char* botName, int maxPlayersO
 	spawnArgs.Set("ui_name", botName);
 
 	// Init the new client, and broadcast it to the rest of the players.
-	game->ServerClientBegin(botClientId, true, botName);
+	game->ServerClientBegin( botClientId );
 	idAsyncServer::SendUserInfoBroadcast(botClientId, spawnArgs, true);
 
 	return 1;

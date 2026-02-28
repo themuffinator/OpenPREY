@@ -379,7 +379,7 @@ ID_INLINE idTempArray<T>::~idTempArray() {
 
 // RAVEN BEGIN
 // jnewquist: Mark memory tags for idBlockAlloc
-template<class type, int blockSize, byte memoryTag>
+template<class type, int blockSize, byte memoryTag = MA_DEFAULT>
 class idBlockAlloc {
 public:
 							idBlockAlloc( void );
@@ -480,7 +480,7 @@ void idBlockAlloc<type,blockSize,memoryTag>::Shutdown( void ) {
 ==============================================================================
 */
 
-template<class type, int baseBlockSize, int minBlockSize, byte memoryTag>
+template<class type, int baseBlockSize, int minBlockSize, byte memoryTag = MA_DEFAULT>
 class idDynamicAlloc {
 public:
 									idDynamicAlloc( void );
@@ -645,7 +645,7 @@ public:
 	idBTreeNode<idDynamicBlock<type>,int> *node;			// node in the B-Tree with free blocks
 };
 
-template<class type, int baseBlockSize, int minBlockSize, byte memoryTag>
+template<class type, int baseBlockSize, int minBlockSize, byte memoryTag = MA_DEFAULT>
 class idDynamicBlockAlloc {
 public:
 									idDynamicBlockAlloc( void );

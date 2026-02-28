@@ -305,10 +305,11 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int num
 idBinaryImage::WriteGeneratedFile
 ========================
 */
-ID_TIME_T idBinaryImage::WriteGeneratedFile( ID_TIME_T sourceFileTime ) {
+	ID_TIME_T idBinaryImage::WriteGeneratedFile( ID_TIME_T sourceFileTime ) {
 	idStr binaryFileName;
 	MakeGeneratedFileName( binaryFileName );
-	idFileLocal file( fileSystem->OpenFileWrite( binaryFileName, "fs_basepath" ) );
+	// Use fs_savepath for generated cache output to avoid write failures on read-only installs.
+	idFileLocal file( fileSystem->OpenFileWrite( binaryFileName, "fs_savepath" ) );
 	if ( file == NULL ) {
 		idLib::Warning( "idBinaryImage: Could not open file '%s'", binaryFileName.c_str() );
 		return FILE_NOT_FOUND_TIMESTAMP;

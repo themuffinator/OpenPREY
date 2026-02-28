@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -34,8 +36,6 @@ static int lastTimerReset = 0;
 static int numArticulatedFigures = 0;
 static idTimer timer_total, timer_pc, timer_ac, timer_collision, timer_lcp;
 #endif
-
-
 
 //===============================================================
 //
@@ -214,26 +214,6 @@ idAFConstraint::Save
 */
 void idAFConstraint::Save( idSaveGame *saveFile ) const {
 	saveFile->WriteInt( type );
-	saveFile->WriteString ( name );		// cnicholson: Added unsaved var
-	// TOSAVE: idAFBody *				body1;		
-	// TOSAVE: idAFBody *				body2;		
-	// TOSAVE: idPhysics_AF *			physics;	
-
-	// TOSAVE: idMatX					J1, J2;
-	// TOSAVE: idVecX					c1, c2;		
-	// TOSAVE: idVecX					lo, hi, e;	
-	// TOSAVE: idAFConstraint *			boxConstraint;
-	for (int i=0; i<6; ++i) {			// cnicholson: Added unsaved var
-        saveFile->WriteInt ( boxIndex[i] );
-	}
-
-	// TOSAVE: idMatX					invI;
-	// TOSAVE: idMatX					J;
-	// TOSAVE: idVecX					s;
-	// TOSAVE: idVecX					lm;
-	saveFile->WriteInt ( firstIndex );  // cnicholson: Added unsaved var
-	
-	saveFile->Write( &fl, sizeof( fl ));// cnicholson: Added unsaved var
 }
 
 /*
@@ -245,16 +225,6 @@ void idAFConstraint::Restore( idRestoreGame *saveFile ) {
 	constraintType_t t;
 	saveFile->ReadInt( (int &)t );
 	assert( t == type );
-
-	saveFile->ReadString ( name );		// cnicholson: Added unrestored var
-
-	for (int i=0; i<6; ++i) {
-        saveFile->ReadInt ( boxIndex[i] );
-	}
-
-	saveFile->ReadInt ( firstIndex );	// cnicholson: Added unsaved var
-
-	saveFile->Read( &fl, sizeof( fl )); // cnicholson: Added unsaved var
 }
 
 
@@ -783,35 +753,23 @@ void idAFConstraint_BallAndSocketJoint::Save( idSaveGame *saveFile ) const {
 	saveFile->WriteVec3( anchor1 );
 	saveFile->WriteVec3( anchor2 );
 	saveFile->WriteFloat( friction );
-// cnicholson: Changed saving to use bools to check if restore is needed
-	//if ( coneLimit ) {
-	//	saveFile->WriteBool( true );
-	//	coneLimit->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
-
-	//if ( pyramidLimit ) {
-	//	saveFile->WriteBool( true );
-	//	pyramidLimit->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
-
-	//if ( fc ) {
-	//	saveFile->WriteBool( true );
-	//	fc->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
-	//if ( coneLimit ) {
-	//	coneLimit->Save( saveFile );		// cnicholson: Bad way to save and restore
-	//}
-	//if ( pyramidLimit ) {
-	//	pyramidLimit->Save( saveFile );
-	//}
-
-	// TOSAVE: idAFConstraint_BallAndSocketJointFriction *fc;
+	//HUMANHEAD PCF rww 05/02/06 - we can't just do conditional writes and not give the restore any indication.
+	//added bool writes.
+	if ( coneLimit ) {
+		saveFile->WriteBool(true);
+		coneLimit->Save( saveFile );
+	}
+	else {
+		saveFile->WriteBool(false);
+	}
+	if ( pyramidLimit ) {
+		saveFile->WriteBool(true);
+		pyramidLimit->Save( saveFile );
+	}
+	else {
+		saveFile->WriteBool(false);
+	}
+	//HUMANHEAD END
 }
 
 /*
@@ -824,42 +782,32 @@ void idAFConstraint_BallAndSocketJoint::Restore( idRestoreGame *saveFile ) {
 	saveFile->ReadVec3( anchor1 );
 	saveFile->ReadVec3( anchor2 );
 	saveFile->ReadFloat( friction );
-
-	// cnicholson: Used bools to save/restore these pointers, old way = bad
-	//bool b;
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !coneLimit ) {
-	//		coneLimit = new idAFConstraint_ConeLimit;
-	//	}
-	//	coneLimit->SetPhysics( physics );
-	//	coneLimit->Restore( saveFile );
-	//}
-
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !pyramidLimit ) {
-	//		pyramidLimit = new idAFConstraint_PyramidLimit;
-	//	}
-	//	pyramidLimit->SetPhysics( physics );
-	//	pyramidLimit->Restore( saveFile );
-	//}
-
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !fc ) {
-	//		fc = new idAFConstraint_BallAndSocketJointFriction;
-	//	}
-	//	fc->SetPhysics( physics );
-	//	fc->Restore( saveFile );
-	//}
-
-	//if ( coneLimit ) {
-	//	coneLimit->Restore( saveFile );
-	//}
-	//if ( pyramidLimit ) {
-	//	pyramidLimit->Restore( saveFile );
-	//}
+	//HUMANHEAD PCF rww 05/02/06 - check if the constraint was written
+	bool hasConstraint;
+	saveFile->ReadBool(hasConstraint);
+	if (hasConstraint) {
+		if ( !coneLimit ) {
+			coneLimit = new idAFConstraint_ConeLimit;
+		}
+		coneLimit->Restore( saveFile );
+	}
+	else if (coneLimit) {
+		delete coneLimit;
+		coneLimit = NULL;
+	}
+	saveFile->ReadBool(hasConstraint);
+	if (hasConstraint) {
+		if ( !pyramidLimit ) {
+			pyramidLimit = new idAFConstraint_PyramidLimit;
+			pyramidLimit->SetPhysics( physics );
+		}
+		pyramidLimit->Restore( saveFile );
+	}
+	else if (pyramidLimit) {
+		delete pyramidLimit;
+		pyramidLimit = NULL;
+	}
+	//HUMANHEAD END
 }
 
 
@@ -1411,37 +1359,23 @@ void idAFConstraint_UniversalJoint::Save( idSaveGame *saveFile ) const {
 	saveFile->WriteVec3( axis1 );
 	saveFile->WriteVec3( axis2 );
 	saveFile->WriteFloat( friction );
-
-	// cnicholson: Changed saving to use bools to check if restore is needed
-	//if ( coneLimit ) {
-	//	saveFile->WriteBool( true );
-	//	coneLimit->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
-
-	//if ( pyramidLimit ) {
-	//	saveFile->WriteBool( true );
-	//	pyramidLimit->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
-
-	//if ( fc ) {
-	//	saveFile->WriteBool( true );
-	//	fc->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
-
-	//if ( coneLimit ) {
-	//	coneLimit->Save( saveFile );
-	//}
-	//if ( pyramidLimit ) {
-	//	pyramidLimit->Save( saveFile );
-	//}
-
-	// TOSAVE: idAFConstraint_UniversalJointFriction *fc;
+	//HUMANHEAD PCF rww 05/02/06 - we can't just do conditional writes and not give the restore any indication.
+	//added bool writes.
+	if ( coneLimit ) {
+		saveFile->WriteBool(true);
+		coneLimit->Save( saveFile );
+	}
+	else {
+		saveFile->WriteBool(false);
+	}
+	if ( pyramidLimit ) {
+		saveFile->WriteBool(true);
+		pyramidLimit->Save( saveFile );
+	}
+	else {
+		saveFile->WriteBool(false);
+	}
+	//HUMANHEAD END
 }
 
 /*
@@ -1458,42 +1392,32 @@ void idAFConstraint_UniversalJoint::Restore( idRestoreGame *saveFile ) {
 	saveFile->ReadVec3( axis1 );
 	saveFile->ReadVec3( axis2 );
 	saveFile->ReadFloat( friction );
-
-// cnicholson: Used bools to save/restore these pointers, old way = bad
-	//bool b;
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !coneLimit ) {
-	//		coneLimit = new idAFConstraint_ConeLimit;
-	//	}
-	//	coneLimit->SetPhysics( physics );
-	//	coneLimit->Restore( saveFile );
-	//}
-
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !pyramidLimit ) {
-	//		pyramidLimit = new idAFConstraint_PyramidLimit;
-	//	}
-	//	pyramidLimit->SetPhysics( physics );
-	//	pyramidLimit->Restore( saveFile );
-	//}
-
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !fc ) {
-	//		fc = new idAFConstraint_UniversalJointFriction;
-	//	}
-	//	fc->SetPhysics( physics );
-	//	fc->Restore( saveFile );
-	//}
-
-	//if ( coneLimit ) {
-	//	coneLimit->Restore( saveFile );
-	//}
-	//if ( pyramidLimit ) {
-	//	pyramidLimit->Restore( saveFile );
-	//}
+	//HUMANHEAD PCF rww 05/02/06 - check if the constraint was written
+	bool hasConstraint;
+	saveFile->ReadBool(hasConstraint);
+	if (hasConstraint) {
+		if ( !coneLimit ) {
+			coneLimit = new idAFConstraint_ConeLimit;
+		}
+		coneLimit->Restore( saveFile );
+	}
+	else if (coneLimit) {
+		delete coneLimit;
+		coneLimit = NULL;
+	}
+	saveFile->ReadBool(hasConstraint);
+	if (hasConstraint) {
+		if ( !pyramidLimit ) {
+			pyramidLimit = new idAFConstraint_PyramidLimit;
+			pyramidLimit->SetPhysics( physics );
+		}
+		pyramidLimit->Restore( saveFile );
+	}
+	else if (pyramidLimit) {
+		delete pyramidLimit;
+		pyramidLimit = NULL;
+	}
+	//HUMANHEAD END
 }
 
 
@@ -2263,17 +2187,9 @@ idAFConstraint_HingeSteering::Save
 ================
 */
 void idAFConstraint_HingeSteering::Save( idSaveGame *saveFile ) const {
-
 	saveFile->WriteFloat(steerAngle);
 	saveFile->WriteFloat(steerSpeed);
 	saveFile->WriteFloat(epsilon);
-
-	//if ( hinge ) {								// cnicholson: Added unsaved var (doesnt work)
-	//	saveFile->WriteBool( true );
-	//	hinge->Save( saveFile );
-	//} else {
-	//	saveFile->WriteBool( false );
-	//}
 }
 
 /*
@@ -2282,24 +2198,9 @@ idAFConstraint_HingeSteering::Restore
 ================
 */
 void idAFConstraint_HingeSteering::Restore( idRestoreGame *saveFile ) {
-
 	saveFile->ReadFloat(steerAngle);
 	saveFile->ReadFloat(steerSpeed);
 	saveFile->ReadFloat(epsilon);
-
-// cnicholson: Added unrestored var (doesnt work)
-	//bool b;
-
-	//saveFile->ReadBool( b );
-	//if ( b ) {
-	//	if ( !hinge ) {
-	//		hinge = new idAFConstraint_Hinge;
-	//	}
-	//	hinge->SetSteerAngle( steerAngle );
-	//	hinge->SetSteerSpeed( steerSpeed );
-	//	hinge->SetLimitEpsilon( epsilon );
-	//	hinge->Restore( saveFile );
-	//}
 }
 
 /*
@@ -3135,6 +3036,7 @@ void idAFConstraint_Contact::Setup( idAFBody *b1, idAFBody *b2, contactInfo_t &c
 	idVec3 p;
 	idVec6 v;
 	float vel;
+	float minBounceVelocity = 2.0f;
 
 	assert( b1 );
 
@@ -3157,10 +3059,9 @@ void idAFConstraint_Contact::Setup( idAFBody *b1, idAFBody *b2, contactInfo_t &c
 		c2[0] = 0.0f;
 	}
 
-	if ( body1->GetBouncyness() > 0.0f ) {
-		c1[0] = body1->GetBouncyness() * -vel;
-	}
-	else {
+	if ( body1->GetBouncyness() > 0.0f && vel > minBounceVelocity ) {	//HUMANHEAD bjk
+		c1[0] = body1->GetBouncyness() * -vel;		// HUMANHEAD bjk: changed back to negative, caused strange looking deaths
+	} else {
 		c1[0] = 0.0f;
 	}
 
@@ -3505,9 +3406,9 @@ void idAFConstraint_ConeLimit::Setup( idAFBody *b1, idAFBody *b2, const idVec3 &
 	this->coneAnchor = coneAnchor;
 	this->body1Axis = body1Axis;
 	this->body1Axis.Normalize();
-	this->cosAngle = idMath::Cos( DEG2RAD( coneAngle * 0.5f ) );
-	this->sinHalfAngle = idMath::Sin( DEG2RAD( coneAngle * 0.25f ) );
-	this->cosHalfAngle = idMath::Cos( DEG2RAD( coneAngle * 0.25f ) );
+	this->cosAngle = (float) cos( DEG2RAD( coneAngle * 0.5f ) );
+	this->sinHalfAngle = (float) sin( DEG2RAD( coneAngle * 0.25f ) );
+	this->cosHalfAngle = (float) cos( DEG2RAD( coneAngle * 0.25f ) );
 }
 
 /*
@@ -3584,6 +3485,12 @@ bool idAFConstraint_ConeLimit::Add( idPhysics_AF *phys, float invTimeStep ) {
 		lm.Zero();	// constraint exerts no force
 		return false;
 	}
+	// HUMANHEAD nla - Figure out which constraints are violated 
+	if ( g_debugAFs.GetInteger() > 1 ) {
+		gameLocal.Printf( "%d Constraint %s => %s\n", gameLocal.time, body1->GetName().c_str(), body2->GetName().c_str() );
+	}	
+	// HUMANHEAD END
+	
 
 	// calculate the inward cone normal for the position the body1 axis went outside the cone
 	normal = body1ax.Cross( ax );
@@ -3678,7 +3585,7 @@ void idAFConstraint_ConeLimit::DebugDraw( void ) {
 	z = anchor + ax * size * cosAngle;
 	start = x + z;
 	for ( a = 0.0f; a < 360.0f; a += 45.0f ) {
-		end = x * idMath::Cos( DEG2RAD(a + 45.0f) ) + y * idMath::Sin( DEG2RAD(a + 45.0f) ) + z;
+		end = x * (float) cos( DEG2RAD(a + 45.0f) ) + y * (float) sin( DEG2RAD(a + 45.0f) ) + z;
 		gameRenderWorld->DebugLine( colorMagenta, anchor, start );
 		gameRenderWorld->DebugLine( colorMagenta, start, end );
 		start = end;
@@ -3757,12 +3664,12 @@ void idAFConstraint_PyramidLimit::Setup( idAFBody *b1, idAFBody *b2, const idVec
 	// pyramid top
 	this->pyramidAnchor = pyramidAnchor;
 	// angles
-	cosAngle[0] = idMath::Cos( DEG2RAD( pyramidAngle1 * 0.5f ) );
-	cosAngle[1] = idMath::Cos( DEG2RAD( pyramidAngle2 * 0.5f ) );
-	sinHalfAngle[0] = idMath::Sin( DEG2RAD( pyramidAngle1 * 0.25f ) );
-	sinHalfAngle[1] = idMath::Sin( DEG2RAD( pyramidAngle2 * 0.25f ) );
-	cosHalfAngle[0] = idMath::Cos( DEG2RAD( pyramidAngle1 * 0.25f ) );
-	cosHalfAngle[1] = idMath::Cos( DEG2RAD( pyramidAngle2 * 0.25f ) );
+	cosAngle[0] = (float) cos( DEG2RAD( pyramidAngle1 * 0.5f ) );
+	cosAngle[1] = (float) cos( DEG2RAD( pyramidAngle2 * 0.5f ) );
+	sinHalfAngle[0] = (float) sin( DEG2RAD( pyramidAngle1 * 0.25f ) );
+	sinHalfAngle[1] = (float) sin( DEG2RAD( pyramidAngle2 * 0.25f ) );
+	cosHalfAngle[0] = (float) cos( DEG2RAD( pyramidAngle1 * 0.25f ) );
+	cosHalfAngle[1] = (float) cos( DEG2RAD( pyramidAngle2 * 0.25f ) );
 
 	this->body1Axis = body1Axis;
 }
@@ -3848,6 +3755,11 @@ bool idAFConstraint_PyramidLimit::Add( idPhysics_AF *phys, float invTimeStep ) {
 		lm.Zero();	// constraint exerts no force
 		return false;
 	}
+	// HUMANHEAD nla - Figure out which constraints are violated 
+	if ( g_debugAFs.GetInteger() > 1 ) {
+		gameLocal.Printf( "%d Constraint %s => %s\n", gameLocal.time, body1->GetName().c_str(), body2->GetName().c_str() );
+	}
+	// HUMANHEAD END
 
 	// calculate the inward pyramid normal for the position the body1 axis went outside the pyramid
 	pyramidVector = worldBase[2];
@@ -4003,6 +3915,256 @@ void idAFConstraint_PyramidLimit::Restore( idRestoreGame *saveFile ) {
 	saveFile->ReadFloat( cosHalfAngle[0] );
 	saveFile->ReadFloat( cosHalfAngle[1] );
 	saveFile->ReadFloat( epsilon );
+}
+
+
+//===============================================================
+//
+//	idAFConstraint_Suspension
+//
+//===============================================================
+
+/*
+================
+idAFConstraint_Suspension::idAFConstraint_Suspension
+================
+*/
+idAFConstraint_Suspension::idAFConstraint_Suspension( void ) {
+	type = CONSTRAINT_SUSPENSION;
+	name = "suspension";
+	InitSize( 3 );
+	fl.allowPrimary = false;
+	fl.frameConstraint = true;
+
+	localOrigin.Zero();
+	localAxis.Identity();
+	suspensionUp = 0.0f;
+	suspensionDown = 0.0f;
+	suspensionKCompress = 0.0f;
+	suspensionDamping = 0.0f;
+	steerAngle = 0.0f;
+	friction = 2.0f;
+	motorEnabled = false;
+	motorForce = 0.0f;
+	motorVelocity = 0.0f;
+	wheelModel = NULL;
+	memset( &trace, 0, sizeof( trace ) );
+	epsilon = LCP_EPSILON;
+}
+
+/*
+================
+idAFConstraint_Suspension::Setup
+================
+*/
+void idAFConstraint_Suspension::Setup( const char *name, idAFBody *body, const idVec3 &origin, const idMat3 &axis, idClipModel *clipModel ) {
+	this->name = name;
+	body1 = body;
+	body2 = NULL;
+	localOrigin = ( origin - body->GetWorldOrigin() ) * body->GetWorldAxis().Transpose();
+	localAxis = axis * body->GetWorldAxis().Transpose();
+	wheelModel = clipModel;
+}
+
+/*
+================
+idAFConstraint_Suspension::SetSuspension
+================
+*/
+void idAFConstraint_Suspension::SetSuspension( const float up, const float down, const float k, const float d, const float f ) {
+	suspensionUp = up;
+	suspensionDown = down;
+	suspensionKCompress = k;
+	suspensionDamping = d;
+	friction = f;
+}
+
+/*
+================
+idAFConstraint_Suspension::GetWheelOrigin
+================
+*/
+const idVec3 idAFConstraint_Suspension::GetWheelOrigin( void ) const {
+	return body1->GetWorldOrigin() + wheelOffset * body1->GetWorldAxis();
+}
+
+/*
+================
+idAFConstraint_Suspension::Evaluate
+================
+*/
+void idAFConstraint_Suspension::Evaluate( float invTimeStep ) {
+	float velocity, suspensionLength, springLength, compression, dampingForce, springForce;
+	idVec3 origin, start, end, vel1, vel2, springDir, r, frictionDir, motorDir;
+	idMat3 axis;
+	idRotation rotation;
+
+	axis = localAxis * body1->GetWorldAxis();
+	origin = body1->GetWorldOrigin() + localOrigin * body1->GetWorldAxis();
+	start = origin + suspensionUp * axis[2];
+	end = origin - suspensionDown * axis[2];
+
+	rotation.SetVec( axis[2] );
+	rotation.SetAngle( steerAngle );
+
+	axis *= rotation.ToMat3();
+
+	gameLocal.clip.Translation( trace, start, end, wheelModel, axis, MASK_SOLID, NULL );
+
+	wheelOffset = ( trace.endpos - body1->GetWorldOrigin() ) * body1->GetWorldAxis().Transpose();
+
+	if ( trace.fraction >= 1.0f ) {
+		J1.SetSize( 0, 6 );
+		if ( body2 ) {
+			J2.SetSize( 0, 6 );
+		}
+		return;
+	}
+
+	// calculate and add spring force
+	vel1 = body1->GetPointVelocity( start );
+	if ( body2 ) {
+		vel2 = body2->GetPointVelocity( trace.c.point );
+	} else {
+		vel2.Zero();
+	}
+
+	suspensionLength = suspensionUp + suspensionDown;
+	springDir = trace.endpos - start;
+	springLength = trace.fraction * suspensionLength;
+	dampingForce = suspensionDamping * idMath::Fabs( ( vel2 - vel1 ) * springDir ) / ( 1.0f + springLength * springLength );
+	compression = suspensionLength - springLength;
+	springForce = compression * compression * suspensionKCompress - dampingForce;
+
+	r = trace.c.point - body1->GetWorldOrigin();
+	J1.SetSize( 2, 6 );
+	J1.SubVec6(0).SubVec3(0) = trace.c.normal;
+	J1.SubVec6(0).SubVec3(1) = r.Cross( trace.c.normal );
+	c1.SetSize( 2 );
+	c1[0] = 0.0f;
+	velocity = J1.SubVec6(0).SubVec3(0) * body1->GetLinearVelocity() + J1.SubVec6(0).SubVec3(1) * body1->GetAngularVelocity();
+
+	if ( body2 ) {
+		r = trace.c.point - body2->GetWorldOrigin();
+		J2.SetSize( 2, 6 );
+		J2.SubVec6(0).SubVec3(0) = -trace.c.normal;
+		J2.SubVec6(0).SubVec3(1) = r.Cross( -trace.c.normal );
+		c2.SetSize( 2 );
+		c2[0] = 0.0f;
+		velocity += J2.SubVec6(0).SubVec3(0) * body2->GetLinearVelocity() + J2.SubVec6(0).SubVec3(1) * body2->GetAngularVelocity();
+	}
+
+	c1[0] = -compression;		// + 0.5f * -velocity;
+
+	e[0] = 1e-4f;
+	lo[0] = 0.0f;
+	hi[0] = springForce;
+	boxConstraint = NULL;
+	boxIndex[0] = -1;
+
+	// project the friction direction into the contact plane
+	frictionDir = axis[1] - axis[1] * trace.c.normal * axis[1];
+	frictionDir.Normalize();
+
+	r = trace.c.point - body1->GetWorldOrigin();
+
+	J1.SubVec6(1).SubVec3(0) = frictionDir;
+	J1.SubVec6(1).SubVec3(1) = r.Cross( frictionDir );
+	c1[1] = 0.0f;
+
+	if ( body2 ) {
+		r = trace.c.point - body2->GetWorldOrigin();
+
+		J2.SubVec6(1).SubVec3(0) = -frictionDir;
+		J2.SubVec6(1).SubVec3(1) = r.Cross( -frictionDir );
+		c2[1] = 0.0f;
+	}
+
+	lo[1] = -friction * physics->GetContactFrictionScale();
+	hi[1] = friction * physics->GetContactFrictionScale();
+
+	boxConstraint = this;
+	boxIndex[1] = 0;
+
+
+	if ( motorEnabled ) {
+		// project the motor force direction into the contact plane
+		motorDir = axis[0] - axis[0] * trace.c.normal * axis[0];
+		motorDir.Normalize();
+
+		r = trace.c.point - body1->GetWorldOrigin();
+
+		J1.ChangeSize( 3, J1.GetNumColumns() );
+		J1.SubVec6(2).SubVec3(0) = -motorDir;
+		J1.SubVec6(2).SubVec3(1) = r.Cross( -motorDir );
+		c1.ChangeSize( 3 );
+		c1[2] = motorVelocity;
+
+		if ( body2 ) {
+			r = trace.c.point - body2->GetWorldOrigin();
+
+			J2.ChangeSize( 3, J2.GetNumColumns() );
+			J2.SubVec6(2).SubVec3(0) = -motorDir;
+			J2.SubVec6(2).SubVec3(1) = r.Cross( -motorDir );
+			c2.ChangeSize( 3 );
+			c2[2] = 0.0f;
+		}
+
+		lo[2] = -motorForce;
+		hi[2] = motorForce;
+		boxIndex[2] = -1;
+	}
+}
+
+/*
+================
+idAFConstraint_Suspension::ApplyFriction
+================
+*/
+void idAFConstraint_Suspension::ApplyFriction( float invTimeStep ) {
+	// do nothing
+}
+
+/*
+================
+idAFConstraint_Suspension::Translate
+================
+*/
+void idAFConstraint_Suspension::Translate( const idVec3 &translation ) {
+}
+
+/*
+================
+idAFConstraint_Suspension::Rotate
+================
+*/
+void idAFConstraint_Suspension::Rotate( const idRotation &rotation ) {
+}
+
+/*
+================
+idAFConstraint_Suspension::DebugDraw
+================
+*/
+void idAFConstraint_Suspension::DebugDraw( void ) {
+	idVec3 origin;
+	idMat3 axis;
+	idRotation rotation;
+
+	axis = localAxis * body1->GetWorldAxis();
+
+	rotation.SetVec( axis[2] );
+	rotation.SetAngle( steerAngle );
+
+	axis *= rotation.ToMat3();
+
+	if ( trace.fraction < 1.0f ) {
+		origin = trace.c.point;
+
+		gameRenderWorld->DebugLine( colorWhite, origin, origin + 6.0f * axis[2] );
+		gameRenderWorld->DebugLine( colorWhite, origin - 4.0f * axis[0], origin + 4.0f * axis[0] );
+		gameRenderWorld->DebugLine( colorWhite, origin - 2.0f * axis[1], origin + 2.0f * axis[1] );
+	}
 }
 
 
@@ -4292,21 +4454,6 @@ idAFBody::Save
 ================
 */
 void idAFBody::Save( idSaveGame *saveFile ) {
-
-	saveFile->WriteString( name );		// cniciholson: Added Unsaved Var
-	//if ( parent ) {
-	//	saveFile->WriteBool( true );
-	//	parent->Save( savefile );		// cniciholson: Added Unsaved Var
-	//}
-	//else {
-	//	saveFile->WriteBool( false );
-	//}
-	// TOSAVE: idList<idAFBody *>		children
-	// TOSAVE: idClipModel *			clipModel
-	// TOSAVE: idAFConstraint *			primaryConstraint
-	// TOSAVE: idList<idAFConstraint *> constraints
-	// TOSAVE: idAFTree *				tree;
-
 	saveFile->WriteFloat( linearFriction );
 	saveFile->WriteFloat( angularFriction );
 	saveFile->WriteFloat( contactFriction );
@@ -4323,48 +4470,12 @@ void idAFBody::Save( idSaveGame *saveFile ) {
 	saveFile->WriteMat3( inertiaTensor );
 	saveFile->WriteMat3( inverseInertiaTensor );
 
-	//saveFile->WriteVec3( state[0].worldOrigin );	// cnicholson: Added unsaved var state[0]
-	//saveFile->WriteMat3( state[0].worldAxis );
-	//saveFile->WriteVec6( state[0].spatialVelocity );
-	//saveFile->WriteVec6( state[0].externalForce );
-	//
-	//saveFile->WriteVec3( state[1].worldOrigin );	// cnicholson: Added unsaved var state[1]
-	//saveFile->WriteMat3( state[1].worldAxis );
-	//saveFile->WriteVec6( state[1].spatialVelocity );
-	//saveFile->WriteVec6( state[1].externalForce );
-
 	saveFile->WriteVec3( current->worldOrigin );
 	saveFile->WriteMat3( current->worldAxis );
 	saveFile->WriteVec6( current->spatialVelocity );
 	saveFile->WriteVec6( current->externalForce );
-
-	//saveFile->WriteVec3( next->worldOrigin );		// cnicholson: Added unsaved var next->
-	//saveFile->WriteMat3( next->worldAxis );
-	//saveFile->WriteVec6( next->spatialVelocity );
-	//saveFile->WriteVec6( next->externalForce );
-	//
-	//saveFile->WriteVec3( saved.worldOrigin );		// cnicholson: Added unsaved var saved
-	//saveFile->WriteMat3( saved.worldAxis );
-	//saveFile->WriteVec6( saved.spatialVelocity );
-	//saveFile->WriteVec6( saved.externalForce );
-
 	saveFile->WriteVec3( atRestOrigin );
 	saveFile->WriteMat3( atRestAxis );
-
-	// TOSAVE: idMatX					inverseWorldSpatialInerti
-	// TOSAVE: idMatX					I, invI;				
-	// TOSAVE: idMatX					J;						
-	// TOSAVE: idVecX					s;						
-	// TOSAVE: idVecX					totalForce;				
-	// TOSAVE: idVecX					auxForce;				
-	// TOSAVE: idVecX					acceleration;			
-	// TOSAVE: float *					response;				
-	// TOSAVE: int *					responseIndex;
-	saveFile->WriteInt( numResponses );				// cnicholson: Added unsaved var
-	saveFile->WriteInt( maxAuxiliaryIndex );		// cnicholson: Added unsaved var
-	saveFile->WriteInt( maxSubTreeAuxiliaryIndex );	// cnicholson: Added unsaved var
-
-	saveFile->Write( &fl, sizeof( fl ) );			// cnicholson: Added unsaved var
 }
 
 /*
@@ -4373,15 +4484,6 @@ idAFBody::Restore
 ================
 */
 void idAFBody::Restore( idRestoreGame *saveFile ) {
-
-	saveFile->ReadString( name );		// cniciholson: Added Unrestored Var
-	// TORESTORE: idList<idAFBody *>		parent
-	// TORESTORE: idList<idAFBody *>		children
-	// TORESTORE: idClipModel *			clipModel
-	// TORESTORE: idAFConstraint *			primaryConstraint
-	// TORESTORE: idList<idAFConstraint *> constraints
-	// TORESTORE: idAFTree *				tree;
-
 	saveFile->ReadFloat( linearFriction );
 	saveFile->ReadFloat( angularFriction );
 	saveFile->ReadFloat( contactFriction );
@@ -4398,49 +4500,14 @@ void idAFBody::Restore( idRestoreGame *saveFile ) {
 	saveFile->ReadMat3( inertiaTensor );
 	saveFile->ReadMat3( inverseInertiaTensor );
 
-	//saveFile->ReadVec3( state[0].worldOrigin );	// cnicholson: Added unrestored var state[0]
-	//saveFile->ReadMat3( state[0].worldAxis );
-	//saveFile->ReadVec6( state[0].spatialVelocity );
-	//saveFile->ReadVec6( state[0].externalForce );
-
-	//saveFile->ReadVec3( state[1].worldOrigin );	// cnicholson: Added unrestored var state[0]
-	//saveFile->ReadMat3( state[1].worldAxis );
-	//saveFile->ReadVec6( state[1].spatialVelocity );
-	//saveFile->ReadVec6( state[1].externalForce );
-
 	saveFile->ReadVec3( current->worldOrigin );
 	saveFile->ReadMat3( current->worldAxis );
 	saveFile->ReadVec6( current->spatialVelocity );
 	saveFile->ReadVec6( current->externalForce );
-
-	//saveFile->ReadVec3( next->worldOrigin );		// cnicholson: Added unrestored var next->
-	//saveFile->ReadMat3( next->worldAxis );
-	//saveFile->ReadVec6( next->spatialVelocity );
-	//saveFile->ReadVec6( next->externalForce );
-
-	//saveFile->ReadVec3( saved.worldOrigin );		// cnicholson: Added unrestored var saved
-	//saveFile->ReadMat3( saved.worldAxis );
-	//saveFile->ReadVec6( saved.spatialVelocity );
-	//saveFile->ReadVec6( saved.externalForce );
-
 	saveFile->ReadVec3( atRestOrigin );
 	saveFile->ReadMat3( atRestAxis );
-
-	// TORESTORE: idMatX					inverseWorldSpatialInerti
-	// TORESTORE: idMatX					I, invI;
-	// TORESTORE: idMatX					J;
-	// TORESTORE: idVecX					s;
-	// TORESTORE: idVecX					totalForce;
-	// TORESTORE: idVecX					auxForce;
-	// TORESTORE: idVecX					acceleration;
-	// TORESTORE: float *					response;
-	// TORESTORE: int *						responseIndex;
-	saveFile->ReadInt( numResponses );				// cnicholson: Added unrestored var
-	saveFile->ReadInt( maxAuxiliaryIndex );			// cnicholson: Added unrestored var
-	saveFile->ReadInt( maxSubTreeAuxiliaryIndex );	// cnicholson: Added unrestored var
-
-	saveFile->Read( &fl, sizeof( fl ) );			// cnicholson: Added unrestored var
 }
+
 
 
 //===============================================================
@@ -4469,11 +4536,6 @@ void idAFTree::Factor( void ) const {
 		body = sortedBodies[i];
 
 		if ( body->children.Num() ) {
-
-// RAVEN BEGIN
-// jscott: fixed warning
-			child = NULL;
-// RAVEN END
 
 			for ( j = 0; j < body->children.Num(); j++ ) {
 
@@ -5203,9 +5265,7 @@ void idPhysics_AF::AuxiliaryForces( float timeStep ) {
 	}
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_lcp.Start();
-	}
+	timer_lcp.Start();
 #endif
 
 	// calculate lagrange multipliers for auxiliary constraints
@@ -5214,9 +5274,7 @@ void idPhysics_AF::AuxiliaryForces( float timeStep ) {
 	}
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_lcp.Stop();
-	}
+	timer_lcp.Stop();
 #endif
 
 	// calculate auxiliary constraint forces
@@ -5395,7 +5453,7 @@ bool idPhysics_AF::CollisionImpulse( float timeStep, idAFBody *body, trace_t &co
 	idEntity *ent;
 
 	ent = gameLocal.entities[collision.c.entityNum];
-	if ( ent == self || !ent ) {
+	if ( ent == self ) {
 		return false;
 	}
 
@@ -5541,20 +5599,14 @@ void idPhysics_AF::CheckForCollisions( float timeStep ) {
 	for ( i = 0; i < bodies.Num(); i++ ) {
 		body = bodies[i];
 
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-		if ( body->clipMask != 0 && !fastEval ) {
-// RAVEN END
+		if ( body->clipMask != 0 ) {
 
 			passEntity = SetupCollisionForBody( body );
 
 #ifdef TEST_COLLISION_DETECTION
 			bool startsolid = false;
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-			if ( gameLocal.Contents( self, body->current->worldOrigin, body->clipModel,
+			if ( gameLocal.clip.Contents( body->current->worldOrigin, body->clipModel,
 															body->current->worldAxis, body->clipMask, passEntity ) ) {
-// RAVEN END
 				startsolid = true;
 			}
 #endif
@@ -5564,11 +5616,9 @@ void idPhysics_AF::CheckForCollisions( float timeStep ) {
 			rotation.SetOrigin( body->current->worldOrigin );
 
 			// if there was a collision
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			if ( gameLocal.Motion( self, collision, body->current->worldOrigin, body->next->worldOrigin, rotation,
+			if ( gameLocal.clip.Motion( collision, body->current->worldOrigin, body->next->worldOrigin, rotation,
 										body->clipModel, body->current->worldAxis, body->clipMask, passEntity ) ) {
-// RAVEN END
+
 				// set the next state to the state at the moment of impact
 				body->next->worldOrigin = collision.endpos;
 				body->next->worldAxis = collision.endAxis;
@@ -5581,11 +5631,8 @@ void idPhysics_AF::CheckForCollisions( float timeStep ) {
 			}
 
 #ifdef TEST_COLLISION_DETECTION
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-			if ( gameLocal.Contents( self, body->next->worldOrigin, body->clipModel,
-													body->next->worldAxis, body->clipMask, passEntity ) ) {
-// RAVEN END
+			if ( gameLocal.clip.Contents( body->next->worldOrigin, body->clipModel,
+														body->next->worldAxis, body->clipMask, passEntity ) ) {
 				if ( !startsolid ) {
 					int bah = 1;
 				}
@@ -5593,10 +5640,7 @@ void idPhysics_AF::CheckForCollisions( float timeStep ) {
 #endif
 		}
 
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		body->clipModel->Link( self, body->clipModel->GetId(), body->next->worldOrigin, body->next->worldAxis );
-// RAVEN END
+		body->clipModel->Link( gameLocal.clip, self, body->clipModel->GetId(), body->next->worldOrigin, body->next->worldAxis );
 	}
 }
 
@@ -5628,10 +5672,7 @@ bool idPhysics_AF::EvaluateContacts( void ) {
 	for ( i = 0; i < bodies.Num(); i++ ) {
 		body = bodies[i];
 
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-		if ( body->clipMask == 0 || fastEval ) {
-// RAVEN END
+		if ( body->clipMask == 0 ) {
 			continue;
 		}
 
@@ -5641,11 +5682,10 @@ bool idPhysics_AF::EvaluateContacts( void ) {
 		dir.SubVec6(0) = body->current->spatialVelocity + current.lastTimeStep * dir.SubVec6(0);
 		dir.SubVec3(0).Normalize();
 		dir.SubVec3(1).Normalize();
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		numContacts = gameLocal.Contacts( self, contactInfo, 10, body->current->worldOrigin, dir.SubVec6(0), 2.0f, //CONTACT_EPSILON,
+
+		numContacts = gameLocal.clip.Contacts( contactInfo, 10, body->current->worldOrigin, dir.SubVec6(0), 2.0f, //CONTACT_EPSILON,
 						body->clipModel, body->current->worldAxis, body->clipMask, passEntity );
-// RAVEN END
+
 #if 1
 		// merge nearby contacts between the same bodies
 		// and assure there are at most three planar contacts between any pair of bodies
@@ -5805,10 +5845,7 @@ void idPhysics_AF::UpdateClipModels( void ) {
 
 	for ( i = 0; i < bodies.Num(); i++ ) {
 		body = bodies[i];
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		body->clipModel->Link( self, body->clipModel->GetId(), body->current->worldOrigin, body->current->worldAxis );
-// RAVEN END
+		body->clipModel->Link( gameLocal.clip, self, body->clipModel->GetId(), body->current->worldOrigin, body->current->worldAxis );
 	}
 }
 
@@ -5921,6 +5958,11 @@ bool idPhysics_AF::TestIfAtRest( float timeStep ) {
 		return true;
 	}
 
+	// HUMANHEAD JRM - frozen - so we are likely teleporting etc.
+	if(frozen) {
+		return false;
+	}
+
 	current.activateTime += timeStep;
 
 	// if the simulation should never be suspended before a certaint amount of time passed
@@ -5961,6 +6003,13 @@ bool idPhysics_AF::TestIfAtRest( float timeStep ) {
 
 		if ( maxTranslationSqr < Square( noMoveTranslation ) && maxRotation < noMoveRotation ) {
 			// hardly moved over a period of time so the articulated figure may come to rest
+			// HUMANHEAD nla
+			if ( g_debugAFs.GetInteger() ) {
+				gameLocal.Printf( "7 Rested due to little movement (Trans: %.2f, Rot: %.2f) after %.2f secs (%.2f)",
+							idMath::Sqrt( maxTranslationSqr), maxRotation, noMoveTime,
+							current.noMoveTime );
+			}
+			// HUMANHEAD END
 			return true;
 		}
 	} else {
@@ -5972,18 +6021,44 @@ bool idPhysics_AF::TestIfAtRest( float timeStep ) {
 		body = bodies[i];
 
 		if ( body->current->spatialVelocity.SubVec3(0).LengthSqr() > Square( suspendVelocity[0] ) ) {
+			// HUMANHEAD nla
+			if ( g_debugAFs.GetInteger() ) {
+				gameLocal.Printf("1 Going because Linear Vel %.2f > %.2f\n", body->current->spatialVelocity.SubVec3(0).Length(), suspendVelocity[0] );
+			}
+			// HUMANHEAD END
 			return false;
 		}
 		if ( body->current->spatialVelocity.SubVec3(1).LengthSqr() > Square( suspendVelocity[1] ) ) {
+			// HUMANHEAD nla
+			if ( g_debugAFs.GetInteger() ) {
+				gameLocal.Printf("2 Going because Angular Vel %.2f > %.2f\n", body->current->spatialVelocity.SubVec3(1).Length(), suspendVelocity[1] );
+			}
+			// HUMANHEAD END
 			return false;
 		}
 		if ( body->acceleration.SubVec3(0).LengthSqr() > Square( suspendAcceleration[0] ) ) {
+			// HUMANHEAD nla
+			if ( g_debugAFs.GetInteger() ) {
+				gameLocal.Printf("3 Going because Linear Acc %.2f > %.2f\n", body->acceleration.SubVec3(0).Length(), suspendAcceleration[0] );
+			}
+			// HUMANHEAD END
 			return false;
 		}
 		if ( body->acceleration.SubVec3(1).LengthSqr() > Square( suspendAcceleration[1] ) ) {
+			// HUMANHEAD nla
+			if ( g_debugAFs.GetInteger() ) {			
+				gameLocal.Printf("4 Going because Angular Acc %.2f > %.2f\n", body->acceleration.SubVec3(1).Length(), suspendAcceleration[1] );
+			}
+			// HUMANHEAD END
 			return false;
 		}
 	}
+
+	// HUMANHEAD nla
+	if ( g_debugAFs.GetInteger() ) {
+		gameLocal.Printf( "5 Came to rest due to min specs met\n" );
+	}
+	// HUMANHEAD END
 
 	// all bodies have a velocity and acceleration small enough to come to rest
 	return true;
@@ -6109,6 +6184,14 @@ void idPhysics_AF::SetMass( float mass, int id ) {
 	}
 	else {
 		forceTotalMass = mass;
+		// HUMANHEAD nla
+		if ( mass > 0 ) {
+			invMass = 1 / mass;
+		}
+		else {
+			invMass = 1;
+		}
+		// HUMANHEAD 
 	}
 	SetChanged();
 }
@@ -6223,6 +6306,7 @@ idPhysics_AF::Evaluate
 ================
 */
 bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
+	PROFILE_SCOPE("AF", PROFMASK_PHYSICS);
 	float timeStep;
 
 	if ( timeScaleRampStart < MS2SEC( endTimeMSec ) && timeScaleRampEnd > MS2SEC( endTimeMSec ) ) {
@@ -6233,6 +6317,17 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 		timeStep = MS2SEC( timeStepMSec ) * timeScale;
 	}
 	current.lastTimeStep = timeStep;
+
+	// HUMANHEAD JRM - To allow afs to waked up when masters change
+#if 0
+	if (current.atRest && masterBody) {
+		Activate();
+	}
+#else	// HUMANHEAD pdm: This was keeping all bound ragdolls from ever coming to rest
+	if (current.atRest && masterBody && self->GetBindMaster() && !self->GetBindMaster()->GetPhysics()->IsAtRest()) {
+		Activate();
+	}
+#endif
 
 
 	// if the articulated figure changed
@@ -6247,11 +6342,32 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 		idVec3 masterOrigin;
 		idMat3 masterAxis;
 		self->GetMasterPosition( masterOrigin, masterAxis );
+
+		// HUMANHEAD nla - Logic to allow frozen bodies to just translate to the new location, and not act like ragdolls
+		if ( frozen ) {
+			idVec3 dOrigin;
+
+			dOrigin = masterOrigin - masterBody->current->worldOrigin;
+
+			// Translate lines ripped from Translate.  There is an error translating when bound, as constraints that perhaps shouldn't be changed are
+			// translate all the bodies	
+			idAFBody *body;
+			for ( int i = 0; i < bodies.Num(); i++ ) {
+				body = bodies[i];
+				body->current->worldOrigin += dOrigin;
+			}
+		}
+		// HUMANHEAD END
+		
 		if ( current.atRest >= 0 && ( masterBody->current->worldOrigin != masterOrigin || masterBody->current->worldAxis != masterAxis ) ) {
 			Activate();
 		}
 		masterBody->current->worldOrigin = masterOrigin;
 		masterBody->current->worldAxis = masterAxis;
+
+		// HUMANHEAD nla
+		if ( frozen ) { return( true ); }
+		// HUMANHEAD END
 	}
 
 	// if the simulation is suspended because the figure is at rest
@@ -6264,10 +6380,11 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	AddPushVelocity( -current.pushVelocity );
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_total.Start();
-		timer_collision.Start();
-	}
+	timer_total.Start();
+#endif
+
+#ifdef AF_TIMINGS
+	timer_collision.Start();
 #endif
 
 	// evaluate contacts
@@ -6277,9 +6394,7 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	SetupContactConstraints();
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_collision.Stop();
-	}
+	timer_collision.Stop();
 #endif
 
 	// evaluate constraint equations
@@ -6292,17 +6407,14 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	AddFrameConstraints();
 
 #ifdef AF_TIMINGS
-	int numPrimary = 0, numAuxiliary = 0;
-	if ( af_showTimings.GetInteger() != 0 ) {
-		int i;
-		for ( i = 0; i < primaryConstraints.Num(); i++ ) {
-			numPrimary += primaryConstraints[i]->J1.GetNumRows();
-		}
-		for ( i = 0; i < auxiliaryConstraints.Num(); i++ ) {
-			numAuxiliary += auxiliaryConstraints[i]->J1.GetNumRows();
-		}
-		timer_pc.Start();
+	int i, numPrimary = 0, numAuxiliary = 0;
+	for ( i = 0; i < primaryConstraints.Num(); i++ ) {
+		numPrimary += primaryConstraints[i]->J1.GetNumRows();
 	}
+	for ( i = 0; i < auxiliaryConstraints.Num(); i++ ) {
+		numAuxiliary += auxiliaryConstraints[i]->J1.GetNumRows();
+	}
+	timer_pc.Start();
 #endif
 
 	// factor matrices for primary constraints
@@ -6312,19 +6424,15 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	PrimaryForces( timeStep );
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_pc.Stop();
-		timer_ac.Start();
-	}
+	timer_pc.Stop();
+	timer_ac.Start();
 #endif
 
 	// calculate and apply auxiliary constraint forces
 	AuxiliaryForces( timeStep );
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_ac.Stop();
-	}
+	timer_ac.Stop();
 #endif
 
 	// evolve current state to next state
@@ -6343,18 +6451,14 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	RemoveFrameConstraints();
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_collision.Start();
-	}
+	timer_collision.Start();
 #endif
 
 	// check for collisions between current and next state
 	CheckForCollisions( timeStep );
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_collision.Stop();
-	}
+	timer_collision.Stop();
 #endif
 
 	// swap the current and next state
@@ -6386,52 +6490,42 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	current.pushVelocity.Zero();
 
 	if ( IsOutsideWorld() ) {
-// RAVEN BEGIN
-// kfuller: warnings shouldn't crash the game
-		if ( bodies.Num() && bodies[0] && bodies[0]->current && self ) {
-			gameLocal.Warning( "articulated figure moved outside world bounds for entity '%s' type '%s' at (%s)",
+		gameLocal.Warning( "articulated figure moved outside world bounds for entity '%s' type '%s' at (%s)",
 							self->name.c_str(), self->GetType()->classname, bodies[0]->current->worldOrigin.ToString(0) );
-		} else {
-			gameLocal.Warning( "articulated figure moved outside world bounds for entity '%s' type '%s' -- no body",
-							self->name.c_str(), self->GetType()->classname );
-		}
-// RAVEN END
 		Rest();
 	}
 
 #ifdef AF_TIMINGS
-	if ( af_showTimings.GetInteger() != 0 ) {
-		timer_total.Stop();
+	timer_total.Stop();
 
-		if ( af_showTimings.GetInteger() == 1 ) {
-			gameLocal.Printf( "%12s: t %1.4f pc %2d, %1.4f ac %2d %1.4f lcp %1.4f cd %1.4f\n",
-							self->name.c_str(),
+	if ( af_showTimings.GetInteger() == 1 ) {
+		gameLocal.Printf( "%12s: t %1.4f pc %2d, %1.4f ac %2d %1.4f lcp %1.4f cd %1.4f\n",
+						self->name.c_str(),
+						timer_total.Milliseconds(),
+						numPrimary, timer_pc.Milliseconds(),
+						numAuxiliary, timer_ac.Milliseconds() - timer_lcp.Milliseconds(),
+						timer_lcp.Milliseconds(), timer_collision.Milliseconds() );
+	}
+	else if ( af_showTimings.GetInteger() == 2 ) {
+		numArticulatedFigures++;
+		if ( endTimeMSec > lastTimerReset ) {
+			gameLocal.Printf( "af %d: t %1.4f pc %2d, %1.4f ac %2d %1.4f lcp %1.4f cd %1.4f\n",
+							numArticulatedFigures,
 							timer_total.Milliseconds(),
 							numPrimary, timer_pc.Milliseconds(),
 							numAuxiliary, timer_ac.Milliseconds() - timer_lcp.Milliseconds(),
 							timer_lcp.Milliseconds(), timer_collision.Milliseconds() );
 		}
-		else if ( af_showTimings.GetInteger() == 2 ) {
-			numArticulatedFigures++;
-			if ( endTimeMSec > lastTimerReset ) {
-				gameLocal.Printf( "af %d: t %1.4f pc %2d, %1.4f ac %2d %1.4f lcp %1.4f cd %1.4f\n",
-								numArticulatedFigures,
-								timer_total.Milliseconds(),
-								numPrimary, timer_pc.Milliseconds(),
-								numAuxiliary, timer_ac.Milliseconds() - timer_lcp.Milliseconds(),
-								timer_lcp.Milliseconds(), timer_collision.Milliseconds() );
-			}
-		}
+	}
 
-		if ( endTimeMSec > lastTimerReset ) {
-			lastTimerReset = endTimeMSec;
-			numArticulatedFigures = 0;
-			timer_total.Clear();
-			timer_pc.Clear();
-			timer_ac.Clear();
-			timer_collision.Clear();
-			timer_lcp.Clear();
-		}
+	if ( endTimeMSec > lastTimerReset ) {
+		lastTimerReset = endTimeMSec;
+		numArticulatedFigures = 0;
+		timer_total.Clear();
+		timer_pc.Clear();
+		timer_ac.Clear();
+		timer_collision.Clear();
+		timer_lcp.Clear();
 	}
 #endif
 
@@ -6499,14 +6593,14 @@ void idPhysics_AF::DebugDraw( void ) {
 				cvarSystem->SetCVarString( "cm_drawColor", colorCyan.ToString( 0 ) );
 				constrainedBody1 = constraint->body1;
 				if ( constrainedBody1 ) {
-					collisionModelManager->DrawModel( constrainedBody1->clipModel->GetCollisionModel(), constrainedBody1->clipModel->GetOrigin(),
-											constrainedBody1->clipModel->GetAxis(), vec3_origin, mat3_identity, 0.0f );
+					collisionModelManager->DrawModel( constrainedBody1->clipModel->Handle(), constrainedBody1->clipModel->GetOrigin(),
+											constrainedBody1->clipModel->GetAxis(), vec3_origin, 0.0f );
 				}
 				cvarSystem->SetCVarString( "cm_drawColor", colorBlue.ToString( 0 ) );
 				constrainedBody2 = constraint->body2;
 				if ( constrainedBody2 ) {
-					collisionModelManager->DrawModel( constrainedBody2->clipModel->GetCollisionModel(), constrainedBody2->clipModel->GetOrigin(),
-											constrainedBody2->clipModel->GetAxis(), vec3_origin, mat3_identity, 0.0f );
+					collisionModelManager->DrawModel( constrainedBody2->clipModel->Handle(), constrainedBody2->clipModel->GetOrigin(),
+											constrainedBody2->clipModel->GetAxis(), vec3_origin, 0.0f );
 				}
 				cvarSystem->SetCVarString( "cm_drawColor", colorRed.ToString( 0 ) );
 			}
@@ -6517,8 +6611,8 @@ void idPhysics_AF::DebugDraw( void ) {
 		highlightBody = GetBody( af_highlightBody.GetString() );
 		if ( highlightBody ) {
 			cvarSystem->SetCVarString( "cm_drawColor", colorYellow.ToString( 0 ) );
-			collisionModelManager->DrawModel( highlightBody->clipModel->GetCollisionModel(), highlightBody->clipModel->GetOrigin(),
-									highlightBody->clipModel->GetAxis(), vec3_origin, mat3_identity, 0.0f );
+			collisionModelManager->DrawModel( highlightBody->clipModel->Handle(), highlightBody->clipModel->GetOrigin(),
+									highlightBody->clipModel->GetAxis(), vec3_origin, 0.0f );
 			cvarSystem->SetCVarString( "cm_drawColor", colorRed.ToString( 0 ) );
 		}
 	}
@@ -6532,8 +6626,8 @@ void idPhysics_AF::DebugDraw( void ) {
 			if ( body == highlightBody ) {
 				continue;
 			}
-			collisionModelManager->DrawModel( body->clipModel->GetCollisionModel(), body->clipModel->GetOrigin(),
-										body->clipModel->GetAxis(), vec3_origin, mat3_identity, 0.0f );
+			collisionModelManager->DrawModel( body->clipModel->Handle(), body->clipModel->GetOrigin(),
+										body->clipModel->GetAxis(), vec3_origin, 0.0f );
 			//DrawTraceModelSilhouette( gameLocal.GetLocalPlayer()->GetEyePosition(), body->clipModel );
 		}
 	}
@@ -6631,10 +6725,7 @@ idPhysics_AF::idPhysics_AF( void ) {
 
 	memset( &current, 0, sizeof( current ) );
 	current.atRest = -1;
-// RAVEN BEGIN
-// bdube: use GetMSec access rather than USERCMD_TIME
-	current.lastTimeStep = gameLocal.GetMSec();
-// RAVEN END
+	current.lastTimeStep = USERCMD_MSEC;
 	saved = current;
 
 	linearFriction = 0.005f;
@@ -6677,10 +6768,10 @@ idPhysics_AF::idPhysics_AF( void ) {
 	worldConstraintsLocked = false;
 	forcePushable = false;
 
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-	fastEval = false;
-// RAVEN END
+	// HUMANHEAD nla
+	frozen = false;
+	invMass = 1;
+	// HUMANHEAD
 
 #ifdef AF_TIMINGS
 	lastTimerReset = 0;
@@ -6753,7 +6844,9 @@ void idPhysics_AF::Save( idSaveGame *saveFile ) const {
 
 	// the articulated figure structure is handled by the owner
 
-	// TOSAVE: idList<idAFTree *>		trees;
+	idPhysics_AF_SavePState( saveFile, current );
+	idPhysics_AF_SavePState( saveFile, saved );
+
 	saveFile->WriteInt( bodies.Num() );
 	for ( i = 0; i < bodies.Num(); i++ ) {
 		bodies[i]->Save( saveFile );
@@ -6769,13 +6862,6 @@ void idPhysics_AF::Save( idSaveGame *saveFile ) const {
 	for ( i = 0; i < constraints.Num(); i++ ) {
 		constraints[i]->Save( saveFile );
 	}
-
-	// TOSAVE: idList<idAFConstraint *>primaryConstraints;				
-	// TOSAVE: idList<idAFConstraint *>auxiliaryConstraints;			
-	// TOSAVE: idList<idAFConstraint *>frameConstraints;				
-	// TOSAVE: idList<idAFConstraint_Contact *>contactConstraints;		
-	// TOSAVE: idList<int>				contactBodies;					
-	// TOSAVE: idList<AFCollision_t>	collisions;						
 
 	saveFile->WriteBool( changedAF );
 
@@ -6819,16 +6905,10 @@ void idPhysics_AF::Save( idSaveGame *saveFile ) const {
 	saveFile->WriteBool( worldConstraintsLocked );
 	saveFile->WriteBool( forcePushable );
 
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-	saveFile->WriteBool( fastEval );
-// RAVEN END
-
-	idPhysics_AF_SavePState( saveFile, current );
-	idPhysics_AF_SavePState( saveFile, saved );
-
-	// TOSAVE: idAFBody *				masterBody;		
-	// TOSAVE: idLCP *					lcp;			
+	// HUMANHEAD mdl
+	saveFile->WriteBool( frozen );
+	saveFile->WriteFloat( invMass );
+	// HUMANHEAD END
 }
 
 /*
@@ -6841,6 +6921,9 @@ void idPhysics_AF::Restore( idRestoreGame *saveFile ) {
 	bool hasMaster;
 
 	// the articulated figure structure should have already been restored
+
+	idPhysics_AF_RestorePState( saveFile, current );
+	idPhysics_AF_RestorePState( saveFile, saved );
 
 	saveFile->ReadInt( num );
 	assert( num == bodies.Num() );
@@ -6901,17 +6984,14 @@ void idPhysics_AF::Restore( idRestoreGame *saveFile ) {
 	saveFile->ReadBool( worldConstraintsLocked );
 	saveFile->ReadBool( forcePushable );
 
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-	saveFile->ReadBool( fastEval );
-// RAVEN END
-
-	idPhysics_AF_RestorePState( saveFile, current );
-	idPhysics_AF_RestorePState( saveFile, saved );
-
 	changedAF = true;
 
 	UpdateClipModels();
+
+	// HUMANHEAD mdl
+	saveFile->ReadBool( frozen );
+	saveFile->ReadFloat( invMass );
+	// HUMANHEAD END
 }
 
 /*
@@ -7470,9 +7550,30 @@ void idPhysics_AF::ApplyImpulse( const int id, const idVec3 &point, const idVec3
 	if ( noImpact || impulse.LengthSqr() < Square( impulseThreshold ) ) {
 		return;
 	}
+	
+	// HUMANHEAD nla - Change any external forces to take into the account of the whole mass, not just the current body.
+	idVec3 modImpulse;
+	idVec3 otherImpulse;
+
+	if ( GetMass() > .1 && self->IsType( idAFEntity_Base::Type ) && 
+		!((idAFEntity_Base *) self)->IsImpulseFromSelf() ) {
+		modImpulse = impulse * GetInvMass() * 2;
+		otherImpulse = modImpulse;
+		//otherImpulse = impulse * ( bodies[id]->mass / GetMass() ) * 2;
+		//gameLocal.Printf( "%d OUTSIDE!\n", gameLocal.time );
+	}
+	else {
+		modImpulse = impulse * bodies[id]->invMass;
+		otherImpulse = impulse;
+		//gameLocal.Printf( "%d inside!\n", gameLocal.time );
+	}
+	// HUMANHEAD END
+	
 	idMat3 invWorldInertiaTensor = bodies[id]->current->worldAxis.Transpose() * bodies[id]->inverseInertiaTensor * bodies[id]->current->worldAxis;
-	bodies[id]->current->spatialVelocity.SubVec3(0) += bodies[id]->invMass * impulse;
-	bodies[id]->current->spatialVelocity.SubVec3(1) += invWorldInertiaTensor * (point - bodies[id]->current->worldOrigin).Cross( impulse );
+	// HUMANHEAD nla - Changed to use modImpulse and otherImpulse
+	bodies[id]->current->spatialVelocity.SubVec3(0) += modImpulse;
+	bodies[id]->current->spatialVelocity.SubVec3(1) += invWorldInertiaTensor * (point - bodies[id]->current->worldOrigin).Cross( otherImpulse );
+	// HUMANHEAD END
 	Activate();
 }
 
@@ -7531,10 +7632,7 @@ void idPhysics_AF::SaveState( void ) {
 	saved = current;
 
 	for ( i = 0; i < bodies.Num(); i++ ) {
-// RAVEN BEGIN
-// JSinger: Changed to call optimized memcpy
-		SIMDProcessor->Memcpy( &bodies[i]->saved, bodies[i]->current, sizeof( AFBodyPState_t ) );
-// RAVEN END
+		memcpy( &bodies[i]->saved, bodies[i]->current, sizeof( AFBodyPState_t ) );
 	}
 }
 
@@ -7744,16 +7842,13 @@ void idPhysics_AF::ClipTranslation( trace_t &results, const idVec3 &translation,
 
 		if ( body->clipModel->IsTraceModel() ) {
 			if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-				gameLocal.TranslationModel( self, bodyResults, body->current->worldOrigin, body->current->worldOrigin + translation,
+				gameLocal.clip.TranslationModel( bodyResults, body->current->worldOrigin, body->current->worldOrigin + translation,
 									body->clipModel, body->current->worldAxis, body->clipMask,
-										model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+										model->Handle(), model->GetOrigin(), model->GetAxis() );
 			}
 			else {
-				gameLocal.Translation( self, bodyResults, body->current->worldOrigin, body->current->worldOrigin + translation,
+				gameLocal.clip.Translation( bodyResults, body->current->worldOrigin, body->current->worldOrigin + translation,
 									body->clipModel, body->current->worldAxis, body->clipMask, self );
-// RAVEN END
 			}
 			if ( bodyResults.fraction < results.fraction ) {
 				results = bodyResults;
@@ -7783,16 +7878,13 @@ void idPhysics_AF::ClipRotation( trace_t &results, const idRotation &rotation, c
 
 		if ( body->clipModel->IsTraceModel() ) {
 			if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				gameLocal.RotationModel( self, bodyResults, body->current->worldOrigin, rotation,
+				gameLocal.clip.RotationModel( bodyResults, body->current->worldOrigin, rotation,
 									body->clipModel, body->current->worldAxis, body->clipMask,
-										model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+										model->Handle(), model->GetOrigin(), model->GetAxis() );
 			}
 			else {
-				gameLocal.Rotation( self, bodyResults, body->current->worldOrigin, rotation,
+				gameLocal.clip.Rotation( bodyResults, body->current->worldOrigin, rotation,
 									body->clipModel, body->current->worldAxis, body->clipMask, self );
-// RAVEN END
 			}
 			if ( bodyResults.fraction < results.fraction ) {
 				results = bodyResults;
@@ -7821,16 +7913,13 @@ int idPhysics_AF::ClipContents( const idClipModel *model ) const {
 
 		if ( body->clipModel->IsTraceModel() ) {
 			if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-				contents |= gameLocal.ContentsModel( self, body->current->worldOrigin,
+				contents |= gameLocal.clip.ContentsModel( body->current->worldOrigin,
 									body->clipModel, body->current->worldAxis, -1,
-										model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+										model->Handle(), model->GetOrigin(), model->GetAxis() );
 			}
 			else {
-				contents |= gameLocal.Contents( self, body->current->worldOrigin,
+				contents |= gameLocal.clip.Contents( body->current->worldOrigin,
 									body->clipModel, body->current->worldAxis, -1, NULL );
-// RAVEN END
 			}
 		}
 	}
@@ -8036,7 +8125,6 @@ void idPhysics_AF::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	int i, num;
 	idCQuat quat;
 
-	// TODO: Check that this conditional write to delta message is OK
 	current.atRest = msg.ReadLong();
 	current.noMoveTime = msg.ReadFloat();
 	current.activateTime = msg.ReadFloat();

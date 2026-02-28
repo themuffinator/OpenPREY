@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 /*
 game_worldspawn.cpp
 
@@ -5,8 +7,8 @@ Worldspawn class.  Each map has one worldspawn which handles global spawnargs.
 
 */
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -35,6 +37,19 @@ void idWorldspawn::Spawn( void ) {
 
 	assert( gameLocal.world == NULL );
 	gameLocal.world = this;
+
+	if (!gameLocal.isMultiplayer) { //HUMANHEAD rww
+		g_gravity.SetFloat( spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY ) ) );
+	}
+
+#if _HH_INLINED_PROC_CLIPMODELS
+	gameLocal.CreateInlinedProcClip(this); //HUMANHEAD rww
+#endif
+
+	// disable stamina on hell levels
+	if ( spawnArgs.GetBool( "no_stamina" ) ) {
+		pm_stamina.SetFloat( 0.0f );
+	}
 
 	// load script
 	scriptname = gameLocal.GetMapName();
@@ -80,10 +95,12 @@ idWorldspawn::Restore
 void idWorldspawn::Restore( idRestoreGame *savefile ) {
 	assert( gameLocal.world == this );
 
-// RAVEN BEGIN
-// bdube: gravity change
-	g_gravity.SetFloat( spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY) ) );
-// RAVEN END
+	g_gravity.SetFloat( spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY ) ) );
+
+	// disable stamina on hell levels
+	if ( spawnArgs.GetBool( "no_stamina" ) ) {
+		pm_stamina.SetFloat( 0.0f );
+	}
 }
 
 /*
@@ -93,6 +110,7 @@ idWorldspawn::~idWorldspawn
 */
 idWorldspawn::~idWorldspawn() {
 	if ( gameLocal.world == this ) {
+		gameLocal.ClearStaticData(); // HUMANHEAD mdl
 		gameLocal.world = NULL;
 	}
 }

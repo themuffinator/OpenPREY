@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_AF_H__
 #define __GAME_AF_H__
@@ -34,13 +36,10 @@ public:
 	void					Restore( idRestoreGame *savefile );
 
 	void					SetAnimator( idAnimator *a ) { animator = a; }
-// RAVEN BEGIN
-// ddynerman: purge constraints/joints before loading a new one
-	bool					Load( idEntity *ent, const char *fileName, bool purgeAF = false );
-// RAVEN END
+	bool					Load( idEntity *ent, const char *fileName );
 	bool					IsLoaded( void ) const { return isLoaded && self != NULL; }
 	const char *			GetName( void ) const { return name.c_str(); }
-	void					SetupPose( idEntity *ent, int time );
+	void					SetupPose( idEntity *ent, int time, bool checkPhysics = true ); // HUMANHEAD mdl:  Added checkPhysics flag
 	void					ChangePose( idEntity *ent, int time );
 	int						EntitiesTouchingAF( afTouch_t touchList[ MAX_GENTITIES ] ) const;
 	void					Start( void );
@@ -65,13 +64,14 @@ public:
 	void					LoadState( const idDict &args );
 
 	void					AddBindConstraints( void );
+	void					AddBindConstraint( constraintType_t type, int bodyId, jointHandle_t joint, idEntity *master );	// HUMANHEAD pdm
 	void					RemoveBindConstraints( void );
 
-	idPhysics_AF			physicsObj;			// articulated figure physics
-	bool					TestSolid( void ) const;
+	bool					TestSolidForce( bool &hiForce ) const; // HUMANHEAD mdl:  For handling ragdolls stuck in the wall
 
 protected:
 	idStr					name;				// name of the loaded .af file
+	idPhysics_AF			physicsObj;			// articulated figure physics
 	idEntity *				self;				// entity using the animated model
 	idAnimator *			animator;			// animator on entity
 	int						modifiedAnim;		// anim to modify
@@ -92,6 +92,8 @@ protected:
 	bool					LoadBody( const idDeclAF_Body *fb, const idJointMat *joints );
 	bool					LoadConstraint( const idDeclAF_Constraint *fc );
 
+public:  // HUMANHEAD mdl:  Made public
+	bool					TestSolid( void ) const;
 };
 
 #endif /* !__GAME_AF_H__ */

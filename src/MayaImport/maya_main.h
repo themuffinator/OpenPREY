@@ -18,10 +18,7 @@ typedef bool ( *exporterDLLEntry_t )( int version, idCommon *common, idSys *sys,
 typedef bool ( *exporterDLLEntry_t )( int version, idCommon *common, idSys *sys );
 #endif
 // RAVEN END
-// RAVEN BEGIN
-// bdube: default src and dest ospath's
-typedef const char *( *exporterInterface_t )( const char *src_ospath, const char* dst_ospath, const char *commandline );
-// RAVEN END
+typedef const char *( *exporterInterface_t )( const char *ospath, const char *commandline );
 typedef void ( *exporterShutdown_t )( void );
 
 #endif /* !__MAYA_MAIN_H__ */

@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __PHYSICS_BASE_H__
 #define __PHYSICS_BASE_H__
@@ -10,10 +12,7 @@
 ===============================================================================
 */
 
-// RAVEN BEGIN
-// jnewquist: Changed from #define to typedef to fix compiler issues
-typedef idEntityPtr<idEntity> contactEntity_t;
-// RAVEN END
+#define contactEntity_t		idEntityPtr<idEntity>
 
 class idPhysics_Base : public idPhysics {
 
@@ -29,10 +28,6 @@ public:
 public:	// common physics interface
 
 	void					SetSelf( idEntity *e );
-//RAVEN BEGIN
-// abahr: for gravity
-	virtual idEntity*		GetSelf() const { return self; }
-// RAVEN END
 
 	void					SetClipModel( idClipModel *model, float density, int id = 0, bool freeOld = true );
 	idClipModel *			GetClipModel( int id = 0 ) const;
@@ -40,11 +35,6 @@ public:	// common physics interface
 
 	void					SetMass( float mass, int id = -1 );
 	float					GetMass( int id = -1 ) const;
-	
-// RAVEN BEGIN
-// bdube: added center mass	
-	idVec3					GetCenterMass ( int id = -1 ) const;
-// RAVEN END
 
 	void					SetContents( int contents, int id = -1 );
 	int						GetContents( int id = -1 ) const;
@@ -67,10 +57,6 @@ public:	// common physics interface
 	bool					IsAtRest( void ) const;
 	int						GetRestStartTime( void ) const;
 	bool					IsPushable( void ) const;
-// RAVEN BEGIN
-// bdube: water interraction
-	bool					IsInWater ( void ) const;
-// RAVEN END	
 
 	void					SaveState( void );
 	void					RestoreState( void );
@@ -111,12 +97,6 @@ public:	// common physics interface
 	void					AddContactEntity( idEntity *e );
 	void					RemoveContactEntity( idEntity *e );
 
-// RAVEN BEGIN
-// abahr: helper function used in projectiles
-	virtual const idVec3	GetContactNormal() const;
-	virtual const idVec3	GetGroundContactNormal() const;
-// RAVEN END
-
 	bool					HasGroundContacts( void ) const;
 	bool					IsGroundEntity( int entityNum ) const;
 	bool					IsGroundClipModel( int entityNum, int id ) const;
@@ -124,6 +104,11 @@ public:	// common physics interface
 	void					SetPushed( int deltaTime );
 	const idVec3 &			GetPushedLinearVelocity( const int id = 0 ) const;
 	const idVec3 &			GetPushedAngularVelocity( const int id = 0 ) const;
+
+	//HUMANHEAD: aob
+	bool					HasContacts( void ) const;
+	idVec3					GetGroundContactNormal() const;
+	//HUMANHEAD END
 
 	void					SetMaster( idEntity *master, const bool orientated = true );
 

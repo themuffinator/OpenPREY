@@ -1,8 +1,5 @@
-// RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// Copyright (C) 2004 Id Software, Inc.
 //
-// MERGE_DATE 09/30/2004
-
 #ifndef __ANIM_H__
 #define __ANIM_H__
 
@@ -34,6 +31,8 @@ class function_t;
 class idEntity;
 class idSaveGame;
 class idRestoreGame;
+class idEventDef; // HUMANHEAD JRM
+class hhAnimator; // HUMANHEAD nla
 
 typedef struct {
 	int		cycleCount;	// how many times the anim has wrapped to the begining (0 for clamped anims)
@@ -64,8 +63,7 @@ typedef enum {
 	JOINTMOD_LOCAL,				// modifies the joint's position or orientation in joint local space
 	JOINTMOD_LOCAL_OVERRIDE,	// sets the joint's position or orientation in joint local space
 	JOINTMOD_WORLD,				// modifies joint's position or orientation in model space
-	JOINTMOD_WORLD_OVERRIDE,	// sets the joint's position or orientation in model space
-	JOINTMOD_COLLAPSE
+	JOINTMOD_WORLD_OVERRIDE		// sets the joint's position or orientation in model space
 } jointModTransform_t;
 
 typedef struct {
@@ -74,15 +72,6 @@ typedef struct {
 	idVec3					pos;
 	jointModTransform_t		transform_pos;
 	jointModTransform_t		transform_axis;
-
-// RAVEN BEGIN
-// bdube: added more features to programmer controlled joints
-	idInterpolateAccelDecelLinear<idAngles>	angularVelocity;
-	int										lastTime;
-	
-	jointHandle_t			collapseJoint;
-// RAVEN END
-
 } jointMod_t;
 
 #define	ANIM_TX				BIT( 0 )
@@ -96,10 +85,6 @@ typedef enum {
 	FC_SCRIPTFUNCTION,
 	FC_SCRIPTFUNCTIONOBJECT,
 	FC_EVENTFUNCTION,
-// RAVEN BEGIN
-// abahr: event call with parms
-	FC_EVENTFUNCTION_ARGS,
-// RAVEN END
 	FC_SOUND,
 	FC_SOUND_VOICE,
 	FC_SOUND_VOICE2,
@@ -112,8 +97,35 @@ typedef enum {
 	FC_SOUND_CHATTER,
 	FC_SKIN,
 	FC_TRIGGER,
+	FC_TRIGGER_SMOKE_PARTICLE,
+	//HUMANHEAD
+	FC_STOPSND,
+	FC_STOPSND_VOICE,	
+	FC_STOPSND_VOICE2,
+	FC_STOPSND_BODY,
+	FC_STOPSND_BODY2,
+	FC_STOPSND_BODY3,
+	FC_STOPSND_WEAPON,
+	FC_STOPSND_ITEM,
+	FC_EVENT_ARGS,				// nla
+	FC_MOOD,					// JRM
+	FC_LAUNCHALTMISSILE,		// aob		
+	FC_LAUNCHMISSILE_BONEDIR,
+	FC_RIGHTFOOTPRINT,
+	FC_LEFTFOOTPRINT,
+	FC_KICK_OBSTACLE,
+	FC_TRIGGER_ANIM_ENT,
+	FC_HIDE,
+	FC_SETKEY,					// mdc
+	//HUMANHEAD END
+	FC_MELEE,
 	FC_DIRECTDAMAGE,
+	FC_BEGINATTACK,
+	FC_ENDATTACK,
 	FC_MUZZLEFLASH,
+	FC_CREATEMISSILE,
+	FC_LAUNCHMISSILE,
+	FC_FIREMISSILEATTARGET,
 	FC_FOOTSTEP,
 	FC_LEFTFOOT,
 	FC_RIGHTFOOT,
@@ -130,41 +142,8 @@ typedef enum {
 	FC_ENABLE_LEG_IK,
 	FC_DISABLE_LEG_IK,
 	FC_RECORDDEMO,
-	FC_AVIGAME,
-	FC_GUIEVENT,
-	
-	FC_AI_ENABLE_PAIN,
-	FC_AI_DISABLE_PAIN,
-	FC_AI_ENABLE_DAMAGE,
-	FC_AI_DISABLE_DAMAGE,
-	FC_AI_LOCKENEMYORIGIN,	
-	FC_AI_ATTACK,
-	FC_AI_ATTACK_MELEE,
-	
-	FC_AI_SPEAK,
-	FC_AI_SPEAK_RANDOM,
-// MCG: for attachment managing
-	FC_ACT_ATTACH_HIDE,
-	FC_ACT_ATTACH_SHOW,
-
-	FC_ENABLE_BLINKING,
-	FC_DISABLE_BLINKING,
-	FC_ENABLE_AUTOBLINK,
-	FC_DISABLE_AUTOBLINK,
-
-	FC_COUNT
-
+	FC_AVIGAME
 } frameCommandType_t;
-
-// RAVEN BEGIN
-// rjohnson: new camera frame commands
-extern struct frameCommandInfo_t
-{
-	const char*		name;
-	bool			modview;
-
-} frameCommandInfo[FC_COUNT];
-// RAVEN END
 
 typedef struct {
 	int						num;
@@ -173,30 +152,17 @@ typedef struct {
 
 typedef struct {
 	frameCommandType_t		type;
+	idStr					*string;
 
-	idStr*					string;
-
-// RAVEN BEGIN
-// bdube: added joint
-	idStr*					joint;
-	idStr*					joint2;
-// abahr:
-	idList<idStr>*			parmList;
-// RAVEN END
+	//HUMANHEAD: aob - cache for event_arg parms
+	idList<idStr>			*parmList;
+	//HUMANHEAD END
 
 	union {
 		const idSoundShader	*soundShader;
 		const function_t	*function;
 		const idDeclSkin	*skin;
 		int					index;
-// RAVEN BEGIN
-// bdube: effects
-		const idDecl		*effect;
-		idStr*				projectile;
-		idStr*				melee;
-// abahr:
-		const class idEventDef*	event;
-// RAVEN END
 	};
 } frameCommand_t;
 
@@ -204,10 +170,7 @@ typedef struct {
 	bool					prevent_idle_override		: 1;
 	bool					random_cycle_start			: 1;
 	bool					ai_no_turn					: 1;
-	bool					ai_no_look					: 1;
-	bool					ai_look_head_only			: 1;	
 	bool					anim_turn					: 1;
-	bool					sync_cycle					: 1;	
 } animFlags_t;
 
 
@@ -257,6 +220,9 @@ public:
 
 class idMD5Anim {
 private:
+// HUMANHEAD nla - Needed for access in hhBaseAnim
+protected:
+// HUMANHEAD END
 	int						numFrames;
 	int						frameRate;
 	int						animLength;
@@ -285,19 +251,22 @@ public:
 	int						NumRefs( void ) const;
 	
 	void					CheckModelHierarchy( const idRenderModel *model ) const;
-	void					GetInterpolatedFrame( const frameBlend_t &frame, idJointQuat *joints, const int *index, int numIndexes ) const;
+	void					GetInterpolatedFrame( frameBlend_t &frame, idJointQuat *joints, const int *index, int numIndexes ) const;
 	void					GetSingleFrame( int framenum, idJointQuat *joints, const int *index, int numIndexes ) const;
+	virtual // HUMANHEAD nla - virtual for hhBaseAnim
 	int						Length( void ) const;
 	int						NumFrames( void ) const;
 	int						NumJoints( void ) const;
 	const idVec3			&TotalMovementDelta( void ) const;
 	const char				*Name( void ) const;
 
+	void					GetFrameBlend( int framenum, frameBlend_t &frame ) const;	// frame 1 is first frame
+	virtual // HUMANHEAD nla - virtual to be overriden
 	void					ConvertTimeToFrame( int time, int cyclecount, frameBlend_t &frame ) const;
-// RAVEN BEGIN
-// jscott: for modview
-	int						ConvertFrameToTime( frameBlend_t &frame ) const;
-// RAVEN END
+
+	// HUMANHEAD nla - Added to allow partial anims.  Overridden in hhMD5Anim
+	virtual void			SetLimits( float start, float end ) const {};
+	// HUMANHEAD END
 
 	void					GetOrigin( idVec3 &offset, int currentTime, int cyclecount ) const;
 	void					GetOriginRotation( idQuat &rotation, int time, int cyclecount ) const;
@@ -313,7 +282,7 @@ public:
 */
 
 class idAnim {
-private:
+protected:		// HUMANHEAD nla - needed to override class
 	const class idDeclModelDef	*modelDef;
 	const idMD5Anim				*anims[ ANIM_MaxSyncedAnims ];
 	int							numAnims;
@@ -323,12 +292,13 @@ private:
 	idList<frameCommand_t>		frameCommands;
 	animFlags_t					flags;
 
-// RAVEN BEGIN
-// bdube: added anim speed
-	float						rate;
-// RAVEN END
-
 public:
+	// HUMANHEAD nla 
+	// To allowed extra frame commands is derived classes.  Returns true if other commands found
+	virtual bool			AddFrameCommandExtra( idToken &token, frameCommand_t &fc, idLexer &src, idStr &errorText ) { return( false ); };
+	virtual bool			CallFrameCommandsExtra( const frameCommand_t &command, idEntity *ent ) const { return( false ); };	
+	// HUMANHEAD END
+
 								idAnim();
 								idAnim( const idDeclModelDef *modelDef, const idAnim *anim );
 								~idAnim();
@@ -345,10 +315,7 @@ public:
 	bool						GetOrigin( idVec3 &offset, int animNum, int time, int cyclecount ) const;
 	bool						GetOriginRotation( idQuat &rotation, int animNum, int currentTime, int cyclecount ) const;
 	bool						GetBounds( idBounds &bounds, int animNum, int time, int cyclecount ) const;
-// RAVEN BEGIN
-// bdube: frame command function that takes a list of frames
-	const char					*AddFrameCommand( const class idDeclModelDef *modelDef, const idList<int>& frames, idLexer &src, const idDict *def );
-// RAVEN END
+	const char					*AddFrameCommand( const class idDeclModelDef *modelDef, int framenum, idLexer &src, const idDict *def );
 	void						CallFrameCommands( idEntity *ent, int from, int to ) const;
 	bool						HasFrameCommands( void ) const;
 
@@ -356,31 +323,7 @@ public:
 	int							FindFrameForFrameCommand( frameCommandType_t framecommand, const frameCommand_t **command ) const;
 	void						SetAnimFlags( const animFlags_t &animflags );
 	const animFlags_t			&GetAnimFlags( void ) const;
-
-// RAVEN BEGIN
-// bdube: added
-	void						CallFrameCommandSound ( const frameCommand_t& command, idEntity* ent, const s_channelType channel ) const;
-	float						GetPlaybackRate ( void ) const;
-	void						SetPlaybackRate ( float rate );
-// jsinger: to support binary serialization/deserialization of idAnims
-#ifdef RV_BINARYDECLS
-								idAnim( idDeclModelDef const *def, SerialInputStream &stream );
-	void						Write( SerialOutputStream &stream ) const;
-#endif
-// RAVEN END
 };
-
-// RAVEN BEGIN
-// bdube: added configurable playback rate
-ID_INLINE float idAnim::GetPlaybackRate ( void ) const {
-	return rate;
-}
-
-ID_INLINE void idAnim::SetPlaybackRate ( float _rate ) {
-	rate = _rate;
-}
-
-// RAVEN END
 
 /*
 ==============================================================================================
@@ -390,35 +333,15 @@ ID_INLINE void idAnim::SetPlaybackRate ( float _rate ) {
 ==============================================================================================
 */
 
-// RAVEN BEGIN
-// jsinger; allow support for serialization/deserialization of binary decls
-#ifdef RV_BINARYDECLS
-class idDeclModelDef : public idDecl, public Serializable<'DMD '> {
-public:
-	virtual void				Write( SerialOutputStream &stream ) const;
-	virtual void				AddReferences() const;
-								idDeclModelDef( SerialInputStream &stream );
-private:
-	int							mNumChannels;
-#else
 class idDeclModelDef : public idDecl {
-#endif
-// RAVEN END
 public:
 								idDeclModelDef();
 								~idDeclModelDef();
 
 	virtual size_t				Size( void ) const;
 	virtual const char *		DefaultDefinition( void ) const;
-	virtual bool				Parse( const char *text, const int textLength ) override;
+	virtual bool				Parse( const char *text, const int textLength );
 	virtual void				FreeData( void );
-
-// RAVEN BEGIN
-// jscott: to prevent a recursive crash
-	virtual	bool				RebuildTextSource( void ) { return( false ); }
-// scork: for detailed error-reporting
-	virtual bool				Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
-// RAVEN END
 
 	void						Touch( void ) const;
 
@@ -445,7 +368,11 @@ public:
 	const int *					GetChannelJoints( int channel ) const;
 
 	const idVec3 &				GetVisualOffset( void ) const;
-		
+
+	// HUMANHEAD nla
+	idDict						channelDict;
+	// HUMANHEAD END
+
 private:
 	void						CopyDecl( const idDeclModelDef *decl );
 	bool						ParseAnim( idLexer &src, int numDefaultAnims );
@@ -457,15 +384,8 @@ private:
 	idList<int>					channelJoints[ ANIM_NumAnimChannels ];
 	idRenderModel *				modelHandle;
 	idList<idAnim *>			anims;
-	const idDeclSkin *			skin;	
+	const idDeclSkin *			skin;
 };
-
-ID_INLINE const idAnim *idDeclModelDef::GetAnim( int index ) const {
-	if ( ( index < 1 ) || ( index > anims.Num() ) ) {
-		return NULL;
-	}
-	return anims[ index - 1 ];
-}
 
 /*
 ==============================================================================================
@@ -476,9 +396,11 @@ ID_INLINE const idAnim *idDeclModelDef::GetAnim( int index ) const {
 */
 
 class idAnimBlend {
-private:
+protected:		// HUMANHEAD nla - Used to access vars in hhAnimBlend
 	const class idDeclModelDef	*modelDef;
+	mutable		// HUMANHEAD nla - Hack to get around const for calls to UpdateFreezeTime
 	int							starttime;
+	mutable		// HUMANHEAD nla - Hack to get around const for calls to UpdateFreezeTime
 	int							endtime;
 	int							timeOffset;
 	float						rate;
@@ -490,28 +412,38 @@ private:
 
 	float						animWeights[ ANIM_MaxSyncedAnims ];
 	short						cycle;
+	short						frame;
 	short						animNum;
 	bool						allowMove;
 	bool						allowFrameCommands;
-	bool						useFrameBlend;
+	// HUMANHEAD nla - All data members need to be in idAnimBlend, due to the pointer math done.  (See idAnimator::GetBounds)
+	bool				frozen;		
+	int					freezeStart;
+	mutable		// HUMANHEAD nla - Hack to get around const for calls to UpdateFreezeTime
+	int					freezeCurrent;
+	int					freezeEnd;
+	int					rotateTime;
+	const idEventDef *	rotateEvent;
 
-	frameBlend_t				frameBlend;
+	friend class				hhAnimator;
+	// HUMANHEAD END
 
 	friend class				idAnimator;
 
 	void						Reset( const idDeclModelDef *_modelDef );
+	virtual		// HUMANHEAD nla
 	void						CallFrameCommands( idEntity *ent, int fromtime, int totime ) const;
-// RAVEN BEGIN
-// twhitaker & jscott: create new SetFrame that allows interpolation between arbitrary frames
-	void						SetFrame( const idDeclModelDef *modelDef, int animnum, const frameBlend_t & frameBlend );
-// jshepard: added rate parameter so we can speed up/slow down animations.
-	void						CycleAnim( const idDeclModelDef *modelDef, int animnum, int currenttime, int blendtime, float rate );
-	void						PlayAnim( const idDeclModelDef *modelDef, int animnum, int currenttime, int blendtime, float rate );
-// RAVEN END
+	void						SetFrame( const idDeclModelDef *modelDef, int animnum, int frame, int currenttime, int blendtime );
+	void						CycleAnim( const idDeclModelDef *modelDef, int animnum, int currenttime, int blendtime );
+	void						PlayAnim( const idDeclModelDef *modelDef, int animnum, int currenttime, int blendtime );
+	virtual		// HUMANHEAD nla
 	bool						BlendAnim( int currentTime, int channel, int numJoints, idJointQuat *blendFrame, float &blendWeight, bool removeOrigin, bool overrideBlend, bool printInfo ) const;
+	virtual		// HUMANHEAD nla
 	void						BlendOrigin( int currentTime, idVec3 &blendPos, float &blendWeight, bool removeOriginOffset ) const;
+	virtual		// HUMANHEAD nla
 	void						BlendDelta( int fromtime, int totime, idVec3 &blendDelta, float &blendWeight ) const;
 	void						BlendDeltaRotation( int fromtime, int totime, idQuat &blendDelta, float &blendWeight ) const;
+	virtual		// HUMANHEAD nla
 	bool						AddBounds( int currentTime, idBounds &bounds, bool removeOriginOffset ) const;
 
 public:
@@ -527,6 +459,7 @@ public:
 	bool						SetSyncedAnimWeight( int num, float weight );
 	void						Clear( int currentTime, int clearTime );
 	bool						IsDone( int currentTime ) const;
+	virtual		// HUMANHEAD nla
 	bool						FrameHasChanged( int currentTime ) const;
 	int							GetCycleCount( void ) const;
 	void						SetCycleCount( int count );
@@ -535,7 +468,9 @@ public:
 	void						SetStartTime( int startTime );
 	int							GetStartTime( void ) const;
 	int							GetEndTime( void ) const;
+	virtual		// HUMANHEAD nla
 	int							GetFrameNumber( int currenttime ) const;
+	virtual		// HUMANHEAD nla
 	int							AnimTime( int currenttime ) const;
 	int							NumFrames( void ) const;
 	int							Length( void ) const;
@@ -546,12 +481,40 @@ public:
 	int							AnimNum( void ) const;
 };
 
-ID_INLINE const idAnim *idAnimBlend::Anim( void ) const {
-	if ( !modelDef ) {
-		return NULL;
-	}
-	return modelDef->GetAnim( animNum );
-}
+// HUMANHEAD nla - Stupid C++ forces me to put this here!  Else I can't use it below in idAnimator due to it not being defined
+class hhAnimBlend : public idAnimBlend {
+ public:
+						hhAnimBlend();
+
+	friend class		hhAnimator;
+	friend class		idAnimator;
+
+	// Overridden Methods					
+	bool				FrameHasChanged( int currentTime ) const;
+	int					AnimTime( int currenttime ) const;
+	int					GetFrameNumber( int currenttime ) const;
+
+
+ protected:	
+
+	// Overridden Methods
+	void				CallFrameCommands( idEntity *ent, int fromtime, int totime ) const;
+	bool				BlendAnim( int currentTime, int channel, int numJoints, idJointQuat *blendFrame, float &blendWeight, bool removeOrigin, bool overrideBlend, bool printInfo ) const;
+	void				BlendOrigin( int currentTime, idVec3 &blendPos, float &blendWeight, bool removeOriginOffset ) const;
+	void				BlendDelta( int fromtime, int totime, idVec3 &blendDelta, float &blendWeight ) const;
+	bool				AddBounds( int currentTime, idBounds &bounds, bool removeOriginOffset ) const;
+						
+	// Original Methods
+	void				UpdateFreezeTime( int currentTime ) const;
+	bool				Freeze( int currentTime, idEntity *owner );
+	bool				Freeze( int currentTime, idEntity *owner, int durationMS );
+	bool				Thaw( int currentTime );
+	bool				ThawIfTime( int currentTime );
+	bool				IsFrozen() const { return( frozen ); };
+
+};
+
+// HUMANHEAD END
 
 /*
 ==============================================================================================
@@ -590,8 +553,8 @@ ID_INLINE idAFPoseJointMod::idAFPoseJointMod( void ) {
 ==============================================================================================
 */
 
-class idAnimator{
-	public:
+class idAnimator {
+public:
 								idAnimator();
 								~idAnimator();
 
@@ -613,13 +576,14 @@ class idAnimator{
 	int							GetAnim( const char *name ) const;
 	bool						HasAnim( const char *name ) const;
 
-	void						ServiceAnims( int fromtime, int totime );
+	// HUMANHEAD nla - Convenience
+	bool						GetJointTransform( const char* name, int currenttime, idVec3 &offset, idMat3 &axis ) { return GetJointTransform( GetJointHandle(name), currenttime, offset, axis ); }
+	bool						GetJointLocalTransform( const char* name, int currenttime, idVec3 &offset, idMat3 &axis ) { return GetJointLocalTransform( GetJointHandle(name), currenttime, offset, axis ); }
+	// HUMANHEAD END
 
-// RAVEN BEGIN
-// rjohnson: added flag to ignore AF when checking for animation
-	bool						IsAnimating	( int currentTime, bool IgnoreAF = false ) const;
-	bool						IsBlending	( int channelNum, int currentTime ) const;
-// RAVEN END
+	void						ServiceAnims( int fromtime, int totime );
+	virtual		// HUMANHEAD nla
+	bool						IsAnimating( int currentTime ) const;
 
 	void						GetJoints( int *numJoints, idJointMat **jointsPtr );
 	int							NumJoints( void ) const;
@@ -629,10 +593,12 @@ class idAnimator{
 	idRenderModel				*SetModel( const char *modelname );
 	idRenderModel				*ModelHandle( void ) const;
 	const idDeclModelDef		*ModelDef( void ) const;
+	bool						IsAnimatedModel( void ) const { return modelDef != NULL; }
 
 	void						ForceUpdate( void );
 	void						ClearForceUpdate( void );
 	bool						CreateFrame( int animtime, bool force );
+	virtual		// HUMANHEAD nla
 	bool						FrameHasChanged( int animtime ) const;
 	void						GetDelta( int fromtime, int totime, idVec3 &delta ) const;
 	bool						GetDeltaRotation( int fromtime, int totime, idMat3 &delta ) const;
@@ -641,9 +607,7 @@ class idAnimator{
 
 	idAnimBlend					*CurrentAnim( int channelNum );
 	void						Clear( int channelNum, int currentTime, int cleartime );
-
-// twhitaker & jscott: create new SetFrame that allows interpolation between arbitrary frames
-	void						SetFrame( int channelNum, int animnum, const frameBlend_t & frameBlend );
+	void						SetFrame( int channelNum, int animnum, int frame, int currenttime, int blendtime );
 	void						CycleAnim( int channelNum, int animnum, int currenttime, int blendtime );
 	void						PlayAnim( int channelNum, int animnum, int currenttime, int blendTime );
 
@@ -653,25 +617,8 @@ class idAnimator{
 
 	void						SetJointPos( jointHandle_t jointnum, jointModTransform_t transform_type, const idVec3 &pos );
 	void						SetJointAxis( jointHandle_t jointnum, jointModTransform_t transform_type, const idMat3 &mat );
-	void						GetJointAxis( jointHandle_t jointnum, idMat3 &mat );
-	void						CollapseJoint ( jointHandle_t jointnum, jointHandle_t collapseTo );
-	void						CollapseJoints ( const char* jointnames, jointHandle_t collapseJoint );
 	void						ClearJoint( jointHandle_t jointnum );
 	void						ClearAllJoints( void );
-
-// RAVEN BEGIN
-// bdube: more joint control functions
-	void						AimJointAt ( jointHandle_t jointnum, const idVec3& pos, const int blendtime );
-	void						SetJointAngularVelocity ( jointHandle_t jointnum, const idAngles& vel, const int currentTime, const int blendTime );
-	idAngles					GetJointAngularVelocity ( jointHandle_t jointnum, const int currentTime );
-	void						ClearJointAngularVelocity ( jointHandle_t jointnum );
-
-// jshepard: rate of playback change
-	void						SetPlaybackRate(float multiplier);
-// abahr:
-	void						SetPlaybackRate( const char* animName, float rate );
-	void						SetPlaybackRate( int animHandle, float rate );
-// RAVEN END
 
 	void						InitAFPose( void );
 	void						SetAFPoseJointMod( const jointHandle_t jointNum, const AFJointModType_t mod, const idMat3 &axis, const idVec3 &origin );
@@ -693,35 +640,22 @@ class idAnimator{
 	int							NumSyncedAnims( int animnum ) const;
 	const char					*AnimName( int animnum ) const;
 	const char					*AnimFullName( int animnum ) const;
-// RAVEN BEGIN
-// rjohnson: more output for animators
-	const char					*AnimMD5Name( int animnum, int index ) const;
-// RAVEN END
 	int							AnimLength( int animnum ) const;
 	const idVec3				&TotalMovementDelta( int animnum ) const;
-	
-// RAVEN BEGIN
-// nrausch: get the nearest joint to a segment - ignores joints behind the origin
-// you can pass it a null jointList in order to test against all joints ( use NumJoints() for the count )
-	jointHandle_t				GetNearestJoint( const idVec3 &start, const idVec3 &end, int time, jointHandle_t *jointList, int cnt ); 
-//MCG
-	jointMod_t *				FindExistingJointMod( jointHandle_t jointnum, int *index );
-// RAVEN END
 
 private:
-// RAVEN BEGIN
-// bdube: added methods
-	jointMod_t *				FindJointMod ( jointHandle_t jointnum );
-// RAVEN END
-
 	void						FreeData( void );
 	void						PushAnims( int channel, int currentTime, int blendTime );
 
-private:
+protected:		// HUMANEAD nla - For access in hhAnimator
 	const idDeclModelDef *		modelDef;
 	idEntity *					entity;
 
+#ifdef HUMANHEAD
+	hhAnimBlend					channels[ ANIM_NumAnimChannels ][ ANIM_MaxAnimsPerChannel ];
+#else
 	idAnimBlend					channels[ ANIM_NumAnimChannels ][ ANIM_MaxAnimsPerChannel ];
+#endif
 	idList<jointMod_t *>		jointMods;
 	int							numJoints;
 	idJointMat *				joints;
@@ -736,20 +670,10 @@ private:
 	float						AFPoseBlendWeight;
 	idList<int>					AFPoseJoints;
 	idList<idAFPoseJointMod>	AFPoseJointMods;
-	idJointQuat *				AFPoseJointFrame;
-	int							AFPoseJointFrameSize;
+	idList<idJointQuat>			AFPoseJointFrame;
 	idBounds					AFPoseBounds;
 	int							AFPoseTime;
-
-// RAVEN BEGIN
-// jshepard: multiplier for the animation rate for all anims under this animator
-	float						rateMultiplier;
-// RAVEN END
 };
-
-ID_INLINE void idAnimator::SetPlaybackRate ( float _rate ) {
-	rateMultiplier = _rate;
-}
 
 /*
 ==============================================================================================
@@ -766,36 +690,21 @@ public:
 
 	static bool					forceExport;
 
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	void						BeginLevelLoad( void );
-	void						EndLevelLoad( void );
-#endif
-// RAVEN END
 	void						Shutdown( void );
 	idMD5Anim *					GetAnim( const char *name );
 	void						ReloadAnims( void );
 	void						ListAnims( void ) const;
-	void						PrintMemInfo( MemInfo *mi );
 	int							JointIndex( const char *name );
 	const char *				JointName( int index ) const;
 
 	void						ClearAnimsInUse( void );
 	void						FlushUnusedAnims( void );
+	void						PrintMemInfo( MemInfo_t *mi );	// HUMANHEAD pdm
 
 private:
 	idHashTable<idMD5Anim *>	animations;
 	idStrList					jointnames;
 	idHashIndex					jointnamesHash;
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	bool						insideLevelLoad;
-#endif
-// RAVEN END
 };
 
 #endif /* !__ANIM_H__ */
-
-// RAVEN END

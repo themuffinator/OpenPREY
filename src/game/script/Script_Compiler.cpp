@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -46,7 +48,7 @@ opcode_t idCompiler::opcodes[] = {
 	
 	{ "-", "SUB_F", 4, false, &def_float, &def_float, &def_float },
 	{ "-", "SUB_V", 4, false, &def_vector, &def_vector, &def_vector },
-
+	
 	{ "==", "EQ_F", 5, false, &def_float, &def_float, &def_float },
 	{ "==", "EQ_V", 5, false, &def_vector, &def_vector, &def_float },
 	{ "==", "EQ_S", 5, false, &def_string, &def_string, &def_float },
@@ -260,14 +262,7 @@ ID_INLINE idVarDef *idCompiler::VirtualFunctionConstant( idVarDef *func ) {
 	memset( &eval, 0, sizeof( eval ) );
 	eval._int = func->scope->TypeDef()->GetFunctionNumber( func->value.functionPtr );
 	if ( eval._int < 0 ) {
-// RAVEN BEGIN
-// bdube: added scope to print
-		if( !func->scope || !func->scope->initialized ) {
-			Error( "Function '%s' not found in uninitialized scope.  Make sure function is an object method.", func->Name() );
-		} else {
-			Error( "Function '%s' not found in scope '%s'", func->Name(), func->scope->Name() );
-		}
-// RAVEN END
+		Error( "Function '%s' not found in scope '%s'", func->Name(), func->scope->Name() );
 	}
     
 	return GetImmediate( &type_virtualfunction, &eval, "" );
@@ -557,10 +552,10 @@ idVarDef *idCompiler::EmitOpcode( const opcode_t *op, idVarDef *var_a, idVarDef 
 		return var_c;
 	}
 
-	if ( var_a && !idStr::Cmp( var_a->Name(), RESULT_STRING ) ) {
+	if ( var_a && !strcmp( var_a->Name(), RESULT_STRING ) ) {
 		var_a->numUsers++;
 	}
-	if ( var_b && !idStr::Cmp( var_b->Name(), RESULT_STRING ) ) {
+	if ( var_b && !strcmp( var_b->Name(), RESULT_STRING ) ) {
 		var_b->numUsers++;
 	}
 	
@@ -614,7 +609,7 @@ bool idCompiler::EmitPush( idVarDef *expression, const idTypeDef *funcArg ) {
 	opcode_t *out;
 
 	out = NULL;
-	for( op = &opcodes[ OP_PUSH_F ]; op->name && !idStr::Cmp( op->name, "<PUSH>" ); op++ ) {
+	for( op = &opcodes[ OP_PUSH_F ]; op->name && !strcmp( op->name, "<PUSH>" ); op++ ) {
 		if ( ( funcArg->Type() == op->type_a->Type() ) && ( expression->Type() == op->type_b->Type() ) ) {
 			out = op;
 			break;
@@ -1129,10 +1124,7 @@ idVarDef *idCompiler::ParseSysObjectCall( idVarDef *funcDef ) {
 		Error( "\"%s\" cannot be called with object notation", funcDef->Name() );
 	}
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !idThread::GetClassType().RespondsTo( *funcDef->value.functionPtr->eventdef ) ) {
-// RAVEN END
+	if ( !idThread::Type.RespondsTo( *funcDef->value.functionPtr->eventdef ) ) {
 		Error( "\"%s\" is not callable as a 'sys' function", funcDef->Name() );
 	}
 
@@ -1173,7 +1165,8 @@ idVarDef *idCompiler::LookupDef( const char *name, const idVarDef *baseobj ) {
 
 				field = LookupDef( name, scope->scope->TypeDef()->def );
 				if ( !field ) {
-					Error( "Unknown value \"%s\"", name );
+					// HUMANHEAD jrm - need to differntiate errors
+					Error( "LookupDef():: Unknown value \"%s\"", name );
 				}
 
 				// type check
@@ -1206,7 +1199,7 @@ idVarDef *idCompiler::LookupDef( const char *name, const idVarDef *baseobj ) {
 						break;
 					}
 					op++;
-					if ( !op->name || idStr::Cmp( op->name, "." ) ) {
+					if ( !op->name || strcmp( op->name, "." ) ) {
 						Error( "no valid opcode to access type '%s'", field->TypeDef()->SuperClass()->Name() );
 					}
 				}
@@ -1260,7 +1253,8 @@ idVarDef *idCompiler::ParseValue( void ) {
 		if ( basetype ) {
 			Error( "%s is not a member of %s", name.c_str(), basetype->TypeDef()->Name() );
 		} else {
-			Error( "Unknown value \"%s\"", name.c_str() );
+			// HUMANHEAD jrm - need to differntiate errors
+			Error( "ParseValue():: Unknown value \"%s\"", name.c_str() ); 
 		}
 	// if namespace, then look up the variable in that namespace
 	} else if ( def->Type() == ev_namespace ) {
@@ -1546,7 +1540,7 @@ idVarDef *idCompiler::GetExpression( int priority ) {
 			}
 
 			op++;
-			if ( !op->name || idStr::Cmp( op->name, oldop->name ) ) {
+			if ( !op->name || strcmp( op->name, oldop->name ) ) {
 				Error( "type mismatch for '%s'", oldop->name );
 			}
 		}
@@ -1683,7 +1677,7 @@ void idCompiler::ParseReturnStatement( void ) {
 	}
 
 	for( op = opcodes; op->name; op++ ) {
-		if ( !idStr::Cmp( op->name, "=" ) ) {
+		if ( !strcmp( op->name, "=" ) ) {
 			break;
 		}
 	}
@@ -1692,7 +1686,7 @@ void idCompiler::ParseReturnStatement( void ) {
 
 	while( !TypeMatches( type_a, op->type_a->Type() ) || !TypeMatches( type_b, op->type_b->Type() ) ) {
 		op++;
-		if ( !op->name || idStr::Cmp( op->name, "=" ) ) {
+		if ( !op->name || strcmp( op->name, "=" ) ) {
 			Error( "type mismatch for return value" );
 		}
 	}
@@ -2127,17 +2121,9 @@ void idCompiler::ParseFunctionDef( idTypeDef *returnType, const char *name ) {
 		}
 	}
 
-// RAVEN BEGIN
-// abahr: moved to below parm size calc as per Jim D
-// RAVEN END
-
 	// calculate stack space used by parms
 	numParms = type->NumParameters();
-// RAVEN BEGIN
-// abahr
-	func->parmTotal = 0;
-	func->parmSize.Clear();
-// RAVEN END
+	func->parmTotal = 0;				//POSTMERGE id fix
 	func->parmSize.SetNum( numParms );
 	for( i = 0; i < numParms; i++ ) {
 		parmType = type->GetParmType( i );
@@ -2148,16 +2134,14 @@ void idCompiler::ParseFunctionDef( idTypeDef *returnType, const char *name ) {
 		}
 		func->parmTotal += func->parmSize[ i ];
 	}
-
-// RAVEN BEGIN
-// abahr: moved here so prototypes calculate parm sizes
+	
+	//POSTMERGE id fix
 	// check if this is a prototype or declaration
 	if ( !CheckToken( "{" ) ) {
 		// it's just a prototype, so get the ; and move on
 		ExpectToken( ";" );
 		return;
 	}
-// RAVEN END
 
 	// define the parms
 	for( i = 0; i < numParms; i++ ) {
@@ -2173,7 +2157,7 @@ void idCompiler::ParseFunctionDef( idTypeDef *returnType, const char *name ) {
 	func->firstStatement = gameLocal.program.NumStatements();
 
 	// check if we should call the super class constructor
-	if ( oldscope->TypeDef()->Inherits( &type_object ) && !stricmp( name, "init" ) ) {
+	if ( oldscope->TypeDef()->Inherits( &type_object ) && !idStr::Icmp( name, "init" ) ) {
 		idTypeDef *superClass;
 		function_t *constructorFunc = NULL;
 
@@ -2200,7 +2184,7 @@ void idCompiler::ParseFunctionDef( idTypeDef *returnType, const char *name ) {
 	}
 
 	// check if we should call the super class destructor
-	if ( oldscope->TypeDef()->Inherits( &type_object ) && !stricmp( name, "destroy" ) ) {
+	if ( oldscope->TypeDef()->Inherits( &type_object ) && !idStr::Icmp( name, "destroy" ) ) {
 		idTypeDef *superClass;
 		function_t *destructorFunc = NULL;
 
@@ -2213,12 +2197,14 @@ void idCompiler::ParseFunctionDef( idTypeDef *returnType, const char *name ) {
 		}
 
 		if ( destructorFunc ) {
-			// change all returns to point to the call to the destructor
-			pos = &gameLocal.program.GetStatement( func->firstStatement );
-			for( i = func->firstStatement; i < gameLocal.program.NumStatements(); i++, pos++ ) {
-				if ( pos->op == OP_RETURN ) {
-					pos->op = OP_GOTO;
-					pos->a = JumpDef( i, gameLocal.program.NumStatements() );
+			if ( func->firstStatement < gameLocal.program.NumStatements() ) {
+				// change all returns to point to the call to the destructor
+				pos = &gameLocal.program.GetStatement( func->firstStatement );
+				for( i = func->firstStatement; i < gameLocal.program.NumStatements(); i++, pos++ ) {
+					if ( pos->op == OP_RETURN ) {
+						pos->op = OP_GOTO;
+						pos->a = JumpDef( i, gameLocal.program.NumStatements() );
+					}
 				}
 			}
 
@@ -2565,7 +2551,6 @@ compiles the 0 terminated text, adding definitions to the program structure
 ============
 */
 void idCompiler::CompileFile( const char *text, const char *filename, bool toConsole ) {
-	idStr orig = filename;
 	idTimer compile_time;
 	bool error;
 
@@ -2638,6 +2623,6 @@ void idCompiler::CompileFile( const char *text, const char *filename, bool toCon
 
 	compile_time.Stop();
 	if ( !toConsole ) {
-		gameLocal.Printf( "Compiled '%s': %.1f ms\n", orig.c_str(), compile_time.Milliseconds() );
+		gameLocal.Printf( "Compiled '%s': %.1f ms\n", filename, compile_time.Milliseconds() );
 	}
 }

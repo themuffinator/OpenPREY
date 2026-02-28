@@ -48,6 +48,14 @@ idCVar bse_useFrustumCull(
 	CVAR_RENDERER | CVAR_BOOL,
 	"if 1, apply renderer frustum culling to BSE effect defs/surfaces");
 
+// Subviews (mirrors/remote cameras) should behave as viewID 0 for suppress/allow.
+static ID_INLINE int R_EffectiveViewIDForSubview() {
+	if ( tr.viewDef != NULL && tr.viewDef->isSubview ) {
+		return 0;
+	}
+	return ( tr.viewDef != NULL ) ? tr.viewDef->renderView.viewID : 0;
+}
+
 
 /*
 ===========================================================================================
@@ -407,13 +415,16 @@ viewEntity_t *R_SetEntityDefViewEntity( idRenderEntityLocal *def ) {
 
 	// copy the model and weapon depth hack for back-end use
 	vModel->modelDepthHack = def->parms.modelDepthHack;
-// jmarshall
-	//vModel->weaponDepthHack = def->parms.weaponDepthHack;
-// jmarshall end
+	vModel->weaponDepthHack = def->parms.weaponDepthHack;
 	R_AxisToModelMatrix( def->parms.axis, def->parms.origin, vModel->modelMatrix );
 
 	// we may not have a viewDef if we are just creating shadows at entity creation time
 	if ( tr.viewDef ) {
+		const int viewID = R_EffectiveViewIDForSubview();
+		if ( def->parms.weaponDepthHackInViewID != 0 &&
+			def->parms.weaponDepthHackInViewID == viewID ) {
+			vModel->weaponDepthHack = true;
+		}
 		myGlMultMatrix( vModel->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vModel->modelViewMatrix );
 
 		vModel->next = tr.viewDef->viewEntitys;
@@ -563,6 +574,7 @@ void idRenderWorldLocal::CreateLightDefInteractions( idRenderLightLocal *ldef ) 
 	idRenderEntityLocal		*edef;
 	portalArea_t	*area;
 	idInteraction	*inter;
+	const int		viewID = R_EffectiveViewIDForSubview();
 
 	for ( lref = ldef->references ; lref ; lref = lref->ownerNext ) {
 		area = lref->area;
@@ -583,7 +595,7 @@ void idRenderWorldLocal::CreateLightDefInteractions( idRenderLightLocal *ldef ) 
 				}
 				// if we are suppressing its shadow in this view, skip
 				if ( !r_skipSuppress.GetBool() ) {
-					if ( edef->parms.suppressShadowInViewID && edef->parms.suppressShadowInViewID == tr.viewDef->renderView.viewID ) {
+					if ( edef->parms.suppressShadowInViewID && edef->parms.suppressShadowInViewID == viewID ) {
 						continue;
 					}
 					if ( edef->parms.suppressShadowInLightID && edef->parms.suppressShadowInLightID == ldef->parms.lightId ) {
@@ -895,6 +907,7 @@ void R_AddLightSurfaces( void ) {
 	viewLight_t		*vLight;
 	idRenderLightLocal *light;
 	viewLight_t		**ptr;
+	const int		viewID = R_EffectiveViewIDForSubview();
 
 	// go through each visible light, possibly removing some from the list
 	ptr = &tr.viewDef->viewLights;
@@ -910,13 +923,13 @@ void R_AddLightSurfaces( void ) {
 		// see if we are suppressing the light in this view
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( light->parms.suppressLightInViewID
-			&& light->parms.suppressLightInViewID == tr.viewDef->renderView.viewID ) {
+			&& light->parms.suppressLightInViewID == viewID ) {
 				*ptr = vLight->next;
 				light->viewCount = -1;
 				continue;
 			}
 			if ( light->parms.allowLightInViewID 
-			&& light->parms.allowLightInViewID != tr.viewDef->renderView.viewID ) {
+			&& light->parms.allowLightInViewID != viewID ) {
 				*ptr = vLight->next;
 				light->viewCount = -1;
 				continue;
@@ -1488,6 +1501,7 @@ R_AddEffectSurfaces
 */
 void R_AddEffectSurfaces(void) {
 	idRenderWorldLocal* world = tr.viewDef->renderWorld;
+	const int viewID = R_EffectiveViewIDForSubview();
 	const int counterMode = bse_frameCounters.GetInteger();
 	int totalDefs = 0;
 	int spawned = 0;
@@ -1571,11 +1585,11 @@ void R_AddEffectSurfaces(void) {
 		}
 
 		if (!r_skipSuppress.GetBool()) {
-			if (def->parms.suppressSurfaceInViewID && def->parms.suppressSurfaceInViewID == tr.viewDef->renderView.viewID) {
+			if (def->parms.suppressSurfaceInViewID && def->parms.suppressSurfaceInViewID == viewID) {
 				++dropViewSuppress;
 				continue;
 			}
-			if (def->parms.allowSurfaceInViewID && def->parms.allowSurfaceInViewID != tr.viewDef->renderView.viewID) {
+			if (def->parms.allowSurfaceInViewID && def->parms.allowSurfaceInViewID != viewID) {
 				++dropViewSuppress;
 				continue;
 			}
@@ -1604,7 +1618,7 @@ void R_AddEffectSurfaces(void) {
 
 		viewEntity_t* vEffect = (viewEntity_t*)R_ClearedFrameAlloc(sizeof(*vEffect));
 		vEffect->entityDef = NULL;
-		vEffect->weaponDepthHack = (def->parms.weaponDepthHackInViewID != 0 && def->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID);
+		vEffect->weaponDepthHack = (def->parms.weaponDepthHackInViewID != 0 && def->parms.weaponDepthHackInViewID == viewID);
 		vEffect->modelDepthHack = def->parms.modelDepthHack;
 		R_AxisToModelMatrix(def->parms.axis, def->parms.origin, vEffect->modelMatrix);
 		myGlMultMatrix(vEffect->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vEffect->modelViewMatrix);

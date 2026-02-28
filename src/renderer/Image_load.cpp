@@ -357,6 +357,35 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
 				break;
 			}
+			// Prey retail content variant: barside_cap maps to barside1 textures.
+			if ( generatedName.Find( "textures/roadhouse/barside_cap_d", false ) >= 0 ) {
+				generatedName.Replace( "barside_cap_d", "barside1_d" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
+			if ( generatedName.Find( "textures/roadhouse/barside_cap_s", false ) >= 0 ) {
+				generatedName.Replace( "barside_cap_s", "barside1_s" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
+			if ( generatedName.Find( "textures/roadhouse/barside_cap_local", false ) >= 0 ) {
+				generatedName.Replace( "barside_cap_local", "barside1_local" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
+			// Prey retail content variant: g_bonewall_001 maps to g_bonewall_001b textures.
+			if ( generatedName.Find( "textures/organic_wall/g_bonewall_001", false ) >= 0 ) {
+				generatedName.Replace( "g_bonewall_001_d", "g_bonewall_001b_d" );
+				generatedName.Replace( "g_bonewall_001_s", "g_bonewall_001b_s" );
+				generatedName.Replace( "g_bonewall_001_local", "g_bonewall_001b_local" );
+				generatedName.Replace( "g_bonewall_001_h", "g_bonewall_001b_h" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
 			if ( generatedName.Find( "models/monsters/skeleton/skeleton01_d#__1000", false ) >= 0 ) {
 				generatedName.Replace( "skeleton01_d#__1000", "skeleton01_d#__0100" );
 				im.SetName( generatedName );
@@ -412,6 +441,26 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 
 			// load the full specification, and perform any image program calculations
 			R_LoadImageProgram( GetName(), &pic, &width, &height, &sourceFileTime, &usage );
+
+			if ( pic == NULL ) {
+				// Prey retail content variant: barside_cap maps to barside1 textures.
+				idStr fallbackProgram = GetName();
+				if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_d", false ) >= 0 ) {
+					fallbackProgram.Replace( "barside_cap_d", "barside1_d" );
+				} else if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_s", false ) >= 0 ) {
+					fallbackProgram.Replace( "barside_cap_s", "barside1_s" );
+				} else if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_local", false ) >= 0 ) {
+					fallbackProgram.Replace( "barside_cap_local", "barside1_local" );
+				} else if ( fallbackProgram.Find( "textures/organic_wall/g_bonewall_001", false ) >= 0 ) {
+					fallbackProgram.Replace( "g_bonewall_001_d", "g_bonewall_001b_d" );
+					fallbackProgram.Replace( "g_bonewall_001_s", "g_bonewall_001b_s" );
+					fallbackProgram.Replace( "g_bonewall_001_local", "g_bonewall_001b_local" );
+					fallbackProgram.Replace( "g_bonewall_001_h", "g_bonewall_001b_h" );
+				}
+				if ( fallbackProgram != GetName() ) {
+					R_LoadImageProgram( fallbackProgram.c_str(), &pic, &width, &height, &sourceFileTime, &usage );
+				}
+			}
 
 			if ( pic == NULL ) {
 				idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
@@ -530,20 +579,6 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
-	static int cfdbgPrints = 0;
-	if ( cfdbgPrints < 64 ) {
-		const char *name = GetName();
-		const int rtWidth = readingFromRenderTexture ? backEnd.renderTexture->GetWidth() : 0;
-		const int rtHeight = readingFromRenderTexture ? backEnd.renderTexture->GetHeight() : 0;
-		common->Printf( "CFDBG copy '%s': fromRT=%d src=(%d,%d %dx%d) rt=%dx%d viewport=(%d,%d %d,%d)\n",
-			name != NULL ? name : "<null>",
-			readingFromRenderTexture ? 1 : 0,
-			x, y, imageWidth, imageHeight,
-			rtWidth, rtHeight,
-			backEnd.viewDef->viewport.x1, backEnd.viewDef->viewport.y1,
-			backEnd.viewDef->viewport.x2, backEnd.viewDef->viewport.y2 );
-		cfdbgPrints++;
-	}
 
 	opts.width = imageWidth;
 	opts.height = imageHeight;

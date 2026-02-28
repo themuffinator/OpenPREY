@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_TRIGGER_H__
 #define __GAME_TRIGGER_H__
@@ -31,19 +33,14 @@ public:
 	virtual void		Disable( void );
 
 protected:
-// RAVEN BEGIN
-// abahr: removed const from function
-	void				CallScript( idEntity* scriptEntity );
-// RAVEN END
+	void				CallScript( void ) const;
 
+private:
+	virtual // HUMANHEAD pdm
 	void				Event_Enable( void );
 	void				Event_Disable( void );
 
-// RAVEN BEGIN
-// abahr: changed to allow parms to be passed
-	idList<rvScriptFuncUtility> scriptFunctions;
-	//const function_t *	scriptFunction;
-// RAVEN END
+	const function_t *	scriptFunction;
 };
 
 
@@ -65,7 +62,6 @@ public:
 
 	void				Save( idSaveGame *savefile ) const;
 	void				Restore( idRestoreGame *savefile );
-	virtual void		Think( void );
 
 private:
 	float				wait;
@@ -73,27 +69,14 @@ private:
 	float				delay;
 	float				random_delay;
 	int					nextTriggerTime;
-	idStr				requirement;
+	idStr				requiredItem;
 	int					removeItem;
 	bool				touchClient;
 	bool				touchOther;
-	bool				touchVehicle;
 	bool				triggerFirst;
 	bool				triggerWithSelf;
-	int					buyZoneTrigger;
-	int					controlZoneTrigger;
-	int					prevZoneController;
-
-	idList<idPlayer*>	playersInTrigger;
 
 	bool				CheckFacing( idEntity *activator );
-	void				HandleControlZoneTrigger();
-
-// RAVEN BEGIN
-// kfuller: want trigger_relays entities to be able to respond to earthquakes
-	void				Event_EarthQuake				(float requiresLOS);
-// RAVEN END
-
 	void				TriggerAction( idEntity *activator );
 	void				Event_TriggerAction( idEntity *activator );
 	void				Event_Trigger( idEntity *activator );
@@ -223,11 +206,6 @@ private:
 	float				delay;
 	int					nextTime;
 
-// RAVEN BEGIN
-// kfuller: added playeronly
-	bool				playerOnly;
-// RAVEN END
-
 	void				Event_Touch( idEntity *other, trace_t *trace );
 	void				Event_Toggle( idEntity *activator );
 };
@@ -265,7 +243,6 @@ public:
 	CLASS_PROTOTYPE( idTrigger_Touch );
 
 						idTrigger_Touch( void );
-						~idTrigger_Touch( );
 
 	void				Spawn( void );
 	virtual void		Think( void );
@@ -280,7 +257,6 @@ public:
 
 private:
 	idClipModel *		clipModel;
-	int					filterTeam;
 
 	void				Event_Trigger( idEntity *activator );
 };

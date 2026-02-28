@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __SCRIPT_PROGRAM_H__
 #define __SCRIPT_PROGRAM_H__
@@ -12,16 +14,20 @@ class idSaveGame;
 class idRestoreGame;
 
 #define MAX_STRING_LEN		128
-// RAVEN BEGIN
-// ddynerman: higher max limit, initially 196608
-// jshepard: ... then 393216
-#define MAX_GLOBALS			589824			// in bytes
 
-// jshepard: raise the limits. Formerly 1024, 3072 and 81920. 
-#define MAX_STRINGS			2048
-#define MAX_FUNCS			6144
-#define MAX_STATEMENTS		163840			// statement_t - 18 bytes last I checked
-// RAVEN END
+// HUMANHEAD PCF BG 5/30/06: Added 20% to script max values.
+
+// HUMANHEAD pdm: Ran out of space on some maps.  TODO figure out why this is happening.
+#define MAX_GLOBALS			530840			// in bytes
+//#define MAX_GLOBALS		196608			// in bytes
+// HUMANHEAD END
+
+#define MAX_STRINGS			1024
+#define MAX_FUNCS			3686
+#define MAX_STATEMENTS		113050			// statement_t - 18 bytes last I checked
+
+// HUMANHEAD END PCF
+
 typedef enum {
 	ev_error = -1, ev_void, ev_scriptevent, ev_namespace, ev_string, ev_float, ev_vector, ev_entity, ev_field, ev_function, ev_virtualfunction, ev_pointer, ev_object, ev_jumpoffset, ev_argsize, ev_boolean
 } etype_t;
@@ -83,7 +89,6 @@ public:
 
 						idTypeDef( const idTypeDef &other );
 						idTypeDef( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux );
-						virtual ~idTypeDef( void ) { }
 	void				operator=( const idTypeDef& other );
 	size_t				Allocated( void ) const;
 
@@ -119,131 +124,64 @@ public:
 	const function_t	*GetFunction( int funcNumber ) const;
 	void				AddFunction( const function_t *func );
 
-// RAVEN BEGIN
-	// abahr
-	virtual const char*	GetReturnedValAsString( idProgram& program ) { return ""; }
-	virtual void		PushOntoStack( idThread* thread, const char* source ) { assert(0); }
-	virtual bool		IsValid( const char* source ) const { return true; }
-	virtual const char*	Format() const { return ""; }
-// RAVEN END
+	//HUMANHEAD: aob
+	virtual void		PushOntoStack( const char* parm, class hhThread* thread ) const {}
+	virtual const char* GetReturnValueAsString( idProgram& program ) const { return ""; }
+	virtual bool		VerifyData( const char* data ) const { return false; }
+	//HUMANHEAD END
 };
 
-// RAVEN BEGIN
-// abahr: subclasses for overwritting helper functions
-
-/***********************************************************************
-
-rvTypeDefInt
-
-***********************************************************************/
-class rvTypeDefInt : public idTypeDef {
+//HUMANHEAD: aob
+class idTypeDefString : public idTypeDef {
 public:
-				rvTypeDefInt( const idTypeDef &other ) : idTypeDef( other ) {}
-				rvTypeDefInt( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) : idTypeDef( etype, edef, ename, esize, aux ) {}
+				idTypeDefString( const idTypeDef &other );
+				idTypeDefString( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux );
 
-	const char*	GetReturnedValAsString( idProgram& program );
-	void		PushOntoStack( idThread* thread, const char* source );
-	bool		IsValid( const char* source ) const;
-
-protected:
-	const char*	Format() const { return "%d"; }
-	int			Parse( const char* source ) const;
-
+	void		PushOntoStack( const char* parm, class hhThread* thread ) const;
+	const char* GetReturnValueAsString( idProgram& program ) const;
+	bool		VerifyData( const char* data ) const; 
 };
 
-/***********************************************************************
-
-rvTypeDefFloat
-
-***********************************************************************/
-class rvTypeDefFloat : public idTypeDef {
+class idTypeDefVector : public idTypeDef {
 public:
-				rvTypeDefFloat( const idTypeDef &other ) : idTypeDef( other ) {}
-				rvTypeDefFloat( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) : idTypeDef( etype, edef, ename, esize, aux ) {}
+				idTypeDefVector( const idTypeDef &other );
+				idTypeDefVector( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux );
 
-	const char*	GetReturnedValAsString( idProgram& program );
-	void		PushOntoStack( idThread* thread, const char* source );
-	bool		IsValid( const char* source ) const;
-
-protected:
-	const char*	Format() const { return "%f"; }
-	float		Parse( const char* source ) const;
+	void		PushOntoStack( const char* parm, class hhThread* thread ) const;
+	const char* GetReturnValueAsString( idProgram& program ) const;
+	bool		VerifyData( const char* data ) const; 
 };
 
-/***********************************************************************
-
-rvTypeDefVec3
-
-***********************************************************************/
-class rvTypeDefVec3 : public idTypeDef {
+class idTypeDefFloat : public idTypeDef {
 public:
-				rvTypeDefVec3( const idTypeDef &other ) : idTypeDef( other ) {}
-				rvTypeDefVec3( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) : idTypeDef( etype, edef, ename, esize, aux ) {}
+				idTypeDefFloat( const idTypeDef &other );
+				idTypeDefFloat( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux );
 
-	const char*	GetReturnedValAsString( idProgram& program );
-	void		PushOntoStack( idThread* thread, const char* source );
-	bool		IsValid( const char* source ) const;
-
-protected:
-	const char*	Format() const { return "%f %f %f"; }
-	idVec3		Parse( const char* source ) const;
+	void		PushOntoStack( const char* parm, class hhThread* thread ) const;
+	const char* GetReturnValueAsString( idProgram& program ) const;
+	bool		VerifyData( const char* data ) const; 
 };
 
-/***********************************************************************
-
-rvTypeDefEntity
-
-***********************************************************************/
-class rvTypeDefEntity : public idTypeDef {
+class idTypeDefEntity : public idTypeDef {
 public:
-				rvTypeDefEntity( const idTypeDef &other ) : idTypeDef( other ) {}
-				rvTypeDefEntity( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) : idTypeDef( etype, edef, ename, esize, aux ) {}
+				idTypeDefEntity( const idTypeDef &other );
+				idTypeDefEntity( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux );
 
-	const char*	GetReturnedValAsString( idProgram& program );
-	void		PushOntoStack( idThread* thread, const char* source );
-	bool		IsValid( const char* source ) const;
-
-protected:
-	idEntity*	Parse( const char* source ) const;
+	void		PushOntoStack( const char* parm, class hhThread* thread ) const;
+	const char* GetReturnValueAsString( idProgram& program ) const;
+	bool		VerifyData( const char* data ) const; 
 };
 
-/***********************************************************************
-
-rvTypeDefString
-
-***********************************************************************/
-class rvTypeDefString : public idTypeDef {
+class idTypeDefBool : public idTypeDef {
 public:
-				rvTypeDefString( const idTypeDef &other ) : idTypeDef( other ) {}
-				rvTypeDefString( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) : idTypeDef( etype, edef, ename, esize, aux ) {}
+				idTypeDefBool( const idTypeDef &other );
+				idTypeDefBool( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux );
 
-	const char*	GetReturnedValAsString( idProgram& program );
-	void		PushOntoStack( idThread* thread, const char* source );
-	bool		IsValid( const char* source ) const;
-
-protected:
-	const char*	Parse( const char* source ) const;
+	void		PushOntoStack( const char* parm, class hhThread* thread ) const;
+	const char* GetReturnValueAsString( idProgram& program ) const;
+	bool		VerifyData( const char* data ) const; 
 };
-
-/***********************************************************************
-
-rvTypeDefBool
-
-***********************************************************************/
-class rvTypeDefBool : public idTypeDef {
-public:
-				rvTypeDefBool( const idTypeDef &other ) : idTypeDef( other ) {}
-				rvTypeDefBool( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) : idTypeDef( etype, edef, ename, esize, aux ) {}
-
-	const char*	GetReturnedValAsString( idProgram& program );
-	void		PushOntoStack( idThread* thread, const char* source );
-	bool		IsValid( const char* source ) const;
-
-protected:
-	const char*	Format() const { return "%u"; }
-	bool		Parse( const char* source ) const;
-};
-// RAVEN END
+//HUMANHEAD END
 
 /***********************************************************************
 
@@ -323,7 +261,7 @@ template<class type, etype_t etype, class returnType>
 ID_INLINE void idScriptVariable<type, etype, returnType>::LinkTo( idScriptObject &obj, const char *name ) {
 	data = ( type * )obj.GetVariable( name, etype );
 	if ( !data ) {
-		gameError( "Missing '%s' field in script object '%s'", name, obj.GetTypeName() );
+		idLib::common->Error( "Missing '%s' field in script object '%s'", name, obj.GetTypeName() );
 	}
 }
 
@@ -364,7 +302,7 @@ sample the data for non-dynamic values.
 
 ***********************************************************************/
 
-typedef idScriptVariable<bool, ev_boolean, bool>			idScriptBool;
+typedef idScriptVariable<int, ev_boolean, int>				idScriptBool;
 typedef idScriptVariable<float, ev_float, float>			idScriptFloat;
 typedef idScriptVariable<float, ev_float, int>				idScriptInt;
 typedef idScriptVariable<idVec3, ev_vector, idVec3>			idScriptVector;
@@ -402,6 +340,7 @@ typedef union varEval_s {
 	int 					*intPtr;
 	byte					*bytePtr;
 	int 					*entityNumberPtr;
+	uintptr_t				pointerToken;
 	int						virtualFunction;
 	int						jumpOffset;
 	int						stackOffset;		// offset in stack for local variables
@@ -409,8 +348,6 @@ typedef union varEval_s {
 	varEval_s				*evalPtr;
 	int						ptrOffset;
 } varEval_t;
-
-class idVarDefName;
 
 class idVarDef {
 	friend class idVarDefName;
@@ -483,27 +420,25 @@ private:
 
 ***********************************************************************/
 
-extern	idTypeDef	type_void;
-extern	idTypeDef	type_scriptevent;
-extern	idTypeDef	type_namespace;
-// RAVEN BEGIN
-// abahr
-extern	rvTypeDefString	type_string;
-extern	rvTypeDefFloat	type_float;
-extern	rvTypeDefVec3	type_vector;
-extern	rvTypeDefEntity	type_entity;
-// RAVEN END
-extern  idTypeDef	type_field;
-extern	idTypeDef	type_function;
-extern	idTypeDef	type_virtualfunction;
-extern  idTypeDef	type_pointer;
-extern	idTypeDef	type_object;
-extern	idTypeDef	type_jumpoffset;	// only used for jump opcodes
-extern	idTypeDef	type_argsize;		// only used for function call and thread opcodes
-// RAVEN BEGIN
-// abahr
-extern	rvTypeDefBool	type_boolean;
-// RAVEN END
+extern	idTypeDef		type_void;
+extern	idTypeDef		type_scriptevent;
+extern	idTypeDef		type_namespace;
+//HUMANHEAD: aob - changed types to inherited types
+extern	idTypeDefString	type_string;
+extern	idTypeDefFloat	type_float;
+extern	idTypeDefVector	type_vector;
+extern	idTypeDefEntity	type_entity;
+//HUMANHEAD END
+extern  idTypeDef		type_field;
+extern	idTypeDef		type_function;
+extern	idTypeDef		type_virtualfunction;
+extern  idTypeDef		type_pointer;
+extern	idTypeDef		type_object;
+extern	idTypeDef		type_jumpoffset;	// only used for jump opcodes
+extern	idTypeDef		type_argsize;		// only used for function call and thread opcodes
+//HUMANHEAD: aob - changed types to inherited types
+extern	idTypeDefBool	type_boolean;
+//HUMANHEAD END
 
 extern	idVarDef	def_void;
 extern	idVarDef	def_scriptevent;
@@ -622,35 +557,21 @@ public:
 
 	int 										GetReturnedInteger( void );
 
-// RAVEN BEGIN
-// abahr: adding helper functions for other types
-	float										GetReturnedFloat();
-	idVec3										GetReturnedVec3();
-	idEntity*									GetReturnedEntity();
-	const char*									GetReturnedString();
-	bool										GetReturnedBool();
-// RAVEN END
+	//HUMANHEAD: aob - need to return other types
+	float 										GetReturnedFloat( void );
+	bool										GetReturnedBool( void );
+	idVec3 										GetReturnedVector( void );
+	idStr										GetReturnedString( void );
+	int											GetReturnedEntity( void );
+	//HUMANHEAD END
 
 	void										ReturnFloat( float value );
 	void										ReturnInteger( int value );
 	void										ReturnVector( idVec3 const &vec );
 	void										ReturnString( const char *string );
-// RAVEN BEGIN
-// abahr: added const
-	void										ReturnEntity( const idEntity *ent );
-// RAVEN END
+	void										ReturnEntity( idEntity *ent );
 	
 	int											NumFilenames( void ) { return fileList.Num( ); }
-	
-// RAVEN BEGIN
-// bdube: added
-	void										ListStates( void );
-// jscott: added for debug with inlines and memory log
-	void										Shutdown( void );
-// jscott: added for stats
-	size_t										ScriptSummary( const idCmdArgs &args );
-	size_t										ClassSummary( const idCmdArgs &args );
-// RAVEN END
 };
 
 /*
@@ -686,50 +607,65 @@ idProgram::GetReturnedInteger
 ================
 */
 ID_INLINE int idProgram::GetReturnedInteger( void ) {
-// RAVEN BEGIN
-// abahr: because we only return floats in idThread we need to only get floats
-	return (int)GetReturnedFloat();
-// RAVEN END
+	// HUMANHEAD pdm: Changed to reference the floatPtr, since we send ints as floats
+	return static_cast<int>(*returnDef->value.floatPtr);
 }
 
-// RAVEN BEGIN
-// abahr: adding helper functions for other types
 /*
 ================
 idProgram::GetReturnedFloat
+
+HUMANHEAD: aob
 ================
 */
-ID_INLINE float idProgram::GetReturnedFloat() {
+ID_INLINE float idProgram::GetReturnedFloat( void ) {
 	return *returnDef->value.floatPtr;
 }
 
 /*
 ================
-idProgram::GetReturnedVec3
+idProgram::GetReturnedBool
+
+HUMANHEAD: aob
 ================
 */
-ID_INLINE idVec3 idProgram::GetReturnedVec3() {
+ID_INLINE bool idProgram::GetReturnedBool( void ) {
+	// HUMANHEAD pdm: Changed to reference the floatPtr, since we send ints as floats
+	return (*(returnDef->value.floatPtr)) != 0.0f;
+}
+
+/*
+================
+idProgram::GetReturnedVector
+
+HUMANHEAD: aob
+================
+*/
+ID_INLINE idVec3 idProgram::GetReturnedVector( void ) {
 	return *returnDef->value.vectorPtr;
 }
 
 /*
 ================
 idProgram::GetReturnedString
+
+HUMANHEAD: aob
 ================
 */
-ID_INLINE const char* idProgram::GetReturnedString() {
-	return returnDef->value.stringPtr;
+ID_INLINE idStr idProgram::GetReturnedString( void ) {
+	return idStr( *returnDef->value.stringPtr );
 }
 
 /*
 ================
-idProgram::GetReturnedBool
+idProgram::GetReturnedEntity
+
+HUMANHEAD: aob
 ================
 */
-ID_INLINE bool idProgram::GetReturnedBool() {
-	return GetReturnedInteger() != 0;
+ID_INLINE int idProgram::GetReturnedEntity( void ) {
+	return *returnDef->value.entityNumberPtr;
 }
-// RAVEN END
 
 /*
 ================

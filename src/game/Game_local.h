@@ -1,15 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
+
 #ifndef __GAME_LOCAL_H__
 #define	__GAME_LOCAL_H__
-
-// RAVEN BEGIN
-// jsinger: attempt to eliminate cross-DLL allocation issues
-#ifdef RV_UNIFIED_ALLOCATOR
-inline void *operator new( size_t s ) { return Memory::Allocate(s); }
-inline void operator delete( void *p ) { Memory::Free(p); }
-inline void *operator new[]( size_t s ) { return Memory::Allocate(s); }
-inline void operator delete[]( void *p ) { Memory::Free(p); }
-#endif
-// RAVEN END
 
 /*
 ===============================================================================
@@ -23,20 +16,31 @@ inline void operator delete[]( void *p ) { Memory::Free(p); }
 #define LAGO_IMG_HEIGHT 64
 #define LAGO_WIDTH	64
 #define LAGO_HEIGHT	44
-#define LAGO_MATERIAL	"textures/mptextures/lagometer"
-#define LAGO_IMAGE		"textures/mptextures/lagometer.tga"
+#define LAGO_MATERIAL	"textures/sfx/lagometer"
+#define LAGO_IMAGE		"textures/sfx/lagometer.tga"
 
 // if set to 1 the server sends the client PVS with snapshots and the client compares against what it sees
 #ifndef ASYNC_WRITE_PVS
 	#define ASYNC_WRITE_PVS 0
 #endif
 
-class idRenderWorld;
-extern idRenderWorld *				gameRenderWorld;
+#ifdef ID_DEBUG_UNINITIALIZED_MEMORY
+// This is real evil but allows the code to inspect arbitrary class variables.
+#define private		public
+#define protected	public
+#endif
 
-#include "../sys/AutoVersion.h"
+extern idRenderWorld *				gameRenderWorld;
+extern idSoundWorld *				gameSoundWorld;
+
+// HUMANHEAD pdm
+#if INGAME_PROFILER_ENABLED
+extern hhProfiler *					profiler;
+#endif
+// HUMANHEAD END
+
 // the "gameversion" client command will print this plus compile date
-#define	GAME_VERSION		"baseQUAKE4-1"
+#define	GAME_VERSION		"basePrey-1"
 
 // classes used by idGameLocal
 class idEntity;
@@ -47,69 +51,47 @@ class idWorldspawn;
 class idTestModel;
 class idAAS;
 class idAI;
-class idRenderTexture;
-// jmarshall
-class rvmBot;
-// jmarshall end
-// RAVEN BEGIN
-// bdube: not using id effects
-//class idSmokeParticles;
-//class idEntityFx;
-// bdube: client side entities
-class rvInstance;
-class rvClientEntity;
-class rvClientModel;
-class rvCTFAssaultPlayerStart;
-class idPlayerStart;
-// RAVEN END
+class idSmokeParticles;
+class idEntityFx;
 class idTypeInfo;
 class idProgram;
 class idThread;
 class idEditEntities;
 class idLocationEntity;
 
-// RAVEN BEGIN
-// dluetscher: reduced max clients for memory usage
-#ifdef _XENON
-#define	MAX_CLIENTS				16
-#else
-// RAVEN END
-#define	MAX_CLIENTS				32
-#endif
+int *OpenPrey_SpawnIdArray();
+idEntity **OpenPrey_EntityArray();
+int OpenPrey_EntityNumber( const idEntity *ent );
 
+#define	MAX_CLIENTS				32
 #define	GENTITYNUM_BITS			12
 #define	MAX_GENTITIES			(1<<GENTITYNUM_BITS)
+//HUMANHEAD rww - client entities!
+#define GENTITYNUM_BITS_PLUSCENT	13 //8192 allowable
+#define	MAX_CENTITIES				MAX_GENTITIES //it doesn't have to be this, but whatever.
+//END HUMANHEAD
 #define	ENTITYNUM_NONE			(MAX_GENTITIES-1)
 #define	ENTITYNUM_WORLD			(MAX_GENTITIES-2)
-// RAVEN BEGIN
-// bdube: dummy entity for client side physics
-#define ENTITYNUM_CLIENT		(MAX_GENTITIES-3)
-#define	ENTITYNUM_MAX_NORMAL	(MAX_GENTITIES-3)
-// RAVEN END
+#define	ENTITYNUM_MAX_NORMAL	(MAX_GENTITIES-2)
 
-// RAVEN BEGIN
-// bdube: client entities
-#define	CENTITYNUM_BITS			12
-#define	MAX_CENTITIES			(1<<CENTITYNUM_BITS)
-// shouchard:  for ban lists and because I hate magic numbers
-#define CLIENT_GUID_LENGTH		12
-// RAVEN END
+//HUMANHEAD: aob - put here it can be used anywhere.  hhSafeEntity wouldn't compile otherwise.
+#if GOLD
+// mdl:  Disable if we're gold
+#define HH_ASSERT( boolArg )
+#else
 
-// RAVEN BEGIN
-// abahr: helper macros
-#define SAFE_DELETE_PTR(p) if(p) { delete (p); (p) = NULL; }
-#define SAFE_REMOVE(p) if(p) { (p)->PostEventMS(&EV_Remove, 0); (p) = NULL; }
-// RAVEN END
+#ifdef _DEBUG
+#define HH_ASSERT( boolArg ) assert( (boolArg) )
+#else
+#define HH_ASSERT( boolArg ) if( !(boolArg) ) { gameLocal.Error("Assertion Failed: %s, File: %s, Line: %d\n", #boolArg, __FILE__, __LINE__); }
+#endif
+
+#endif // GOLD
+//HUMANHEAD END
 
 //============================================================================
 
-void gameError( const char *fmt, ... );
-
 #include "gamesys/Event.h"
-// RAVEN BEGIN
-// bdube: added
-#include "gamesys/State.h"
-// RAVEN END
 #include "gamesys/Class.h"
 #include "gamesys/SysCvar.h"
 #include "gamesys/SysCmds.h"
@@ -119,6 +101,11 @@ void gameError( const char *fmt, ... );
 #include "script/Script_Program.h"
 
 #include "anim/Anim.h"
+// HUMANHEAD nla
+#include "../prey/game_anim.h"
+#include "../prey/game_animBlend.h"
+#include "../prey/prey_animator.h"
+// HUMANHEAD END
 
 #include "ai/AAS.h"
 
@@ -126,18 +113,20 @@ void gameError( const char *fmt, ... );
 #include "physics/Push.h"
 
 #include "Pvs.h"
+#include "MultiplayerGame.h"
 
-#include "FreeView.h"
+// HUMANHEAD
+#include "../prey/prey_camerainterpolator.h"	// HUMANHEAD
+#include "../prey/anim_baseanim.h"				// HUMANHEAD nla - For playing partial animations
+#define NUM_AAS 3
+// HUMANHEAD END
 
 //============================================================================
 
 const int MAX_GAME_MESSAGE_SIZE		= 8192;
 const int MAX_ENTITY_STATE_SIZE		= 512;
 const int ENTITY_PVS_SIZE			= ((MAX_GENTITIES+31)>>5);
-// RAVEN BEGIN
-// abahr: changed to NUM_PORTAL_ATTRIBUTES to take into account gravity
-const int NUM_RENDER_PORTAL_BITS	= NUM_PORTAL_ATTRIBUTES;
-// RAVEN END
+const int NUM_RENDER_PORTAL_BITS	= idMath::BitsForInteger( PS_BLOCK_ALL );
 
 typedef struct entityState_s {
 	int						entityNumber;
@@ -155,26 +144,42 @@ typedef struct snapshot_s {
 
 const int MAX_EVENT_PARAM_SIZE		= 128;
 
+//HUMANHEAD rww - for assistance in cleaning up garbage events for ents that no longer exist on client
+//#define _HH_NET_EVENT_TYPE_VALIDATION
+//HUMANHEAD END
+
 typedef struct entityNetEvent_s {
 	int						spawnId;
 	int						event;
 	int						time;
 	int						paramsSize;
 	byte					paramsBuf[MAX_EVENT_PARAM_SIZE];
+#ifdef _HH_NET_EVENT_TYPE_VALIDATION //HUMANHEAD rww
+	int						entTypeId;
+#endif //HUMANHEAD END
 	struct entityNetEvent_s	*next;
 	struct entityNetEvent_s *prev;
 } entityNetEvent_t;
 
 enum {
+	GAME_RELIABLE_MESSAGE_INIT_DECL_REMAP,
+	GAME_RELIABLE_MESSAGE_REMAP_DECL,
 	GAME_RELIABLE_MESSAGE_SPAWN_PLAYER,
 	GAME_RELIABLE_MESSAGE_DELETE_ENT,
 	GAME_RELIABLE_MESSAGE_CHAT,
+	//HUMANHEAD PCF rww 05/10/06 - "fix" for server-localized join messages (this is dumb).
+	GAME_RELIABLE_MESSAGE_SPECIAL,
+	//HUMANHEAD END
 	GAME_RELIABLE_MESSAGE_TCHAT,
+	GAME_RELIABLE_MESSAGE_SOUND_EVENT,
+	GAME_RELIABLE_MESSAGE_SOUND_INDEX,
 	GAME_RELIABLE_MESSAGE_DB,
+	GAME_RELIABLE_MESSAGE_DB_DEATH, //HUMANHEAD rww
 	GAME_RELIABLE_MESSAGE_KILL,
 	GAME_RELIABLE_MESSAGE_DROPWEAPON,
 	GAME_RELIABLE_MESSAGE_RESTART,
 	GAME_RELIABLE_MESSAGE_SERVERINFO,
+	GAME_RELIABLE_MESSAGE_TOURNEYLINE,
 	GAME_RELIABLE_MESSAGE_CALLVOTE,
 	GAME_RELIABLE_MESSAGE_CASTVOTE,
 	GAME_RELIABLE_MESSAGE_STARTVOTE,
@@ -184,74 +189,25 @@ enum {
 	GAME_RELIABLE_MESSAGE_VCHAT,
 	GAME_RELIABLE_MESSAGE_STARTSTATE,
 	GAME_RELIABLE_MESSAGE_MENU,
-	GAME_RELIABLE_MESSAGE_EVENT,
-// RAVEN BEGIN
-// bdube: effect
-	GAME_RELIABLE_MESSAGE_ITEMACQUIRESOUND,
-// ddynerman: death messages
-	GAME_RELIABLE_MESSAGE_DEATH,
-// ddynerman: game state
-	GAME_RELIABLE_MESSAGE_GAMESTATE,
-// ddynerman: game stat
-	GAME_RELIABLE_MESSAGE_STAT,
-// asalmon: game stats for xenon
-	GAME_RELIABLE_MESSAGE_ALL_STATS,
-// ddynerman: ingame awards
-	GAME_RELIABLE_MESSAGE_INGAMEAWARD,
-// ddynerman: instances
-	GAME_RELIABLE_MESSAGE_SET_INSTANCE,
-// shouchard:  for voicechat
-	GAME_RELIABLE_MESSAGE_VOICECHAT_MUTING,
-// shouchard:  for server admin
-	GAME_RELIABLE_MESSAGE_SERVER_ADMIN,
-// shouchard:  for voting
-	GAME_RELIABLE_MESSAGE_CALLPACKEDVOTE,
-	GAME_RELIABLE_MESSAGE_STARTPACKEDVOTE,
-// mekberg: get ban list for server
-	GAME_RELIABLE_MESSAGE_GETADMINBANLIST,
-	GAME_RELIABLE_MESSAGE_PRINT
-// jscott: for voice comms
-// TTimo: implemented or not by the OS, the network protocol should not be affected
-	,
-	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT,
-	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO,
-	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_TEST,
-	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO_TEST,
-	GAME_RELIABLE_MESSAGE_CHEAT_GIVE,
-	GAME_RELIABLE_MESSAGE_CHEAT_GOD,
-	GAME_RELIABLE_MESSAGE_CHEAT_NOCLIP
-// RAVEN END	
-};
-
-enum {
-	GAME_UNRELIABLE_MESSAGE_EVENT,
-	GAME_UNRELIABLE_MESSAGE_EFFECT,
-	GAME_UNRELIABLE_MESSAGE_HITSCAN,
-	GAME_UNRELIABLE_MESSAGE_VOICEDATA_SERVER
-};
-
-enum {
-	GAME_UNRELIABLE_RECORD_CLIENTNUM,
-	GAME_UNRELIABLE_RECORD_AREAS,
-
-	GAME_UNRELIABLE_RECORD_COUNT
+	GAME_RELIABLE_MESSAGE_WARMUPTIME,
+	GAME_RELIABLE_MESSAGE_EVENT
 };
 
 typedef enum {
 	GAMESTATE_UNINITIALIZED,		// prior to Init being called
 	GAMESTATE_NOMAP,				// no map loaded
 	GAMESTATE_STARTUP,				// inside InitFromNewMap().  spawning map entities.
-	GAMESTATE_RESTART,				// spawning map entities from an instance restart, but not fully restarting
 	GAMESTATE_ACTIVE,				// normal gameplay
 	GAMESTATE_SHUTDOWN				// inside MapShutdown().  clearing memory.
 } gameState_t;
 
 typedef struct {
-	idPlayerStart	*ent;
-	int				dist;
+	idEntity	*ent;
+	int			dist;
 } spawnSpot_t;
 
 //============================================================================
+
 class idEventQueue {
 public:
 	typedef enum {
@@ -276,10 +232,7 @@ public:
 private:
 	entityNetEvent_t *					start;
 	entityNetEvent_t *					end;
-// RAVEN BEGIN
-// jnewquist: Mark memory tags for idBlockAlloc
-	idBlockAlloc<entityNetEvent_t,32,MA_EVENT>	eventAllocator;
-// RAVEN END
+	idBlockAlloc<entityNetEvent_t,32>	eventAllocator;
 };
 
 //============================================================================
@@ -293,7 +246,9 @@ public:
 	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
+#ifndef HUMANHEAD //HUMANHEAD: aob - changed prototype.  new version in HH section
 	idEntityPtr<type> &		operator=( type *ent );
+#endif
 
 	// synchronize entity pointers over the network
 	int						GetSpawnId( void ) const { return spawnId; }
@@ -304,46 +259,157 @@ public:
 	type *					GetEntity( void ) const;
 	int						GetEntityNum( void ) const;
 
-// RAVEN BEGIN
-// bdube: overloaded operators
-							idEntityPtr( type* ent ) { *this = ent; }
-	idEntityPtr<type>&		operator=( idEntityPtr<type>& ent ) { *this = ent.GetEntity(); return *this; }
-	type *					operator->( void ) const;				
-	operator				type *( void ) const;
-// RAVEN END
+#ifdef HUMANHEAD //HUMANHEAD: aob
+							idEntityPtr( const type* ent ) { Assign( ent ); }
+
+	void					Clear();
+	idEntityPtr<type> &		Assign( const idEntity *ent );
+	idEntityPtr<type> &		Assign( const idEntityPtr<type> &ent );
+	idEntityPtr<type> &		operator=( const idEntity *ent );
+	idEntityPtr<type> &		operator=( const idEntityPtr<type> &ent );
+	type *					operator->() const { return GetEntity(); }
+	bool					IsEqualTo( const idEntity *ent ) const;
+	bool					IsEqualTo( const idEntityPtr<type> &ent ) const;
+	bool					operator==( const idEntity *ent ) const;
+	bool					operator==( const idEntityPtr<type> &ent ) const;
+	bool					operator!=( const idEntity *ent ) const;
+	bool					operator!=( const idEntityPtr<type> &ent ) const;
+#endif
 
 private:
 	int						spawnId;
 };
 
-// RAVEN BEGIN
-// abahr: forward declaration
-class rvGravityArea;
-// RAVEN END
+template< class type >
+ID_INLINE idEntityPtr<type>::idEntityPtr() {
+	spawnId = 0;
+}
 
-// jmarshall
-struct rvmGameRender_t {
-	idRenderTexture* forwardRenderPassRT;
-	idRenderTexture* postProcessRT[2];
-	idRenderTexture* forwardRenderPassResolvedRT;
-	const idMaterial* noPostProcessMaterial;
-	const idMaterial* casPostProcessMaterial;
-	const idMaterial* blurPostProcessMaterial;
-	const idMaterial* blackPostProcessMaterial;
-	const idMaterial* resolvePostProcessMaterial;
-	const idMaterial* smaaEdgePostProcessMaterial;
-	const idMaterial* smaaBlendPostProcessMaterial;
-	bool postProcessAvailable;
-	bool smaaAvailable;
-	int videoRestartCount;
-};
-// jmarshall end
+template< class type >
+ID_INLINE void idEntityPtr<type>::Save( idSaveGame *savefile ) const {
+	savefile->WriteInt( spawnId );
+}
 
-//============================================================================
-// ddynerman: moved MultiplayerGame.h down here, so it can use more stuff in Game_local (idEntityPtr)
-#include "mp/Buying.h"
-#include "mp/Tourney.h"
-#include "MultiplayerGame.h"
+template< class type >
+ID_INLINE void idEntityPtr<type>::Restore( idRestoreGame *savefile ) {
+	savefile->ReadInt( spawnId );
+}
+
+//HUMANHEAD: aob - moved operator= code to this helper function
+#ifdef HUMANHEAD
+template< class type >
+ID_INLINE void idEntityPtr<type>::Clear() {
+	spawnId = 0;
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::IsEqualTo( const idEntity *ent ) const {
+	return GetEntity() == ent;
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::IsEqualTo( const idEntityPtr<type> &ent ) const {
+	return IsEqualTo( ent.GetEntity() );
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::operator==( const idEntity *ent ) const {
+	return IsEqualTo( ent );
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::operator==( const idEntityPtr<type> &ent ) const {
+	return IsEqualTo( ent );
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::operator!=( const idEntity *ent ) const {
+	return !IsEqualTo( ent );
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::operator!=( const idEntityPtr<type> &ent ) const {
+	return !IsEqualTo( ent );
+}
+
+template< class type >
+ID_INLINE idEntityPtr<type> &idEntityPtr<type>::Assign( const idEntityPtr<type> &ent ) {
+	return Assign( ent.GetEntity() );
+}
+
+template< class type >
+ID_INLINE idEntityPtr<type> &idEntityPtr<type>::Assign( const idEntity *ent ) {
+	if ( ent == NULL ) {
+		spawnId = 0;
+	} else {
+		int *spawnIds = OpenPrey_SpawnIdArray();
+		const int entityNum = OpenPrey_EntityNumber( ent );
+		//HUMANHEAD rww - take cent bits into account
+		spawnId = ( spawnIds[ entityNum ] << GENTITYNUM_BITS_PLUSCENT ) | entityNum;
+	}
+	return *this;
+}
+
+template< class type >
+ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( const idEntityPtr<type> &ent ) {
+	return Assign( ent );
+}
+
+template< class type >
+ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( const idEntity *ent ) {
+	return Assign( ent );
+}
+#else
+template< class type >
+ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( type *ent ) {
+	if ( ent == NULL ) {
+		spawnId = 0;
+	} else {
+		spawnId = ( gameLocal.spawnIds[ent->entityNumber] << GENTITYNUM_BITS ) | ent->entityNumber;
+	}
+	return *this;
+}
+#endif
+// HUMANHEAD END
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
+	if ( id == spawnId ) {
+		return false;
+	}
+	int *spawnIds = OpenPrey_SpawnIdArray();
+	//HUMANHEAD rww - take cent bits into account
+	if ( ( id >> GENTITYNUM_BITS_PLUSCENT ) == spawnIds[ id & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) ] ) {
+		spawnId = id;
+		return true;
+	}
+	return false;
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::IsValid( void ) const {
+	int *spawnIds = OpenPrey_SpawnIdArray();
+	//HUMANHEAD rww - take cent bits into account
+	return ( spawnIds[ spawnId & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) ] == ( spawnId >> GENTITYNUM_BITS_PLUSCENT ) );
+}
+
+template< class type >
+ID_INLINE type *idEntityPtr<type>::GetEntity( void ) const {
+	int *spawnIds = OpenPrey_SpawnIdArray();
+	idEntity **entities = OpenPrey_EntityArray();
+	//HUMANHEAD rww - take cent bits into account
+	int entityNum = spawnId & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 );
+	if ( ( spawnIds[ entityNum ] == ( spawnId >> GENTITYNUM_BITS_PLUSCENT ) ) ) {
+		return static_cast<type *>( entities[ entityNum ] );
+	}
+	return NULL;
+}
+
+template< class type >
+ID_INLINE int idEntityPtr<type>::GetEntityNum( void ) const {
+	//HUMANHEAD rww - take cent bits into account
+	return ( spawnId & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) );
+}
 
 //============================================================================
 
@@ -352,12 +418,17 @@ public:
 	idDict					serverInfo;				// all the tunable parameters, like numclients, etc
 	int						numClients;				// pulled from serverInfo and verified
 	idDict					userInfo[MAX_CLIENTS];	// client specific settings
-	const usercmd_t			*usercmds;				// client input commands
+	usercmd_t				usercmds[MAX_CLIENTS];	// client input commands
 	idDict					persistentPlayerInfo[MAX_CLIENTS];
+	//HUMANHEAD rww - introducing client entities.
+	/*
 	idEntity *				entities[MAX_GENTITIES];// index to entities
 	int						spawnIds[MAX_GENTITIES];// for use in idEntityPtr
+	*/
+	idEntity *				entities[MAX_GENTITIES+MAX_CENTITIES];// index to entities
+	int						spawnIds[MAX_GENTITIES+MAX_CENTITIES];// for use in idEntityPtr
+	//END HUMANHEAD
 	int						firstFreeIndex;			// first free index in the entities array
-	int						minSpawnIndex;			// when spawning multiple instances, so nothing pollutes in between the instances
 	int						num_entities;			// current number <= MAX_GENTITIES
 	idHashIndex				entityHash;				// hash table to quickly find entities by name
 	idWorldspawn *			world;					// world entity
@@ -366,46 +437,32 @@ public:
 	int						numEntitiesToDeactivate;// number of entities that became inactive in current frame
 	bool					sortPushers;			// true if active lists needs to be reordered to place pushers at the front
 	bool					sortTeamMasters;		// true if active lists needs to be reordered to place physics team masters before their slaves
+	//HUMANHEAD rww
+	bool					sortSnapshotPushers;	// true if snapshot lists needs to be reordered to place pushers at the front
+	bool					sortSnapshotTeamMasters;// true if snapshot lists needs to be reordered to place physics team masters before their slaves
+	//HUMANHEAD END
 	idDict					persistentLevelInfo;	// contains args that are kept around between levels
-
-// RAVEN BEGIN
-// bdube: client entities
-	rvClientEntity *			clientEntities[MAX_CENTITIES];	// index to client entities
-	int							clientSpawnIds[MAX_CENTITIES];	// for use in idClientEntityPtr
-	idLinkList<rvClientEntity>	clientSpawnedEntities;			// all client side entities
-	int							num_clientEntities;				// current number of client entities
-	int							firstFreeClientIndex;			// first free index in the client entities array
-	
-	int							entityRegisterTime;
-// RAVEN END
 
 	// can be used to automatically effect every material in the world that references globalParms
 	float					globalShaderParms[ MAX_GLOBAL_SHADER_PARMS ];	
-	int						specialEffectsEnabled;
-	float					specialEffectParms[ SPECIAL_EFFECT_MAX ][ MAX_ENTITY_SHADER_PARMS ];
 
 	idRandom				random;					// random number generator used throughout the game
 
 	idProgram				program;				// currently loaded script and data space
 	idThread *				frameCommandThread;
 
+	idClip					clip;					// collision detection
 	idPush					push;					// geometric pushing
 	idPVS					pvs;					// potential visible set
-	pvsHandle_t				clientsPVS[MAX_CLIENTS];// PVS of multiplayer clients updated every frame
 
 	idTestModel *			testmodel;				// for development testing of models
-// RAVEN BEGIN
-// bdube: not using id effects
-//	idEntityFx *			testFx;					// for development testing of fx
-// RAVEN END
-
-	// only set when an end level is activated, which will take over camera positioning
-	// and draw end-level guis, then 
+	idEntityFx *			testFx;					// for development testing of fx
 
 	idStr					sessionCommand;			// a target_sessionCommand can set this to return something to the session 
 
 	idMultiplayerGame		mpGame;					// handles rules for standard dm
 
+	idSmokeParticles *		smokeParticles;			// global smoke trails
 	idEditEntities *		editEntities;			// in game editing
 
 	int						cinematicSkipTime;		// don't allow skipping cinemetics until this time has passed so player doesn't skip out accidently from a firefight
@@ -418,36 +475,21 @@ public:
 	int						framenum;
 	int						previousTime;			// time in msec of last frame
 	int						time;					// in msec
-	int						msec;					// time since last update in milliseconds
-	int						mHz;					// hertz
-	int						autoScreenshotStartTime;
-	bool					autoScreenshotPending;
-	int						autoMachinegunImpactStartTime;
-	bool					autoMachinegunImpactPending;
+	static const int		msec = USERCMD_MSEC;	// time since last update in milliseconds
 
 	int						vacuumAreaNum;			// -1 if level doesn't have any outside areas
-
-// RAVEN BEGIN
-// abahr:
-	idList<rvGravityArea*>	gravityInfo;			// area num for each gravity zone
-	idList< idEntityPtr<idEntity> > scriptObjectProxies;
-// RAVEN END
 
 	gameType_t				gameType;
 	bool					isMultiplayer;			// set if the game is run in multiplayer mode
 	bool					isServer;				// set if the game is run for a dedicated or listen server
 	bool					isClient;				// set if the game is run for a client
-	bool					mpInteractionsGenerated; // true once interactions are generated after the first game frame
 													// discriminates between the RunFrame path and the ClientPrediction path
 													// NOTE: on a listen server, isClient is false
-// RAVEN BEGIN
-// ddynerman: set if we're a server and not dedicated
-	bool					isListenServer;			
-// RAVEN END
-	int						localClientNum;			// number of the local client. MP: -1 on a dedicated, MAX_CLIENTS when playing a server demo
+	int						localClientNum;			// number of the local client. MP: -1 on a dedicated
 	idLinkList<idEntity>	snapshotEntities;		// entities from the last snapshot
 	int						realClientTime;			// real client time
 	bool					isNewFrame;				// true if this is a new game frame, not a rerun due to prediction
+	float					clientSmoothing;		// smoothing of other clients in the view
 	int						entityDefBits;			// bits required to store an entity def number
 
 	static const char *		sufaceTypeNames[ MAX_SURFACE_TYPES ];	// text names for surface types
@@ -455,233 +497,71 @@ public:
 	idEntityPtr<idEntity>	lastGUIEnt;				// last entity with a GUI, used by Cmd_NextGUI_f
 	int						lastGUI;				// last GUI on the lastGUIEnt
 
-// RAVEN BEGIN
-// bdube: added
-	int						editors;				// Mirrored editors flags from common determine which editors are running
-	bool					isLastPredictFrame;		// on an MP server or in SP game this means 'last catchup frame' rather than predict
-// RAVEN END
-
-// RAVEN BEGIN
-// rjohnson: entity usage stats
-	idStr					mapFileNameStripped;		// name of the map, empty string if no map loaded, with path and extension removed.  If entity filter, that is appended
-	idList<idDict>			entityUsageList;
-// ddynerman: the entity currently thinking, used to play effects/etc only in the appropriate instance
-	idEntity*				currentThinkingEntity;
-
-	const static int		INITIAL_SPAWN_COUNT = 1;
-
-	idFreeView				freeView;
-
-// RAVEN END
-
-	int filterMod;
-	idList<idStr> modList;
+	int						timeRandom;				//HUMANHEAD rww - for time seeding
 
 	// ---------------------- Public idGame Interface -------------------
 
 							idGameLocal();
 
-// RAVEN BEGIN
-// jsinger: attempt to eliminate cross-DLL allocation issues
-#ifdef RV_UNIFIED_ALLOCATOR
-	virtual void			Init( void *(*allocator)( size_t size ), void (*deallocator)( void *ptr ), size_t (*msize)( void *ptr ) );
-#else
 	virtual void			Init( void );
-#endif
-// RAVEN END
 	virtual void			Shutdown( void );
 	virtual void			SetLocalClient( int clientNum );
 	virtual void			ThrottleUserInfo( void );
-	virtual const idDict *	SetUserInfo( int clientNum, const idDict &userInfo, bool isClient );
+	virtual const idDict *	SetUserInfo( int clientNum, const idDict &userInfo, bool isClient, bool canModify );
 	virtual const idDict *	GetUserInfo( int clientNum );
-	virtual bool			IsClientActive( int clientNum );
 	virtual void			SetServerInfo( const idDict &serverInfo );
-
-	virtual const idDict *	RepeaterSetUserInfo( int clientNum, const idDict &userInfo ) { assert(false); return NULL; }
 
 	virtual const idDict &	GetPersistentPlayerInfo( int clientNum );
 	virtual void			SetPersistentPlayerInfo( int clientNum, const idDict &playerInfo );
-	virtual void			InitFromNewMap( const char *mapName, idRenderWorld *renderWorld, bool isServer, bool isClient, int randSeed );
-	virtual bool			InitFromSaveGame( const char *mapName, idRenderWorld *renderWorld, idFile *saveGameFile );
-// RAVEN BEGIN
-// mekberg: added saveTypes
-	virtual void			SaveGame( idFile *saveGameFile, saveType_t saveType = ST_REGULAR );
-// RAVEN END
+	virtual void			InitFromNewMap( const char *mapName, idRenderWorld *renderWorld, idSoundWorld *soundWorld, bool isServer, bool isClient, int randSeed );
+	virtual bool			InitFromSaveGame( const char *mapName, idRenderWorld *renderWorld, idSoundWorld *soundWorld, idFile *saveGameFile );
+	virtual void			SaveGame( idFile *saveGameFile );
 	virtual void			MapShutdown( void );
 	virtual void			CacheDictionaryMedia( const idDict *dict );
-	virtual void			SpawnPlayer( int clientNum, bool isBot, const char* botName);
-// RAVEN BEGIN
-	virtual gameReturn_t	RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame );
-	virtual	void			MenuFrame( void );
-// RAVEN END
-	virtual void			RepeaterFrame( const userOrigin_t *clientOrigins, bool lastCatchupFrame, int spoolTime = 0 ) {};
+	virtual void			SpawnPlayer( int clientNum );
+	virtual gameReturn_t	RunFrame( const usercmd_t *clientCmds );
 	virtual bool			Draw( int clientNum );
-	void					CheckAutoMachinegunImpact( void );
-	void					CheckAutoScreenshot( void );
 	virtual escReply_t		HandleESC( idUserInterface **gui );
 	virtual idUserInterface	*StartMenu( void );
 	virtual const char *	HandleGuiCommands( const char *menuCommand );
-	virtual void			HandleMainMenuCommands( const char *menuCommand, idUserInterface *gui );
-	virtual allowReply_t	ServerAllowClient( int clientId, int numClients, const char *IP, const char *guid, const char *password, const char *privatePassword, char reason[MAX_STRING_CHARS] );
-	virtual void			ServerClientConnect( int clientNum, const char *guid );
-	virtual void			ServerClientBegin( int clientNum, bool isBot, const char* botName);
+	virtual allowReply_t	ServerAllowClient( int numClients, const char *IP, const char *guid, const char *password, char reason[MAX_STRING_CHARS] );
+	virtual void			ServerClientConnect( int clientNum );
+	virtual void			ServerClientBegin( int clientNum );
 	virtual void			ServerClientDisconnect( int clientNum );
 	virtual void			ServerWriteInitialReliableMessages( int clientNum );
-	virtual allowReply_t	RepeaterAllowClient( int clientId, int numClients, const char *IP, const char *guid, bool repeater, const char *password, const char *privatePassword, char reason[MAX_STRING_CHARS] ) { idStr::Copynz( reason, "#str_107239" /* zinx - FIXME - not banned... */, sizeof(reason) ); return ALLOW_NO; };
-	virtual void			RepeaterClientConnect( int clientNum ) {assert(false);};
-	virtual void			RepeaterClientBegin( int clientNum ) {assert(false);};
-	virtual void			RepeaterClientDisconnect( int clientNum ) {assert(false);};
-	virtual void			RepeaterWriteInitialReliableMessages( int clientNum ) {assert(false);};	
-
-// jmarshall
-	virtual void			GetRandomBotName(int clientNum, idStr& name);
-	virtual int				TravelTimeToGoal(const idVec3& origin, const idVec3& goal);
-	virtual int				GetBotItemEntry(const char* name);
-
-	void					AddBot(const char* botName);
-
-	idAAS* GetBotAAS(void)
-	{
-		if (NumAAS() == 0)
-			return nullptr;
-
-		return GetAAS(0);
-	}
-
-	void					RegisterBot(rvmBot* bot)
-	{
-		registeredBots.AddUnique(bot);
-	}
-	void					UnRegisterBot(rvmBot* bot)
-	{
-		registeredBots.Remove(bot);
-	}
-
-	float					SysScriptTime(void) const
-	{
-		return MS2SEC(realClientTime);
-	}
-	float					SysScriptFrameTime(void) const
-	{
-		return MS2SEC(time - previousTime);
-	}
-
-	void	Trace(trace_t& results, const idVec3& start, const idVec3& end, int contentMask, int passEntity);
-// jmarshall end
-
-// RAVEN BEGIN
-// jnewquist: Use dword array to match pvs array so we don't have endianness problems.
-	virtual void			ServerWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, int lastSnapshotFrame );
-// RAVEN END
+	virtual void			ServerWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, byte *clientInPVS, int numPVSClients );
 	virtual bool			ServerApplySnapshot( int clientNum, int sequence );
 	virtual void			ServerProcessReliableMessage( int clientNum, const idBitMsg &msg );
-	virtual bool			RepeaterApplySnapshot( int clientNum, int sequence ) { assert(false); return false; }
-	virtual void			RepeaterProcessReliableMessage( int clientNum, const idBitMsg &msg ) { assert(false); }
-	virtual void			ClientReadSnapshot( int clientNum, int snapshotSequence, const int gameFrame, const int gameTime, const int dupeUsercmds, const int aheadOfServer, const idBitMsg &msg );
+	virtual void			ClientReadSnapshot( int clientNum, int sequence, const int gameFrame, const int gameTime, const int dupeUsercmds, const int aheadOfServer, const idBitMsg &msg );
 	virtual bool			ClientApplySnapshot( int clientNum, int sequence );
 	virtual void			ClientProcessReliableMessage( int clientNum, const idBitMsg &msg );
-	virtual gameReturn_t	ClientPrediction( int clientNum, const usercmd_t *clientCmds, bool lastPredictFrame = true, ClientStats_t *cs = NULL );
-// RAVEN BEGIN
-// ddynerman: client game frame
-	virtual void			ClientRun( void );
-	virtual void			ClientEndFrame( void );
+	virtual gameReturn_t	ClientPrediction( int clientNum, const usercmd_t *clientCmds );
 
-// jshepard: rcon password check
-	virtual void			ProcessRconReturn( bool success );
-	virtual void			ResetRconGuiStatus( void );
-// RAVEN END
-	
+	//HUMANHEAD rww
+	virtual void			LogitechLCDUpdate(void) {}
+
+	virtual void			ServerAddUnreliableSnapMessage(int clientNum, const idBitMsg &msg);
+	virtual void			ClientReadUnreliableSnapMessages(int clientNum, const idBitMsg &msg);
+	//HUMANHEAD END
+
 	virtual void			GetClientStats( int clientNum, char *data, const int len );
 	virtual void			SwitchTeam( int clientNum, int team );
 
 	virtual bool			DownloadRequest( const char *IP, const char *guid, const char *paks, char urls[ MAX_STRING_CHARS ] );
 
-	virtual bool			HTTPRequest( const char *IP, const char *file, bool isGamePak );
-
-// RAVEN BEGIN
-// bdube: client hitscan
-	virtual void			ClientHitScan( const idBitMsg &msg );
-// jscott: for effects system
-	virtual void			StartViewEffect( int type, float time, float scale );
-	virtual void			GetPlayerView( idVec3 &origin, idMat3 &axis );
-	virtual void			Translation( trace_t &trace, idVec3 &source, idVec3 &dest, idTraceModel *trm, int clipMask );
-	virtual void			SpawnClientMoveable ( const char* name, int lifetime, const idVec3& origin, const idMat3& axis, const idVec3& velocity, const idVec3& angular_velocity );
-// bdube: added debug methods
-	virtual void			DebugSetString ( const char* name, const char* value );
-	virtual void			DebugSetFloat ( const char* name, float value );
-	virtual void			DebugSetInt ( const char* name, int value );
-	virtual const char*		DebugGetStatString ( const char* name );
-	virtual int				DebugGetStatInt ( const char* name );
-	virtual float			DebugGetStatFloat ( const char* name );
-	virtual bool			IsDebugHudActive ( void ) const;
-// rjohnson: for new note taking mechanism
-	virtual bool			GetPlayerInfo( idVec3 &origin, idMat3 &axis, int PlayerNum = -1, idAngles *deltaViewAngles = NULL, int reqClientNum = -1 );
-	virtual void			SetPlayerInfo( idVec3 &origin, idMat3 &axis, int PlayerNum = -1 );
-	virtual	bool			PlayerChatDisabled( int clientNum );
-	virtual void			SetViewComments( const char *text = 0 );
-// ddynerman: utility functions
-	virtual void			GetPlayerName( int clientNum, char* name );
-	virtual void			GetPlayerClan( int clientNum, char* clan );
-	virtual void			SetFriend( int clientNum, bool isFriend );
-	static  void			Cmd_PrintMapEntityNumbers_f( const idCmdArgs& args );
-	static  void			Cmd_PrintSpawnIds_f( const idCmdArgs& args );
-// abahr:
-	virtual int				GetNumGravityAreas() const;
-	virtual const rvGravityArea* GetGravityInfo( int index ) const;
-	virtual void			SetGravityInfo( int index, rvGravityArea* info );
-	virtual void			AddUniqueGravityInfo( rvGravityArea* info );
-
-	virtual int				GetCurrentGravityInfoIndex( const idVec3& origin ) const;
-	virtual bool			InGravityArea( idEntity* entity ) const;
-	virtual int				GetCurrentGravityInfoIndex( idEntity* entity ) const;
-	virtual const idVec3	GetCurrentGravity( idEntity* entity ) const;
-
-	virtual const idVec3	GetCurrentGravity( const idVec3& origin, const idMat3& axis ) const;
-
-	virtual bool			InGravityArea( rvClientEntity* entity ) const;
-	virtual int				GetCurrentGravityInfoIndex( rvClientEntity* entity ) const;
-	virtual const idVec3	GetCurrentGravity( rvClientEntity* entity ) const;
-	virtual idEntity*		ReferenceScriptObjectProxy( const char* scriptObjectName );
-	virtual void			ReleaseScriptObjectProxy( const char* proxyName );
-
-// rjohnson: entity usage stats
-	virtual void			ListEntityStats( const idCmdArgs &args );
-// RAVEN END
-
-	virtual void			SetDemoState( demoState_t state, bool serverDemo, bool timeDemo );
-	virtual void			SetRepeaterState( bool isRepeater, bool serverIsRepeater ) {if (isRepeater || serverIsRepeater) Warning("Repeater does not work for single player.");};
-	virtual void			WriteNetworkInfo( idFile* file, int clientNum );
-	virtual void			ReadNetworkInfo( int gameTime, idFile* file, int clientNum );
-	virtual bool			ValidateDemoProtocol( int minor_ref, int minor );
-
-	virtual void			ServerWriteServerDemoSnapshot( int sequence, idBitMsg &msg, int lastSnapshotFrame );
-	virtual void			ClientReadServerDemoSnapshot( int sequence, const int gameFrame, const int gameTime, const idBitMsg &msg );
-
-	virtual void			RepeaterWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, const userOrigin_t &pvs_origin, int lastSnapshotFrame ) {assert(false);};
-	virtual void			RepeaterEndSnapshots( void ) {};
-	virtual void			ClientReadRepeaterSnapshot( int sequence, const int gameFrame, const int gameTime, const int aheadOfServer, const idBitMsg &msg ) {assert(false);};
-
-	virtual int				GetDemoFollowClient( void ) { return serverDemo ? followPlayer : -1; }
-
-	virtual void			GetBotInput( int clientNum, usercmd_t &userCmd ) { Error( "Bot input requested\n" ); };
-
-	virtual const char *	GetLoadingGui( const char *mapDeclName ) { return NULL; }
-	virtual void			SetupLoadingGui( idUserInterface *gui ) {}
-
 	// ---------------------- Public idGameLocal Interface -------------------
 
-	void					Printf( const char *fmt, ... ) const;
-	void					DPrintf( const char *fmt, ... ) const;
-	void					Warning( const char *fmt, ... ) const;
-	void					DWarning( const char *fmt, ... ) const;
-	void					Error( const char *fmt, ... ) const;
+	void					Printf( const char *fmt, ... ) const id_attribute((format(printf,2,3)));
+	void					DPrintf( const char *fmt, ... ) const id_attribute((format(printf,2,3)));
+	void					Warning( const char *fmt, ... ) const id_attribute((format(printf,2,3)));
+	void					DWarning( const char *fmt, ... ) const id_attribute((format(printf,2,3)));
+	void					Error( const char *fmt, ... ) const id_attribute((format(printf,2,3)));
 
 							// Initializes all map variables common to both save games and spawned games
 	void					LoadMap( const char *mapName, int randseed );
 
-	void					LocalMapRestart( int instance = -1 );
-	void					MapRestart( int instance = -1 );
-	static void				VerifyServerSettings_f( const idCmdArgs &args );
+	void					LocalMapRestart( void );
+	void					MapRestart( void );
 	static void				MapRestart_f( const idCmdArgs &args );
 	bool					NextMap( void );	// returns wether serverinfo settings have been modified
 	static void				NextMap_f( const idCmdArgs &args );
@@ -692,61 +572,36 @@ public:
 	int						NumAAS( void ) const;
 	idAAS *					GetAAS( int num ) const;
 	idAAS *					GetAAS( const char *name ) const;
-// RAVEN BEGIN
-// jscott: added accessor for memory tracking
-	int						GetNumAAS( void ) const { return( aasList.Num() ); }
-// RAVEN END
 	void					SetAASAreaState( const idBounds &bounds, const int areaContents, bool closed );
 	aasHandle_t				AddAASObstacle( const idBounds &bounds );
 	void					RemoveAASObstacle( const aasHandle_t handle );
 	void					RemoveAllAASObstacles( void );
-// RAVEN BEGIN
-// mwhitlock: added entity memory usage stuff.
-	size_t					GetEntityMemoryUsage ( void ) const;
-// RAVEN END
+
 	bool					CheatsOk( bool requirePlayer = true );
-	void					SetSkill( int value );
+//	void					SetSkill( int value );	// HUMANHEAD pdm: not used
 	gameState_t				GameState( void ) const;
-	void					SetGameState( gameState_t newState ) { gamestate = newState; }
 	idEntity *				SpawnEntityType( const idTypeInfo &classdef, const idDict *args = NULL, bool bIsClientReadSnapshot = false );
-	bool					SpawnEntityDef( const idDict &args, idEntity **ent = NULL, bool setDefaults = true );
-	bool					SpawnClientEntityDef( const idDict &args, rvClientEntity **ent = NULL, bool setDefaults = true, const char* spawn = NULL );
-// abahr:
-	idEntity*				SpawnEntityDef( const char* entityDefName, const idDict* additionalArgs = NULL );
-	template< class type >
-	type*					SpawnSafeEntityDef( const char* entityDefName, const idDict* additionalArgs = NULL );
-	int						GetPreviousTime() const { return previousTime; }
-// RAVEN END
+	//HUMANHEAD rww
+	idEntity *				SpawnEntityTypeClient( const idTypeInfo &classdef, const idDict *args );
+	//HUMANHEAD END
+
+	//HUMANHEAD rww - added clientEntity, bIsClientReadSnapshot
+	bool					SpawnEntityDef( const idDict &args, idEntity **ent = NULL, bool setDefaults = true, bool clientEntity = false, bool bIsClientReadSnapshot = false );
+	//HUMANHEAD END
+
 	int						GetSpawnId( const idEntity *ent ) const;
 
-	const idDeclEntityDef *	FindEntityDef( const char *name, bool makeDefault = true ) const;
-	const idDict *			FindEntityDefDict( const char *name, bool makeDefault = true ) const;
+	const idDeclEntityDef *	FindEntityDef( const char *name, bool makeDefault = false ) const;
+	const idDict *			FindEntityDefDict( const char *name, bool makeDefault = false ) const;
 
 	void					RegisterEntity( idEntity *ent );
 	void					UnregisterEntity( idEntity *ent );
-	// used to skip one when registering entities, leaving an empty entity in the array
-	void					SkipEntityIndex( void );
 
-	bool					RequirementMet( idEntity *activator, const idStr &requirement, int removeItem );
+	bool					RequirementMet( idEntity *activator, const idStr &requirements, int removeItem );
 
-// RITUAL BEGIN
-// squirrel: accessor for si_weaponStay checks
-	bool					IsWeaponsStayOn( void );
-// RITUAL END
-
-// RAVEN BEGIN
-// bdube: client entities
-	void					RegisterClientEntity( rvClientEntity *cent );
-	void					UnregisterClientEntity( rvClientEntity *cent );
-// RAVEN END
-
+	virtual					//HUMANHEAD jsh made virtual
 	void					AlertAI( idEntity *ent );
-// RAVEN BEGIN
-// bdube: added get alert actor
-	idActor *				GetAlertActor( void );
-	idEntity *				GetAlertEntity( void );
-// RAVEN END
-
+	idActor *				GetAlertEntity( void );
 
 	bool					InPlayerPVS( idEntity *ent ) const;
 	bool					InPlayerConnectedArea( idEntity *ent ) const;
@@ -754,13 +609,6 @@ public:
 	void					SetCamera( idCamera *cam );
 	idCamera *				GetCamera( void ) const;
 	bool					SkipCinematic( void );
-
-// RAVEN BEGIN
-// jscott: for portal skies
-	idCamera				*GetPortalSky( void ) const;
-	void					SetPortalSky( idCamera *cam );
-// RAVEN END
-
 	void					CalcFov( float base_fov, float &fov_x, float &fov_y ) const;
 
 	void					AddEntityToHash( const char *name, idEntity *ent );
@@ -772,356 +620,255 @@ public:
 
 	static void				ArgCompletion_EntityName( const idCmdArgs &args, void(*callback)( const char *s ) );
 	idEntity *				FindTraceEntity( idVec3 start, idVec3 end, const idTypeInfo &c, const idEntity *skip ) const;
-	static void				ArgCompletion_AIName( const idCmdArgs &args, void(*callback)( const char *s ) );
-
-//RAVEN BEGIN
-// bgeisler: added, I don't want to have to do this work myself every single time I have an entityNumber
-	idEntity *				FindEntity( int entityNumber )	{ return ((entityNumber >= 0 && entityNumber < MAX_GENTITIES) ? entities[entityNumber] : NULL); }
-//RAVEN BEGIN
-
 	idEntity *				FindEntity( const char *name ) const;
 	idEntity *				FindEntityUsingDef( idEntity *from, const char *match ) const;
 	int						EntitiesWithinRadius( const idVec3 org, float radius, idEntity **entityList, int maxCount ) const;
 
-	void					KillBox( idEntity *ent, bool catch_teleport = false );
-	void					RadiusPush( const idVec3 &origin, const float radius, const float push, const idEntity *inflictor, const idEntity *ignore, float inflictorScale, const bool quake );
-// RAVEN BEGIN
-// ddynerman: return number of people damaged
-	void					RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEntity *attacker, idEntity *ignoreDamage, idEntity *ignorePush, const char *damageDefName, float dmgPower = 1.0f, int* hitCount = NULL );
-// bdube: inflictor
-	void					RadiusPushClipModel( idEntity* inflictor, const idVec3 &origin, const float push, const idClipModel *clipModel );
-// RAVEN END
+	// HUMANHEAD pdm
+	static void				ArgCompletion_ClassName( const idCmdArgs &args, void(*callback)( const char *s ) );
+	static void				ArgCompletion_EntityOrClassName( const idCmdArgs &args, void(*callback)( const char *s ) );
+	virtual bool			PlayerIsDeathwalking( void );
+	virtual unsigned int	GetTimePlayed( void );
+	virtual void			ClearTimePlayed( void );
 
-	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, float angle = 0 );
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-	void					BloodSplat( const idEntity* ent, const idVec3 &origin, const idVec3 &dir, float size, const char *material );
-// RAVEN END
+	void					KillBox( idEntity *ent, bool catch_teleport = false );
+	//HUMANHEAD PCF rww 05/15/06 - use a custom clipmask killbox (seperated due to pcf paranoia)
+	void					KillBoxMasked( idEntity *ent, int clipMask, bool catch_teleport = false );
+	//HUMANHEAD END
+	virtual					// HUMANHEAD JRM - made virtual
+	void					RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEntity *attacker, idEntity *ignoreDamage, idEntity *ignorePush, const char *damageDefName, float dmgPower = 1.0f );
+	virtual					// HUMANHEAD JRM - made virtual
+	void					RadiusPush( const idVec3 &origin, const float radius, const float push, const idEntity *inflictor, const idEntity *ignore, float inflictorScale, const bool quake );
+	void					RadiusPushClipModel( const idVec3 &origin, const float push, const idClipModel *clipModel );
+
+	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, float angle = 0.0f );
+	void					BloodSplat( const idVec3 &origin, const idVec3 &dir, float size, const char *material );
 
 	void					CallFrameCommand( idEntity *ent, const function_t *frameCommand );
-// RAVEN BEGIN
-// bdube: added script object frame commands
-	void					CallFrameCommand( idScriptObject* obj, const function_t* frameCommand );
-	void					CallFrameCommand( idEntity* ent, const char* frameCommand );
-// RAVEN END	
-
 	void					CallObjectFrameCommand( idEntity *ent, const char *frameCommand );
 
 	const idVec3 &			GetGravity( void ) const;
 
 	// added the following to assist licensees with merge issues
-	int						GetFrameNum() const { return framenum; }
-	int						GetTime() const { return time; }
-	int						GetMSec() const { return msec; }
-	int						GetMHz() const { return mHz; }
+	int						GetFrameNum() const { return framenum; };
+	int						GetTime() const { return time; };
+	int						GetMSec() const { return msec; };
 
 	int						GetNextClientNum( int current ) const;
 	idPlayer *				GetClientByNum( int current ) const;
 	idPlayer *				GetClientByName( const char *name ) const;
 	idPlayer *				GetClientByCmdArgs( const idCmdArgs &args ) const;
-	int						GetClientNumByName( const char *name ) const;
 
 	idPlayer *				GetLocalPlayer() const;
-	
-// RAVEN BEGIN
-// jshepard: update player data after main menu close
-	void					UpdatePlayerPostMainMenu();
+	// HUMANHEAD nla
+	bool 					AmLocalClient( idPlayer *player );
+	bool					isCoop;
+	bool					IsCooperative() const	{	return isCoop;	}
+	bool					IsCompetitive() const	{	return isMultiplayer && !IsCooperative();	}
 
-// bdube: added
-	int						GetSpawnCount ( void ) const;
-	void					SetSpawnCount ( int newSpawnCount ) { spawnCount = newSpawnCount; }
-// ddynerman: team type
-	bool					IsTeamGame ( void ) const;
-// RAVEN END	
-	
+	// For saving objects that we don't want to have to spawn -mdl
+	void					RegisterUniqueObject( idClass *object ); // Meant to be called once by constructor of object being registered
+	void					UnregisterUniqueObject( idClass *object ); // Meant to be called by once destructor of object being registered
+
+	virtual void			FocusGUICleanup(idUserInterface *gui); //HUMANHEAD rww
+
+	// HUMANHEAD pdm: print game side memory statistics
+	virtual void			PrintMemInfo( MemInfo_t *mi );
+
+// HUMANHEAD pdm: Support for level appending
+	bool					DeathwalkMapLoaded() const {
+#if DEATHWALK_AUTOLOAD
+		return bShouldAppend;
+#else
+		return false;
+#endif
+	}
+#if DEATHWALK_AUTOLOAD
+	bool					bShouldAppend;			// Taken from serverinfo
+protected:
+	idMapFile *				additionalMapFile;
+	virtual void			SpawnAppendedMapEntities() {}
+#endif
+// HUMANHEAD END
+
+// HUMANHEAD mdl
+protected:
+	// Special case, these must be virtual.  Allows hhGameLocal to save and restore it's data -mdl
+	virtual void			Save( idSaveGame *savefile ) const { }
+	virtual void			Restore( idRestoreGame *savefile ) { }
+
+	// For saving objects that we don't want to have to spawn -mdl
+	idList<idClass *>		uniqueObjects; // The object list
+	idList<int>				uniqueObjRefs; // The reference count list
+
+public:
+// HUMANHEAD END
+
 	void					SpreadLocations();
 	idLocationEntity *		LocationForPoint( const idVec3 &point );	// May return NULL
-// RAVEN BEGIN
-// bdube: added
-	idLocationEntity*		AddLocation				( const idVec3& point, const char* name );
-// ddynerman: new gametype specific spawn code
-	bool					SpotWouldTelefrag( idPlayer* player, idPlayerStart* spawn );
-	idEntity*				SelectSpawnPoint( idPlayer* player );
-	void					UpdateForwardSpawns( rvCTFAssaultPlayerStart* point, int team );
-	void					ClearForwardSpawns( void );
-// RAVEN END
+	idEntity *				SelectInitialSpawnPoint( idPlayer *player );
 
 	void					SetPortalState( qhandle_t portal, int blockingBits );
-	void					ServerSendChatMessage( int to, const char *name, const char *text, const char *parm = "" );
+	void					SaveEntityNetworkEvent( const idEntity *ent, int event, const idBitMsg *msg );
+	void					ServerSendChatMessage( int to, const char *name, const char *text );
+	//HUMANHEAD PCF rww 05/10/06 - "fix" for server-localized join messages (this is dumb).
+	typedef enum {
+		SPECIALMSG_UNKNOWN = 0,
+		SPECIALMSG_JOINED,
+		//HUMANHEAD PCF rww 05/17/06 - localized vote checks (nested pcf's, hot!)
+		SPECIALMSG_ALREADYRUNNINGMAP,
+		SPECIALMSG_JUSTONE,
+		//HUMANHEAD END
+		SPECIALMSG_NUM
+	} serverSpecialMsg_e;
+	void					ServerSendSpecialMessage( serverSpecialMsg_e msgType, int to, const char *fromNonLoc, int numTextPtrs, const char **text );
+	//HUMANHEAD END
+	int						ServerRemapDecl( int clientNum, declType_t type, int index );
+	int						ClientRemapDecl( declType_t type, int index );
 
 	void					SetGlobalMaterial( const idMaterial *mat );
 	const idMaterial *		GetGlobalMaterial();
-	void					SetSpecialEffect( ESpecialEffectType which, bool enabled );
-	void					SetSpecialEffectParm( ESpecialEffectType which, int parm, float value );
-	bool					IsSpecialEffectEnabled( ESpecialEffectType which ) const;
-	void					ApplySpecialEffectsToRenderView( renderView_t *view ) const;
 
-	void					SetGibTime( int _time ) { nextGibTime = _time; }
-	int						GetGibTime() { return nextGibTime; }
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
-	void					SetUnFreezeTime( int _time ) { unFreezeTime = _time; };
-	int						GetUnFreezeTime() { return unFreezeTime; };
-	void					SetIsFrozen( bool _isFrozen ) { isFrozen = _isFrozen; };
-	bool					GetIsFrozen() { return isFrozen; };
-// RITUAL END
+	void					SetGibTime( int _time ) { nextGibTime = _time; };
+	int						GetGibTime() { return nextGibTime; };
+
 	bool					NeedRestart();
 
-// RAVEN BEGIN
-// jshepard: update end of level on player hud
-	void					UpdateEndLevel();
-// MCG: added whizz-by sound
-	void					CheckPlayerWhizzBy	( idVec3 start, idVec3 end, idEntity* hitEnt, idEntity *attacker );
-// bdube: added hitscan
-// twhitaker: added additionalIgnore parameter
-	idEntity*				HitScan				( const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity * additionalIgnore = NULL, int *areas = NULL );
-// bdube: added effect calls
-	virtual rvClientEffect*	PlayEffect			( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect			( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	const idDecl			*GetEffect			( const idDict& args, const char* effectName, const rvDeclMatType* materialType = NULL );
+// HUMANHEAD
+	void					SetSteamTime( int _time ) { nextSteamTime = _time; };
+	int						GetSteamTime() { return nextSteamTime; };
+	void					SpiritWalkSoundMode(bool active);
+	void					DialogSoundMode(bool active);
+// HUMANHEAD END
 
-	idList<idEntity*>		ambientLights; // lights that cast ambient
+	//HUMANHEAD rww
+	bool					EntInClientSnapshot(int entNum) { return (!isClient || (clientPVS[localClientNum][entNum >> 5] & ( 1 << ( entNum & 31 ) ))); }
+	int						GetMapSpawnCount(void) { return mapSpawnCount; }
 
-// ddynerman:	multiple collision world - game collision wrapper functions to
-//				use the correct idClip
-//				---------------------------------------------------------------
-//				These are wrapper functions around idClip collision detection 
-//				functions.  They expose the collision detection engine to the 
-//				game code, but do collision world determination in one spot.
-//              'ent' refers to the entity we want collision information about
-	bool					Translation	( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, const idEntity *passEntity2 = 0 );
-	bool					Rotation	( const idEntity* ent, trace_t &results, const idVec3 &start, const idRotation &rotation, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity );
-	bool					Motion		( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idRotation &rotation, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity );
-	int						Contacts	( const idEntity* ent, contactInfo_t *contacts, const int maxContacts, const idVec3 &start, const idVec6 &dir, const float depth, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity );
-	int						Contents	( const idEntity* ent, const idVec3 &start, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, idEntity **touchedEntity = NULL );
-	// special case translations versus the rest of the world
-	bool					TracePoint	( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, int contentMask, const idEntity *passEntity );
-	bool					TraceBounds	( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idBounds &bounds, int contentMask, const idEntity *passEntity );
-	// clip versus a specific model
-	void					TranslationModel( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
-	void					RotationModel	( const idEntity* ent, trace_t &results, const idVec3 &start, const idRotation &rotation, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
-	int						ContactsModel	( const idEntity* ent, contactInfo_t *contacts, const int maxContacts, const idVec3 &start, const idVec6 &dir, const float depth, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
-	int						ContentsModel	( const idEntity* ent, const idVec3 &start, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
-	// clip versus all entities but not the world
-	void					TranslationEntities( const idEntity* ent, trace_t &results, const idVec3 &start, const idVec3 &end, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, const idEntity *passEntity2 = 0 );
-	// get a contact feature
-	bool					GetModelContactFeature( const idEntity* ent, const contactInfo_t &contact, const idClipModel *clipModel, idFixedWinding &winding ) const;
-	// get entities/clip models within or touching the given bounds
-	int						EntitiesTouchingBounds	( const idEntity* ent, const idBounds &bounds, int contentMask, idEntity **entityList, int maxCount ) const;
-	int						ClipModelsTouchingBounds( const idEntity* ent, const idBounds &bounds, int contentMask, idClipModel **clipModelList, int maxCount ) const;
-	int						PlayersTouchingBounds	( const idEntity* ent, const idBounds &bounds, int contentMask, idPlayer **entityList, int maxCount ) const;
-	const idBounds &		GetWorldBounds( const idEntity* ent ) const;
+	void					GetAPUserInfo(idDict &dict, int clientNum);
+	void					SpawnArtificialPlayer(void);
+	//HUMANHEAD END
 
-	void					Link( idClipModel* clip, idEntity *ent, int newId, const idVec3 &newOrigin, const idMat3 &newAxis, int renderModelHandle = -1 );
-
-	idClip*					GetEntityClipWorld( const idEntity* ent );
-	const idClip*			GetEntityClipWorld( const idEntity* ent ) const;
-	int						GetNumMapEntities( void ) const;
-
-	int						AddClipWorld( int id );
-	void					RemoveClipWorld( int id );
-	int						AddInstance( int id = -1, bool deferPopulate = false );
-	void					RemoveInstance( int id );
-	rvInstance*				GetInstance( int id );
-	int						GetNumInstances( void );
-// ddynerman: multiple game instances
-	void					SpawnMapEntities( int instance = 0, unsigned short* entityNumIn = NULL, unsigned short* entityNumOut = NULL, int* startSpawnCount = NULL );
-	void					InstanceClear( void );
-// ddynerman: utility function
-	virtual const char*		GetLongGametypeName( const char* gametype );
-	virtual void			ReceiveRemoteConsoleOutput( const char* output );
-
-	bool					IsFlagGameType( void ) { return ( gameType == GAME_CTF || gameType == GAME_1F_CTF || gameType == GAME_ARENA_CTF || gameType == GAME_ARENA_1F_CTF ); }
-	bool					IsTeamGameType( void ) { return ( gameType == GAME_TDM || gameType == GAME_CTF || gameType == GAME_ARENA_CTF || gameType == GAME_DEADZONE ); }
-	bool					IsTeamPowerups( void );
-
-	// twhitaker: needed this for difficulty settings
-	float					GetDifficultyModifier( void ) { const static float difficulty[] = { -0.3f, 0.0f, 0.4f, 0.8f }; return difficulty[ idMath::ClampInt( 0, 3, g_skill.GetInteger() ) ]; }
-
-	bool					IsMultiplayer( void ) { return isMultiplayer; }
-
-// mekberg: added
-	bool					InCinematic( void ) { return inCinematic; }
-
-	// mekberg: so ban list can be populated outside of multiplayer game
-	void					PopulateBanList( idUserInterface* hud );
-// RAVEN END
-
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-#if defined(_RV_MEM_SYS_SUPPORT)
-	virtual void			FlushBeforelevelLoad( void );
+	//HUMANHEAD rww - keep track of layered spawning
+	//if an object spawns another object in its spawn on mapload, this will completely destroy everything because
+	//we need map-load-time entities to be in sync on client and server, and obviously the client cannot spawn them.
+	//if this is really required and a postevent spawn cannot be done, then the spawnCount must be incremented to fake
+	//the spawn on the client and the server should force the artificial entity to spawn above the map entity count.
+	//(this does work as i have tested it, but it's an ugly hack that i would like to avoid)
+#if !GOLD
+	int						layeredSpawn;
+	bool					spawnPopulating;
 #endif
-// RAVEN END
+	//HUMANHEAD END
 
-	void					ServerSendInstanceReliableMessageExcluding( const idEntity* owner, int excludeClient, const idBitMsg& msg );
-	void					ServerSendInstanceReliableMessage( const idEntity* owner, int clientNum, const idBitMsg& msg );	
+	//HUMANHEAD rww
+	bool					logitechLCDEnabled;
+	bool					logitechLCDDisplayAlt;
+	DWORD					logitechLCDButtonsLast;
+	int						logitechLCDUpdateTime;
+	//HUMANHEAD END
 
-	void					SendUnreliableMessage( const idBitMsg &msg, const int clientNum );
-	// note: local client on dedicated server is always excluded
-	void					SendUnreliableMessagePVS( const idBitMsg &msg, const idEntity *instanceEnt, int area1 = -1, int area2 = -1 );
-
-	demoState_t				GetDemoState( void ) const { return demoState; }
-	bool					IsServerDemo( void ) const { return serverDemo; }
-	bool					IsTimeDemo( void ) const { return timeDemo; }
-	int						GetDemoFollowClient( void ) const { return serverDemo ? followPlayer : -1; }
-	idUserInterface			*GetDemoHud( void );
-	idUserInterface			*GetDemoMphud( void );
-	idUserInterface			*GetDemoCursor( void );
-
-	/*
-	do not synchronize implicit decls over the network
-	implicit decls are created when loading sounds and materials that don't have an explicit entry in the def files
-	clients and server may load those in different orders in a same map, or even join in with different orders because of different map histories before this game
-	in D3 we maintain remap tables, but it's much better to have tighter multiplayer assets so we have no need at all
-	still, you want to catch when bad things happen, so indexes should ALL be read and written through these functions
-	*/
-	static void				WriteDecl( idBitMsg &msg, const idDecl *decl );
-	static const idDecl*	ReadDecl( const idBitMsg &msg, declType_t type );
-	static void				WriteDecl( idBitMsgDelta &msg, const idDecl *decl );
-	static const idDecl*	ReadDecl( const idBitMsgDelta &msg, declType_t type );
-
-	idPlayerStart			*RandomSpawn( void );
-
-	int						GetStartingIndexForInstance( int instanceID );
-	void					ClientSetStartingIndex( int i ) { clientInstanceFirstFreeIndex = i; }
-	void					ServerSetMinSpawnIndex( void );
-	void					ServerSetEntityIndexWatermark( int instanceID );
-
-// RAVEN BEGIN
-// ddynerman: multiple instance for MP
-	idList<idClip*>			clip;					// collision detection
-	idList<rvInstance*>		instances;
-// RAVEN END
-private:
-	// keep watermarks on the high entity index
-	// server transmits this to clients so they use the right entity layout
-	idList<int>				instancesEntityIndexWatermarks;
-	int						clientInstanceFirstFreeIndex;
+protected:	// HUMANHEAD
+	const static int		INITIAL_SPAWN_COUNT = 1;
 
 	idStr					mapFileName;			// name of the map, empty string if no map loaded
 	idMapFile *				mapFile;				// will be NULL during the game unless in-game editing is used
 	bool					mapCycleLoaded;
 
+	//HUMANHEAD rww
+	class hhDDAManager*		ddaManager;
+	//HUMANHEAD END
+
+	//HUMANHEAD jsh
+	class hhReactionHandler*	reactionHandler;
+	//HUMANHEAD END
+
 	int						spawnCount;
-	bool					isMapEntity[ MAX_GENTITIES ]; // it's handy to know which entities are part of the map
-// RAVEN BEGIN
-// bdube: client entities	
-	int						clientSpawnCount;
-// RAVEN END
+	int						mapSpawnCount;			// it's handy to know which entities are part of the map
 
 	idLocationEntity **		locationEntities;		// for location names, etc
 
 	idCamera *				camera;
 	const idMaterial *		globalMaterial;			// for overriding everything
-	void					ResetSpecialEffects();
-
-// RAVEN BEGIN
-// jscott: for portal skies
-	idCamera				*portalSky;
-	bool					portalSkyVisible;
-// RAVEN END
 
 	idList<idAAS *>			aasList;				// area system
 	idStrList				aasNames;
 
-// RAVEN BEGIN
-// bdube: GetAlertActor
-	idEntityPtr<idActor>	lastAIAlertActor;
-	int						lastAIAlertActorTime;
-	idEntityPtr<idEntity>	lastAIAlertEntity;
-	int						lastAIAlertEntityTime;
-// RAVEN END
+	idEntityPtr<idActor>	lastAIAlertEntity;
+	int						lastAIAlertTime;
 
 	idDict					spawnArgs;				// spawn args used during entity spawning  FIXME: shouldn't be necessary anymore
-// RAVEN BEGIN
-// nmckenzie:
-	const idDeclEntityDef *	spawnOverrides;
-// RAVEN END
 
 	pvsHandle_t				playerPVS;				// merged pvs of all players
-	bool					freePlayerPVS;			// tracks if playerPVS needs to be released
 	pvsHandle_t				playerConnectedAreas;	// all areas connected to any player area
 
 	idVec3					gravity;				// global gravity vector
 	gameState_t				gamestate;				// keeps track of whether we're spawning, shutting down, or normal gameplay
 	bool					influenceActive;		// true when a phantasm is happening
 	int						nextGibTime;
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
-	int						unFreezeTime;			// time at which players unfreeze and the match begins
-	bool					isFrozen;				// true if the match is frozen (for buying, etc.)
-// RITUAL END
+	int						nextSteamTime;			// HUMANHEAD mdl:  Don't spawn too many steam entities at once
 
-	entityState_t *			clientEntityStates[MAX_CLIENTS+1][MAX_GENTITIES];	// MAX_CLIENTS slot is for server demo recordings
-	int						clientPVS[MAX_CLIENTS+1][ENTITY_PVS_SIZE];
-	snapshot_t *			clientSnapshots[MAX_CLIENTS+1];
-// RAVEN BEGIN
-// jnewquist: Mark memory tags for idBlockAlloc
-	idBlockAlloc<entityState_t,256,MA_ENTITY> entityStateAllocator;
-	idBlockAlloc<snapshot_t,64,MA_ENTITY> snapshotAllocator;
-// RAVEN END
+	idList<int>				clientDeclRemap[MAX_CLIENTS][DECL_MAX_TYPES];
+
+	entityState_t *			clientEntityStates[MAX_CLIENTS][MAX_GENTITIES];
+	int						clientPVS[MAX_CLIENTS][ENTITY_PVS_SIZE];
+	snapshot_t *			clientSnapshots[MAX_CLIENTS];
+	idBlockAlloc<entityState_t,256>entityStateAllocator;
+	idBlockAlloc<snapshot_t,64>snapshotAllocator;
+
+	idMsgQueue				unreliableSnapMsg[MAX_CLIENTS]; //HUMANHEAD rww - unreliable messages get appended to the snapshot message (since snapshots are unreliable)
 
 	idEventQueue			eventQueue;
+	idEventQueue			savedEventQueue;
 
-	idList<idPlayerStart*>	spawnSpots;
-// RAVEN BEGIN
-// ddynerman: two lists to hold team spawn points for team based games
-	idList<idPlayerStart*>	teamSpawnSpots[TEAM_MAX];	
-	idList<idPlayerStart*>	teamForwardSpawnSpots[TEAM_MAX]; // forward spawn positions, used in CTF
-// RAVEN END
+	idStaticList<spawnSpot_t, MAX_GENTITIES> spawnSpots;
+	idStaticList<idEntity *, MAX_GENTITIES> initialSpots;
+	int						currentInitialSpot;
 
 	idDict					newInfo;
 
 	idStrList				shakeSounds;
 
-// jmarshall
-	rvmGameRender_t			gameRender;
-// jmarshall end
-
 	byte					lagometer[ LAGO_IMG_HEIGHT ][ LAGO_IMG_WIDTH ][ 4 ];
 
-	idMsgQueue				unreliableMessages[ MAX_CLIENTS+1 ];	// MAX_CLIENTS slot for server demo recording
-
-	demoState_t				demoState;
-	bool					serverDemo;
-	bool					timeDemo;
-
-	// demo interaction usercmds
-	usercmd_t				usercmd, oldUsercmd;
-	int						followPlayer;	// free fly or spectate follow through local interaction during server demo replays
-	idUserInterface			*demo_hud;
-	idUserInterface			*demo_mphud;
-	idUserInterface			*demo_cursor;
-
-	int						demo_protocol;	// keep track of the protocol of the demo we're replaying
-
-private:
+	// HUMANHEAD mdl:  Play time
+	unsigned int			playTime; // Total play time, not including current session
+	unsigned int			playTimeStart; // -1 if not playing, otherwise time when current sesion started
+	// HUMANHEAD END
 
 	void					Clear( void );
 							// returns true if the entity shouldn't be spawned at all in this game type or difficulty level
+	virtual					// HUMANHEAD mdl: Made virtual
 	bool					InhibitEntitySpawn( idDict &spawnArgs );
 							// spawn entities from the map file
+	virtual	// HUMANHEAD JRM - made virtual
+	void					SpawnMapEntities( void );
 							// commons used by init, shutdown, and restart
-	void					MapPopulate( int instance = -1 );
-	void					MapClear( bool clearClients, int instance = -1 );
+	void					MapPopulate( void );
+	void					MapClear( bool clearClients );
 
-	bool					SetupPortalSkyPVS( idPlayer *player );
-// RAVEN END
+	pvsHandle_t				GetClientPVS( idPlayer *player, pvsType_t type );
 	void					SetupPlayerPVS( void );
 	void					FreePlayerPVS( void );
 	void					UpdateGravity( void );
 	void					SortActiveEntityList( void );
+	//HUMANHEAD
+	void					SortSnapshotEntityList( void );
+	void					RegisterLocationsWithSoundWorld();
+	//HUMANHEAD END
 	void					ShowTargets( void );
 	void					RunDebugInfo( void );
 
 	void					InitScriptForMap( void );
+
 	void					InitConsoleCommands( void );
 	void					ShutdownConsoleCommands( void );
 
 	void					InitAsyncNetwork( void );
 	void					ShutdownAsyncNetwork( void );
 	void					InitLocalClient( int clientNum );
+	void					InitClientDeclRemap( int clientNum );
+	void					ServerSendDeclRemapToClient( int clientNum, declType_t type, int index );
 	void					FreeSnapshotsOlderThanSequence( int clientNum, int sequence );
 	bool					ApplySnapshot( int clientNum, int sequence );
 	void					WriteGameStateToSnapshot( idBitMsgDelta &msg ) const;
@@ -1130,135 +877,35 @@ private:
 	void					ServerProcessEntityNetworkEventQueue( void );
 	void					ClientProcessEntityNetworkEventQueue( void );
 	void					ClientShowSnapshot( int clientNum ) const;
-	void					SetGameType( void );
-// RAVEN BEGIN
-// ddynerman: gametype specific spawn code
-	void					InitializeSpawns( void );
-	idList<spawnSpot_t>		WeightSpawnSpots( idPlayer* player );
-// RAVEN END
+							// call after any change to serverInfo. Will update various quick-access flags
+	void					UpdateServerInfoFlags( void );
+	void					RandomizeInitialSpawns( void );
 	static int				sortSpawnPoints( const void *ptr1, const void *ptr2 );
 
 	void					DumpOggSounds( void );
 	void					GetShakeSounds( const idDict *dict );
-	bool					ValidateServerSettings( const char *map, const char *gametype );
+
+	void					SelectTimeGroup( int timeGroup );
+	int						GetTimeGroupTime( int timeGroup );
+	idStr					GetBestGameType( const char* map, const char* gametype );
 
 	void					Tokenize( idStrList &out, const char *in );
 
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	void					ShutdownInstances( void );
-// shouchard:  ban list support (lives in game_network.cpp)
-
 	void					UpdateLagometer( int aheadOfServer, int dupeUsercmds );
-
-	void					ClientReadUnreliableMessages( const idBitMsg &msg );
-	void					ProcessUnreliableMessage( const idBitMsg &msg );
-
-	void					UpdateClientsPVS( void );
-
-	bool					IsDemoReplayInAreas( int area1, int area2 );
-
-	void					BuildModList( void );
-
-public:
-	void					LoadBanList();
-	void					SaveBanList();
-	void					FlushBanList();
-	bool					IsPlayerBanned( const char *name );
-	bool					IsGuidBanned( const char *guid );
-	void					AddGuidToBanList( const char *guid );
-	void					RemoveGuidFromBanList( const char *guid );
-	virtual void			RegisterClientGuid( int clientNum, const char *guid );
-
-	int						GetBanListCount();
-	const mpBanInfo_t*		GetBanListEntry( int entry );	// returns client name
-	const char*				GetGuidByClientNum( int clientNum );	// returns GUID
-	int						GetClientNumByGuid( const char* );		// returns clientNum
-
-// mekberg: get and send ban list
-	void					ServerSendBanList( int clientNum );
-
-// jscott: made public
-	pvsHandle_t				GetClientPVS( idPlayer *player, pvsType_t type );
-
-	int						GetCurrentDemoProtocol( void ) { return demo_protocol; }
-// jmarshall
-	void					RenderScene(const renderView_t* view, idRenderWorld* renderWorld, idCamera* portalSky);
-private:	
-	void					ResizeRenderTextures(int width, int height);
-	void					InitGameRenderSystem(void);
-	void					ShutdownGameRenderSystem(void);
-// jmarshall end
-private:
-	char					clientGuids[ MAX_CLIENTS ][ CLIENT_GUID_LENGTH ];
-	idList<mpBanInfo_t>		banList;
-	bool					banListLoaded;
-	bool					banListChanged;
-// RAVEN END
-
-// jmarshall
-	void					AlertBots(idPlayer* player, idVec3 alert_position);
-
-	const idDeclEntityDef* botItemTable;;
-
-	idList<rvmBot*> registeredBots;
-
-	idAAS* bot_aas;
-// jmarshall end
 };
 
 //============================================================================
 
-extern idGameLocal			gameLocal;
-// RAVEN BEGIN
-// jsinger: animationLib changed to a pointer to prevent it from allocating memory
-//          before the unified allocator is initialized
-extern idAnimManager		*animationLib;
-// RAVEN END
+// HUMANHEAD pdm
+// HUMANHEAD mdl:  Commented out the old gameLocal because it was messing up tagging
+//#ifdef HUMANHEAD
+	#include "../prey/prey_game.h"
+	extern hhGameLocal			gameLocal;
+//#else	// HUMANHEAD
+//extern idGameLocal			gameLocal;
+//#endif	// HUMANHEAD
 
-//============================================================================
-
-ID_INLINE void idGameLocal::WriteDecl( idBitMsg &msg, const idDecl *decl ) {
-	assert( decl );
-// jmarshall - changed to a warning.
-	if ( decl->IsImplicit() ) {
-		gameLocal.Warning( "WriteDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( decl->GetType() ), decl->GetName(), decl->Index() );
-	}
-// jmarshall end
-	msg.WriteLong( decl->Index() );
-}
-
-ID_INLINE const idDecl* idGameLocal::ReadDecl( const idBitMsg &msg, declType_t type ) {
-	int index = msg.ReadLong();
-	const idDecl *decl = declManager->DeclByIndex( type, index );
-	if ( !decl ) {
-		gameLocal.Error( "ReadDecl: NULL %s decl at index %d", declManager->GetDeclNameFromType( type ), index );
-	}
-	if ( decl->IsImplicit() ) {
-		gameLocal.Error( "ReadDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( type ), decl->GetName(), decl->Index() );
-	}
-	return decl;
-}
-
-ID_INLINE void idGameLocal::WriteDecl( idBitMsgDelta &msg, const idDecl *decl ) {
-	assert( decl );
-	if ( decl->IsImplicit() ) {
-		gameLocal.Error( "WriteDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( decl->GetType() ), decl->GetName(), decl->Index() );
-	}
-	msg.WriteLong( decl->Index() );
-}
-
-ID_INLINE const idDecl* idGameLocal::ReadDecl( const idBitMsgDelta &msg, declType_t type ) {
-	int index = msg.ReadLong();
-	const idDecl *decl = declManager->DeclByIndex( type, index );
-	if ( !decl ) {
-		gameLocal.Error( "ReadDecl: NULL %s decl at index %d", declManager->GetDeclNameFromType( type ), index );
-	}
-	if ( decl->IsImplicit() ) {
-		gameLocal.Error( "ReadDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( type ), decl->GetName(), decl->Index() );
-	}
-	return decl;
-}
+extern idAnimManager		animationLib;
 
 //============================================================================
 
@@ -1270,33 +917,80 @@ public:
 //============================================================================
 
 
+//
+// these defines work for all startsounds from all entity types
+// make sure to change script/doom_defs.script if you add any channels, or change their order
+//
+typedef enum {
+	SND_CHANNEL_ANY = SCHANNEL_ANY,
+	SND_CHANNEL_VOICE = SCHANNEL_ONE,
+	SND_CHANNEL_VOICE2,
+	SND_CHANNEL_BODY,
+	SND_CHANNEL_BODY2,
+	SND_CHANNEL_BODY3,
+	SND_CHANNEL_WEAPON,
+	SND_CHANNEL_ITEM,
+	SND_CHANNEL_HEART,
+	SND_CHANNEL_PDA,
+	SND_CHANNEL_LANDING,	// HUMANHEAD pdm: needed seperate channel for landing
+	SND_CHANNEL_RADIO,
+
+//HUMANHEAD: aob
+	SND_CHANNEL_WALLWALK,
+	SND_CHANNEL_WALLWALK2,
+	SND_CHANNEL_SPIRITWALK,
+	SND_CHANNEL_MISC1,
+	SND_CHANNEL_MISC2,
+	SND_CHANNEL_MISC3,
+	SND_CHANNEL_MISC4,
+	SND_CHANNEL_MISC5,
+	SND_CHANNEL_IDLE,
+	SND_CHANNEL_DYING,
+	SND_CHANNEL_THRUSTERS,
+	SND_CHANNEL_DOCKED,
+	SND_CHANNEL_TRACTORBEAM,
+	SND_CHANNEL_RECHARGE,
+//HUMANHEAD END
+
+	// internal use only.  not exposed to script or framecommands.
+	SND_CHANNEL_AMBIENT,
+	SND_CHANNEL_DAMAGE
+} gameSoundChannel_t;
+
 // content masks
+#ifdef HUMANHEAD
+#define	MASK_ALL					(-1)
+#define	MASK_SOLID					(CONTENTS_SOLID|CONTENTS_FORCEFIELD)
+#define	MASK_MONSTERSOLID			(CONTENTS_SOLID|CONTENTS_MONSTERCLIP|CONTENTS_BODY|CONTENTS_FORCEFIELD|CONTENTS_HUNTERCLIP)
+#define	MASK_PLAYERSOLID			(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY|CONTENTS_FORCEFIELD)
+#define	MASK_DEADSOLID				(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_FORCEFIELD|CONTENTS_CORPSE)
+#define MASK_SPECTATOR				(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_CORPSE)
+#define	MASK_WATER					(CONTENTS_WATER)
+#define	MASK_OPAQUE					(CONTENTS_OPAQUE) // HUMANHEAD:  Used to be MASK_SOLID for us
+#define	MASK_SPIRITPLAYER			(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY|CONTENTS_SPIRITBRIDGE)						// HUMANHEAD:  Identical to playersolid, except for forcefield and spiritbridge
+#define MASK_VISIBILITY				(CONTENTS_OPAQUE|CONTENTS_RENDERMODEL|CONTENTS_BODY)
+#define MASK_TRACTORBEAM			(CONTENTS_SOLID|CONTENTS_RENDERMODEL|CONTENTS_BODY|CONTENTS_FORCEFIELD|CONTENTS_SHOOTABLE|CONTENTS_CORPSE)
+#define	MASK_SHOT_RENDERMODEL		(CONTENTS_SOLID|CONTENTS_RENDERMODEL|CONTENTS_SHOOTABLE|CONTENTS_CORPSE|CONTENTS_WATER)
+#define	MASK_SHOT_BOUNDINGBOX		(CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_SHOOTABLE|CONTENTS_CORPSE|CONTENTS_WATER)
+#define	MASK_SHOTANDPROJECTILES		(MASK_SHOT_RENDERMODEL|CONTENTS_PROJECTILE)														// for shooting projectiles with projectiles
+#define MASK_SPIRITARROW			(CONTENTS_SOLID|CONTENTS_RENDERMODEL|CONTENTS_CORPSE|CONTENTS_WATER|CONTENTS_SHOOTABLEBYARROW)	// No forcefield (forcefields/spiritsecrets)
+#else	// HUMANHEAD END
 #define	MASK_ALL					(-1)
 #define	MASK_SOLID					(CONTENTS_SOLID)
 #define	MASK_MONSTERSOLID			(CONTENTS_SOLID|CONTENTS_MONSTERCLIP|CONTENTS_BODY)
 #define	MASK_PLAYERSOLID			(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY)
 #define	MASK_DEADSOLID				(CONTENTS_SOLID|CONTENTS_PLAYERCLIP)
 #define	MASK_WATER					(CONTENTS_WATER)
-#define	MASK_OPAQUE					(CONTENTS_OPAQUE|CONTENTS_SIGHTCLIP)
+#define	MASK_OPAQUE					(CONTENTS_OPAQUE)
 #define	MASK_SHOT_RENDERMODEL		(CONTENTS_SOLID|CONTENTS_RENDERMODEL)
 #define	MASK_SHOT_BOUNDINGBOX		(CONTENTS_SOLID|CONTENTS_BODY)
-#define MASK_LARGESHOT_RENDERMODEL	(CONTENTS_SOLID|CONTENTS_RENDERMODEL|CONTENTS_LARGESHOTCLIP)
-#define MASK_LARGESHOT_BOUNDINGBOX	(CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_LARGESHOTCLIP)
-#define MASK_DMGSOLID				(CONTENTS_SOLID|CONTENTS_LARGESHOTCLIP)
-
-// RAVEN BEGIN
-// creed: added monster clip
-#define	MASK_MONSTERCLIP			(CONTENTS_SOLID|CONTENTS_MONSTERCLIP)
-// RAVEN END
+#endif	// HUMANHEAD
 
 const float DEFAULT_GRAVITY			= 1066.0f;
-const float DEFAULT_GRAVITY_MP		= 800.0f;
-
 #define DEFAULT_GRAVITY_STRING		"1066"
-#define DEFAULT_MP_GRAVITY_STRING	"800"
 const idVec3 DEFAULT_GRAVITY_VEC3( 0, 0, -DEFAULT_GRAVITY );
 
-const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 1.0f );
+const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 
 //============================================================================
 
@@ -1315,200 +1009,118 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 1.0f );
 #include "physics/Physics_Parametric.h"
 #include "physics/Physics_RigidBody.h"
 #include "physics/Physics_AF.h"
-#include "physics/Physics_Particle.h"
-#include "physics/Physics_VehicleMonster.h"
 
-#include "vehicle/VehicleController.h"
+//HUMANHEAD
+#include "physics/Physics_PreyPlayer.h"			// HUMANHEAD
+#include "../Prey/Physics_PreyParametric.h"		// HUMANHEAD nla
+#include "../Prey/Physics_PreyAI.h"				// HUMANHEAD jrm
+#include "../Prey/physics_simple.h"				// HUMANHEAD aob
+#include "../prey/game_woundmanager.h"			// HUMANHEAD: aob - must be before Entity.h
+//HUMANHEAD END
+
+#include "SmokeParticles.h"
 
 #include "Entity.h"
-#include "Game_Debug.h"
-#include "IconManager.h"
+
+//HUMANHEAD
+//#include "../prey/game_renderentity.h"			// should be right after idRenderEntity.h
+#include "../prey/game_animatedentity.h"		// should be right after entity.h
+//HUMANHEAD END
+
 #include "GameEdit.h"
 #include "AF.h"
 #include "IK.h"
 #include "AFEntity.h"
 #include "Misc.h"
-#include "Actor.h"
 
-// client entities
-#include "client/ClientEntity.h"
-#include "client/ClientEffect.h"
-#include "client/ClientMoveable.h"
-#include "client/ClientModel.h"
-#include "client/ClientAFEntity.h"
+// HUMANHEAD
+#include "ai/aas_Local.h"						// HUMANHEAD nla
+// HUMANHEAD END
+
+#include "Actor.h"
+#include "Projectile.h"
+
+//HUMANHEAD:
+#include "../prey/game_fxinfo.h"				// HUMANHEAD
+#include "../prey/particles_particles.h"
+#include "../prey/game_spherepart.h"			//HUMANHEAD: aob
+#include "../prey/physics_delta.h"				//HUMANHEAD: aob
+#include "../prey/game_animDriven.h"			//HUMANHEAD: aob
+#include "../prey/prey_projectile.h"			//HUMANHEAD: aob
+#include "../prey/prey_projectileautocannon.h"	//HUMANHEAD: aob
+#include "../prey/prey_projectilerifle.h"		//HUMANHEAD: aob
+#include "../prey/prey_projectilesoulcannon.h"		//HUMANHEAD: aob
+#include "../prey/prey_projectiletracking.h"		//HUMANHEAD: aob
+#include "../prey/prey_projectilerocketlauncher.h"	//HUMANHEAD: aob
+#include "../prey/prey_projectilehiderweapon.h"		//HUMANHEAD: aob
+#include "../prey/prey_projectilespiritarrow.h"		//HUMANHEAD: aob
+#include "../prey/prey_projectilecrawlergrenade.h"	//HUMANHEAD: aob
+#include "../prey/prey_projectileshuttle.h"			//HUMANHEAD: aob
+#include "../prey/prey_projectilemine.h"		//HUMANHEAD: aob
+#include "../prey/prey_projectilebugtrigger.h"			//HUMANHEAD: jsh
+#include "../prey/prey_projectilebug.h"			//HUMANHEAD: jsh
+#include "../prey/prey_projectilecocoon.h"			//HUMANHEAD: jsh
+#include "../prey/prey_projectilegasbagpod.h"		//HUMANHEAD: mdl
+#include "../prey/prey_projectilebounce.h"	//HUMANHEAD: aob
+#include "../prey/prey_projectiletrigger.h"			//HUMANHEAD: jsh
+#include "../prey/prey_projectilefreezer.h"			//HUMANHEAD: bjk
+#include "../prey/prey_projectilewrench.h"			//HUMANHEAD: bjk
+#include "item.h"								//HUMANHEAD: aob - must be above weapon.h
+#include "../prey/game_dda.h"
+#include "../prey/game_utils.h"					//HUMANHEAD: aob
+#include "../prey/prey_soundleadincontroller.h" //HUMANHEAD: aob
+//HUMANHEAD END
 
 #include "Weapon.h"
-
-#include "script/ScriptFuncUtility.h"
-
 #include "Light.h"
 #include "WorldSpawn.h"
-#include "Item.h"
+// HUMANHEAD AOB: Moved up above weapon
 #include "PlayerView.h"
-// TTimo: moved AI.h up, can't do template instanciation on forward declared-classes
-#include "ai/AI.h"
+#include "PlayerIcon.h"
+
+// HUMANHEAD
+#include "../prey/game_light.h"					// HUMANHEAD: aob
+#include "../prey/game_playerview.h"
+#include "../prey/prey_firecontroller.h"		// HUMANHEAD: aob
+#include "../prey/prey_weaponfirecontroller.h"	// HUMANHEAD: aob
+#include "../prey/prey_vehiclefirecontroller.h"	// HUMANHEAD: aob
+#include "../prey/prey_baseweapons.h"
+#include "../prey/prey_items.h"					// HUMANHEAD: aob
+#include "../prey/game_hand.h"					// HUMANHEAD nla - must be before guihand
+#include "../prey/game_guihand.h"				// HUMANHEAD nla - must be before Player
+#include "../prey/game_handcontrol.h"			// HUMANHEAD pdm - must be before Player
+#include "../prey/game_weaponhandstate.h"
+// HUMANHEAD END
+
 #include "Player.h"
+#include "../prey/physics_vehicle.h"			// HUMANHEAD pdm - must be before game_vehicle.h
+#include "../prey/force_converge.h"				// HUMANHEAD pdm - must be before game_vehicle.h
+#include "../prey/game_vehicle.h"				// HUMANHEAD pdm - must be before game_player.h
+#include "../prey/game_dock.h"					// HUMANHEAD
+#include "../prey/game_shuttle.h"				// HUMANHEAD pdm - must be after game_vehicle.h
+#include "../prey/game_player.h"				// HUMANHEAD nla 
 #include "Mover.h"
-// RAVEN BEGIN
-// abahr:
-#include "vehicle/VehicleParts.h"
-#include "vehicle/Vehicle.h"
-#include "SplineMover.h"
-#include "TramGate.h"
-#include "vehicle/VehicleDriver.h"
-// RAVEN END
 #include "Camera.h"
 #include "Moveable.h"
 #include "Target.h"
 #include "Trigger.h"
 #include "Sound.h"
+#include "../prey/prey_sound.h"//HUMANHEAD: aob
+#include "../prey/prey_spiritproxy.h"			// HUMANHEAD
+#include "Fx.h"
+#include "../prey/game_entityfx.h"				// HUMANHEAD
 #include "SecurityCamera.h"
 #include "BrittleFracture.h"
 
-// RAVEN BEGIN
-// nmckenzie: Reduce dependencies.
-#include "mp/CTF.h"
-#include "mp/stats/StatManager.h"
-#include "mp/Tourney.h"
-#include "Instance.h"
-// RAVEN END
+#include "ai/AI.h"
 #include "anim/Anim_Testmodel.h"
-
-// RAVEN BEGIN
-// jscott: for lip syncing
-#include "LipSync.h"
-// RAVEN END
 
 #include "script/Script_Compiler.h"
 #include "script/Script_Interpreter.h"
 #include "script/Script_Thread.h"
 
-#ifdef _XENON
-#define PACIFIER_UPDATE session->PacifierUpdate()
-#else
-#define PACIFIER_UPDATE
-#endif
-
-// RAVEN BEGIN
-// bdube: inlines
-ID_INLINE rvClientEffect* idGameLocal::PlayEffect( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, bool broadcast, effectCategory_t category, const idVec4& effectTint ) {
-	return PlayEffect ( GetEffect ( args, effectName ), origin, axis, loop, endOrigin, broadcast, false, category, effectTint );
-}
-
-ID_INLINE bool idGameLocal::IsTeamGame( void ) const {
-	return ( isMultiplayer && ( gameType == GAME_CTF || gameType == GAME_TDM || gameType == GAME_1F_CTF || gameType == GAME_ARENA_CTF || gameType == GAME_DEADZONE ) );
-}
-
-ID_INLINE int idGameLocal::GetNumMapEntities( void ) const {
-	if ( mapFile == NULL ) {
-		return -1;
-	} else {
-		return mapFile->GetNumEntities();
-	}
-}
-
-ID_INLINE rvInstance* idGameLocal::GetInstance( int id ) {
-	return instances[ id ];
-}
-
-ID_INLINE int idGameLocal::GetNumInstances( void ) {
-	return instances.Num();
-}
-
-ID_INLINE void idGameLocal::ReceiveRemoteConsoleOutput( const char* output ) {
-	if( isMultiplayer ) {
-		mpGame.ReceiveRemoteConsoleOutput( output );
-	}
-}
-
-// abahr:
-template< class type >
-type* idGameLocal::SpawnSafeEntityDef( const char* entityDefName, const idDict* additionalArgs ) {
-	idEntity* entity = SpawnEntityDef( entityDefName, additionalArgs );
-	if( !entity ) {
-		return NULL;
-	}
-	
-	if( !entity->IsType(type::GetClassType()) ) {
-		entity->PostEventMS( &EV_Remove, 0 );
-		return NULL;
-	}
-	
-	return static_cast<type*>( entity );
-}
-// RAVEN END
-
-template< class type >
-ID_INLINE idEntityPtr<type>::idEntityPtr() {
-	spawnId = 0;
-}
-
-template< class type >
-ID_INLINE void idEntityPtr<type>::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( spawnId );
-}
-
-template< class type >
-ID_INLINE void idEntityPtr<type>::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( spawnId );
-}
-
-template< class type >
-ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( type *ent ) {
-	if ( ent == NULL ) {
-		spawnId = 0;
-	} else {
-		spawnId = ( gameLocal.spawnIds[ent->entityNumber] << GENTITYNUM_BITS ) | ent->entityNumber;
-	}
-	return *this;
-}
-
-template< class type >
-ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
-	if ( id == spawnId ) {
-		return false;
-	}
-	if ( ( id >> GENTITYNUM_BITS ) == gameLocal.spawnIds[ id & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] ) {
-		spawnId = id;
-		return true;
-	}
-	return false;
-}
-
-template< class type >
-ID_INLINE bool idEntityPtr<type>::IsValid( void ) const {
-	return ( gameLocal.spawnIds[ spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] == ( spawnId >> GENTITYNUM_BITS ) );
-}
-
-template< class type >
-ID_INLINE type *idEntityPtr<type>::GetEntity( void ) const {
-	int entityNum = spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	if ( ( gameLocal.spawnIds[ entityNum ] == ( spawnId >> GENTITYNUM_BITS ) ) ) {
-		return static_cast<type *>( gameLocal.entities[ entityNum ] );
-	}
-	return NULL;
-}
-
-template< class type >
-ID_INLINE int idEntityPtr<type>::GetEntityNum( void ) const {
-	return ( spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 ) );
-}
-
-// RAVEN BEGIN
-// bdube: overloaded operator
-template< class type >
-ID_INLINE type * idEntityPtr<type>::operator->( void ) const {
-	return GetEntity ( );
-}
-
-template< class type >
-ID_INLINE idEntityPtr<type>::operator type * ( void ) const { 
-	return GetEntity(); 
-}
-// RAVEN END
-
-#include "../idlib/containers/ListGame.h"
-
-#include "bots/bot.h"
+//HUMANHEAD: aob - must be after Script_Thread.h
+#include "../prey/prey_script_thread.h"
+//HUMANHEAD END
 
 #endif	/* !__GAME_LOCAL_H__ */

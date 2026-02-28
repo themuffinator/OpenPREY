@@ -124,9 +124,11 @@ void idSoundHardware_OpenAL::PrintDeviceList( const char* list )
 	}
 	else
 	{
+		int index = 0;
 		do
 		{
-			idLib::Printf( "    %s\n", list );
+			idLib::Printf( "    %d: %s\n", index, list );
+			index++;
 			list += strlen( list ) + 1;
 		}
 		while( *list != '\0' );
@@ -212,6 +214,37 @@ void listDevices_f( const idCmdArgs& args )
 	idSoundHardware_OpenAL::PrintALCInfo( ( ALCdevice* )soundSystem->GetOpenALDevice() );
 }
 
+static bool OpenQ4_GetOpenALDeviceNameByIndex( int deviceIndex, idStr& outDeviceName )
+{
+	if( deviceIndex < 0 )
+	{
+		return false;
+	}
+
+	const ALCenum listSpecifier =
+		( alcIsExtensionPresent( NULL, "ALC_ENUMERATE_ALL_EXT" ) != AL_FALSE ) ?
+		ALC_ALL_DEVICES_SPECIFIER :
+		ALC_DEVICE_SPECIFIER;
+
+	const char* list = alcGetString( NULL, listSpecifier );
+	if( !list || *list == '\0' )
+	{
+		return false;
+	}
+
+	for( int index = 0; *list != '\0'; ++index )
+	{
+		if( index == deviceIndex )
+		{
+			outDeviceName = list;
+			return true;
+		}
+		list += strlen( list ) + 1;
+	}
+
+	return false;
+}
+
 /*
 ========================
 idSoundHardware_OpenAL::Init
@@ -223,7 +256,29 @@ void idSoundHardware_OpenAL::Init()
 
 	common->Printf( "Setup OpenAL device and context... " );
 
-	openalDevice = alcOpenDevice( NULL );
+	idStr requestedDeviceName;
+	const int requestedDeviceIndex = s_device.GetInteger();
+	if( requestedDeviceIndex >= 0 )
+	{
+		if( OpenQ4_GetOpenALDeviceNameByIndex( requestedDeviceIndex, requestedDeviceName ) )
+		{
+			common->Printf( "requested device %d ('%s')... ", requestedDeviceIndex, requestedDeviceName.c_str() );
+			openalDevice = alcOpenDevice( requestedDeviceName.c_str() );
+			if( openalDevice == NULL )
+			{
+				common->Warning( "Failed to open requested OpenAL device %d ('%s'); falling back to default device.", requestedDeviceIndex, requestedDeviceName.c_str() );
+			}
+		}
+		else
+		{
+			common->Warning( "Invalid s_device index %d; falling back to default OpenAL device.", requestedDeviceIndex );
+		}
+	}
+
+	if( openalDevice == NULL )
+	{
+		openalDevice = alcOpenDevice( NULL );
+	}
 	if( openalDevice == NULL )
 	{
 		common->FatalError( "idSoundHardware_OpenAL::Init: alcOpenDevice() failed\n" );
@@ -239,16 +294,31 @@ void idSoundHardware_OpenAL::Init()
 
 	common->Printf( "Done.\n" );
 
-	common->Printf( "OpenAL vendor: %s\n", alGetString( AL_VENDOR ) );
-	common->Printf( "OpenAL renderer: %s\n", alGetString( AL_RENDERER ) );
+	const char* openalVendor = alGetString( AL_VENDOR );
+	const char* openalRenderer = alGetString( AL_RENDERER );
+	common->Printf( "OpenAL vendor: %s\n", openalVendor );
+	common->Printf( "OpenAL renderer: %s\n", openalRenderer );
 	common->Printf( "OpenAL version: %s\n", alGetString( AL_VERSION ) );
 	common->Printf( "OpenAL extensions: %s\n", alGetString( AL_EXTENSIONS ) );
+
+	bool useEfxReverb = s_useEAXReverb.GetBool();
+	if( useEfxReverb )
+	{
+		const bool creativeSoftware =
+			( openalVendor != NULL && strstr( openalVendor, "Creative" ) != NULL ) &&
+			( openalRenderer != NULL && strstr( openalRenderer, "Software" ) != NULL );
+		if( creativeSoftware )
+		{
+			common->Warning( "OpenAL EFX disabled on Creative software renderer for compatibility." );
+			useEfxReverb = false;
+		}
+	}
 
 	efxEnabled = false;
 	auxEffectSlot = 0;
 	auxReverbEffect = 0;
 #if OPENQ4_OPENAL_EFX_SUPPORTED
-	if( s_useEAXReverb.GetBool() && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE && OpenQ4_LoadHardwareEfxProcs() )
+	if( useEfxReverb && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE && OpenQ4_LoadHardwareEfxProcs() )
 	{
 		qalGenEffects( 1, &auxReverbEffect );
 		if( CheckALErrors() == AL_NO_ERROR && auxReverbEffect != 0 )
@@ -292,16 +362,16 @@ void idSoundHardware_OpenAL::Init()
 			common->Warning( "OpenAL EFX requested but unavailable; wet send disabled." );
 		}
 	}
-	else if( s_useEAXReverb.GetBool() && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE )
+	else if( useEfxReverb && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE )
 	{
 		common->Warning( "OpenAL EFX extension reported but required EFX entry points are missing; wet send disabled." );
 	}
-	else if( s_useEAXReverb.GetBool() )
+	else if( useEfxReverb )
 	{
 		common->Warning( "OpenAL EFX extension not reported by device; wet send disabled." );
 	}
 #else
-	if( s_useEAXReverb.GetBool() )
+	if( useEfxReverb )
 	{
 		common->Warning( "OpenAL EFX requested but this build does not expose EFX symbols; wet send disabled." );
 	}

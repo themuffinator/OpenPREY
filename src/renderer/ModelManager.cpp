@@ -305,6 +305,10 @@ idRenderModel *idRenderModelManagerLocal::GetModel( const char *modelName, bool 
 	} else if ( extension.Icmp( "prt" ) == 0  ) {
 		model = new idRenderModelPrt;
 		model->InitFromFile( modelName );
+	} else if ( extension.Icmp( "beam" ) == 0 ) {
+		// Prey frequently references runtime beam models as *.beam assets.
+		model = new idRenderModelBeam;
+		model->InitEmpty( modelName );
 	} else if ( extension.Icmp( "liquid" ) == 0  ) {
 		model = new idRenderModelLiquid;
 		model->InitFromFile( modelName );

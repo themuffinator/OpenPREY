@@ -73,7 +73,7 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $env:OPENQ4_SKIP_GAMELIBS_SYNC = "1"
+          $env:OPENPREY_SKIP_GAMELIBS_SYNC = "1"
 
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype release --wrap-mode=forcefallback
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          export OPENQ4_SKIP_GAMELIBS_SYNC=1
+          export OPENPREY_SKIP_GAMELIBS_SYNC=1
 
           tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype release --wrap-mode=forcefallback
           if [ $? -eq 0 ]; then
@@ -107,11 +107,11 @@ jobs:
             --source-root "${GITHUB_WORKSPACE}" \
             --output-dir "${RUNNER_TEMP}"
 
-          echo "zip_path=${RUNNER_TEMP}/openq4-${{ steps.version.outputs.version_tag }}-${{ matrix.platform }}.zip" >> "$GITHUB_OUTPUT"
+          echo "zip_path=${RUNNER_TEMP}/openprey-${{ steps.version.outputs.version_tag }}-${{ matrix.platform }}.zip" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openq4-nightly-${{ steps.version.outputs.version_tag }}-${{ matrix.platform }}
+          name: openprey-nightly-${{ steps.version.outputs.version_tag }}-${{ matrix.platform }}
           path: ${{ steps.package.outputs.zip_path }}
           if-no-files-found: error

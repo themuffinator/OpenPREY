@@ -1,9 +1,11 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
-#include "ai/AI_Manager.h"
+
 
 /*
 ===============================================================================
@@ -112,16 +114,13 @@ void idTrigger::Disable( void ) {
 idTrigger::CallScript
 ================
 */
-void idTrigger::CallScript( idEntity* scriptEntity ) {
-// RAVEN BEGIN
-// abahr
-	for( int ix = scriptFunctions.Num() - 1; ix >= 0; --ix ) {
-		scriptFunctions[ix].InsertEntity( scriptEntity, 0 );//We could pass both the activator and self if wanted
-		scriptFunctions[ix].CallFunc( &spawnArgs );
-		scriptFunctions[ix].RemoveIndex( 0 );
-	}
-// RAVEN END
+void idTrigger::CallScript( void ) const {
+	idThread *thread;
 
+	if ( scriptFunction ) {
+		thread = new idThread( scriptFunction );
+		thread->DelayedStart( 0 );
+	}
 }
 
 /*
@@ -130,10 +129,7 @@ idTrigger::GetScriptFunction
 ================
 */
 const function_t *idTrigger::GetScriptFunction( void ) const {
-// RAVEN BEGIN
-// abahr: 
-	return (scriptFunctions.Num()) ? scriptFunctions[0].GetFunc() : NULL;
-// RAVEN END
+	return scriptFunction;
 }
 
 /*
@@ -142,13 +138,11 @@ idTrigger::Save
 ================
 */
 void idTrigger::Save( idSaveGame *savefile ) const {
-// RAVEN BEGIN
-// abahr
-	savefile->WriteInt( scriptFunctions.Num() );
-	for( int ix = scriptFunctions.Num() - 1; ix >= 0; --ix ) {
-		scriptFunctions[ix].Save( savefile );
+	if ( scriptFunction ) {
+		savefile->WriteString( scriptFunction->Name() );
+	} else {
+		savefile->WriteString( "" );
 	}
-// RAVEN END
 }
 
 /*
@@ -157,15 +151,16 @@ idTrigger::Restore
 ================
 */
 void idTrigger::Restore( idRestoreGame *savefile ) {
-// RAVEN BEGIN
-// abahr
-	int numScripts = 0;
-	savefile->ReadInt( numScripts );
-	scriptFunctions.SetNum( numScripts );
-	for( int ix = scriptFunctions.Num() - 1; ix >= 0; --ix ) {
-		scriptFunctions[ix].Restore( savefile );
+	idStr funcname;
+	savefile->ReadString( funcname );
+	if ( funcname.Length() ) {
+		scriptFunction = gameLocal.program.FindFunction( funcname );
+		if ( scriptFunction == NULL ) {
+			gameLocal.Warning( "idTrigger_Multi '%s' at (%s) calls unknown function '%s'", name.c_str(), GetPhysics()->GetOrigin().ToString(0), funcname.c_str() );
+		}
+	} else {
+		scriptFunction = NULL;
 	}
-// RAVEN END
 }
 
 /*
@@ -192,10 +187,7 @@ idTrigger::idTrigger
 ================
 */
 idTrigger::idTrigger() {
-// RAVEN BEGIN
-// abahr: scriptFunction init's itself
-	//scriptFunction = NULL;
-// RAVEN END
+	scriptFunction = NULL;
 }
 
 /*
@@ -206,20 +198,15 @@ idTrigger::Spawn
 void idTrigger::Spawn( void ) {
 	GetPhysics()->SetContents( CONTENTS_TRIGGER );
 
-// RAVEN BEGIN
-// abahr:
-	scriptFunctions.SetGranularity( 1 );
-	for( const idKeyValue* kv = spawnArgs.MatchPrefix("call"); kv; kv = spawnArgs.MatchPrefix("call", kv) ) {
-		if( !kv->GetValue() ) {
-			continue;
+	idStr funcname = spawnArgs.GetString( "call", "" );
+	if ( funcname.Length() ) {
+		scriptFunction = gameLocal.program.FindFunction( funcname );
+		if ( scriptFunction == NULL ) {
+			gameLocal.Warning( "trigger '%s' at (%s) calls unknown function '%s'", name.c_str(), GetPhysics()->GetOrigin().ToString(0), funcname.c_str() );
 		}
-
-		rvScriptFuncUtility& utility = scriptFunctions.Alloc();
-		if( !utility.Init(kv->GetValue()) ) {
-			gameLocal.Warning( "Trigger '%s' at (%s) trying to call an unknown function.", name.c_str(), GetPhysics()->GetOrigin().ToString(0) );
-		}
+	} else {
+		scriptFunction = NULL;
 	}
-// RAVEN END
 }
 
 
@@ -231,20 +218,12 @@ void idTrigger::Spawn( void ) {
 ===============================================================================
 */
 
-// RAVEN BEGIN
-// abahr: changed to 'E' to allow NULL entities
-const idEventDef EV_TriggerAction( "<triggerAction>", "E" );
-// RAVEN END
+const idEventDef EV_TriggerAction( "<triggerAction>", "e" );
 
 CLASS_DECLARATION( idTrigger, idTrigger_Multi )
 	EVENT( EV_Touch,			idTrigger_Multi::Event_Touch )
 	EVENT( EV_Activate,			idTrigger_Multi::Event_Trigger )
 	EVENT( EV_TriggerAction,	idTrigger_Multi::Event_TriggerAction )
-
-// RAVEN BEGIN
-// kfuller: respond to earthquakes
-	EVENT( EV_Earthquake,		idTrigger_Multi::Event_EarthQuake )
-// RAVEN END
 END_CLASS
 
 
@@ -262,12 +241,8 @@ idTrigger_Multi::idTrigger_Multi( void ) {
 	removeItem = 0;
 	touchClient = false;
 	touchOther = false;
-	touchVehicle = false;
 	triggerFirst = false;
 	triggerWithSelf = false;
-	buyZoneTrigger = 0;
-	controlZoneTrigger = 0;
-	prevZoneController = TEAM_NONE;
 }
 
 /*
@@ -281,11 +256,10 @@ void idTrigger_Multi::Save( idSaveGame *savefile ) const {
 	savefile->WriteFloat( delay );
 	savefile->WriteFloat( random_delay );
 	savefile->WriteInt( nextTriggerTime );
-	savefile->WriteString( requirement );
+	savefile->WriteString( requiredItem );
 	savefile->WriteInt( removeItem );
 	savefile->WriteBool( touchClient );
 	savefile->WriteBool( touchOther );
-	savefile->WriteBool( touchVehicle );
 	savefile->WriteBool( triggerFirst );
 	savefile->WriteBool( triggerWithSelf );
 }
@@ -301,11 +275,10 @@ void idTrigger_Multi::Restore( idRestoreGame *savefile ) {
 	savefile->ReadFloat( delay );
 	savefile->ReadFloat( random_delay );
 	savefile->ReadInt( nextTriggerTime );
-	savefile->ReadString( requirement );
+	savefile->ReadString( requiredItem );
 	savefile->ReadInt( removeItem );
 	savefile->ReadBool( touchClient );
 	savefile->ReadBool( touchOther );
-	savefile->ReadBool( touchVehicle );
 	savefile->ReadBool( triggerFirst );
 	savefile->ReadBool( triggerWithSelf );
 }
@@ -338,23 +311,12 @@ void idTrigger_Multi::Spawn( void ) {
 		gameLocal.Warning( "idTrigger_Multi '%s' at (%s) has random_delay >= delay", name.c_str(), GetPhysics()->GetOrigin().ToString(0) );
 	}
 
-	spawnArgs.GetString( "requires", "", requirement );
+	spawnArgs.GetString( "requires", "", requiredItem );
 	spawnArgs.GetInt( "removeItem", "0", removeItem );
 	spawnArgs.GetBool( "triggerFirst", "0", triggerFirst );
 	spawnArgs.GetBool( "triggerWithSelf", "0", triggerWithSelf );
-	spawnArgs.GetInt( "buyZone", "0", buyZoneTrigger);
-	spawnArgs.GetInt( "controlZone", "0", controlZoneTrigger);
 
-	if ( buyZoneTrigger == -1 )
-		gameLocal.Warning( "trigger_buyzone '%s' at (%s) has no buyZone key set!", name.c_str(), GetPhysics()->GetOrigin().ToString(0) );
-
-	if ( controlZoneTrigger == -1 )
-		gameLocal.Warning( "trigger_controlzone '%s' at (%s) has no controlZone key set!", name.c_str(), GetPhysics()->GetOrigin().ToString(0) );
-
-
-	if ( spawnArgs.GetBool( "onlyVehicle" ) ) {
-		touchVehicle = true;
-	} else if ( spawnArgs.GetBool( "anyTouch" ) ) {
+	if ( spawnArgs.GetBool( "anyTouch" ) ) {
 		touchClient = true;
 		touchOther = true;
 	} else if ( spawnArgs.GetBool( "noTouch" ) ) {
@@ -372,13 +334,9 @@ void idTrigger_Multi::Spawn( void ) {
 
 	if ( spawnArgs.GetBool( "flashlight_trigger" ) ) {
 		GetPhysics()->SetContents( CONTENTS_FLASHLIGHT_TRIGGER );
-	} else if ( spawnArgs.GetBool( "projectile_trigger" ) ) {
-		GetPhysics()->SetContents( CONTENTS_TRIGGER | CONTENTS_PROJECTILE );
 	} else {
 		GetPhysics()->SetContents( CONTENTS_TRIGGER );
 	}
-
-	BecomeActive( TH_THINK );
 }
 
 /*
@@ -388,21 +346,11 @@ idTrigger_Multi::CheckFacing
 */
 bool idTrigger_Multi::CheckFacing( idEntity *activator ) {
 	if ( spawnArgs.GetBool( "facing" ) ) {
-		if ( !activator->IsType( idPlayer::GetClassType() ) ) {
+		if ( !activator->IsType( idPlayer::Type ) ) {
 			return true;
 		}
 		idPlayer *player = static_cast< idPlayer* >( activator );
-
-		// Unfortunately, the angle key rotates the trigger entity also.  So I've added
-		//	an angleFacing key which is used instead when present, otherwise the code defaults
-		//	to the behaviour present prior to this change
-		idVec3 tFacing = GetPhysics()->GetAxis()[0];
-		if ( spawnArgs.FindKey( "angleFacing" )) {
-			idAngles angs(0,spawnArgs.GetFloat( "angleFacing", "0" ),0);
-			tFacing = angs.ToForward();
-		}
-		float dot = player->viewAngles.ToForward() * tFacing;
-
+		float dot = player->viewAngles.ToForward() * GetPhysics()->GetAxis()[0];
 		float angle = RAD2DEG( idMath::ACos( dot ) );
 		if ( angle  > spawnArgs.GetFloat( "angleLimit", "30" ) ) {
 			return false;
@@ -418,25 +366,8 @@ idTrigger_Multi::TriggerAction
 ================
 */
 void idTrigger_Multi::TriggerAction( idEntity *activator ) {
-// RAVEN BEGIN
-// jdischler: added for Aweldon.  The trigger, when activated, will call the listed func with all attached targets, then return.
-	if ( spawnArgs.GetBool( "_callWithTargets", "0" )) 
-	{
-		idEntity *ent;
-		for( int i = 0; i < targets.Num(); i++ ) 
-		{
-			ent = targets[ i ].GetEntity();
-			if ( !ent ) 
-			{
-				continue;
-			}
-			CallScript( ent );
-		}
-		return;
-	}
-// RAVEN END
 	ActivateTargets( triggerWithSelf ? this : activator );
-	CallScript( triggerWithSelf ? this : activator );
+	CallScript();
 
 	if ( wait >= 0 ) {
 		nextTriggerTime = gameLocal.time + SEC2MS( wait + random * gameLocal.random.CRandomFloat() );
@@ -468,27 +399,24 @@ so wait for the delay time before firing
 ================
 */
 void idTrigger_Multi::Event_Trigger( idEntity *activator ) {
-// RAVEN BEGIN
-// bdube: moved trigger first 
-	if ( triggerFirst ) {
-		triggerFirst = false;
-		return;
-	}
-
 	if ( nextTriggerTime > gameLocal.time ) {
 		// can't retrigger until the wait is over
 		return;
 	}
 
 	// see if this trigger requires an item
-	if ( !gameLocal.RequirementMet( activator, requirement, removeItem ) ) {
+	if ( !gameLocal.RequirementMet( activator, requiredItem, removeItem ) ) {
 		return;
 	}
 
 	if ( !CheckFacing( activator ) ) {
 		return;
 	}
-// RAVEN END
+
+	if ( triggerFirst ) {
+		triggerFirst = false;
+		return;
+	}
 
 	// don't allow it to trigger twice in a single frame
 	nextTriggerTime = gameLocal.time + 1;
@@ -502,117 +430,6 @@ void idTrigger_Multi::Event_Trigger( idEntity *activator ) {
 	}
 }
 
-
-void idTrigger_Multi::HandleControlZoneTrigger()
-{
-	// This only does something in multiplayer
-	if ( !gameLocal.isMultiplayer )
-		return;
-
-	const int TEAM_DEADLOCK = 2;
-
-	int pCount = 0;
-	int count = 0, controllingTeam = TEAM_NONE;
-	count = playersInTrigger.Num();
-
-	for ( int i = 0; i<count; i++ )
-	{
-		// No token? Ignore em!
-		if ( spawnArgs.GetBool("requiresDeadZonePowerup", "1") && !playersInTrigger[i]->PowerUpActive( POWERUP_DEADZONE ) )
-			continue;
-
-		if ( spawnArgs.GetBool("requiresDeadZonePowerup", "1") )
-		{
-			pCount++;
-		}
-
-		int team = playersInTrigger[i]->team;
-
-		if ( i == 0 )
-			controllingTeam = playersInTrigger[i]->team;
-
-		// Assign the controlling team based on the first player
-		// for zones that accept both.
-		if ( team != controllingTeam )
-		{
-			controllingTeam = TEAM_DEADLOCK;
-			pCount = 0;
-		}
-	}
-
-	if ( controllingTeam != controlZoneTrigger-1 && controlZoneTrigger != 3 )
-	{
-		controllingTeam = TEAM_NONE;
-		pCount = 0;
-	}
-
-	int situation = DZ_NONE;
-	if ( controllingTeam != prevZoneController )
-	{
-		if ( controllingTeam == TEAM_MARINE && prevZoneController == TEAM_NONE )
-			situation = DZ_MARINES_TAKEN;
-		else if ( controllingTeam == TEAM_STROGG && prevZoneController == TEAM_NONE )
-			situation = DZ_STROGG_TAKEN;
-		else if ( controllingTeam == TEAM_NONE && prevZoneController == TEAM_MARINE )
-			situation = DZ_MARINES_LOST;
-		else if ( controllingTeam == TEAM_NONE && prevZoneController == TEAM_STROGG )
-			situation = DZ_STROGG_LOST;
-		else if ( controllingTeam == TEAM_MARINE && prevZoneController == TEAM_STROGG )
-			situation = DZ_STROGG_TO_MARINE;
-		else if ( controllingTeam == TEAM_STROGG && prevZoneController == TEAM_MARINE )
-			situation = DZ_MARINE_TO_STROGG;
-
-		// DEADLOCK
-		else if ( controllingTeam == TEAM_DEADLOCK && prevZoneController == TEAM_MARINE )
-			situation = DZ_MARINE_DEADLOCK;
-		else if ( controllingTeam == TEAM_DEADLOCK && prevZoneController == TEAM_STROGG )
-			situation = DZ_STROGG_DEADLOCK;
-		else if ( controllingTeam == TEAM_DEADLOCK && prevZoneController == TEAM_NONE )
-			situation = DZ_MARINE_DEADLOCK; // Unlikely case, just use this.
-		else if ( controllingTeam == TEAM_MARINE && prevZoneController == TEAM_DEADLOCK )
-			situation = DZ_MARINE_REGAIN;
-		else if ( controllingTeam == TEAM_STROGG && prevZoneController == TEAM_DEADLOCK )
-			situation = DZ_STROGG_REGAIN;
-		else if ( controllingTeam == TEAM_NONE && prevZoneController == TEAM_DEADLOCK )
-			situation = DZ_MARINES_LOST; // Unlikely case, just use this.
-	}
-
-	/// Report individual credits
-	for( int i = 0; i < count; i++ )
-	{
-		idPlayer* player = playersInTrigger[i];
-
-		// No token? Ignore em!
-		if ( spawnArgs.GetBool("requiresDeadZonePowerup", "1") && !player->PowerUpActive( POWERUP_DEADZONE ) )
-			continue;
-
-		int team = player->team;
-		if( team == controllingTeam )
-		{
-			gameLocal.mpGame.ReportZoneControllingPlayer( player );
-		}
-	}
-
-	/// Report zone control to multiplayer game manager
-	gameLocal.mpGame.ReportZoneController(controllingTeam, pCount, situation, this);
-
-	playersInTrigger.Clear();
-	prevZoneController = controllingTeam;
-}
-
-
-/*
-================
-idTrigger_Multi::Think
-================
-*/
-void idTrigger_Multi::Think()
-{
-	// Control zone handling
-	if ( controlZoneTrigger > 0 ) 
-		HandleControlZoneTrigger();
-}
-
 /*
 ================
 idTrigger_Multi::Event_Touch
@@ -623,45 +440,16 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// jdischler: vehicle only trigger
-	if ( touchVehicle ) {
-		if ( !other->IsType(rvVehicle::GetClassType()) ) {
+	bool player = other->IsType( idPlayer::Type );
+	if ( player ) {
+		if ( !touchClient ) {
 			return;
 		}
-	} else {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		bool player = other->IsType( idPlayer::GetClassType() );
-// RAVEN END
-		if ( player ) {
-			if ( !touchClient ) {
-				return;
-			}
-			if ( static_cast< idPlayer * >( other )->spectating ) {
-				return;
-			}
-
-		    // Buy zone handling
-		    if ( buyZoneTrigger /*&& gameLocal.mpGame.mpGameState.gameState.currentState != 1*/ ) {
-			    idPlayer *p = static_cast< idPlayer * >( other );
-			    if ( buyZoneTrigger-1 == p->team || buyZoneTrigger == 3)
-			    {
-				    p->inBuyZone = true;
-				    p->inBuyZonePrev = true;
-			    }
-		    }
-    
-		    // Control zone handling
-		    if ( controlZoneTrigger > 0 ) {
-			    idPlayer *p = static_cast< idPlayer * >( other );
-				if ( p->PowerUpActive(POWERUP_DEADZONE) || !spawnArgs.GetBool("requiresDeadZonePowerup", "1") )
-					playersInTrigger.Append(p);
-		    }
-
-		} else if ( !touchOther ) {
+		if ( static_cast< idPlayer * >( other )->spectating ) {
 			return;
 		}
+	} else if ( !touchOther ) {
+		return;
 	}
 
 	if ( nextTriggerTime > gameLocal.time ) {
@@ -670,7 +458,7 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 	}
 
 	// see if this trigger requires an item
-	if ( !gameLocal.RequirementMet( other, requirement, removeItem ) ) {
+	if ( !gameLocal.RequirementMet( other, requiredItem, removeItem ) ) {
 		return;
 	}
 
@@ -682,13 +470,6 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 		triggerFirst = true;
 	}
 
-// RAVEN BEGIN
-// rjohnson: added block
-	if ( developer.GetBool() && *spawnArgs.GetString ( "message" ) ) {
-		gameLocal.DPrintf ( "Trigger: %s\n", spawnArgs.GetString ( "message" ) );
-	}
-// RAVEN END
-
 	nextTriggerTime = gameLocal.time + 1;
 	if ( delay > 0 ) {
 		// don't allow it to trigger again until our delay has passed
@@ -698,47 +479,6 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 		TriggerAction( other );
 	}
 }
-
-// RAVEN BEGIN
-// kfuller:
-void idTrigger_Multi::Event_EarthQuake(float requiresLOS)
-{
-	// does this entity even care about earthquakes?
-	float	quakeChance = 0;
-
-	if (!spawnArgs.GetFloat("quakeChance", "0", quakeChance))
-	{
-		return;
-	}
-	if (rvRandom::flrand(0, 1.0f) > quakeChance)
-	{
-		// failed its activation roll
-		return;
-	}
-	if (requiresLOS)
-	{
-		// if the player doesn't have line of sight to this fx, don't do anything
-		trace_t		trace;
-		idPlayer	*player = gameLocal.GetLocalPlayer();
-		idVec3		viewOrigin;
-		idMat3		viewAxis;
-
-		player->GetViewPos(viewOrigin, viewAxis);
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.TracePoint( this, trace, viewOrigin, GetPhysics()->GetOrigin(), MASK_OPAQUE, player );
-// RAVEN END
-		if (trace.fraction < 1.0f)
-		{
-			// something blocked LOS
-			return;
-		}
-	}
-	// activate this effect now
-	TriggerAction(gameLocal.entities[ENTITYNUM_WORLD]);
-}
-
-// RAVEN END
 
 /*
 ===============================================================================
@@ -780,7 +520,7 @@ void idTrigger_EntityName::Save( idSaveGame *savefile ) const {
 	savefile->WriteFloat( random_delay );
 	savefile->WriteInt( nextTriggerTime );
 	savefile->WriteBool( triggerFirst );
-	savefile->WriteString( entityName );	
+	savefile->WriteString( entityName );
 }
 
 /*
@@ -839,12 +579,8 @@ idTrigger_EntityName::TriggerAction
 ================
 */
 void idTrigger_EntityName::TriggerAction( idEntity *activator ) {
-// RAVEN BEGIN
-// abahr: want same functionality as trigger_multi.  Need to move this code into these two function calls
-	idEntity* scriptEntity = spawnArgs.GetBool("triggerWithSelf") ? this : activator;
-	ActivateTargets( scriptEntity );
-	CallScript( scriptEntity );
-// RAVEN END
+	ActivateTargets( activator );
+	CallScript();
 
 	if ( wait >= 0 ) {
 		nextTriggerTime = gameLocal.time + SEC2MS( wait + random * gameLocal.random.CRandomFloat() );
@@ -881,20 +617,9 @@ void idTrigger_EntityName::Event_Trigger( idEntity *activator ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// abahr: so we can exclude an entity by name
-	if( !activator ) {
+	if ( !activator || ( activator->name != entityName ) ) {
 		return;
 	}
-
-	if( spawnArgs.GetBool("excludeEntityName") && activator->name == entityName ) {
-		return;
-	}
-
-	if( !spawnArgs.GetBool("excludeEntityName") && activator->name != entityName ) {
-		return;
-	}
-// RAVEN END
 
 	if ( triggerFirst ) {
 		triggerFirst = false;
@@ -928,20 +653,9 @@ void idTrigger_EntityName::Event_Touch( idEntity *other, trace_t *trace ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// abahr: so we can exclude an entity by name
-	if( !other ) {
+	if ( !other || ( other->name != entityName ) ) {
 		return;
 	}
-
-	if( spawnArgs.GetBool("excludeEntityName") && other->name == entityName ) {
-		return;
-	}
-
-	if( !spawnArgs.GetBool("excludeEntityName") && other->name != entityName ) {
-		return;
-	}
-// RAVEN END
 
 	nextTriggerTime = gameLocal.time + 1;
 	if ( delay > 0 ) {
@@ -1181,7 +895,7 @@ idTrigger_Count::Event_TriggerAction
 */
 void idTrigger_Count::Event_TriggerAction( idEntity *activator ) {
 	ActivateTargets( activator );
-	CallScript( activator );
+	CallScript();
 	if ( goal == -1 ) {
 		PostEventMS( &EV_Remove, 0 );
 	}
@@ -1199,6 +913,7 @@ CLASS_DECLARATION( idTrigger, idTrigger_Hurt )
 	EVENT( EV_Touch,		idTrigger_Hurt::Event_Touch )
 	EVENT( EV_Activate,		idTrigger_Hurt::Event_Toggle )
 END_CLASS
+
 
 /*
 ================
@@ -1220,10 +935,6 @@ void idTrigger_Hurt::Save( idSaveGame *savefile ) const {
 	savefile->WriteBool( on );
 	savefile->WriteFloat( delay );
 	savefile->WriteInt( nextTime );
-// RAVEN BEGIN
-// bdube: playeronly flag
-	savefile->WriteBool ( playerOnly );
-// RAVEN END	
 }
 
 /*
@@ -1235,10 +946,6 @@ void idTrigger_Hurt::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( on );
 	savefile->ReadFloat( delay );
 	savefile->ReadInt( nextTime );
-// RAVEN BEGIN
-// bdube: playeronly flag
-	savefile->ReadBool( playerOnly );
-// RAVEN END	
 }
 
 /*
@@ -1252,12 +959,6 @@ idTrigger_Hurt::Spawn
 void idTrigger_Hurt::Spawn( void ) {
 	spawnArgs.GetBool( "on", "1", on );
 	spawnArgs.GetFloat( "delay", "1.0", delay );
-
-// RAVEN BEGIN
-// kfuller: playeronly flag
-	spawnArgs.GetBool( "playerOnly", "0", playerOnly );
-// RAVEN END
-
 	nextTime = gameLocal.time;
 	Enable();
 }
@@ -1270,20 +971,12 @@ idTrigger_Hurt::Event_Touch
 void idTrigger_Hurt::Event_Touch( idEntity *other, trace_t *trace ) {
 	const char *damage;
 
-// RAVEN BEGIN
-// kfuller: playeronly flag
-// jnewquist: Use accessor for static class type 
-	if ( playerOnly && !other->IsType( idPlayer::GetClassType() ) ) {
-		return;
-	}
-// RAVEN END
-
 	if ( on && other && gameLocal.time >= nextTime ) {
 		damage = spawnArgs.GetString( "def_damage", "damage_painTrigger" );
-		other->Damage( this, NULL, vec3_origin, damage, 1.0f, INVALID_JOINT );
+		other->Damage( NULL, NULL, vec3_origin, damage, 1.0f, INVALID_JOINT );
 
 		ActivateTargets( other );
-		CallScript( other );
+		CallScript();
 
 		nextTime = gameLocal.time + SEC2MS( delay );
 	}
@@ -1352,19 +1045,6 @@ idTrigger_Touch::idTrigger_Touch( void ) {
 	clipModel = NULL;
 }
 
-
-/*
-================
-idTrigger_Touch::idTrigger_Touch
-================
-*/
-idTrigger_Touch::~idTrigger_Touch( ) {
-	if ( clipModel ) {
-		delete clipModel;
-		clipModel = 0;
-	}
-}
-
 /*
 ================
 idTrigger_Touch::Spawn
@@ -1372,33 +1052,13 @@ idTrigger_Touch::Spawn
 */
 void idTrigger_Touch::Spawn( void ) {
 	// get the clip model
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	clipModel = new idClipModel( GetPhysics()->GetClipModel() );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
+
 	// remove the collision model from the physics object
 	GetPhysics()->SetClipModel( NULL, 1.0f );
 
 	if ( spawnArgs.GetBool( "start_on" ) ) {
 		BecomeActive( TH_THINK );
-	}
-	filterTeam = -1;
-	idStr filterTeamStr = spawnArgs.GetString( "filterTeam" );
-	if ( filterTeamStr.Size() )
-	{
-		if ( !idStr::Icmp( "marine", filterTeamStr.c_str() ) )
-		{
-			filterTeam = AITEAM_MARINE;
-		}
-		else if ( !idStr::Icmp( "strogg", filterTeamStr.c_str() ) )
-		{
-			filterTeam = AITEAM_STROGG;
-		}
 	}
 }
 
@@ -1409,7 +1069,6 @@ idTrigger_Touch::Save
 */
 void idTrigger_Touch::Save( idSaveGame *savefile ) {
 	savefile->WriteClipModel( clipModel );
-	savefile->WriteInt( filterTeam );
 }
 
 /*
@@ -1419,7 +1078,6 @@ idTrigger_Touch::Restore
 */
 void idTrigger_Touch::Restore( idRestoreGame *savefile ) {
 	savefile->ReadClipModel( clipModel );
-	savefile->ReadInt( filterTeam );
 }
 
 /*
@@ -1432,45 +1090,12 @@ void idTrigger_Touch::TouchEntities( void ) {
 	idBounds bounds;
 	idClipModel *cm, *clipModelList[ MAX_GENTITIES ];
 
-// RAVEN BEGIN
-// abahr: now scriptFunction list
-	if ( clipModel == NULL || !scriptFunctions.Num() ) {
-// RAVEN END
+	if ( clipModel == NULL || GetScriptFunction() == NULL ) {
 		return;
 	}
 
-	bounds.FromTransformedBounds( clipModel->GetBounds(), GetBindMaster()!=NULL?GetPhysics()->GetOrigin():clipModel->GetOrigin(), GetBindMaster()!=NULL?GetPhysics()->GetAxis():clipModel->GetAxis() );
-// RAVEN BEGIN
-// MCG: filterTeam
-	if ( filterTeam != -1 )
-	{
-		idActor* actor;
-		// Iterate through the filter team
-		for( actor = aiManager.GetAllyTeam ( (aiTeam_t)filterTeam ); actor; actor = actor->teamNode.Next() ) {
-			// Skip hidden actors and actors that can't be targeted
-			if( actor->fl.notarget || actor->fl.isDormant || ( actor->IsHidden ( ) && !actor->IsInVehicle() ) ) {
-				continue;
-			}
-			if ( !bounds.IntersectsBounds ( actor->GetPhysics()->GetAbsBounds ( ) ) ) {
-				continue;
-			}
-			cm = actor->GetPhysics()->GetClipModel();
-			if ( !cm || !cm->IsTraceModel() ) {
-				continue;
-			}
-			if ( !gameLocal.ContentsModel( this, cm->GetOrigin(), cm, cm->GetAxis(), -1,
-				clipModel->GetCollisionModel(), GetBindMaster()!=NULL?GetPhysics()->GetOrigin():clipModel->GetOrigin(), GetBindMaster()!=NULL?GetPhysics()->GetAxis():clipModel->GetAxis() ) ) {
-				continue;
-			}
-			ActivateTargets( (idEntity*)actor );
-
-			CallScript( (idEntity*)actor );
-		}
-		return;
-	}
-// ddynerman: multiple clip worlds
-	numClipModels = gameLocal.ClipModelsTouchingBounds( this, bounds, -1, clipModelList, MAX_GENTITIES );
-// RAVEN END
+	bounds.FromTransformedBounds( clipModel->GetBounds(), clipModel->GetOrigin(), clipModel->GetAxis() );
+	numClipModels = gameLocal.clip.ClipModelsTouchingBounds( bounds, -1, clipModelList, MAX_GENTITIES );
 
 	for ( i = 0; i < numClipModels; i++ ) {
 		cm = clipModelList[ i ];
@@ -1485,20 +1110,16 @@ void idTrigger_Touch::TouchEntities( void ) {
 			continue;
 		}
 		
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		if ( !gameLocal.ContentsModel( this, cm->GetOrigin(), cm, cm->GetAxis(), -1,
-									clipModel->GetCollisionModel(), clipModel->GetOrigin(), clipModel->GetAxis() ) ) {
-// RAVEN END
+		if ( !gameLocal.clip.ContentsModel( cm->GetOrigin(), cm, cm->GetAxis(), -1,
+									clipModel->Handle(), clipModel->GetOrigin(), clipModel->GetAxis() ) ) {
 			continue;
 		}
 
 		ActivateTargets( entity );
 
-// RAVEN BEGIN
-// abahr: changed to be compatible with new script function utility
-		CallScript( entity );
-// RAVEN END
+		idThread *thread = new idThread();
+		thread->CallFunction( entity, GetScriptFunction(), false );
+		thread->DelayedStart( 0 );
 	}
 }
 

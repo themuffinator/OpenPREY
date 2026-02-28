@@ -56,6 +56,15 @@ typedef struct portalStack_s {
 	// positive side is outside the visible frustum
 } portalStack_t;
 
+// Subviews (mirrors/remote cameras) should always behave like viewID 0 for
+// suppress/allow tests so player bodies can appear while view weapons stay hidden.
+static ID_INLINE int R_EffectiveViewIDForSubview() {
+	if ( tr.viewDef != NULL && tr.viewDef->isSubview ) {
+		return 0;
+	}
+	return ( tr.viewDef != NULL ) ? tr.viewDef->renderView.viewID : 0;
+}
+
 
 //====================================================================
 
@@ -594,6 +603,7 @@ void idRenderWorldLocal::AddAreaEntityRefs( int areaNum, const portalStack_t *ps
 	portalArea_t		*area;
 	viewEntity_t		*vEnt;
 	idBounds			b;
+	const int			viewID = R_EffectiveViewIDForSubview();
 
 	area = &portalAreas[ areaNum ];
 
@@ -611,11 +621,11 @@ void idRenderWorldLocal::AddAreaEntityRefs( int areaNum, const portalStack_t *ps
 		// check for completely suppressing the model
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( entity->parms.suppressSurfaceInViewID
-					&& entity->parms.suppressSurfaceInViewID == tr.viewDef->renderView.viewID ) {
+					&& entity->parms.suppressSurfaceInViewID == viewID ) {
 				continue;
 			}
 			if ( entity->parms.allowSurfaceInViewID 
-					&& entity->parms.allowSurfaceInViewID != tr.viewDef->renderView.viewID ) {
+					&& entity->parms.allowSurfaceInViewID != viewID ) {
 				continue;
 			}
 		}

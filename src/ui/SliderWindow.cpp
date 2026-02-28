@@ -124,6 +124,7 @@ idWinVar *idSliderWindow::GetWinVarByName(const char *_name, bool fixup, drawWin
 }
 
 const char *idSliderWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) {
+	float oldValue = value;
 
 	if (!(event->evType == SE_KEY && event->evValue2)) {
 		return "";
@@ -150,6 +151,12 @@ const char *idSliderWindow::HandleEvent(const sysEvent_t *event, bool *updateVis
 	} else {
 		gui->SetStateFloat( cvarStr, value );
 		UpdateCvar( false );
+	}
+	if ( value != oldValue ) {
+		RunScript( ON_SLIDERCHANGE );
+		if ( cmd.Length() ) {
+			return cmd;
+		}
 	}
 
 	return "";
@@ -283,6 +290,7 @@ void idSliderWindow::DrawBackground(const idRectangle &_drawRect) {
 
 const char *idSliderWindow::RouteMouseCoords(float xd, float yd) {
 	float pct;
+	float oldValue = value;
 
 	if (!(flags & WIN_CAPTURE)) {
 		return "";
@@ -334,6 +342,12 @@ const char *idSliderWindow::RouteMouseCoords(float xd, float yd) {
 		gui->SetStateFloat( cvarStr, value );
 	}
 	UpdateCvar( false );
+	if ( value != oldValue ) {
+		RunScript( ON_SLIDERCHANGE );
+		if ( cmd.Length() ) {
+			return cmd;
+		}
+	}
 
 	return "";
 }

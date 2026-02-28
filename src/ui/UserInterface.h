@@ -57,6 +57,8 @@ public:
 
 								// handles a named event
 	virtual void				HandleNamedEvent( const char *eventName ) = 0;
+	virtual const char *		Translate( const char *string ) { return string; }
+	virtual void				CallStartup( void ) = 0;
 
 								// repaints the ui
 	virtual void				Redraw( int time ) = 0;

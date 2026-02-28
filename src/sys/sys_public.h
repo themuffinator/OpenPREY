@@ -44,7 +44,11 @@ If you have questions concerning this license or the applicable additional terms
 #define	BUILD_STRING					"win-x64"
 #define BUILD_OS_ID						0
 #define	CPUSTRING						"x64"
+#if defined(_WIN64)
+#define CPU_EASYARGS					0
+#else
 #define CPU_EASYARGS					1
+#endif
 
 #define ALIGN16( x )					__declspec(align(16)) x
 #define PACKED
@@ -577,6 +581,23 @@ public:
 
 	virtual void			OpenURL( const char *url, bool quit ) = 0;
 	virtual void			StartProcess( const char *exePath, bool quit ) = 0;
+
+	// Legacy Logitech LCD hooks used by Prey game code.
+	virtual bool			LGLCD_Init( void ) { return false; }
+	virtual void			LGLCD_Shutdown( void ) {}
+	virtual bool			LGLCD_Valid( void ) { return false; }
+	virtual void			LGLCD_UploadImage( unsigned char *pixels, int w, int h, bool highPriority, bool flipColor ) {}
+	virtual bool			LGLCD_ReadSoftButtons( DWORD *out ) {
+		if ( out != NULL ) {
+			*out = 0;
+		}
+		return false;
+	}
+	virtual void			LGLCD_DrawBegin( void ) {}
+	virtual void			LGLCD_DrawFinish( bool clearBuffer ) {}
+	virtual void			LGLCD_DrawRaw( unsigned char *pixels, int x, int y, int w, int h, int pitch, bool flipColor, bool layered, int rotate ) {}
+	virtual void			LGLCD_DrawText( const char *text, int x, int y, bool layered ) {}
+	virtual void			LGLCD_DrawShape( int shapeType, int x, int y, int sizeX, int sizeY, int parm, bool layered ) {}
 
 	virtual int				Milliseconds(void) = 0;
 };

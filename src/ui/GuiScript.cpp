@@ -113,6 +113,42 @@ void Script_Set(idWindow *window, idList<idGSWinVar> *src) {
 
 /*
 =========================
+Script_Inc
+=========================
+*/
+void Script_Inc(idWindow *window, idList<idGSWinVar> *src) {
+	if ( src == NULL || src->Num() < 2 || (*src)[0].var == NULL || (*src)[1].var == NULL ) {
+		return;
+	}
+
+	const float currentValue = static_cast<float>( atof( (*src)[0].var->c_str() ) );
+	const float incrementValue = static_cast<float>( atof( (*src)[1].var->c_str() ) );
+	const float newValue = currentValue + incrementValue;
+
+	(*src)[0].var->Set( va( "%g", newValue ) );
+	(*src)[0].var->SetEval( false );
+
+	idWinFloatPtr *floatPtr = dynamic_cast<idWinFloatPtr *>( (*src)[0].var );
+	if ( floatPtr ) {
+		idWinVec4 *owner = floatPtr->GetOwnerVec4();
+		if ( owner ) {
+			owner->SetEval( false );
+		}
+	}
+
+	if ( gui_debugScript.GetInteger() > 2 ) {
+		const char *varName = (*src)[0].var ? (*src)[0].var->GetName() : "<null>";
+		common->Printf( "GUI: inc %s by %s -> %g (caller=%s gui=%s)\n",
+			varName,
+			(*src)[1].var->c_str(),
+			newValue,
+			window ? window->GetName() : "<null>",
+			window && window->GetGui() ? window->GetGui()->GetSourceFile() : "<null>" );
+	}
+}
+
+/*
+=========================
 Script_SetFocus
 =========================
 */
@@ -239,6 +275,35 @@ Script_ResetCinematics
 */
 void Script_ResetCinematics(idWindow *window, idList<idGSWinVar> *src) {
 	window->ResetCinematics();
+}
+
+/*
+=========================
+Script_ResetCapture
+=========================
+*/
+void Script_ResetCapture(idWindow *window, idList<idGSWinVar> *src) {
+	if ( window == NULL || window->GetGui() == NULL ) {
+		return;
+	}
+
+	idWindow *desktop = window->GetGui()->GetDesktop();
+	if ( desktop == NULL ) {
+		return;
+	}
+
+	if ( src->Num() > 0 ) {
+		idWinStr *parm = dynamic_cast<idWinStr*>((*src)[0].var);
+		if ( parm && parm->Length() > 0 ) {
+			drawWin_t *namedWindow = desktop->FindChildByName( parm->c_str() );
+			if ( namedWindow && namedWindow->win ) {
+				namedWindow->win->ResetCapture();
+				return;
+			}
+		}
+	}
+
+	desktop->ResetCapture();
 }
 
 /*
@@ -467,11 +532,13 @@ typedef struct {
 
 guiCommandDef_t commandList[] = {
 	{ "set", Script_Set, 2, 999 },
+	{ "inc", Script_Inc, 2, 2 },
 	{ "setFocus", Script_SetFocus, 1, 1 },
 	{ "endGame", Script_EndGame, 0, 0 },
 	{ "resetTime", Script_ResetTime, 0, 2 },
 	{ "showCursor", Script_ShowCursor, 1, 1 },
 	{ "resetCinematics", Script_ResetCinematics, 0, 2 },
+	{ "resetCapture", Script_ResetCapture, 0, 1 },
 	{ "transition", Script_Transition, 4, 6 },
 	{ "localSound", Script_LocalSound, 1, 1 },
 	{ "setlightcolor", Script_SetLightColor, 1, 1 },
@@ -675,7 +742,7 @@ idGuiScriptList::FixupParms
 =========================
 */
 void idGuiScript::FixupParms(idWindow *win) {
-	if (handler == &Script_Set) {
+	if (handler == &Script_Set || handler == &Script_Inc) {
 		bool precacheBackground = false;
 		bool precacheSounds = false;
 		idWinStr *str = dynamic_cast<idWinStr*>(parms[0].var);
@@ -689,7 +756,7 @@ void idGuiScript::FixupParms(idWindow *win) {
 			if ( dynamic_cast<idWinBackground *>(dest) != NULL ) {
 				precacheBackground = true;
 			}
-		} else if ( idStr::Icmp( str->c_str(), "cmd" ) == 0 ) {
+		} else if ( handler == &Script_Set && idStr::Icmp( str->c_str(), "cmd" ) == 0 ) {
 			precacheSounds = true;
 		}
 		int parmCount = parms.Num();

@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __PHYSICS_STATICMULTI_H__
 #define __PHYSICS_STATICMULTI_H__
@@ -26,10 +28,6 @@ public:
 public:	// common physics interface
 
 	void					SetSelf( idEntity *e );
-//RAVEN BEGIN
-// abahr: for gravity
-	virtual idEntity*		GetSelf() const { return self; }
-// RAVEN END
 
 	void					SetClipModel( idClipModel *model, float density, int id = 0, bool freeOld = true );
 	idClipModel *			GetClipModel( int id = 0 ) const;
@@ -37,11 +35,6 @@ public:	// common physics interface
 
 	void					SetMass( float mass, int id = -1 );
 	float					GetMass( int id = -1 ) const;
-
-// RAVEN BEGIN
-// bdube: means of getting center of mass
-	idVec3					GetCenterMass( int id = -1 ) const;
-// RAVEN END
 
 	void					SetContents( int contents, int id = -1 );
 	int						GetContents( int id = -1 ) const;
@@ -64,10 +57,6 @@ public:	// common physics interface
 	bool					IsAtRest( void ) const;
 	int						GetRestStartTime( void ) const;
 	bool					IsPushable( void ) const;
-// RAVEN BEGIN
-// bdube: water interraction
-	bool					IsInWater ( void ) const;
-// RAVEN END	
 
 	void					SaveState( void );
 	void					RestoreState( void );
@@ -129,10 +118,7 @@ public:	// common physics interface
 
 protected:
 	idEntity *				self;					// entity using this physics object
-// RAVEN BEGIN
-// rjohnson: converted this from a struct to a class
-	idList<idStaticPState>	current;				// physics state
-// RAVEN END
+	idList<staticPState_t>	current;				// physics state
 	idList<idClipModel *>	clipModels;				// collision model
 
 	// master

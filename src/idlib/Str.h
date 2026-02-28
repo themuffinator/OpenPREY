@@ -176,6 +176,7 @@ public:
 	int					IcmpPrefix( const char *text ) const;
 
 						// case insensitive compare ignoring color
+	int					IcmpNoColor( const char *text ) const;
 // RAVEN BEGIN
 // bdube: changed to escapes
 	int					IcmpNoEscape( const char *text ) const;
@@ -306,6 +307,7 @@ public:
 	static int			Cmpn( const char *s1, const char *s2, int n );
 	static int			Icmp( const char *s1, const char *s2 );
 	static int			Icmpn( const char *s1, const char *s2, int n );
+	static int			IcmpNoColor( const char *s1, const char *s2 );
 // RAVEN BEGIN
 // bdube: escapes
 	static int			IcmpNoEscape( const char *s1, const char *s2 );
@@ -766,6 +768,11 @@ ID_INLINE int idStr::Icmpn( const char *text, int n ) const {
 ID_INLINE int idStr::IcmpPrefix( const char *text ) const {
 	assert( text );
 	return idStr::Icmpn( data, text, strlen( text ) );
+}
+
+ID_INLINE int idStr::IcmpNoColor( const char *text ) const {
+	assert( text );
+	return idStr::IcmpNoColor( data, text );
 }
 
 // RAVEN BEGIN

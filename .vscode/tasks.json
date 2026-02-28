@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Configure OpenQ4 (Meson Debug)",
+      "label": "Configure OpenPrey (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -24,7 +24,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Compile OpenQ4 (Meson Debug)",
+      "label": "Compile OpenPrey (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "label": "Stage OpenQ4 Install Tree (Meson Debug)",
+      "label": "Stage OpenPrey Install Tree (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -60,11 +60,11 @@
       "problemMatcher": []
     },
     {
-      "label": "Build OpenQ4 (Meson Debug)",
+      "label": "Build OpenPrey (Meson Debug)",
       "dependsOrder": "sequence",
       "dependsOn": [
-        "Compile OpenQ4 (Meson Debug)",
-        "Stage OpenQ4 Install Tree (Meson Debug)"
+        "Compile OpenPrey (Meson Debug)",
+        "Stage OpenPrey Install Tree (Meson Debug)"
       ],
       "group": {
         "kind": "build",

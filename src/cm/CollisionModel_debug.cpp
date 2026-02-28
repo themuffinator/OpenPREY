@@ -66,6 +66,20 @@ const char *cm_contentsNameByIndex[] = {
 	"aas_solid",					// 14
 	"aas_obstacle",					// 15
 	"flashlight_trigger",			// 16
+#ifdef HUMANHEAD
+	"forcefield",					// 17
+	"spiritbridge",					// 18
+	"areaportal",					// 19
+	"nocsg",						// 20
+	"blockradiusdamage",			// 21
+	"shootable",					// 22
+	"deathvolume",					// 23
+	"vehicleclip",					// 24
+	"ownertoowner",					// 25
+	"gameportal",					// 26
+	"shootablebyarrow",				// 27
+	"hunterclip",					// 28
+#else
 	"sightclip",					// 17
 	"largeshotclip",				// 18
 	"notacticalfeatures",			// 19
@@ -78,6 +92,7 @@ const char *cm_contentsNameByIndex[] = {
 	"fog",							// 26
 	"lava",							// 27
 	"slime",						// 28
+#endif
 	NULL
 };
 
@@ -99,6 +114,20 @@ int cm_contentsFlagByIndex[] = {
 	CONTENTS_AAS_SOLID,				// 14
 	CONTENTS_AAS_OBSTACLE,			// 15
 	CONTENTS_FLASHLIGHT_TRIGGER,	// 16
+#ifdef HUMANHEAD
+	CONTENTS_FORCEFIELD,			// 17
+	CONTENTS_SPIRITBRIDGE,			// 18
+	CONTENTS_AREAPORTAL,			// 19
+	CONTENTS_NOCSG,					// 20
+	CONTENTS_BLOCK_RADIUSDAMAGE,	// 21
+	CONTENTS_SHOOTABLE,				// 22
+	CONTENTS_DEATHVOLUME,			// 23
+	CONTENTS_VEHICLECLIP,			// 24
+	CONTENTS_OWNER_TO_OWNER,		// 25
+	CONTENTS_GAME_PORTAL,			// 26
+	CONTENTS_SHOOTABLEBYARROW,		// 27
+	CONTENTS_HUNTERCLIP,			// 28
+#else
 	CONTENTS_SIGHTCLIP,				// 17
 	CONTENTS_LARGESHOTCLIP,			// 18
 	CONTENTS_NOTACTICALFEATURES,	// 19
@@ -111,6 +140,7 @@ int cm_contentsFlagByIndex[] = {
 	CONTENTS_FOG,					// 26
 	CONTENTS_LAVA,					// 27
 	CONTENTS_SLIME,					// 28
+#endif
 	0
 };
 
@@ -170,6 +200,15 @@ const char *idCollisionModelManagerLocal::StringFromContents( const int contents
 	}
 
 	return contentsString;
+}
+
+/*
+================
+idCollisionModelManagerLocal::ContentsName
+================
+*/
+const char *idCollisionModelManagerLocal::ContentsName( const int contents ) const {
+	return StringFromContents( contents );
 }
 
 /*

@@ -61,7 +61,8 @@ int idDeviceContext::FindFont( const char *name ) {
 	// If the font was not found, try to register it
 	idStr fileName = name;
 	if ( idStr::Icmp( fileName.c_str(), "fonts" ) == 0 ) {
-		fileName = "fonts/chain";
+		// Prey retail stores the default fontImage_*.dat under fonts/<lang>/.
+		fileName = "fonts";
 	}
 	fileName.Replace("fonts", va("fonts/%s", fontLang.c_str()) );
 

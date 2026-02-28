@@ -423,9 +423,17 @@ int idCollisionModelManagerLocal::PointContents( const idVec3 p, idCollisionMode
 	cm_brush_t *b;
 	idPlane *plane;
 
-	// If model is NULL, assume we are wanting the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	// Legacy game code may pass NULL to indicate the world model.
+	if ( model == NULL && models != NULL && numModels > 0 ) {
+		model = models[0];
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		return 0;
 	}
 
 	node = idCollisionModelManagerLocal::PointNode( p, (idCollisionModelLocal *)model );
@@ -489,8 +497,23 @@ int idCollisionModelManagerLocal::ContentsTrm( trace_t *results, const idVec3 &s
 	idVec3 dir;
 	ALIGN16( cm_traceWork_t tw );
 
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	if ( model == NULL && models != NULL && numModels > 0 ) {
+		model = models[0];
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		results->fraction = 1.0f;
+		results->endpos = start;
+		results->endAxis = trmAxis;
+		results->c.type = CONTACT_NONE;
+		results->c.contents = 0;
+		results->c.material = NULL;
+		results->c.materialType = NULL;
+		return 0;
 	}
 
 	// fast point case
@@ -637,9 +660,16 @@ int idCollisionModelManagerLocal::Contents( const idVec3 &start,
 											idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
 	trace_t results;
 
-	// If the model is NULL then assume we are checking the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	if ( model == NULL && models != NULL && numModels > 0 ) {
+		model = models[0];
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		return 0;
 	}
 
 	return ContentsTrm( &results, start, trm, trmAxis, contentMask, (idCollisionModelLocal *)model, modelOrigin, modelAxis );

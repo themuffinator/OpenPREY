@@ -18,6 +18,7 @@ public:
 	virtual				~idListGUI() { }
 
 	virtual void		Config( idUserInterface *pGUI, const char *name ) = 0;
+	virtual void		Add( int id, const idStr &s ) = 0;
 // RAVEN BEGIN
 // shouchard:  added greyed support
 //	virtual void		Add( int id, const idStr& s, bool greyed = false ) = 0;

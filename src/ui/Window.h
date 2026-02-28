@@ -184,10 +184,14 @@ public:
 // jmarshall - quake 4 guis
 		ON_BACKACTION,
 		ON_TABRELEASE,
+		ON_TABACTIVATE,
 		ON_GAINFOCUS,
 		ON_LOSEFOCUS,
 		ON_SELCHANGE,
+		ON_SLIDERCHANGE,
 		ON_INIT,
+		ON_STARTUP,
+		ON_MAXCHARS,
 		ON_JOYSTART,
 		ON_JOYSELECT,
 		ON_JOYBACK,
@@ -240,6 +244,7 @@ public:
 	idWindow *SetFocus(idWindow *w, bool scripts = true);
 
 	idWindow *SetCapture(idWindow *w);
+	void ResetCapture();
 	void SetParent(idWindow *w);
 	void SetFlag(unsigned int f);
 	void ClearFlag(unsigned int f);
@@ -269,7 +274,9 @@ public:
 	float GetMaxCharWidth();
 	void SetFont();
 	void SetInitialState(const char *_name);
+	void SetWindowDefType( const char *defType );
 	void AddChild(idWindow *win);
+	void AddChildWindow(idWindow *win);
 	void DebugDraw(int time, float x, float y);
 	void CalcClientRect(float xofs, float yofs);
 	void CommonInit();
@@ -405,6 +412,14 @@ protected:
 	void ParseString(idParser *src, idStr &out);
 	void ParseVec4(idParser *src, idVec4 &out);
 	void ConvertRegEntry(const char *name, idParser *src, idStr &out, int tabs);
+	bool IsTabContainerDef() const;
+	bool IsTabDef() const;
+	int GetTabContainerTabCount() const;
+	idWindow *GetTabContainerTabWindow( int tabIndex ) const;
+	int GetTabContainerRequestedTabIndex() const;
+	int GetTabContainerTabAt( float x, float y ) const;
+	void UpdateTabContainerState( bool runActivateScript );
+	void DrawTabContainerTabs();
 
 	float actualX;					// physical coords
 	float actualY;					// ''
@@ -429,7 +444,10 @@ protected:
 	unsigned char screenAlignY;
 	idStr	name;
 	idStr	comment;
-	idVec2	shear;
+	idStr	windowDefType;
+	int		activeTabIndex;
+	bool	tabContainerInitialized;
+	idWinVec2	shear;
 
 	signed char	textShadow;
 	unsigned char fontNum;

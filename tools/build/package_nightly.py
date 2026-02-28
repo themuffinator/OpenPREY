@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create curated nightly distributable archives for OpenQ4."""
+"""Create curated nightly distributable archives for OpenPrey."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
-PRODUCT_NAME = "OpenQ4"
+PRODUCT_NAME = "OpenPrey"
 SUPPORTED_ARCHES = ("x64", "x86", "arm64")
 
 PLATFORM_EXECUTABLE_EXT = {
@@ -19,24 +19,18 @@ PLATFORM_EXECUTABLE_EXT = {
     "macos": "",
 }
 
-PLATFORM_BSE_BINARY = {
-    "windows": "libbse-q4.dll",
-    "linux": "libbse-q4.so",
-    "macos": "libbse-q4.dylib",
-}
-
-OPENBASE_EXCLUDED_DIRS = {"logs", "screenshots"}
-OPENBASE_EXCLUDED_SUFFIXES = {".pdb", ".lib", ".exp", ".ilk"}
+OPENPREY_EXCLUDED_DIRS = {"logs", "screenshots"}
+OPENPREY_EXCLUDED_SUFFIXES = {".pdb", ".lib", ".exp", ".ilk"}
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Package OpenQ4 nightly artifacts into a release zip."
+        description="Package OpenPrey nightly artifacts into a release zip."
     )
     parser.add_argument(
         "--platform",
         required=True,
-        choices=sorted(PLATFORM_BSE_BINARY.keys()),
+        choices=sorted(PLATFORM_EXECUTABLE_EXT.keys()),
         help="Target runner platform (windows/linux/macos).",
     )
     parser.add_argument(
@@ -58,7 +52,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--source-root",
         default=".",
-        help="OpenQ4 repository root.",
+        help="OpenPrey repository root.",
     )
     parser.add_argument(
         "--install-dir",
@@ -73,13 +67,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv[1:])
 
 
-def get_root_binaries(platform: str, arch: str) -> tuple[str, str, str]:
+def get_root_binaries(platform: str, arch: str) -> tuple[str, ...]:
     exe_ext = PLATFORM_EXECUTABLE_EXT[platform]
-    return (
+    binaries = [
         f"{PRODUCT_NAME}-client_{arch}{exe_ext}",
         f"{PRODUCT_NAME}-ded_{arch}{exe_ext}",
-        PLATFORM_BSE_BINARY[platform],
-    )
+    ]
+    if platform == "windows":
+        binaries.append("OpenAL32.dll")
+    return tuple(binaries)
 
 
 def copy_required_binaries(platform: str, arch: str, install_dir: Path, package_root: Path) -> None:
@@ -90,26 +86,26 @@ def copy_required_binaries(platform: str, arch: str, install_dir: Path, package_
         shutil.copy2(source, package_root / filename)
 
 
-def create_openbase_pk4(
-    install_openbase_dir: Path, destination_pk4: Path
+def create_openprey_pk4(
+    install_openprey_dir: Path, destination_pk4: Path
 ) -> tuple[int, list[str]]:
     added_files = 0
     skipped_samples: list[str] = []
 
     with ZipFile(destination_pk4, "w", compression=ZIP_DEFLATED, compresslevel=9) as pk4:
-        for path in sorted(install_openbase_dir.rglob("*")):
+        for path in sorted(install_openprey_dir.rglob("*")):
             if not path.is_file():
                 continue
 
-            rel = path.relative_to(install_openbase_dir)
+            rel = path.relative_to(install_openprey_dir)
             rel_parts_lower = {part.lower() for part in rel.parts}
 
-            if rel_parts_lower & OPENBASE_EXCLUDED_DIRS:
+            if rel_parts_lower & OPENPREY_EXCLUDED_DIRS:
                 if len(skipped_samples) < 5:
                     skipped_samples.append(rel.as_posix())
                 continue
 
-            if path.suffix.lower() in OPENBASE_EXCLUDED_SUFFIXES:
+            if path.suffix.lower() in OPENPREY_EXCLUDED_SUFFIXES:
                 if len(skipped_samples) < 5:
                     skipped_samples.append(rel.as_posix())
                 continue
@@ -151,14 +147,18 @@ def main(argv: list[str]) -> int:
         print(f"error: README.md not found at {readme_path}", file=sys.stderr)
         return 1
 
-    install_openbase_dir = install_dir / "openbase"
-    if not install_openbase_dir.is_dir():
-        print(f"error: openbase directory not found: {install_openbase_dir}", file=sys.stderr)
+    install_game_dir = install_dir / "openprey"
+    game_dir_name = "openprey"
+    if not install_game_dir.is_dir():
+        print(
+            f"error: game directory not found: {install_game_dir}",
+            file=sys.stderr,
+        )
         return 1
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    package_stem = f"openq4-{args.version_tag}-{args.platform}"
+    package_stem = f"openprey-{args.version_tag}-{args.platform}"
     package_root = output_dir / package_stem
     if package_root.exists():
         shutil.rmtree(package_root)
@@ -167,17 +167,17 @@ def main(argv: list[str]) -> int:
     shutil.copy2(readme_path, package_root / "README.md")
     copy_required_binaries(args.platform, args.arch, install_dir, package_root)
 
-    openbase_package_dir = package_root / "openbase"
-    openbase_package_dir.mkdir(parents=True, exist_ok=True)
-    openbase_pk4_name = f"openq4-openbase-{args.version_tag}.pk4"
-    openbase_pk4_path = openbase_package_dir / openbase_pk4_name
+    game_package_dir = package_root / game_dir_name
+    game_package_dir.mkdir(parents=True, exist_ok=True)
+    game_pk4_name = f"openprey-{game_dir_name}-{args.version_tag}.pk4"
+    game_pk4_path = game_package_dir / game_pk4_name
 
-    added_files, skipped_samples = create_openbase_pk4(
-        install_openbase_dir, openbase_pk4_path
+    added_files, skipped_samples = create_openprey_pk4(
+        install_game_dir, game_pk4_path
     )
     if added_files == 0:
         print(
-            "error: openbase pk4 packaging found no eligible files after filtering",
+            f"error: {game_dir_name} pk4 packaging found no eligible files after filtering",
             file=sys.stderr,
         )
         return 1
@@ -185,10 +185,10 @@ def main(argv: list[str]) -> int:
     zip_path = output_dir / f"{package_stem}.zip"
     create_release_zip(package_root, zip_path)
 
-    print(f"Packaged OpenQ4 nightly {args.version} for {args.platform}")
+    print(f"Packaged OpenPrey nightly {args.version} for {args.platform}")
     print(f"Package directory: {package_root}")
     print(f"Release archive: {zip_path}")
-    print(f"Openbase pk4: {openbase_pk4_path} ({added_files} files)")
+    print(f"Game pk4 ({game_dir_name}): {game_pk4_path} ({added_files} files)")
     if skipped_samples:
         print("Filtered sample paths:")
         for rel in skipped_samples:

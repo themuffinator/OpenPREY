@@ -1,6 +1,6 @@
-# OpenQ4 Platform And Architecture Roadmap
+# OpenPrey Platform And Architecture Roadmap
 
-This document defines the long-term platform direction for OpenQ4 and how SDL3 + Meson are used to get there.
+This document defines platform direction for OpenPrey and how SDL3 + Meson are used during the Prey (2006) adaptation.
 
 ## Target End State
 
@@ -8,47 +8,45 @@ This document defines the long-term platform direction for OpenQ4 and how SDL3 +
   - Windows
   - Linux
   - macOS
-- First-class support for modern 64-bit desktop architecture:
+- First-class support for modern 64-bit desktop architectures:
   - x64 (`x86_64`)
-- Keep original Quake 4 gameplay/module behavior compatible while modernizing platform and build layers.
+- Preserve stock Prey asset compatibility while modernizing build/platform layers.
 
-## Current Baseline (0.0.1 era)
+## Current Baseline (0.0.1 Era)
 
-- Primary actively validated build target: Windows x64.
+- Primary actively validated host: Windows x64.
 - Build system: Meson + Ninja.
 - Dependency model: Meson subprojects/wraps.
-- Platform backend direction: SDL3-first (legacy Win32 backend is transitional only).
-- Language baseline target: C++23 semantics (`vc++latest` on current MSVC Meson front-end).
-- Toolchain baseline direction: MSVC 19.46+ (Visual Studio 2026 generation), with compatibility fallback permitted during migration.
+- Backend direction: SDL3 first (legacy Win32 path is transitional).
+- Toolchain direction: MSVC 19.46+ recommended (enforceable with `-Denforce_msvc_2026=true`).
 
 ## SDL3 Direction
 
-- SDL3 is the default backend path and the portability layer for:
+- SDL3 is the default portability layer for:
   - window lifecycle
   - input event handling
-  - context/window interop glue
-- New platform-facing work should prefer SDL3 abstractions first.
-- Platform-specific code should be isolated under `src/sys/<platform>/` when SDL3 cannot cover a requirement directly.
+  - display/mode management
+- New platform-facing work should prefer SDL3 abstractions.
+- Platform-specific fallbacks should remain isolated under `src/sys/<platform>/`.
 
 ## Meson Direction
 
-- Meson is the canonical build system going forward.
-- External dependencies should be consumed via Meson dependency resolution and subprojects/wraps.
-- New build logic should be host-aware and architecture-aware, with x64 as the active compatibility baseline.
-- Meson configuration defaults to `cpp_std=vc++latest` (C++23-targeting mode on MSVC).
-- Meson currently adds `/Zc:strictStrings-` on MSVC to preserve compatibility with legacy string-literal usage while the codebase is modernized.
-- `tools/build/meson_setup.ps1` prefers VS 2026+ (major 18) when present; strict minimum enforcement can be enabled with `-Denforce_msvc_2026=true`.
+- Meson is the canonical build system.
+- External dependencies should be resolved through Meson dependency/subproject flow.
+- `tools/build/meson_setup.ps1` is the standard Windows entry point.
+- `builddir/` is the standard build output directory.
+- `.install/` is the standard staged runtime package root.
 
 ## Bring-Up Staging
 
-1. Keep Windows x64 stable with SDL3 default backend.
-2. Incrementally wire Linux build/source selection and validation into Meson.
-3. Incrementally wire macOS build/source selection and validation into Meson.
-4. Promote Linux and macOS to first-class once they pass consistent compile/link/runtime validation loops.
+1. Keep Windows x64 stable for OpenPrey engine/game workflows.
+2. Incrementally enable Linux build/source selection and validation.
+3. Incrementally enable macOS build/source selection and validation.
+4. Promote non-Windows platforms once compile/link/runtime validation becomes repeatable.
 
 ## Definition Of Done For First-Class Platform Support
 
-- Clean configure + build in Meson.
-- Engine initializes and reaches map/session startup with stock Quake 4 assets.
-- Core input, rendering, audio, and networking paths work without platform-specific content hacks.
-- Regressions are tracked in docs and fixed in engine/platform code, not with asset overrides.
+- Clean Meson configure + build.
+- Engine reaches playable map/session startup with stock Prey assets.
+- Core input, rendering, audio, and networking paths work without content-side hacks.
+- Regressions are fixed in engine/platform code (not by shipping replacement assets).

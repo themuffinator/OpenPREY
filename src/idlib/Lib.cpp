@@ -339,6 +339,7 @@ static float	(*_BigFloat)( float l );
 static float	(*_LittleFloat)( float l );
 static void		(*_BigRevBytes)( void *bp, int elsize, int elcount );
 static void		(*_LittleRevBytes)( void *bp, int elsize, int elcount );
+static void		(*_LittleBitField)( void *bp, int elsize );
 static void		(*_SixtetsForInt)( byte *out, int src );
 static int		(*_IntForSixtets)( byte *in );
 
@@ -348,6 +349,7 @@ short	LittleShort( short l ) { return l; }
 int		LittleLong( int l ) { return l; }
 float	LittleFloat( float l ) { return l; }
 void	LittleRevBytes( void *bp, int elsize, int elcount ) {}
+void	LittleBitField( void *bp, int elsize ) { _LittleBitField( bp, elsize ); }
 
 short	BigShort( short l ) { return _BigShort( l ); }
 int		BigLong( int l ) { return _BigLong( l ); }
@@ -360,6 +362,7 @@ short	LittleShort( short l ) { return _LittleShort( l ); }
 int		LittleLong( int l ) { return _LittleLong( l ); }
 float	LittleFloat( float l ) { return _LittleFloat( l ); }
 void	LittleRevBytes( void *bp, int elsize, int elcount ) { _LittleRevBytes( bp, elsize, elcount ); }
+void	LittleBitField( void *bp, int elsize ) { _LittleBitField( bp, elsize ); }
 
 short	BigShort( short l ) { return l; }
 int		BigLong( int l ) { return l; }
@@ -504,6 +507,39 @@ void RevBytesNoSwap( void *bp, int elsize, int elcount ) {
 
 /*
 ================
+RevBitFieldSwap
+================
+*/
+void RevBitFieldSwap( void *bp, int elsize ) {
+	int i;
+	unsigned char *p, t, v;
+
+	LittleRevBytes( bp, elsize, 1 );
+
+	p = (unsigned char *)bp;
+	while ( elsize-- ) {
+		v = *p;
+		t = v;
+		for ( i = 7; i; i-- ) {
+			t |= v & 1;
+			t <<= 1;
+			v >>= 1;
+		}
+		*p++ = t;
+	}
+}
+
+/*
+================
+RevBitFieldNoSwap
+================
+*/
+void RevBitFieldNoSwap( void *bp, int elsize ) {
+	return;
+}
+
+/*
+================
 SixtetsForIntLittle
 ================
 */
@@ -579,6 +615,7 @@ void Swap_Init( void ) {
 		_LittleFloat = FloatNoSwap;
 		_BigRevBytes = RevBytesSwap;
 		_LittleRevBytes = RevBytesNoSwap;
+		_LittleBitField = RevBitFieldNoSwap;
 		_SixtetsForInt = SixtetsForIntLittle;
 		_IntForSixtets = IntForSixtetsLittle;
 	} else {
@@ -591,6 +628,7 @@ void Swap_Init( void ) {
 		_LittleFloat = FloatSwap;
 		_BigRevBytes = RevBytesNoSwap;
 		_LittleRevBytes = RevBytesSwap;
+		_LittleBitField = RevBitFieldSwap;
 		_SixtetsForInt = SixtetsForIntBig;
 		_IntForSixtets = IntForSixtetsBig;
 	}

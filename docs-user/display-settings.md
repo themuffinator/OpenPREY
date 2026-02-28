@@ -1,6 +1,6 @@
 # Display Settings and Multi-Screen Guide
 
-This guide covers OpenQ4 display/window settings for end users, including multi-monitor behavior and modern fullscreen/window handling.
+This guide covers OpenPrey display/window settings for end users, including multi-monitor behavior and modern fullscreen/window handling.
 
 ## Quick Start
 
@@ -61,8 +61,8 @@ Notes:
 
 - When windowed (`r_fullscreen 0`, `r_borderless 0`), resizing updates `r_windowWidth`/`r_windowHeight` automatically.
 - Moving the window updates `win_xpos`/`win_ypos` automatically.
-- When switching fullscreen -> windowed, OpenQ4 restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
-- If you unplug/rearrange monitors and the saved window position becomes off-screen, OpenQ4 will recover by clamping/recentering the window back onto a valid display.
+- When switching fullscreen -> windowed, OpenPrey restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
+- If you unplug/rearrange monitors and the saved window position becomes off-screen, OpenPrey will recover by clamping/recentering the window back onto a valid display.
 - If you set `r_screen` to an explicit display index (`0..N`), window placement is constrained to that display's usable area. With `r_screen -1`, placement is respected unless it becomes invalid/off-screen.
 - SDL3 tip: hold `Shift` while resizing to snap the window aspect ratio to common targets (4:3, 16:9, 16:10, 21:9, etc.).
 
@@ -187,5 +187,5 @@ vid_restart
 - If a display change does not apply, run `vid_restart`.
 - If monitor targeting looks wrong, run `listDisplays`, then set `r_screen` to the correct index and restart video.
 - If UI appears too centered/boxed on wide displays, set `ui_aspectCorrection 0`.
-- If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; OpenQ4 will also attempt to recover automatically.
+- If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; OpenPrey will also attempt to recover automatically.
 - If AA settings seem unchanged, check values with `r_multiSamples`, `r_postAA`, and `r_msaaAlphaToCoverage`, then run `vid_restart`.

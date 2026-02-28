@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -110,12 +112,9 @@ void idForce_Drag::Evaluate( int time ) {
 	l2 = dir2.Normalize();
 
 	rotation.Set( centerOfMass, dir2.Cross( dir1 ), RAD2DEG( idMath::ACos( dir1 * dir2 ) ) );
-	physics->SetAngularVelocity( rotation.ToAngularVelocity() / MS2SEC( gameLocal.GetMSec() ), id );
+	physics->SetAngularVelocity( rotation.ToAngularVelocity() / MS2SEC( USERCMD_MSEC ), id );
 
-// RAVEN BEGIN
-// bdube: use GetMSec access rather than USERCMD_TIME
-	velocity = physics->GetLinearVelocity( id ) * damping + dir1 * ( ( l1 - l2 ) * ( 1.0f - damping ) / MS2SEC( gameLocal.GetMSec ( ) ) );
-// RAVEN END
+	velocity = physics->GetLinearVelocity( id ) * damping + dir1 * ( ( l1 - l2 ) * ( 1.0f - damping ) / MS2SEC( USERCMD_MSEC ) );
 	physics->SetLinearVelocity( velocity, id );
 }
 

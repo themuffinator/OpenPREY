@@ -1,25 +1,25 @@
-# OpenQ4 TODO
+# OpenPrey TODO
 
-This file tracks current known issues and upcoming features.
+This file tracks current known issues and upcoming tasks for the OpenPrey migration.
 
 ## Known Issues
 
-- [ ] Viewport sometimes remains black when changing between SP and MP; investigate update/refresh logic during module transitions.
-- [ ] Menu cursor handling needs improvement (focus, capture, and consistency across input modes and resolutions).
-- [ ] The locked door bug inherited from Quake4Doom still persists and needs a root-cause fix.
-- [ ] Machinegun zoom projection yaw differs from viewangles yaw.
+- [ ] Validate startup/module boot sequence against stock Prey assets and remove remaining startup warnings.
+- [ ] Audit SP/MP launch defaults and map bootstrap commands for Prey behavior under unified game-module loading.
+- [ ] Confirm save/config path behavior after OpenPrey rebrand changes.
+- [ ] Confirm `fs_basepath` auto-detection across real CD-era install layouts and registry variants.
 
-## Upcoming Features and Improvements
+## Near-Term Tasks
 
-- [ ] Add an optional shadow mapping setting/path.
-- [ ] Review and port relevant features and improvements implemented in the last 5 years of RBDOOM3-BFG commits.
-- [ ] Merge shared code between MP/SP and streamline the process of switching between each.
-- [ ] Find and implement ways to improve loading times.
-- [ ] Expand multiplayer controls and port relevant WORR functionality/logic.
-- [ ] Improve menu and loading screen horizontal expansion behavior.
-- [ ] Machinegun and railgun zoom images need to suit all screen aspect ratios.
-- [ ] CPMA-esque rainbow a-z color escapes implementation, disable black
+- [ ] Continue OpenQ4 -> OpenPrey naming cleanup in user-facing strings and packaging metadata.
+- [ ] Document Prey PK4 checksum baseline once validation data is captured.
+- [ ] Expand runtime validation matrix (SP, MP, dedicated server).
+- [ ] Verify companion `OpenPrey-GameLibs` sync/build workflow (Meson + legacy VC layout) in CI and local dev loops.
+- [ ] Integrate Prey gameplay trees from companion repo into active OpenPrey game-module compilation.
+- [ ] Resolve remaining game-library compile blockers after engine `idGame` API alignment (idlib allocators, `idBitMsg` helpers, collision handles, render entity fields, entity-pointer APIs).
 
-## Potential change in project scope
+## Longer-Term
 
-Project may benefit from catering towards multiple idTech4 titles, to include: Doom 3, Doom 3: BFG, Prey, ETQW
+- [ ] Reduce inherited Quake 4 assumptions in gameplay/asset compatibility paths where they conflict with Prey behavior.
+- [ ] Reinstate Doom 3/Prey particle-system behavior and validate effects parity.
+- [ ] Remove any remaining legacy game-directory naming from docs/scripts and keep `openprey` as the sole namespace.

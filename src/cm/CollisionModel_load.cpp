@@ -278,9 +278,6 @@ void idCollisionModelManagerLocal::LoadProcBSP( const char *name ) {
 	idStr filename;
 	idToken token;
 	idLexer *src;
-// jmarshall
-	bool isLegacyWorldFile = false;
-// jmarshall end
 
 	// load it
 	filename = name;
@@ -292,29 +289,32 @@ void idCollisionModelManagerLocal::LoadProcBSP( const char *name ) {
 		return;
 	}
 
-	if (!src->ReadToken(&token)) {
-		common->Printf("idRenderWorldLocal::InitFromMap: Invalid EOF in world file\n");
+	if ( !src->ReadToken( &token ) ) {
+		common->Printf( "idCollisionModelManagerLocal::LoadProcBSP: Invalid EOF in world file\n" );
 		delete src;
 		return;
 	}
 
-	if (token.Icmp(PROC_FILE_ID))
-	{
-		common->Printf("idRenderWorldLocal::InitFromMap: bad id '%s' instead of '%s'\n", token.c_str(), PROC_FILE_ID);
+	const bool isQ4Proc = ( token.Icmp( PROC_FILE_ID ) == 0 );
+	const bool isD3Proc = ( token.Icmp( "mapProcFile003" ) == 0 );
+
+	if ( !isQ4Proc && !isD3Proc ) {
+		common->Printf( "idCollisionModelManagerLocal::LoadProcBSP: bad id '%s' (expected '%s' or 'mapProcFile003')\n", token.c_str(), PROC_FILE_ID );
 		delete src;
 		return;
 	}
 
-// jmarshall: quake 4 proc format
-	if (!src->ReadToken(&token) || token.Icmp(PROC_FILEVERSION)) {
-		common->Printf("idRenderWorldLocal::InitFromMap: bad version '%s' instead of '%s'\n", token.c_str(), PROC_FILEVERSION);
-		delete src;
-		return;
-	}
+	// Quake 4 proc files prepend a separate version and map CRC token.
+	if ( isQ4Proc ) {
+		if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILEVERSION ) ) {
+			common->Printf( "idCollisionModelManagerLocal::LoadProcBSP: bad version '%s' instead of '%s'\n", token.c_str(), PROC_FILEVERSION );
+			delete src;
+			return;
+		}
 
-	// Map CRC, we aren't going to use it.
-	src->ReadToken(&token);
-// jmarshall end
+		// Map CRC, we aren't going to use it.
+		src->ReadToken( &token );
+	}
 
 	// parse the file
 	while ( 1 ) {
@@ -3435,6 +3435,30 @@ void idCollisionModelManagerLocal::AccumulateModelInfo( idCollisionModelLocal *m
 	}
 }
 
+/*
+================
+idCollisionModelManagerLocal::ModelInfo
+================
+*/
+void idCollisionModelManagerLocal::ModelInfo( int modelIndex ) {
+	idCollisionModelLocal summary;
+
+	if ( modelIndex < 0 ) {
+		AccumulateModelInfo( &summary );
+		common->Printf( "models loaded: %d\n", numModels );
+		PrintModelInfo( &summary );
+		return;
+	}
+
+	if ( modelIndex >= numModels || models[ modelIndex ] == NULL ) {
+		common->Printf( "invalid collision model index %d (loaded: %d)\n", modelIndex, numModels );
+		return;
+	}
+
+	common->Printf( "collision model %d: %s\n", modelIndex, models[ modelIndex ]->name.c_str() );
+	PrintModelInfo( models[ modelIndex ] );
+}
+
 
 /*
 ================
@@ -3657,19 +3681,31 @@ idCollisionModelManagerLocal::TrmFromModel
 */
 bool idCollisionModelManagerLocal::TrmFromModel( const idCollisionModelLocal *model, idTraceModel &trm ) {
 	int i, j, numEdgeUsers[MAX_TRACEMODEL_EDGES+1];
+	auto fallbackToBounds = [&]() -> bool {
+		if ( model->bounds.IsCleared() ) {
+			return false;
+		}
+		idBounds bounds = model->bounds;
+		if ( bounds[0].Compare( bounds[1] ) ) {
+			bounds.ExpandSelf( 1.0f );
+		}
+		common->Warning( "idCollisionModelManagerLocal::TrmFromModel: using bounds fallback for model %s", model->name.c_str() );
+		trm = idTraceModel( bounds );
+		return true;
+	};
 
 	// if the model has too many vertices to fit in a trace model
 	if ( model->numVertices > MAX_TRACEMODEL_VERTS ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has too many vertices.\n", model->name.c_str() );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	// plus one because the collision model accounts for the first unused edge
 	if ( model->numEdges > MAX_TRACEMODEL_EDGES+1 ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has too many edges.\n", model->name.c_str() );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	trm.type = TRM_CUSTOM;
@@ -3683,7 +3719,7 @@ bool idCollisionModelManagerLocal::TrmFromModel( const idCollisionModelLocal *mo
 	if ( !TrmFromModel_r( trm, model->node ) ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has too many polygons.\n", model->name.c_str() );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	// copy vertices
@@ -3712,7 +3748,7 @@ bool idCollisionModelManagerLocal::TrmFromModel( const idCollisionModelLocal *mo
 		if ( numEdgeUsers[i] != 2 ) {
 			common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has dangling edges, the model has to be an enclosed hull.\n", model->name.c_str() );
 			PrintModelInfo( model );
-			return false;
+			return fallbackToBounds();
 		}
 	}
 

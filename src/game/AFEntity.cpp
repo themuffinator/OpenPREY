@@ -1,9 +1,11 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
-#include "Projectile.h"
+
 
 /*
 ===============================================================================
@@ -39,8 +41,6 @@ idMultiModelAF::~idMultiModelAF( void ) {
 			modelDefHandles[i] = -1;
 		}
 	}
-	
-	SetPhysics( NULL );	
 }
 
 /*
@@ -139,29 +139,10 @@ void idChain::BuildChain( const idStr &name, const idVec3 &origin, float linkLen
 	for ( i = 0; i < numLinks; i++ ) {
 
 		// add body
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 		clip = new idClipModel( trm );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_POP_HEAP();
-// RAVEN END
 		clip->SetContents( CONTENTS_SOLID );
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clip->Link( this, 0, org, mat3_identity );
-// RAVEN END
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_PUSH_HEAP_MEM(this);
-// RAVEN END
+		clip->Link( gameLocal.clip, this, 0, org, mat3_identity );
 		body = new idAFBody( name + idStr(i), clip, density );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_POP_HEAP();
-// RAVEN END
 		physicsObj.AddBody( body );
 
 		// visual model for body
@@ -170,29 +151,13 @@ void idChain::BuildChain( const idStr &name, const idVec3 &origin, float linkLen
 		// add constraint
 		if ( bindToWorld ) {
 			if ( !lastBody ) {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-				RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 				uj = new idAFConstraint_UniversalJoint( name + idStr(i), body, lastBody );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-				RV_POP_HEAP();
-// RAVEN END
 				uj->SetShafts( idVec3( 0, 0, -1 ), idVec3( 0, 0, 1 ) );
 				//uj->SetConeLimit( idVec3( 0, 0, -1 ), 30.0f );
 				//uj->SetPyramidLimit( idVec3( 0, 0, -1 ), idVec3( 1, 0, 0 ), 90.0f, 30.0f );
 			}
 			else {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-				RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 				uj = new idAFConstraint_UniversalJoint( name + idStr(i), lastBody, body );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-				RV_POP_HEAP();
-// RAVEN END
 				uj->SetShafts( idVec3( 0, 0, 1 ), idVec3( 0, 0, -1 ) );
 				//uj->SetConeLimit( idVec3( 0, 0, 1 ), 30.0f );
 			}
@@ -202,15 +167,7 @@ void idChain::BuildChain( const idStr &name, const idVec3 &origin, float linkLen
 		}
 		else {
 			if ( lastBody ) {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-				RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 				bsj = new idAFConstraint_BallAndSocketJoint( "joint" + idStr(i), lastBody, body );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-				RV_POP_HEAP();
-// RAVEN END
 				bsj->SetAnchor( org + idVec3( 0, 0, halfLinkLength ) );
 				bsj->SetConeLimit( idVec3( 0, 0, 1 ), 60.0f, idVec3( 0, 0, 1 ) );
 				physicsObj.AddConstraint( bsj );
@@ -259,15 +216,8 @@ void idChain::Spawn( void ) {
 ===============================================================================
 */
 
-const idEventDef EV_ClearAnims( "clearAnims" );
-
-CLASS_DECLARATION( idAnimatedEntity, idAFAttachment )
-// RAVEN BEGIN
-// jshepard: we'd like these to animate.
-		EVENT( AI_PlayAnim,				idAFAttachment::Event_PlayAnim )
-		EVENT( AI_PlayCycle,			idAFAttachment::Event_PlayCycle )
-		EVENT( EV_ClearAnims,			idAFAttachment::Event_ClearAnims )
-// RAVEN END
+// HUMANHEAD pdm: Changed to hhAnimatedEntity
+CLASS_DECLARATION( hhAnimatedEntity, idAFAttachment )
 END_CLASS
 
 /*
@@ -279,16 +229,7 @@ idAFAttachment::idAFAttachment( void ) {
 	body			= NULL;
 	combatModel		= NULL;
 	idleAnim		= 0;
-	damageJoint		= INVALID_JOINT;
-
-// RAVEN BEGIN
-// jscott: Lip Syncing variables
-	lipSyncAnim		= 0;			
-	lipSyncData		= NULL;			
-	soundJoint		= INVALID_JOINT;
-// MCG
-	noPlayerImpactFX = false;
-// RAVEN END
+	attachJoint		= INVALID_JOINT;
 }
 
 /*
@@ -302,10 +243,6 @@ idAFAttachment::~idAFAttachment( void ) {
 
 	delete combatModel;
 	combatModel = NULL;
-
-// RAVEN BEGIN
-	EndLipSyncing();
-// RAVEN END
 }
 
 /*
@@ -314,117 +251,7 @@ idAFAttachment::Spawn
 =====================
 */
 void idAFAttachment::Spawn( void ) {
-	idStr	jointName;
-
 	idleAnim = animator.GetAnim( "idle" );
-
-// RAVEN BEGIN
-	// Init the lip sync data
-	lipSyncAnim = 0;
-	if( spawnArgs.GetInt( "uses_lip_syncing", "0" ) ) {
-		lipSyncAnim = animator.GetAnim( "lipsync" );
-	}
-
-	// Grab the joint to play sounds off
-	soundJoint = INVALID_JOINT;
-	spawnArgs.GetString( "sound_bone", "", jointName );
-
-	// Do we want a bone to play sounds on?
-	if( jointName.Length() ) {
-
-		// Try to find the specified bone
-		soundJoint = animator.GetJointHandle( jointName );
-
-		if ( soundJoint == INVALID_JOINT ) {
-			// The def specified a bone for this and we can't find it - warn them.
-			gameLocal.Warning( "idAnimated '%s' at (%s): cannot find joint '%s' for sound playback", name.c_str(), GetPhysics()->GetOrigin().ToString(0), jointName.c_str() );
-		}
-	}
-
-	noPlayerImpactFX = spawnArgs.GetBool( "noPlayerImpactFX", "0" );
-// RAVEN END
-}
-
-/*
-=====================
-idAFAttachment::InitCopyJoints
-=====================
-*/
-void idAFAttachment::InitCopyJoints ( void ) {
-	copyJoints_t		copyJoint;
-	const idKeyValue*	kv;
-	const char*			jointName;
-	idAnimator*			bodyAnimator;
-
-	if ( !body ) {
-		return;
-	}
-	
-	bodyAnimator = body->GetAnimator ( );
-
-	// set up the list of joints to copy to the head
-	for( kv = spawnArgs.MatchPrefix( "copy_joint", NULL ); kv != NULL; kv = spawnArgs.MatchPrefix( "copy_joint", kv ) ) {
-		if ( kv->GetValue() == "" ) {
-			// probably clearing out inherited key, so skip it
-			continue;
-		}
-
-		if ( !body->spawnArgs.GetString ( va("copy_joint_world %s", kv->GetValue().c_str() ), kv->GetValue().c_str(), &jointName ) ) {
-			copyJoint.mod = JOINTMOD_LOCAL_OVERRIDE;			
-			body->spawnArgs.GetString ( va("copy_joint %s", kv->GetValue().c_str() ), kv->GetValue().c_str(), &jointName );
-		} else {
-			copyJoint.mod = JOINTMOD_WORLD_OVERRIDE;
-		}
-		
-		copyJoint.from = bodyAnimator->GetJointHandle ( jointName );
-		if ( copyJoint.from == INVALID_JOINT ) {
-			gameLocal.Warning( "Unknown copy_joint '%s' on entity %s", jointName, name.c_str() );
-			continue;
-		}
-
-		copyJoint.to = animator.GetJointHandle( kv->GetValue() );
-		if ( copyJoint.to == INVALID_JOINT ) {
-			gameLocal.Warning( "Unknown copy_joint '%s' on head of entity %s", kv->GetValue().c_str(), name.c_str() );
-			continue;
-		}
-
-		copyJoints.Append( copyJoint );
-	}
-}
-
-/*
-=====================
-idAFAttachment::CopyJointsFromBody
-=====================
-*/
-void idAFAttachment::CopyJointsFromBody ( void ) {
-	MEM_SCOPED_TAG(tag,MA_ANIM);
-
-	idAnimator*	bodyAnimator;
-	int			i;
-	idMat3		mat;
-	idMat3		axis;
-	idVec3		pos;
-	
-	if ( !body ) {
-		return;
-	}
-	bodyAnimator = body->GetAnimator();
-
-	// copy the animation from the body to the head
-	for( i = 0; i < copyJoints.Num(); i++ ) {
-		if ( copyJoints[ i ].mod == JOINTMOD_WORLD_OVERRIDE ) {
-			mat = GetPhysics()->GetAxis().Transpose();
-			body->GetJointWorldTransform( copyJoints[ i ].from, gameLocal.time, pos, axis );
-			pos -= GetPhysics()->GetOrigin();
-			animator.SetJointPos( copyJoints[ i ].to, copyJoints[ i ].mod, pos * mat );
-			animator.SetJointAxis( copyJoints[ i ].to, copyJoints[ i ].mod, axis * mat );
-		} else {
-			bodyAnimator->GetJointLocalTransform( copyJoints[ i ].from, gameLocal.time, pos, axis );
-			animator.SetJointPos( copyJoints[ i ].to, copyJoints[ i ].mod, pos );
-			animator.SetJointAxis( copyJoints[ i ].to, copyJoints[ i ].mod, axis );
-		}
-	}	
 }
 
 /*
@@ -432,13 +259,16 @@ void idAFAttachment::CopyJointsFromBody ( void ) {
 idAFAttachment::SetBody
 =====================
 */
-void idAFAttachment::SetBody( idAnimatedEntity *bodyEnt, const char *model, jointHandle_t _damageJoint ) {
+void idAFAttachment::SetBody( idEntity *bodyEnt, const char *model, jointHandle_t attachJoint ) {
+	bool bleed;
+
 	body = bodyEnt;
-	damageJoint = _damageJoint;
+	this->attachJoint = attachJoint;
 	SetModel( model );
 	fl.takedamage = true;
 
-	spawnArgs.SetBool( "bleed", body->spawnArgs.GetBool( "bleed" ) );
+	bleed = body->spawnArgs.GetBool( "bleed" );
+	spawnArgs.SetBool( "bleed", bleed );
 }
 
 /*
@@ -448,7 +278,7 @@ idAFAttachment::ClearBody
 */
 void idAFAttachment::ClearBody( void ) {
 	body = NULL;
-	damageJoint = INVALID_JOINT;
+	attachJoint = INVALID_JOINT;
 	Hide();
 }
 
@@ -469,32 +299,9 @@ archive object for savegame file
 ================
 */
 void idAFAttachment::Save( idSaveGame *savefile ) const {
-	int i;
-
-	body.Save ( savefile );
+	savefile->WriteObject( body );
 	savefile->WriteInt( idleAnim );
-	savefile->WriteJoint( damageJoint );
-	savefile->WriteJoint( soundJoint );
-
-// RAVEN BEGIN
-// jscott: for lipsyncing
-	savefile->WriteInt( lipSyncAnim );
-// RAVEN END
-
-	savefile->WriteInt( copyJoints.Num() );
-	for( i = 0; i < copyJoints.Num(); i++ ) {
-		savefile->WriteInt( copyJoints[i].mod );
-		savefile->WriteJoint( copyJoints[i].from );
-		savefile->WriteJoint( copyJoints[i].to );
-	}
-
-	bool hadCombatModel = false;
-	if ( combatModel ) {
-		hadCombatModel = true;
-	}
-	savefile->WriteBool( hadCombatModel );
-
-	savefile->WriteBool( noPlayerImpactFX );
+	savefile->WriteJoint( attachJoint );
 }
 
 /*
@@ -505,43 +312,12 @@ unarchives object from save game file
 ================
 */
 void idAFAttachment::Restore( idRestoreGame *savefile ) {
-	body.Restore ( savefile );
+	savefile->ReadObject( reinterpret_cast<idClass *&>( body ) );
 	savefile->ReadInt( idleAnim );
-	savefile->ReadJoint( damageJoint );
-	savefile->ReadJoint( soundJoint );
+	savefile->ReadJoint( attachJoint );
 
-// RAVEN BEGIN
-// jscott: for lipsyncing
-	savefile->ReadInt( lipSyncAnim );
-// jscott: difficult to start a sound mid sentence and impossible to sync up the timing with the animation
-	lipSyncData = NULL;
-// RAVEN END
-
-	int i;
-	int num;
-	savefile->ReadInt( num );
-	copyJoints.SetNum( num );
-	for( i = 0; i < num; i++ ) {
-		int val;
-		savefile->ReadInt( val );
-		copyJoints[i].mod = static_cast<jointModTransform_t>( val );
-		savefile->ReadJoint( copyJoints[i].from );
-		savefile->ReadJoint( copyJoints[i].to );
-	}
-
-	bool hadCombatModel;
-	savefile->ReadBool( hadCombatModel );
-	if ( hadCombatModel ) {
-		SetCombatModel();
-		LinkCombat();
-	}
-
-	savefile->ReadBool( noPlayerImpactFX );
-
-	lipSyncAnim = 0;
-	if( spawnArgs.GetInt( "uses_lip_syncing", "0" ) ) {
-		lipSyncAnim = animator.GetAnim( "lipsync" );
-	}
+	SetCombatModel();
+	LinkCombat();
 }
 
 /*
@@ -575,7 +351,7 @@ void idAFAttachment::Damage( idEntity *inflictor, idEntity *attacker, const idVe
 	const char *damageDefName, const float damageScale, const int location ) {
 	
 	if ( body ) {
-		body->Damage( inflictor, attacker, dir, damageDefName, damageScale, damageJoint );
+		body->Damage( inflictor, attacker, dir, damageDefName, damageScale, attachJoint );
 	}
 }
 
@@ -584,11 +360,11 @@ void idAFAttachment::Damage( idEntity *inflictor, idEntity *attacker, const idVe
 idAFAttachment::AddDamageEffect
 ================
 */
-void idAFAttachment::AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, idEntity* inflictor ) {
+void idAFAttachment::AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, bool broadcast ) { //HUMANHEAD rww - added broadcast
 	if ( body ) {
 		trace_t c = collision;
-		c.c.id = JOINT_HANDLE_TO_CLIPMODEL_ID( damageJoint );
-		body->AddDamageEffect( c, velocity, damageDefName, inflictor );
+		c.c.id = JOINT_HANDLE_TO_CLIPMODEL_ID( attachJoint );
+		body->AddDamageEffect( c, velocity, damageDefName, broadcast );
 	}
 }
 
@@ -599,35 +375,9 @@ idAFAttachment::GetImpactInfo
 */
 void idAFAttachment::GetImpactInfo( idEntity *ent, int id, const idVec3 &point, impactInfo_t *info ) {
 	if ( body ) {
-		body->GetImpactInfo( ent, JOINT_HANDLE_TO_CLIPMODEL_ID( damageJoint ), point, info );
+		body->GetImpactInfo( ent, JOINT_HANDLE_TO_CLIPMODEL_ID( attachJoint ), point, info );
 	} else {
 		idEntity::GetImpactInfo( ent, id, point, info );
-	}
-}
-
-/*
-================
-idAFAttachment::CanPlayImpactEffect
-================
-*/
-bool idAFAttachment::CanPlayImpactEffect ( idEntity* attacker, idEntity* target ) {
-	if ( ( noPlayerImpactFX && GetNoPlayerImpactFX( ) ) && attacker && attacker->IsType( idPlayer::GetClassType() ) ) {
-		return false;
-	}
-
-	return idAnimatedEntity::CanPlayImpactEffect( attacker, target );
-}
-
-/*
-================
-idAFAttachment::GetNoPlayerImpactFX
-================
-*/
-bool idAFAttachment::GetNoPlayerImpactFX( void ) {
-	if ( GetTeamMaster( ) && this != GetTeamMaster( ) && GetTeamMaster( )->IsType( idAFEntity_Base::GetClassType( ) ) ) {
-		return static_cast<idAFEntity_Base*>( GetTeamMaster( ) )->GetNoPlayerImpactFX( );
-	} else {
-		return noPlayerImpactFX;
 	}
 }
 
@@ -636,9 +386,9 @@ bool idAFAttachment::GetNoPlayerImpactFX( void ) {
 idAFAttachment::ApplyImpulse
 ================
 */
-void idAFAttachment::ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse, bool splash ) {
+void idAFAttachment::ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse ) {
 	if ( body ) {
-		body->ApplyImpulse( ent, JOINT_HANDLE_TO_CLIPMODEL_ID( damageJoint ), point, impulse );
+		body->ApplyImpulse( ent, JOINT_HANDLE_TO_CLIPMODEL_ID( attachJoint ), point, impulse );
 	} else {
 		idEntity::ApplyImpulse( ent, id, point, impulse );
 	}
@@ -651,7 +401,7 @@ idAFAttachment::AddForce
 */
 void idAFAttachment::AddForce( idEntity *ent, int id, const idVec3 &point, const idVec3 &force ) {
 	if ( body ) {
-		body->AddForce( ent, JOINT_HANDLE_TO_CLIPMODEL_ID( damageJoint ), point, force );
+		body->AddForce( ent, JOINT_HANDLE_TO_CLIPMODEL_ID( attachJoint ), point, force );
 	} else {
 		idEntity::AddForce( ent, id, point, force );
 	}
@@ -662,13 +412,10 @@ void idAFAttachment::AddForce( idEntity *ent, int id, const idVec3 &point, const
 idAFAttachment::PlayIdleAnim
 ================
 */
-// RAVEN BEGIN
-// bdube: added channel
-void idAFAttachment::PlayIdleAnim( int channel, int blendTime ) {
-	if ( idleAnim && ( idleAnim != animator.CurrentAnim( channel )->AnimNum() ) ) {
-		animator.CycleAnim( channel, idleAnim, gameLocal.time, blendTime );
+void idAFAttachment::PlayIdleAnim( int blendTime ) {
+	if ( idleAnim && ( idleAnim != animator.CurrentAnim( ANIMCHANNEL_ALL )->AnimNum() ) ) {
+		animator.CycleAnim( ANIMCHANNEL_ALL, idleAnim, gameLocal.time, blendTime );
 	}
-// RAVEN END
 }
 
 /*
@@ -677,41 +424,11 @@ idAfAttachment::Think
 ================
 */
 void idAFAttachment::Think( void ) {
-// RAVEN BEGIN
-// jscott: Lip sync main code
-	HandleLipSync();
-// RAVEN END
-
-	idAnimatedEntity::Think();
-}
-
-// RAVEN BEGIN
-/*
-===============
-idAnimated::GetPhysicsToSoundTransform
-===============
-*/
-bool idAFAttachment::GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis ) {
-	if ( soundJoint != INVALID_JOINT ) {
-		animator.GetJointTransform( soundJoint, gameLocal.time, origin, axis );
-		axis = GetPhysics()->GetAxis();
-	} else {
-		origin = GetPhysics()->GetOrigin();
-		axis = GetPhysics()->GetAxis();
+	// HUMANHEAD pdm: Changed to hhAnimatedEntity
+	hhAnimatedEntity::Think();
+	if ( thinkFlags & TH_UPDATEPARTICLES ) {
+		UpdateDamageEffects();
 	}
-
-	return true;
-}
-// RAVEN END
-
-/*
-================
-idAFAttachment::UpdateAnimationControllers
-================
-*/
-bool idAFAttachment::UpdateAnimationControllers( void ) {
-	CopyJointsFromBody( );
-	return idAnimatedEntity::UpdateAnimationControllers( );
 }
 
 /*
@@ -724,15 +441,7 @@ void idAFAttachment::SetCombatModel( void ) {
 		combatModel->Unlink();
 		combatModel->LoadModel( modelDefHandle );
 	} else {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 		combatModel = new idClipModel( modelDefHandle );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_POP_HEAP();
-// RAVEN END
 	}
 	combatModel->SetOwner( body );
 }
@@ -757,10 +466,7 @@ void idAFAttachment::LinkCombat( void ) {
 	}
 
 	if ( combatModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		combatModel->Link( this, 0, renderEntity.origin, renderEntity.axis, modelDefHandle );
-// RAVEN END
+		combatModel->Link( gameLocal.clip, this, 0, renderEntity.origin, renderEntity.axis, modelDefHandle );
 	}
 }
 
@@ -775,77 +481,6 @@ void idAFAttachment::UnlinkCombat( void ) {
 	}
 }
 
-// RAVEN BEGIN
-// bdube: return the body entity for damage
-/*
-================
-idAFAttachment::GetDamageEntity
-================
-*/
-idEntity* idAFAttachment::GetDamageEntity ( void ) { 
-	return body ? body : this;
-}
-
-// jshepard: we need to animate these
-/*
-================
-idAFAttachment::Event_PlayAnim
-================
-*/
-void idAFAttachment::Event_PlayAnim ( int channel, const char *animname ) {
-	int anim;
-	float animTime;
-	float blendFrames = 4;
-
-	anim = animator.GetAnim( animname );
-	if ( !anim ) {
-		gameLocal.Warning( "missing '%s' animation on '%s' (%s)", animname, name.c_str(), GetEntityDefName() );
-		animator.Clear( channel, gameLocal.time, FRAME2MS( blendFrames ) );
-		idThread::ReturnFloat( false );
-	} else {
-		animator.PlayAnim( channel, anim, gameLocal.time, FRAME2MS( blendFrames ) );
-		animTime = animator.CurrentAnim( channel )->GetEndTime();
-		idThread::ReturnFloat( MS2SEC( animTime - gameLocal.time ) );
-	}
-	blendFrames = 0;
-}
-
-// jdischler: and we want cycling, too.
-/*
-===============
-idAFAttachment::Event_PlayCycle
-===============
-*/
-void idAFAttachment::Event_PlayCycle( int channel, const char *animname ) {
-	int anim;
-	float animTime;
-	float blendFrames = 4;
-
-	anim = animator.GetAnim( animname );
-	if ( !anim ) {
-		gameLocal.Warning( "missing '%s' animation on '%s' (%s)", animname, name.c_str(), GetEntityDefName() );
-		animator.Clear( channel, gameLocal.time, FRAME2MS( blendFrames ) );
-	} else {
-		animator.CycleAnim( channel, anim, gameLocal.time, FRAME2MS( blendFrames ) );
-		animTime = animator.CurrentAnim( channel )->GetEndTime();
-	}
-	blendFrames = 0;
-}
-
-/*
-================
-idAFAttachment::Event_ClearAnims
-
-Clears any animation running on the idAFAttachment
-================
-*/
-void idAFAttachment::Event_ClearAnims( void ) {
-	//animator.ClearAllAnims( gameLocal.time, 100 );
-	animator.Clear( ANIMCHANNEL_ALL, gameLocal.time, 0 );
-}
-
-// RAVEN END
-
 /*
 ===============================================================================
 
@@ -855,14 +490,32 @@ void idAFAttachment::Event_ClearAnims( void ) {
 */
 
 const idEventDef EV_SetConstraintPosition( "SetConstraintPosition", "sv" );
-// RAVEN BEGIN
-// kfuller: added
-const idEventDef EV_TPose( "tpose", NULL );
-// RAVEN END
+const idEventDef EV_SetCollision( "setAFCollision", "d" );	// HUMANHEAD pdm
 
-CLASS_DECLARATION( idAnimatedEntity, idAFEntity_Base )
+// HUMANHEAD pdm: Changed to hhAnimatedEntity
+CLASS_DECLARATION( hhAnimatedEntity, idAFEntity_Base )
 	EVENT( EV_SetConstraintPosition,	idAFEntity_Base::Event_SetConstraintPosition )
+	EVENT( EV_SetCollision,				idAFEntity_Base::Event_SetCollision )			// HUMANHEAD pdm
 END_CLASS
+
+// HUMANHEAD nla - forward decar's for Evil C++
+class hhDoor { 
+ public:
+ 	static  idTypeInfo Type;
+};
+
+// HUMANHEAD mdl:  I hate these partial decls, but I need them for the other door types too
+class hhModelDoor {
+ public:
+	 static  idTypeInfo Type;
+};
+
+class hhProxDoor {
+ public:
+	 static  idTypeInfo Type;
+};
+
+// HUMANHEAD END
 
 static const float BOUNCE_SOUND_MIN_VELOCITY	= 80.0f;
 static const float BOUNCE_SOUND_MAX_VELOCITY	= 200.0f;
@@ -876,9 +529,9 @@ idAFEntity_Base::idAFEntity_Base( void ) {
 	combatModel = NULL;
 	combatModelContents = 0;
 	nextSoundTime = 0;
+	numSplats = 0;	//HUMANHEAD bjk
 	spawnOrigin.Zero();
 	spawnAxis.Identity();
-	noPlayerImpactFX = false;
 }
 
 /*
@@ -897,13 +550,19 @@ idAFEntity_Base::Save
 ================
 */
 void idAFEntity_Base::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( noPlayerImpactFX );
 	savefile->WriteInt( combatModelContents );
 	savefile->WriteClipModel( combatModel );
 	savefile->WriteVec3( spawnOrigin );
 	savefile->WriteMat3( spawnAxis );
 	savefile->WriteInt( nextSoundTime );
 	af.Save( savefile );
+	// HUMANHEAD mdl
+	savefile->WriteBool( impulseFromSelf );
+	savefile->WriteInt( numSplats );
+	for ( int i = 0; i < 16; i++ ) {
+		savefile->WriteVec3( splats[i] );
+	}
+	// HUMANHEAD END
 }
 
 /*
@@ -912,7 +571,6 @@ idAFEntity_Base::Restore
 ================
 */
 void idAFEntity_Base::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( noPlayerImpactFX );
 	savefile->ReadInt( combatModelContents );
 	savefile->ReadClipModel( combatModel );
 	savefile->ReadVec3( spawnOrigin );
@@ -921,6 +579,14 @@ void idAFEntity_Base::Restore( idRestoreGame *savefile ) {
 	LinkCombat();
 
 	af.Restore( savefile );
+
+	// HUMANHEAD mdl
+	savefile->ReadBool( impulseFromSelf );
+	savefile->ReadInt( numSplats );
+	for ( int i = 0; i < 16; i++ ) {
+		savefile->ReadVec3( splats[i] );
+	}
+	// HUMANHEAD END
 }
 
 /*
@@ -933,7 +599,9 @@ void idAFEntity_Base::Spawn( void ) {
 	spawnAxis = GetPhysics()->GetAxis();
 	nextSoundTime = 0;
 
-	noPlayerImpactFX = spawnArgs.GetBool( "noPlayerImpactFX", "0" );
+	// HUMANHEAD nla
+	impulseFromSelf = false;
+	// HUMANHEAD END
 }
 
 /*
@@ -941,14 +609,10 @@ void idAFEntity_Base::Spawn( void ) {
 idAFEntity_Base::LoadAF
 ================
 */
-bool idAFEntity_Base::LoadAF( const char* keyname ) {
+bool idAFEntity_Base::LoadAF( void ) {
 	idStr fileName;
-	
-	if ( !keyname || !*keyname ) {
-		keyname = "articulatedFigure";
-	}
 
-	if ( !spawnArgs.GetString( keyname, "*unknown*", fileName ) ) {
+	if ( !spawnArgs.GetString( "articulatedFigure", "*unknown*", fileName ) ) {
 		return false;
 	}
 
@@ -984,17 +648,14 @@ void idAFEntity_Base::Think( void ) {
 		LinkCombat();
 	}
 
-// RAVEN BEGIN
-// kfuller: added
-	if (spawnArgs.GetBool("touchtriggers")) {
+	// HUMANHEAD nla - Added logic to allow things to touch triggers
+	if ( fl.touchTriggers ) {
 		TouchTriggers();
 	}
-
-// rjohnson: added check to see if we no longer need to think!
-	if (GetPhysics()->IsAtRest() && !animator.IsAnimating( gameLocal.time, true ) ) {
-		BecomeInactive( TH_ANIMATE );
-	}
-// RAVEN END
+	// HUMANHEAD END
+	//HUMANHEAD: aob - moved from idActor
+	UpdateWounds();
+	//HUMANHEAD END
 }
 
 /*
@@ -1059,6 +720,16 @@ void idAFEntity_Base::AddBindConstraints( void ) {
 
 /*
 ================
+HUMANHEAD bjk
+idAFEntity_Base::AddBindConstraints
+================
+*/
+void idAFEntity_Base::AddBindConstraint( constraintType_t type, int bodyId, jointHandle_t joint ) {
+	af.AddBindConstraint( type, bodyId, joint, GetBindMaster() );
+}
+
+/*
+================
 idAFEntity_Base::RemoveBindConstraints
 ================
 */
@@ -1084,23 +755,14 @@ void idAFEntity_Base::GetImpactInfo( idEntity *ent, int id, const idVec3 &point,
 idAFEntity_Base::ApplyImpulse
 ================
 */
-void idAFEntity_Base::ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse, bool splash ) {
-	if ( !splash && ( noPlayerImpactFX || GetNoPlayerImpactFX( ) ) ) {
-		if ( ent->IsType( idPlayer::GetClassType() ) )
-		{//player
-			return;
-		}
-		if ( ent->IsType( idProjectile::GetClassType() ) )
-		{//projectile
-			if ( ((idProjectile*)ent)->GetOwner() && ((idProjectile*)ent)->GetOwner()->IsType( idPlayer::GetClassType() ) )
-			{//owned by player
-				return;
-			}
-		}
-	}
-
+void idAFEntity_Base::ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse ) {
 	if ( af.IsLoaded() ) {
-		af.ApplyImpulse( ent, id, point, impulse );
+		// HUMANHEAD nla 
+		// mdl:  Changed so CheckImpulse can now reject an impulse for no-gore mode
+		if ( CheckImpulse( ent ) ) {			// Allow ragdolls to know if a force is from itself, or outside.  Prevents ragdoll "issues" with the number of bodies in a ragdoll.
+			af.ApplyImpulse( ent, id, point, impulse );
+		}
+		// HUMANHEAD END
 	}
 	if ( !af.IsActive() ) {
 		idEntity::ApplyImpulse( ent, id, point, impulse );
@@ -1121,14 +783,6 @@ void idAFEntity_Base::AddForce( idEntity *ent, int id, const idVec3 &point, cons
 	}
 }
 
-bool idAFEntity_Base::CanPlayImpactEffect ( idEntity* attacker, idEntity* target ) {
-	if ( ( noPlayerImpactFX && GetNoPlayerImpactFX( ) ) && attacker && attacker->IsType( idPlayer::GetClassType() ) ) {
-		return false;
-	}
-
-	return idAnimatedEntity::CanPlayImpactEffect( attacker, target );
-}
-
 /*
 ================
 idAFEntity_Base::Collide
@@ -1140,22 +794,27 @@ bool idAFEntity_Base::Collide( const trace_t &collision, const idVec3 &velocity 
 	if ( af.IsActive() ) {
 		v = -( velocity * collision.c.normal );
 		if ( v > BOUNCE_SOUND_MIN_VELOCITY && gameLocal.time > nextSoundTime ) {
-// RAVEN BEGIN
-// jscott: fixed negative sqrt call
-			if( v > BOUNCE_SOUND_MAX_VELOCITY ) {
-				f = 1.0f;
-			} else if( v <= BOUNCE_SOUND_MIN_VELOCITY ) {
-				f = 0.0f;
-			} else {
-				f = ( v - BOUNCE_SOUND_MIN_VELOCITY ) * ( 1.0f / ( BOUNCE_SOUND_MAX_VELOCITY - BOUNCE_SOUND_MIN_VELOCITY ) );
-			}
-// RAVEN END
+			f = v > BOUNCE_SOUND_MAX_VELOCITY ? 1.0f : idMath::Sqrt( v - BOUNCE_SOUND_MIN_VELOCITY ) * ( 1.0f / idMath::Sqrt( BOUNCE_SOUND_MAX_VELOCITY - BOUNCE_SOUND_MIN_VELOCITY ) );
 			if ( StartSound( "snd_bounce", SND_CHANNEL_ANY, 0, false, NULL ) ) {
 				// don't set the volume unless there is a bounce sound as it overrides the entire channel
 				// which causes footsteps on ai's to not honor their shader parms
 				SetSoundVolume( f );
 			}
 			nextSoundTime = gameLocal.time + 500;
+		}
+		if ( g_bloodEffects.GetBool() && g_ragdollDecals.GetBool() && v > 2.0f && spawnArgs.GetBool("produces_splats") && numSplats < 16 ) {
+			bool close = false;
+			for(int i=0;i<numSplats;i++) {
+				idVec3 dist = splats[i] - collision.c.point;
+				if( dist * dist < 35.0f )
+					close = true;
+			}
+			if( !close ) {
+				idStr decal = spawnArgs.RandomPrefix( "mtr_splat", gameLocal.random );
+				gameLocal.ProjectDecal(collision.c.point, -collision.c.normal, 10.0f, true, spawnArgs.GetFloat("splat_size", "20"), decal );
+				splats[numSplats] = collision.c.point;
+				numSplats++;
+			}
 		}
 	}
 
@@ -1190,6 +849,25 @@ bool idAFEntity_Base::UpdateAnimationControllers( void ) {
 }
 
 /*
+=============
+idAFEntity_Base::CheckImpulse
+	HUMANHEAD nla
+=============
+*/
+bool idAFEntity_Base::CheckImpulse( idEntity *impulseSource ) {
+	if (GERMAN_VERSION || g_nogore.GetBool()) {
+		if ( !spawnArgs.GetBool( "not_gory", "0" ) && impulseSource->IsType( hhProjectile::Type ) ) {
+			return false;
+		}
+	}
+	impulseFromSelf = (impulseSource == this);
+	if (!impulseFromSelf) {
+		StartSound("snd_impulse", SND_CHANNEL_ANY, 0, true);
+	}
+	return true;
+}
+
+/*
 ================
 idAFEntity_Base::SetCombatModel
 ================
@@ -1199,15 +877,7 @@ void idAFEntity_Base::SetCombatModel( void ) {
 		combatModel->Unlink();
 		combatModel->LoadModel( modelDefHandle );
 	} else {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 		combatModel = new idClipModel( modelDefHandle );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-		RV_POP_HEAP();
-// RAVEN END
 	}
 }
 
@@ -1248,10 +918,7 @@ void idAFEntity_Base::LinkCombat( void ) {
 		return;
 	}
 	if ( combatModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		combatModel->Link( this, 0, renderEntity.origin, renderEntity.axis, modelDefHandle );
-// RAVEN END
+		combatModel->Link( gameLocal.clip, this, 0, renderEntity.origin, renderEntity.axis, modelDefHandle );
 	}
 }
 
@@ -1316,7 +983,7 @@ void idAFEntity_Base::DropAFs( idEntity *ent, const char *type, idList<idEntity 
 			af = static_cast<idAFEntity_Base *>(newEnt);
 			af->GetPhysics()->SetOrigin( ent->GetPhysics()->GetOrigin() );
 			af->GetPhysics()->SetAxis( ent->GetPhysics()->GetAxis() );
-			af->af.SetupPose( ent, gameLocal.time );
+			af->af.SetupPose( ent, gameLocal.time, false ); // HUMANHEAD mdl:  Added false to disable physics check
 			if ( list ) {
 				list->Append( af );
 			}
@@ -1330,19 +997,6 @@ void idAFEntity_Base::DropAFs( idEntity *ent, const char *type, idList<idEntity 
 	if ( skinName[0] ) {
 		skin = declManager->FindSkin( skinName );
 		ent->SetSkin( skin );
-	}
-}
-
-/*
-================
-idAFEntity_Base::GetNoPlayerImpactFX
-================
-*/
-bool idAFEntity_Base::GetNoPlayerImpactFX( void ) {
-	if ( GetTeamMaster( ) && this != GetTeamMaster( ) && GetTeamMaster( )->IsType( idAFEntity_Base::GetClassType( ) ) ) {
-		return static_cast<idAFEntity_Base*>( GetTeamMaster( ) )->GetNoPlayerImpactFX( );
-	} else {
-		return noPlayerImpactFX;
 	}
 }
 
@@ -1403,6 +1057,9 @@ idAFEntity_Gibbable::Save
 void idAFEntity_Gibbable::Save( idSaveGame *savefile ) const {
 	savefile->WriteBool( gibbed );
 	savefile->WriteBool( combatModel != NULL );
+	// HUMANHEAD mdl
+	savefile->WriteInt( gibHealth );
+	// HUMANHEAD END
 }
 
 /*
@@ -1416,15 +1073,16 @@ void idAFEntity_Gibbable::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( gibbed );
 	savefile->ReadBool( hasCombatModel );
 
+	// HUMANHEAD mdl
+	savefile->ReadInt( gibHealth );
+	// HUMANHEAD END
+
 	InitSkeletonModel();
 
 	if ( hasCombatModel ) {
 		SetCombatModel();
 		LinkCombat();
 	}
-
-	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_Gib", false, false );
 }
 
 /*
@@ -1436,9 +1094,9 @@ void idAFEntity_Gibbable::Spawn( void ) {
 	InitSkeletonModel();
 
 	gibbed = false;
-
-	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_Gib", false, false );
+	// HUMANHEAD mdl
+	gibHealth = spawnArgs.GetInt( "gibhealth", "0" );
+	// HUMANHEAD END
 }
 
 /*
@@ -1478,6 +1136,7 @@ idAFEntity_Gibbable::Present
 ================
 */
 void idAFEntity_Gibbable::Present( void ) {
+	PROFILE_SCOPE("Present", PROFMASK_NORMAL);
 	renderEntity_t skeleton;
 
 	if ( !gameLocal.isNewFrame ) {
@@ -1514,7 +1173,15 @@ void idAFEntity_Gibbable::Damage( idEntity *inflictor, idEntity *attacker, const
 		return;
 	}
 	idAFEntity_Base::Damage( inflictor, attacker, dir, damageDefName, damageScale, location );
-	if ( health < -20 && spawnArgs.GetBool( "gib" ) ) {
+
+	// HUMANHEAD mdl
+	const idDict *damageDef = gameLocal.FindEntityDefDict( damageDefName );
+	if ( !damageDef ) {
+		gameLocal.Error( "Unknown damageDef '%s'\n", damageDefName );
+	}
+	// HUMANHEAD END
+
+	if ( gibHealth != 0 && health < gibHealth && damageDef->GetBool( "gib" ) && spawnArgs.GetBool( "gib" ) ) { // HUMANHEAD mdl:  Changed to gibHealth instead of -20, and added damageDef gib check
 		Gib( dir, damageDefName );
 	}
 }
@@ -1532,10 +1199,7 @@ void idAFEntity_Gibbable::SpawnGibs( const idVec3 &dir, const char *damageDefNam
 
 	assert( !gameLocal.isClient );
 
-// RAVEN BEGIN
-// ddynerman: added false as 2nd parameter, otherwise def will be created
-	const idDict *damageDef = gameLocal.FindEntityDefDict( damageDefName, false );
-// RAVEN END
+	const idDict *damageDef = gameLocal.FindEntityDefDict( damageDefName );
 	if ( !damageDef ) {
 		gameLocal.Error( "Unknown damageDef '%s'", damageDefName );
 	}
@@ -1546,9 +1210,17 @@ void idAFEntity_Gibbable::SpawnGibs( const idVec3 &dir, const char *damageDefNam
 	// spawn gib items
 	idMoveableItem::DropItems( this, "gib", &list );
 
+	// HUMANHEAD mdl
+	gibNonSolid = damageDef->GetBool( "gibNonSolid" ); // Moved this up from below
+	const char *debris = spawnArgs.GetString( "def_gibDebrisSpawner" );
+	float duration = 4.0f; // Default to 4 seconds, original Doom3 time to live
+	if ( debris && *debris ) {
+		hhUtils::SpawnDebrisMass( debris, this->GetOrigin(), &this->GetAxis()[2], &dir, -1, gibNonSolid, &duration, this ); //rww - now using entity ptr
+	}
+	// HUMANHEAD END
+
 	// blow out the gibs in the given direction away from the center of the entity
 	entityCenter = GetPhysics()->GetAbsBounds().GetCenter();
-	gibNonSolid = damageDef->GetBool( "gibNonSolid" );
 	for ( i = 0; i < list.Num(); i++ ) {
 		if ( gibNonSolid ) {
 			list[i]->GetPhysics()->SetContents( 0 );
@@ -1561,14 +1233,15 @@ void idAFEntity_Gibbable::SpawnGibs( const idVec3 &dir, const char *damageDefNam
 			velocity = list[i]->GetPhysics()->GetAbsBounds().GetCenter() - entityCenter;
 			velocity.NormalizeFast();
 			velocity += ( i & 1 ) ? dir : -dir;
-			list[i]->GetPhysics()->SetLinearVelocity( velocity * 225.0f );
+			list[i]->GetPhysics()->SetLinearVelocity( velocity * 75.0f );
 		}
 		list[i]->GetRenderEntity()->noShadow = true;
-		list[i]->GetRenderEntity()->shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f;
-// RAVEN BEGIN
-// dluetscher: reduced the gib lifetime from 4. to 1.5
-		list[i]->PostEventSec( &EV_Remove, 1.5f );
-// RAVEN END
+		// HUMANHEAD mdl:  Removed time of death and added duration from debris spawner
+		//list[i]->GetRenderEntity()->shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f; // HUMANHEAD mdl:  We never want this set on gib pieces
+		if ( duration != 0.0f ) {
+			list[i]->PostEventSec( &EV_Remove, duration );
+		}
+		// HUMANHEAD END
 	}
 }
 
@@ -1583,14 +1256,19 @@ void idAFEntity_Gibbable::Gib( const idVec3 &dir, const char *damageDefName ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// ddynerman: added false as 2nd parameter, otherwise def will be created
-	const idDict *damageDef = gameLocal.FindEntityDefDict( damageDefName, false );
-// RAVEN END
+	const idDict *damageDef = gameLocal.FindEntityDefDict( damageDefName );
 	if ( !damageDef ) {
 		gameLocal.Error( "Unknown damageDef '%s'", damageDefName );
 	}
 
+#if HUMANHEAD
+	GetAFPhysics()->SetContents( 0 );
+	GetAFPhysics()->SetClipMask( 0 );
+	GetAFPhysics()->UnlinkClip();
+	if ( af.IsLoaded() ) { // HUMANHEAD mdl:  Added IsLoaded() check
+		GetAFPhysics()->PutToRest();
+	}
+#else
 	if ( damageDef->GetBool( "gibNonSolid" ) ) {
 		GetAFPhysics()->SetContents( 0 );
 		GetAFPhysics()->SetClipMask( 0 );
@@ -1600,12 +1278,11 @@ void idAFEntity_Gibbable::Gib( const idVec3 &dir, const char *damageDefName ) {
 		GetAFPhysics()->SetContents( CONTENTS_CORPSE );
 		GetAFPhysics()->SetClipMask( CONTENTS_SOLID );
 	}
+#endif
 
 	UnlinkCombat();
-// RAVEN BEGIN
-// mekberg: changed from g_bloodEffects to g_decals
-	if ( g_decals.GetBool() ) {
-// RAVEN END
+
+	if ( g_bloodEffects.GetBool() ) {
 		if ( gameLocal.time > gameLocal.GetGibTime() ) {
 			gameLocal.SetGibTime( gameLocal.time + GIB_DELAY );
 			SpawnGibs( dir, damageDefName );
@@ -1618,17 +1295,9 @@ void idAFEntity_Gibbable::Gib( const idVec3 &dir, const char *damageDefName ) {
 		gibbed = true;
 	}
 
-// RAVEN BEGIN
-// bdube: default is to remove the character immediately
-	// however, this is bad in the case of the player.  What was happening is that the
-	//	player was being removed right away, but the respawn logic runs off of 
-	//  idPlayer::EvaluateControls, which no longer gets run when the player is gibbed and removed.
-	//	So...the game effectively sits locked on a black screen and you never get a menu..
-	if ( !gameLocal.isMultiplayer && this->IsType( idPlayer::GetClassType() )) {
-		return;
-	}
-	PostEventSec( &EV_Gibbed, spawnArgs.GetFloat ( "gibRemoveDelay", "0" ) );
-// RAVEN END
+
+	Hide(); // HUMANHEAD mdl:  Hide the entity but wait 4 seconds before removing so snd_gibbed will play
+	PostEventSec( &EV_Gibbed, 4.0f );
 }
 
 /*
@@ -1638,6 +1307,43 @@ idAFEntity_Gibbable::Event_Gib
 */
 void idAFEntity_Gibbable::Event_Gib( const char *damageDefName ) {
 	Gib( idVec3( 0, 0, 1 ), damageDefName );
+}
+
+/*
+=============
+idAFEntity_Gibbable::CheckRagdollDamage
+  Returns false if nothing was done, 
+  Returns true if was removed
+HUMANHEAD nla
+=============
+*/
+bool idAFEntity_Gibbable::CheckRagdollDamage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, int location ) {
+
+	if ( !af.IsLoaded() || !af.IsActive() ) {
+		return false;
+	}
+
+	// HUMANHEAD mdl:  Check to see if the damageDef is supposed to gib
+	const idDict *damageDef = gameLocal.FindEntityDefDict( damageDefName );
+	if ( !damageDef ) {
+		gameLocal.Error( "Unknown damageDef '%s'", damageDefName );
+	}
+	if ( !damageDef->GetBool( "gib" ) ) {
+		return false;
+	}
+	// HUMANHEAD END
+
+	if ( inflictor && ( inflictor->IsType( hhDoor::Type ) || inflictor->IsType( hhModelDoor::Type ) || inflictor->IsType( hhProxDoor::Type ) ) ) { // HUMANHEAD mdl:  Added additional checks for hhModelDoor and hhProxDoor
+		Gib( dir, damageDefName );
+		return true;
+	}
+	
+	if ( gibHealth && health < gibHealth ) {
+		Gib( dir, damageDefName );
+		return true;
+	}
+
+	return false;
 }
 
 /*
@@ -1713,21 +1419,6 @@ void idAFEntity_Generic::Spawn( void ) {
 	SetCombatModel();
 
 	SetPhysics( af.GetPhysics() );
-
-// RAVEN BEGIN
-// kfuller: we just put the guy to rest so don't be affected by an attractor
-/*
-	const char *attractor = spawnArgs.GetString("attractor");
-	if (attractor && attractor[0]) {
-		rvRagdollAttractor *attractorEnt = dynamic_cast<rvRagdollAttractor*>(gameLocal.FindEntity(attractor));
-		if (attractorEnt) {
-			attractorEnt->RemoveAttractee(entityNumber);
-		} else {
-			gameLocal.Warning("idAFEntity::LoadAF -- failed to find attractor '%s'", attractor);
-		}
-	}
-*/
-// RAVEN END
 
 	af.GetPhysics()->PutToRest();
 	if ( !spawnArgs.GetBool( "nodrop", "0" ) ) {
@@ -1829,20 +1520,8 @@ void idAFEntity_WithAttachedHead::Spawn( void ) {
 		int anim = head.GetEntity()->GetAnimator()->GetAnim( "dead" );
 
 		if ( anim ) {
-// RAVEN BEGIN
-			frameBlend_t frameBlend = { 0, 0, 0, 1.0f, 0 };
-			head.GetEntity()->GetAnimator()->SetFrame( ANIMCHANNEL_ALL, anim, frameBlend );
-// RAVEN END
+			head.GetEntity()->GetAnimator()->SetFrame( ANIMCHANNEL_ALL, anim, 0, gameLocal.time, 0 );
 		}
-	}
-
-
-	idEntity *headEnt = head.GetEntity();
-	idAnimator *headAnimator;
-	if ( headEnt ) {
-		headAnimator = headEnt->GetAnimator();
-	} else {
-		headAnimator = &animator;
 	}
 }
 
@@ -1869,61 +1548,52 @@ void idAFEntity_WithAttachedHead::Restore( idRestoreGame *savefile ) {
 idAFEntity_WithAttachedHead::SetupHead
 ================
 */
-void idAFEntity_WithAttachedHead::SetupHead( const char* headDefName ) {
+void idAFEntity_WithAttachedHead::SetupHead( void ) {
 	idAFAttachment		*headEnt;
 	idStr				jointName;
+	const char			*headModel;
 	jointHandle_t		joint;
-	const idKeyValue	*sndKV;
+	idVec3				origin;
+	idMat3				axis;
 
-	if ( gameLocal.isClient && head.GetEntity() == NULL ) {
+	//HUMANHEAD rww - disabled in mp for now
+	if (gameLocal.isMultiplayer) {
 		return;
 	}
+	//HUMANHEAD END
 
-	// If we don't pass in a specific head model, try looking it up
-	if( !headDefName[ 0 ] ) {
-		headDefName = spawnArgs.GetString( "def_head", "" );		
-	} 
-
-	if ( headDefName[ 0 ] ) {
-		jointName = spawnArgs.GetString( "joint_head" );
+	// HUMANHEAD pdm: changed from def_head to model_head for precaching
+	headModel = spawnArgs.GetString( "model_head", "" );
+	if ( headModel[ 0 ] ) {
+		jointName = spawnArgs.GetString( "head_joint" );
 		joint = animator.GetJointHandle( jointName );
 		if ( joint == INVALID_JOINT ) {
-			gameLocal.Error( "Joint '%s' not found for 'joint_head' on '%s'", jointName.c_str(), name.c_str() );
+			gameLocal.Error( "Joint '%s' not found for 'head_joint' on '%s'", jointName.c_str(), name.c_str() );
 		}
 
-		// copy any sounds in case we have frame commands on the head
-		idDict	args;
-		sndKV = spawnArgs.MatchPrefix( "snd_", NULL );
-		while( sndKV ) {
-			args.Set( sndKV->GetKey(), sndKV->GetValue() );
-			sndKV = spawnArgs.MatchPrefix( "snd_", sndKV );
-		}
+		headEnt = static_cast<idAFAttachment *>( gameLocal.SpawnEntityType( idAFAttachment::Type, NULL ) );
+		headEnt->SetName( va( "%s_head", name.c_str() ) );
+		headEnt->SetBody( this, headModel, joint );
+		headEnt->SetCombatModel();
+		head = headEnt;
 
-		if ( !gameLocal.isClient ) {
-			args.Set( "classname", headDefName );
-			if( !gameLocal.SpawnEntityDef( args, ( idEntity ** )&headEnt ) ) {
-				gameLocal.Warning( "idActor::SetupHead() - Unknown head model '%s'\n", headDefName );
-				return;
-			}
-			headEnt->spawnArgs.Set( "classname", headDefName );
+		// HUMANHEAD CJR:  Set up scale on the head
+		float scale = 1.0f;
+		if ( spawnArgs.FindKey("scale") ) {
+			scale = spawnArgs.GetFloat("scale", "1.0" );
+			headEnt->SetShaderParm( SHADERPARM_ANY_DEFORM, DEFORMTYPE_SCALE );
+			headEnt->SetShaderParm( SHADERPARM_ANY_DEFORM_PARM1, scale );
+		} // HUMANHEAD END
 
-			headEnt->SetName( va( "%s_head", name.c_str() ) );
-			headEnt->SetBody ( this, headDefName, joint );
-			head = headEnt;
-		} else {
-			// we got our spawnid from the server
-			headEnt = head.GetEntity();
-			headEnt->GetRenderEntity()->suppressSurfaceInViewID = entityNumber + 1;
-		}
-		
+		animator.GetJointTransform( joint, gameLocal.time, origin, axis );
+		origin = renderEntity.origin + origin * ( renderEntity.axis * scale ); // HUMANHEAD CJR:  Factor in scale
+		headEnt->SetOrigin( origin );
+		headEnt->SetAxis( renderEntity.axis );
 		headEnt->BindToJoint( this, joint, true );
-		headEnt->GetPhysics()->SetOrigin( vec3_origin );		
-		headEnt->GetPhysics()->SetAxis( mat3_identity );
-		
-		head->InitCopyJoints ( );
-	} else if ( head ) {
-		head->PostEventMS( &EV_Remove, 0 );
-		head = NULL;
+
+		// HUMANHEAD pdm:  Copy the skin to the head as well
+		headEnt->SetSkin( this->GetSkin() );
+		// END HUMANHEAD
 	}
 }
 
@@ -1949,10 +1619,7 @@ void idAFEntity_WithAttachedHead::LinkCombat( void ) {
 	}
 
 	if ( combatModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		combatModel->Link( this, 0, renderEntity.origin, renderEntity.axis, modelDefHandle );
-// RAVEN END
+		combatModel->Link( gameLocal.clip, this, 0, renderEntity.origin, renderEntity.axis, modelDefHandle );
 	}
 	headEnt = head.GetEntity();
 	if ( headEnt ) {
@@ -2098,7 +1765,7 @@ idAFEntity_Vehicle::idAFEntity_Vehicle( void ) {
 	wheelRadius			= 0.0f;
 	steerAngle			= 0.0f;
 	steerSpeed			= 0.0f;
-//	dustSmoke			= NULL;
+	dustSmoke			= NULL;
 }
 
 /*
@@ -2133,12 +1800,10 @@ void idAFEntity_Vehicle::Spawn( void ) {
 	player = NULL;
 	steerAngle = 0.0f;
 
-/*
 	const char *smokeName = spawnArgs.GetString( "smoke_vehicle_dust", "muzzlesmoke" );
 	if ( *smokeName != '\0' ) {
 		dustSmoke = static_cast<const idDeclParticle *>( declManager->FindType( DECL_PARTICLE, smokeName ) );
 	}
-*/
 }
 
 /*
@@ -2190,6 +1855,199 @@ float idAFEntity_Vehicle::GetSteerAngle( void ) {
 	}
 
 	return steerAngle;
+}
+
+
+/*
+===============================================================================
+
+  idAFEntity_VehicleSimple
+
+===============================================================================
+*/
+
+CLASS_DECLARATION( idAFEntity_Vehicle, idAFEntity_VehicleSimple )
+END_CLASS
+
+/*
+================
+idAFEntity_VehicleSimple::idAFEntity_VehicleSimple
+================
+*/
+idAFEntity_VehicleSimple::idAFEntity_VehicleSimple( void ) {
+	int i;
+	for ( i = 0; i < 4; i++ ) {
+		suspension[i] = NULL;
+	}
+}
+
+/*
+================
+idAFEntity_VehicleSimple::~idAFEntity_VehicleSimple
+================
+*/
+idAFEntity_VehicleSimple::~idAFEntity_VehicleSimple( void ) {
+	delete wheelModel;
+	wheelModel = NULL;
+}
+
+/*
+================
+idAFEntity_VehicleSimple::Spawn
+================
+*/
+void idAFEntity_VehicleSimple::Spawn( void ) {
+	static const char *wheelJointKeys[] = {
+		"wheelJointFrontLeft",
+		"wheelJointFrontRight",
+		"wheelJointRearLeft",
+		"wheelJointRearRight"
+	};
+	static idVec3 wheelPoly[4] = { idVec3( 2, 2, 0 ), idVec3( 2, -2, 0 ), idVec3( -2, -2, 0 ), idVec3( -2, 2, 0 ) };
+
+	int i;
+	idVec3 origin;
+	idMat3 axis;
+	idTraceModel trm;
+
+	trm.SetupPolygon( wheelPoly, 4 );
+	trm.Translate( idVec3( 0, 0, -wheelRadius ) );
+	wheelModel = new idClipModel( trm );
+
+	for ( i = 0; i < 4; i++ ) {
+		const char *wheelJointName = spawnArgs.GetString( wheelJointKeys[i], "" );
+		if ( !wheelJointName[0] ) {
+			gameLocal.Error( "idAFEntity_VehicleSimple '%s' no '%s' specified", name.c_str(), wheelJointKeys[i] );
+		}
+		wheelJoints[i] = animator.GetJointHandle( wheelJointName );
+		if ( wheelJoints[i] == INVALID_JOINT ) {
+			gameLocal.Error( "idAFEntity_VehicleSimple '%s' can't find wheel joint '%s'", name.c_str(), wheelJointName );
+		}
+
+		GetAnimator()->GetJointTransform( wheelJoints[i], 0, origin, axis );
+		origin = renderEntity.origin + origin * renderEntity.axis;
+
+		suspension[i] = new idAFConstraint_Suspension();
+		suspension[i]->Setup( va( "suspension%d", i ), af.GetPhysics()->GetBody( 0 ), origin, af.GetPhysics()->GetAxis( 0 ), wheelModel );
+		suspension[i]->SetSuspension(	g_vehicleSuspensionUp.GetFloat(),
+										g_vehicleSuspensionDown.GetFloat(),
+										g_vehicleSuspensionKCompress.GetFloat(),
+										g_vehicleSuspensionDamping.GetFloat(),
+										g_vehicleTireFriction.GetFloat() );
+
+		af.GetPhysics()->AddConstraint( suspension[i] );
+	}
+
+	memset( wheelAngles, 0, sizeof( wheelAngles ) );
+	BecomeActive( TH_THINK );
+}
+
+/*
+================
+idAFEntity_VehicleSimple::Think
+================
+*/
+void idAFEntity_VehicleSimple::Think( void ) {
+	int i;
+	float force = 0.0f, velocity = 0.0f, steerAngle = 0.0f;
+	idVec3 origin;
+	idMat3 axis;
+	idRotation wheelRotation, steerRotation;
+
+	if ( thinkFlags & TH_THINK ) {
+
+		if ( player ) {
+			// capture the input from a player
+			velocity = g_vehicleVelocity.GetFloat();
+			if ( player->usercmd.forwardmove < 0 ) {
+				velocity = -velocity;
+			}
+			force = idMath::Fabs( player->usercmd.forwardmove * g_vehicleForce.GetFloat() ) * (1.0f / 128.0f);
+			steerAngle = GetSteerAngle();
+		}
+
+		// update the wheel motor force and steering
+		for ( i = 0; i < 2; i++ ) {
+
+			// front wheel drive
+			if ( velocity != 0.0f ) {
+				suspension[i]->EnableMotor( true );
+			} else {
+				suspension[i]->EnableMotor( false );
+			}
+			suspension[i]->SetMotorVelocity( velocity );
+			suspension[i]->SetMotorForce( force );
+
+			// update the wheel steering
+			suspension[i]->SetSteerAngle( steerAngle );
+		}
+
+		// adjust wheel velocity for better steering because there are no differentials between the wheels
+		if ( steerAngle < 0.0f ) {
+			suspension[0]->SetMotorVelocity( velocity * 0.5f );
+		} else if ( steerAngle > 0.0f ) {
+			suspension[1]->SetMotorVelocity( velocity * 0.5f );
+		}
+
+		// update suspension with latest cvar settings
+		for ( i = 0; i < 4; i++ ) {
+			suspension[i]->SetSuspension(	g_vehicleSuspensionUp.GetFloat(),
+											g_vehicleSuspensionDown.GetFloat(),
+											g_vehicleSuspensionKCompress.GetFloat(),
+											g_vehicleSuspensionDamping.GetFloat(),
+											g_vehicleTireFriction.GetFloat() );
+		}
+
+		// run the physics
+		RunPhysics();
+
+		// move and rotate the wheels visually
+		for ( i = 0; i < 4; i++ ) {
+			idAFBody *body = af.GetPhysics()->GetBody( 0 );
+
+			origin = suspension[i]->GetWheelOrigin();
+			velocity = body->GetPointVelocity( origin ) * body->GetWorldAxis()[0];
+			wheelAngles[i] += velocity * MS2SEC( gameLocal.msec ) / wheelRadius;
+
+			// additional rotation about the wheel axis
+			wheelRotation.SetAngle( RAD2DEG( wheelAngles[i] ) );
+			wheelRotation.SetVec( 0, -1, 0 );
+
+			if ( i < 2 ) {
+				// rotate the wheel for steering
+				steerRotation.SetAngle( steerAngle );
+				steerRotation.SetVec( 0, 0, 1 );
+				// set wheel rotation
+				animator.SetJointAxis( wheelJoints[i], JOINTMOD_WORLD, wheelRotation.ToMat3() * steerRotation.ToMat3() );
+			} else {
+				// set wheel rotation
+				animator.SetJointAxis( wheelJoints[i], JOINTMOD_WORLD, wheelRotation.ToMat3() );
+			}
+
+			// set wheel position for suspension
+			origin = ( origin - renderEntity.origin ) * renderEntity.axis.Transpose();
+			GetAnimator()->SetJointPos( wheelJoints[i], JOINTMOD_WORLD_OVERRIDE, origin );
+		}
+/*
+		// spawn dust particle effects
+		if ( force != 0.0f && !( gameLocal.framenum & 7 ) ) {
+			int numContacts;
+			idAFConstraint_Contact *contacts[2];
+			for ( i = 0; i < 4; i++ ) {
+				numContacts = af.GetPhysics()->GetBodyContactConstraints( wheels[i]->GetClipModel()->GetId(), contacts, 2 );
+				for ( int j = 0; j < numContacts; j++ ) {
+					gameLocal.smokeParticles->EmitSmoke( dustSmoke, gameLocal.time, gameLocal.random.RandomFloat(), contacts[j]->GetContact().point, contacts[j]->GetContact().normal.ToMat3() );
+				}
+			}
+		}
+*/
+	}
+
+	UpdateAnimation();
+	if ( thinkFlags & TH_UPDATEVISUALS ) {
+		Present();
+		LinkCombat();
+	}
 }
 
 
@@ -2341,15 +2199,24 @@ void idAFEntity_VehicleFourWheels::Think( void ) {
 			if ( force == 0.0f ) {
 				velocity = wheels[i]->GetLinearVelocity() * wheels[i]->GetWorldAxis()[0];
 			}
-// RAVEN BEGIN
-// bdube: msec to GetMsec
-			wheelAngles[i] += velocity * MS2SEC( gameLocal.GetMSec() ) / wheelRadius;
-// RAVEN END
+			wheelAngles[i] += velocity * MS2SEC( gameLocal.msec ) / wheelRadius;
 			// give the wheel joint an additional rotation about the wheel axis
 			rotation.SetAngle( RAD2DEG( wheelAngles[i] ) );
 			axis = af.GetPhysics()->GetAxis( 0 );
 			rotation.SetVec( (wheels[i]->GetWorldAxis() * axis.Transpose())[2] );
 			animator.SetJointAxis( wheelJoints[i], JOINTMOD_WORLD, rotation.ToMat3() );
+		}
+
+		// spawn dust particle effects
+		if ( force != 0.0f && !( gameLocal.framenum & 7 ) ) {
+			int numContacts;
+			idAFConstraint_Contact *contacts[2];
+			for ( i = 0; i < 4; i++ ) {
+				numContacts = af.GetPhysics()->GetBodyContactConstraints( wheels[i]->GetClipModel()->GetId(), contacts, 2 );
+				for ( int j = 0; j < numContacts; j++ ) {
+					gameLocal.smokeParticles->EmitSmoke( dustSmoke, gameLocal.time, gameLocal.random.RandomFloat(), contacts[j]->GetContact().point, contacts[j]->GetContact().normal.ToMat3() );
+				}
+			}
 		}
 	}
 
@@ -2522,15 +2389,24 @@ void idAFEntity_VehicleSixWheels::Think( void ) {
 			if ( force == 0.0f ) {
 				velocity = wheels[i]->GetLinearVelocity() * wheels[i]->GetWorldAxis()[0];
 			}
-// RAVEN BEGIN
-// bdube: msec to GetMsec
-			wheelAngles[i] += velocity * MS2SEC( gameLocal.GetMSec() ) / wheelRadius;
-// RAVEN END
+			wheelAngles[i] += velocity * MS2SEC( gameLocal.msec ) / wheelRadius;
 			// give the wheel joint an additional rotation about the wheel axis
 			rotation.SetAngle( RAD2DEG( wheelAngles[i] ) );
 			axis = af.GetPhysics()->GetAxis( 0 );
 			rotation.SetVec( (wheels[i]->GetWorldAxis() * axis.Transpose())[2] );
 			animator.SetJointAxis( wheelJoints[i], JOINTMOD_WORLD, rotation.ToMat3() );
+		}
+
+		// spawn dust particle effects
+		if ( force != 0.0f && !( gameLocal.framenum & 7 ) ) {
+			int numContacts;
+			idAFConstraint_Contact *contacts[2];
+			for ( i = 0; i < 6; i++ ) {
+				numContacts = af.GetPhysics()->GetBodyContactConstraints( wheels[i]->GetClipModel()->GetId(), contacts, 2 );
+				for ( int j = 0; j < numContacts; j++ ) {
+					gameLocal.smokeParticles->EmitSmoke( dustSmoke, gameLocal.time, gameLocal.random.RandomFloat(), contacts[j]->GetContact().point, contacts[j]->GetContact().normal.ToMat3() );
+				}
+			}
 		}
 	}
 
@@ -2843,7 +2719,12 @@ bool idGameEdit::AF_SpawnEntity( const char *fileName ) {
 	args.Set( "angle", va( "%f", yaw + 180 ) );
 	org = player->GetPhysics()->GetOrigin() + idAngles( 0, yaw, 0 ).ToForward() * 80 + idVec3( 0, 0, 1 );
 	args.Set( "origin", org.ToString() );
+	// HUMANHEAD nla - Need them to spawn a hhAFEntity
+#ifdef HUMANHEAD
+	args.Set( "spawnclass", "hhAFEntity" );
+#else
 	args.Set( "spawnclass", "idAFEntity_Generic" );
+#endif	// HUMANHEAD END
 	if ( af->model[0] ) {
 		args.Set( "model", af->model.c_str() );
 	} else {
@@ -2854,10 +2735,12 @@ bool idGameEdit::AF_SpawnEntity( const char *fileName ) {
 	}
 	args.Set( "articulatedFigure", fileName );
 	args.Set( "nodrop", "1" );
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	ent = static_cast<idAFEntity_Generic *>(gameLocal.SpawnEntityType( idAFEntity_Generic::GetClassType(), &args));
-// RAVEN END
+	// HUMANHEAD nla - Need them to spawn a hhAFEntity
+#ifdef HUMANHEAD
+	ent = static_cast<idAFEntity_Generic *>( gameLocal.SpawnObject( "ragdoll_base", &args ) );
+#else
+	ent = static_cast<idAFEntity_Generic *>(gameLocal.SpawnEntityType( idAFEntity_Generic::Type, &args));
+#endif	// HUMANHEAD END
 
 	// always update this entity
 	ent->BecomeActive( TH_THINK );
@@ -2884,10 +2767,7 @@ void idGameEdit::AF_UpdateEntities( const char *fileName ) {
 
 	// reload any idAFEntity_Generic which uses the given articulated figure file
 	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent->IsType( idAFEntity_Base::GetClassType() ) ) {
-// RAVEN END
+		if ( ent->IsType( idAFEntity_Base::Type ) ) {
 			af = static_cast<idAFEntity_Base *>(ent);
 			if ( name.Icmp( af->GetAFName() ) == 0 ) {
 				af->LoadAF();
@@ -2920,10 +2800,7 @@ void idGameEdit::AF_UndoChanges( void ) {
 
 		// reload all AF entities using the file
 		for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			if ( ent->IsType( idAFEntity_Base::GetClassType() ) ) {
-// RAVEN END
+			if ( ent->IsType( idAFEntity_Base::Type ) ) {
 				af = static_cast<idAFEntity_Base *>(ent);
 				if ( idStr::Icmp( decl->GetName(), af->GetAFName() ) == 0 ) {
 					af->LoadAF();
@@ -2983,7 +2860,7 @@ idGameEdit::AF_CreateMesh
 idRenderModel *idGameEdit::AF_CreateMesh( const idDict &args, idVec3 &meshOrigin, idMat3 &meshAxis, bool &poseIsSet ) {
 	int i, jointNum;
 	const idDeclAF *af;
-	const idDeclAF_Body *fb = NULL;
+	const idDeclAF_Body *fb;
 	renderEntity_t ent;
 	idVec3 origin, *bodyOrigin, *newBodyOrigin, *modifiedOrigin;
 	idMat3 axis, *bodyAxis, *newBodyAxis, *modifiedAxis;
@@ -3009,6 +2886,9 @@ idRenderModel *idGameEdit::AF_CreateMesh( const idDict &args, idVec3 &meshOrigin
 
 	classname = args.GetString( "classname" );
 	defArgs = gameLocal.FindEntityDefDict( classname );
+	if ( !defArgs ) {
+		gameLocal.Error( "Unknown classname '%s'", classname );
+	}
 
 	// get the articulated figure
 	afName = GetArgString( args, defArgs, "articulatedFigure" );
@@ -3114,10 +2994,7 @@ idRenderModel *idGameEdit::AF_CreateMesh( const idDict &args, idVec3 &meshOrigin
 
 	// save the original joints
 	originalJoints = ( idJointMat * )_alloca16( numMD5joints * sizeof( originalJoints[0] ) );
-// RAVEN BEGIN
-// JSinger: Changed to call optimized memcpy
-	SIMDProcessor->Memcpy( originalJoints, ent.joints, numMD5joints * sizeof( originalJoints[0] ) );
-// RAVEN END
+	memcpy( originalJoints, ent.joints, numMD5joints * sizeof( originalJoints[0] ) );
 
 	// buffer to store the joint mods
 	jointMod = (declAFJointMod_t *) _alloca16( numMD5joints * sizeof( declAFJointMod_t ) );
@@ -3186,18 +3063,9 @@ idRenderModel *idGameEdit::AF_CreateMesh( const idDict &args, idVec3 &meshOrigin
 	return md5->InstantiateDynamicModel( &ent, NULL, NULL );
 }
 
-// RAVEN BEGIN
-// bdube: af attractors
-
-/*
-===============================================================================
-
-  rvAFAttractor
-
-===============================================================================
-*/
-
-CLASS_DECLARATION( idEntity, rvAFAttractor )
-END_CLASS
-
-// RAVEN END
+// HUMANHEAD pdm: method for turning off ragdoll collision
+void idAFEntity_Base::Event_SetCollision(int on) {
+	if (GetPhysics() && GetPhysics()->IsType(idPhysics_AF::Type)) {
+		static_cast<idPhysics_AF*>(GetPhysics())->SetCollision(on != 0);
+	}
+}

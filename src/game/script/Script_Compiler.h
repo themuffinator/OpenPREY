@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 #ifndef __SCRIPT_COMPILER_H__
 #define __SCRIPT_COMPILER_H__
 
@@ -192,8 +194,8 @@ private:
 	const idVarDef	*basetype;			// for accessing fields
 
 	float			Divide( float numerator, float denominator );
-	void			Error( const char *error, ... ) const;
-	void			Warning( const char *message, ... ) const;
+	void			Error( const char *error, ... ) const id_attribute((format(printf,2,3)));
+	void			Warning( const char *message, ... ) const id_attribute((format(printf,2,3)));
 	idVarDef		*OptimizeOpcode( const opcode_t *op, idVarDef *var_a, idVarDef *var_b );
 	idVarDef		*EmitOpcode( const opcode_t *op, idVarDef *var_a, idVarDef *var_b );
 	idVarDef		*EmitOpcode( int op, idVarDef *var_a, idVarDef *var_b );

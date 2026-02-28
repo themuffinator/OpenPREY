@@ -233,6 +233,20 @@ idMat3 idVec3::ToMat3( void ) const {
 
 /*
 =============
+idVec3::hhToMat3
+=============
+*/
+idMat3 idVec3::hhToMat3( void ) const {
+	idVec3	left;
+	idVec3	down;
+
+	// NormalVectors returns left and down for this forward vector.
+	NormalVectors( left, down );
+	return idMat3( *this, left, -down );
+}
+
+/*
+=============
 idVec3::ToMat3
 =============
 */

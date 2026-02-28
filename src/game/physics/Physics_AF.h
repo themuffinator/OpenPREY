@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __PHYSICS_AF_H__
 #define __PHYSICS_AF_H__
@@ -31,6 +33,7 @@ class idAFConstraint_Contact;
 class idAFConstraint_ContactFriction;
 class idAFConstraint_ConeLimit;
 class idAFConstraint_PyramidLimit;
+class idAFConstraint_Suspension;
 class idAFBody;
 class idAFTree;
 class idPhysics_AF;
@@ -50,7 +53,8 @@ typedef enum {
 	CONSTRAINT_CONTACT,
 	CONSTRAINT_FRICTION,
 	CONSTRAINT_CONELIMIT,
-	CONSTRAINT_PYRAMIDLIMIT
+	CONSTRAINT_PYRAMIDLIMIT,
+	CONSTRAINT_SUSPENSION
 } constraintType_t;
 
 
@@ -568,6 +572,48 @@ protected:
 	virtual void			ApplyFriction( float invTimeStep );
 };
 
+// vehicle suspension
+class idAFConstraint_Suspension : public idAFConstraint {
+
+public:
+							idAFConstraint_Suspension( void );
+
+	void					Setup( const char *name, idAFBody *body, const idVec3 &origin, const idMat3 &axis, idClipModel *clipModel );
+	void					SetSuspension( const float up, const float down, const float k, const float d, const float f );
+
+	void					SetSteerAngle( const float degrees ) { steerAngle = degrees; }
+	void					EnableMotor( const bool enable ) { motorEnabled = enable; }
+	void					SetMotorForce( const float force ) { motorForce = force; }
+	void					SetMotorVelocity( const float vel ) { motorVelocity = vel; }
+	void					SetEpsilon( const float e ) { epsilon = e; }
+	const idVec3			GetWheelOrigin( void ) const;
+
+	virtual void			DebugDraw( void );
+	virtual void			Translate( const idVec3 &translation );
+	virtual void			Rotate( const idRotation &rotation );
+
+protected:
+	idVec3					localOrigin;				// position of suspension relative to body1
+	idMat3					localAxis;					// orientation of suspension relative to body1
+	float					suspensionUp;				// suspension up movement
+	float					suspensionDown;				// suspension down movement
+	float					suspensionKCompress;		// spring compress constant
+	float					suspensionDamping;			// spring damping
+	float					steerAngle;					// desired steer angle in degrees
+	float					friction;					// friction
+	bool					motorEnabled;				// whether the motor is enabled or not
+	float					motorForce;					// motor force
+	float					motorVelocity;				// desired velocity
+	idClipModel *			wheelModel;					// wheel model
+	idVec3					wheelOffset;				// wheel position relative to body1
+	trace_t					trace;						// contact point with the ground
+	float					epsilon;					// lcp epsilon
+
+protected:
+	virtual void			Evaluate( float invTimeStep );
+	virtual void			ApplyFriction( float invTimeStep );
+};
+
 
 //===============================================================
 //
@@ -634,6 +680,8 @@ public:
 
 	void					Save( idSaveGame *saveFile );
 	void					Restore( idRestoreGame *saveFile );
+
+	const idVecX &			GetTotalForce(void) const { return totalForce; } // HUMANHEAD mdl
 
 private:
 							// properties
@@ -737,6 +785,7 @@ typedef struct AFCollision_s {
 	idAFBody *				body;
 } AFCollision_t;
 
+
 class idPhysics_AF : public idPhysics_Base {
 
 public:
@@ -773,7 +822,6 @@ public:
 	void					DeleteBody( const int id );
 	void					DeleteConstraint( const char *constraintName );
 	void					DeleteConstraint( const int id );
-
 							// get all the contact constraints acting on the body
 	int						GetBodyContactConstraints( const int id, idAFConstraint_Contact *contacts[], int maxContacts ) const;
 							// set the default friction for bodies
@@ -808,11 +856,6 @@ public:
 	void					SetComeToRest( bool enable ) { comeToRest = enable; }
 							// call when structure of articulated figure changes
 	void					SetChanged( void ) { changedAF = true; }
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-							// enable or disable fast evaluation
-	void					SetFastEval( const bool enable ) { fastEval = enable; }
-// RAVEN END
 							// enable/disable activation by impact
 	void					EnableImpact( void );
 	void					DisableImpact( void );
@@ -830,9 +873,6 @@ public:	// common physics interface
 
 	void					SetMass( float mass, int id = -1 );
 	float					GetMass( int id = -1 ) const;
-
-	//MCG: added SetImpulseThreshold
-	void					SetImpulseThreshold( float newIT ) { impulseThreshold = newIT; };
 
 	void					SetContents( int contents, int id = -1 );
 	int						GetContents( int id = -1 ) const;
@@ -886,6 +926,13 @@ public:	// common physics interface
 	void					SetPushed( int deltaTime );
 	const idVec3 &			GetPushedLinearVelocity( const int id = 0 ) const;
 	const idVec3 &			GetPushedAngularVelocity( const int id = 0 ) const;
+
+	// HUMANHEAD nla - Added to allow bound ragdols to be teleported w/out any problem
+	void					Freeze() { frozen = true; };
+	void					Thaw() { frozen = false; };
+	bool					IsFrozen() const { return frozen; }
+	float					GetInvMass() { if ( invMass == 1.0 && totalMass != 0.0f ) { invMass = 1 / totalMass; } return invMass; };
+	// HUMANHEAD END
 
 	void					SetMaster( idEntity *master, const bool orientated = true );
 
@@ -945,10 +992,6 @@ private:
 	bool					noImpact;						// if true do not activate when another object collides
 	bool					worldConstraintsLocked;			// if true world constraints cannot be moved
 	bool					forcePushable;					// if true can be pushed even when bound to a master
-// RAVEN BEGIN
-// rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
-	bool					fastEval;						// if true the fast eval is on
-// RAVEN END
 
 							// physics state
 	AFPState_t				current;
@@ -956,6 +999,11 @@ private:
 
 	idAFBody *				masterBody;						// master body
 	idLCP *					lcp;							// linear complementarity problem solver
+
+	// HUMANHEAD nla - Added to allow bound ragdols to be teleported w/out any problem
+	bool					frozen;
+	float					invMass;	// The inv mass of the body
+	// HUMANHEAD END
 
 private:
 	void					BuildTrees( void );

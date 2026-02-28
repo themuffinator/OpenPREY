@@ -1,12 +1,11 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __SCRIPT_INTERPRETER_H__
 #define __SCRIPT_INTERPRETER_H__
 
 #define MAX_STACK_DEPTH 	64
-
-// RB: doubled local stack size
-#define LOCALSTACK_SIZE 	(6144 * 2)
-// RB end
+#define LOCALSTACK_SIZE 	6144
 
 typedef struct prstack_s {
 	int 				s;
@@ -35,19 +34,17 @@ private:
 	idThread			*thread;
 
 	void				PopParms( int numParms );
-// RAVEN BEGIN
-//	abahr: making Push public to allow parms to be put on stack
-public:
 	void				PushString( const char *string );
-	void				Push( intptr_t value );
-	void				PushVector(const idVec3& vector);
-private:
-// RAVEN END
+	public://HUMANHEAD: aob - so we can pass parms in manually
+	void				Push( int value );
+	void				PushStringValue( const char *string );
+	private://HUMANHEAD: aob - undo the public declaration
 	const char			*FloatToString( float value );
 	void				AppendString( idVarDef *def, const char *from );
 	void				SetString( idVarDef *def, const char *from );
 	const char			*GetString( idVarDef *def );
 	varEval_t			GetVariable( idVarDef *def );
+	byte				*ResolveFieldPointer( varEval_t &pointerVar, int valueSize );
 	idEntity			*GetEntity( int entnum ) const;
 	idScriptObject		*GetScriptObject( int entnum ) const;
 	void				NextInstruction( int position );
@@ -55,11 +52,6 @@ private:
 	void				LeaveFunction( idVarDef *returnDef );
 	void				CallEvent( const function_t *func, int argsize );
 	void				CallSysEvent( const function_t *func, int argsize );
-// RAVEN BEGIN
-// jshepard: last variable referenced in the script-- keep tabs on it so we can print it for warnings.
-	idVarDef			*LastScriptVariable;
-// RAVEN END
-
 
 public:
 	bool				doneProcessing;
@@ -80,13 +72,16 @@ public:
 	int					CurrentLine( void ) const;
 	const char			*CurrentFile( void ) const;
 
-	void				Error( const char *fmt, ... ) const;
-	void				Warning( const char *fmt, ... ) const;
+	void				Error( char *fmt, ... ) const id_attribute((format(printf,2,3)));
+	void				Warning( char *fmt, ... ) const id_attribute((format(printf,2,3)));
 	void				DisplayInfo( void ) const;
 
 	bool				BeginMultiFrameEvent( idEntity *ent, const idEventDef *event );
 	void				EndMultiFrameEvent( idEntity *ent, const idEventDef *event );
 	bool				MultiFrameEventInProgress( void ) const;
+	// HUMANHEAD nla - Needed to check what the current event is
+	bool				RunningEvent( idEntity *ent, const idEventDef *event );
+	// HUMANHEAD END
 
 	void				ThreadCall( idInterpreter *source, const function_t *func, int args );
 	void				EnterFunction( const function_t *func, bool clearStack );
@@ -122,25 +117,21 @@ ID_INLINE void idInterpreter::PopParms( int numParms ) {
 idInterpreter::Push
 ====================
 */
-ID_INLINE void idInterpreter::Push( intptr_t value ) {
-	if ( localstackUsed + sizeof(intptr_t) > LOCALSTACK_SIZE ) {
+ID_INLINE void idInterpreter::Push( int value ) {
+	if ( localstackUsed + sizeof( int ) > LOCALSTACK_SIZE ) {
 		Error( "Push: locals stack overflow\n" );
 	}
-	*(intptr_t* )&localstack[ localstackUsed ]	= value;
-	localstackUsed += sizeof(intptr_t);
+	*( int * )&localstack[ localstackUsed ]	= value;
+	localstackUsed += sizeof( int );
 }
 
 /*
 ====================
-idInterpreter::PushVector
+idInterpreter::PushStringValue
 ====================
 */
-ID_INLINE void idInterpreter::PushVector(const idVec3& vector) {
-	if (localstackUsed + E_EVENT_SIZEOF_VEC > LOCALSTACK_SIZE) {
-		Error("Push: locals stack overflow\n");
-	}
-	*(idVec3*)&localstack[localstackUsed] = vector;
-	localstackUsed += E_EVENT_SIZEOF_VEC;
+ID_INLINE void idInterpreter::PushStringValue( const char *string ) {
+	PushString( string );
 }
 
 /*
@@ -232,11 +223,10 @@ idInterpreter::GetEntity
 ================
 */
 ID_INLINE idEntity *idInterpreter::GetEntity( int entnum ) const{
-	assert( entnum <= MAX_GENTITIES );
-	if ( ( entnum > 0 ) && ( entnum <= MAX_GENTITIES ) ) {
-		return gameLocal.entities[ entnum - 1 ];
+	if ( ( entnum <= 0 ) || ( entnum > MAX_GENTITIES ) ) {
+		return NULL;
 	}
-	return NULL;
+	return gameLocal.entities[ entnum - 1 ];
 }
 
 /*
@@ -247,12 +237,12 @@ idInterpreter::GetScriptObject
 ID_INLINE idScriptObject *idInterpreter::GetScriptObject( int entnum ) const {
 	idEntity *ent;
 
-	assert( entnum <= MAX_GENTITIES );
-	if ( ( entnum > 0 ) && ( entnum <= MAX_GENTITIES ) ) {
-		ent = gameLocal.entities[ entnum - 1 ];
-		if ( ent && ent->scriptObject.data ) {
-			return &ent->scriptObject;
-		}
+	if ( ( entnum <= 0 ) || ( entnum > MAX_GENTITIES ) ) {
+		return NULL;
+	}
+	ent = gameLocal.entities[ entnum - 1 ];
+	if ( ent && ent->scriptObject.data ) {
+		return &ent->scriptObject;
 	}
 	return NULL;
 }

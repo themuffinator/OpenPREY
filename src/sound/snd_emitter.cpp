@@ -1120,6 +1120,39 @@ void idSoundEmitterLocal::ModifySound( const s_channelType channel, const soundS
 
 /*
 ========================
+idSoundEmitterLocal::GetSoundParms
+========================
+*/
+soundShaderParms_t *idSoundEmitterLocal::GetSoundParms( idSoundShader *shader, const s_channelType channel )
+{
+	static soundShaderParms_t convertedParms;
+
+	for ( int i = channels.Num() - 1; i >= 0; --i )
+	{
+		idSoundChannel *chan = channels[i];
+		if ( chan == NULL )
+		{
+			continue;
+		}
+		if ( channel != SCHANNEL_ANY && chan->logicalChannel != channel )
+		{
+			continue;
+		}
+		if ( shader != NULL && chan->soundShader != shader )
+		{
+			continue;
+		}
+
+		convertedParms = chan->parms;
+		convertedParms.volume = LinearToDB( chan->parms.volume );
+		return &convertedParms;
+	}
+
+	return NULL;
+}
+
+/*
+========================
 idSoundEmitterLocal::FadeSound
 ========================
 */
@@ -1216,5 +1249,81 @@ float idSoundEmitterLocal::CurrentAmplitude()
 			amplitude = Max( amplitude, chan->loopingSample->GetAmplitude( ( relativeTime - leadinLength ) % chan->loopingSample->LengthInMsec() ) );
 		}
 	}
+	return amplitude;
+}
+
+/*
+========================
+idSoundEmitterLocal::CurrentAmplitude
+========================
+*/
+float idSoundEmitterLocal::CurrentAmplitude( const s_channelType channel )
+{
+	if ( channel == SCHANNEL_ANY ) {
+		return CurrentAmplitude();
+	}
+
+	float amplitude = 0.0f;
+	const int currentTime = soundWorld->GetSoundTime();
+	for ( int i = 0; i < channels.Num(); i++ )
+	{
+		idSoundChannel *chan = channels[i];
+		if ( chan == NULL || chan->logicalChannel != channel || currentTime < chan->startTime || ( chan->endTime > 0 && currentTime >= chan->endTime ) )
+		{
+			continue;
+		}
+
+		const int relativeTime = currentTime - chan->startTime;
+		const int leadinLength = chan->leadinSample->LengthInMsec();
+		if ( relativeTime < leadinLength )
+		{
+			amplitude = Max( amplitude, chan->leadinSample->GetAmplitude( relativeTime ) );
+		}
+		else if ( chan->loopingSample != NULL )
+		{
+			amplitude = Max( amplitude, chan->loopingSample->GetAmplitude( ( relativeTime - leadinLength ) % chan->loopingSample->LengthInMsec() ) );
+		}
+	}
+
+	return amplitude;
+}
+
+/*
+========================
+idSoundEmitterLocal::CurrentVoiceAmplitude
+========================
+*/
+float idSoundEmitterLocal::CurrentVoiceAmplitude( const s_channelType channel )
+{
+	float amplitude = 0.0f;
+	const int currentTime = soundWorld->GetSoundTime();
+	for ( int i = 0; i < channels.Num(); i++ )
+	{
+		idSoundChannel *chan = channels[i];
+		if ( chan == NULL || currentTime < chan->startTime || ( chan->endTime > 0 && currentTime >= chan->endTime ) )
+		{
+			continue;
+		}
+		if ( channel != SCHANNEL_ANY && chan->logicalChannel != channel )
+		{
+			continue;
+		}
+		if ( ( chan->parms.soundShaderFlags & SSF_VOICEAMPLITUDE ) == 0 )
+		{
+			continue;
+		}
+
+		const int relativeTime = currentTime - chan->startTime;
+		const int leadinLength = chan->leadinSample->LengthInMsec();
+		if ( relativeTime < leadinLength )
+		{
+			amplitude = Max( amplitude, chan->leadinSample->GetAmplitude( relativeTime ) );
+		}
+		else if ( chan->loopingSample != NULL )
+		{
+			amplitude = Max( amplitude, chan->loopingSample->GetAmplitude( ( relativeTime - leadinLength ) % chan->loopingSample->LengthInMsec() ) );
+		}
+	}
+
 	return amplitude;
 }

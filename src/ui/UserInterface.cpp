@@ -315,9 +315,41 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 		while( src.ReadToken( &token ) ) {
 			if ( idStr::Icmp( token, "windowDef" ) == 0 ) {
 				desktop->SetDC( &uiManagerLocal.dc );
+				desktop->SetWindowDefType( token.c_str() );
 				if ( desktop->Parse( &src, rebuild ) ) {
 					desktop->SetFlag( WIN_DESKTOP );
 					desktop->FixupParms();
+				}
+				continue;
+			}
+			else if ( idStr::Icmp( token, "animationDef" ) == 0 ||
+					  idStr::Icmp( token, "buttonDef" ) == 0 ||
+					  idStr::Icmp( token, "superWindowDef" ) == 0 ||
+					  idStr::Icmp( token, "tabContainerDef" ) == 0 ||
+					  idStr::Icmp( token, "tabDef" ) == 0 ||
+					  idStr::Icmp( token, "keyDef" ) == 0 ||
+					  idStr::Icmp( token, "creditDef" ) == 0 ||
+					  idStr::Icmp( token, "splineDef" ) == 0 ||
+					  idStr::Icmp( token, "bindDef" ) == 0 ||
+					  idStr::Icmp( token, "bindKeyDef" ) == 0 ) {
+				const idStr childDefType = token;
+				idToken childName;
+				idWindow *child = NULL;
+
+				desktop->SetDC( &uiManagerLocal.dc );
+				if ( !src.ExpectTokenType( TT_NAME, 0, &childName ) ) {
+					continue;
+				}
+
+				src.UnreadToken( &childName );
+				child = new idWindow( &uiManagerLocal.dc, this );
+				child->SetWindowDefType( childDefType.c_str() );
+				if ( child->Parse( &src, rebuild ) ) {
+					desktop->SetFlag( WIN_DESKTOP );
+					desktop->AddChildWindow( child );
+					child->FixupParms();
+				} else {
+					delete child;
 				}
 				continue;
 			}
@@ -384,6 +416,13 @@ const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _tim
 
 void idUserInterfaceLocal::HandleNamedEvent ( const char* eventName ) {
 	desktop->RunNamedEvent( eventName );
+}
+
+void idUserInterfaceLocal::CallStartup( void ) {
+	if ( desktop != NULL ) {
+		desktop->RunScript( idWindow::ON_STARTUP );
+		desktop->RunNamedEvent( "onStartup" );
+	}
 }
 
 void idUserInterfaceLocal::Redraw( int _time ) {

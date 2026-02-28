@@ -86,10 +86,25 @@ idCVar com_autoScreenshot( "com_autoScreenshot", "0", CVAR_SYSTEM | CVAR_BOOL | 
 idCVar com_makingBuild( "com_makingBuild", "0", CVAR_BOOL | CVAR_SYSTEM, "1 when making a build" );
 idCVar com_updateLoadSize( "com_updateLoadSize", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "update the load size after loading a map" );
 idCVar com_videoRam( "com_videoRam", "64", CVAR_INTEGER | CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ARCHIVE, "holds the last amount of detected video ram" );
-idCVar com_activeGameModule( "com_activeGameModule", "", CVAR_SYSTEM, "active game module (game_sp/game_mp)" );
+idCVar com_activeGameModule( "com_activeGameModule", "", CVAR_SYSTEM, "active game module (unified: game)" );
 idCVar com_nextGameModule( "com_nextGameModule", "", CVAR_SYSTEM, "internal one-shot game module override for reloadEngine" );
 
 idCVar com_product_lang_ext( "com_product_lang_ext", "1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE, "Extension to use when creating language files." );
+
+// Prey menu/runtime compatibility cvars expected by retail guis.
+idCVar gui_filter_pb( "gui_filter_pb", "0", CVAR_ARCHIVE | CVAR_SYSTEM, "filter PunkBuster-protected servers in browser" );
+idCVar g_subtitles( "g_subtitles", "1", CVAR_ARCHIVE | CVAR_GAME, "enable subtitle display" );
+idCVar com_profanity( "com_profanity", "0", CVAR_ARCHIVE | CVAR_SYSTEM, "enable profanity filter" );
+idCVar r_shaderlevel( "r_shaderlevel", "2", CVAR_ARCHIVE | CVAR_RENDERER, "shader quality level for legacy Prey menu binding" );
+idCVar r_correctspecular( "r_correctspecular", "1", CVAR_ARCHIVE | CVAR_RENDERER, "toggle corrected specular calculations" );
+idCVar r_normalizebumpmap( "r_normalizebumpmap", "0", CVAR_ARCHIVE | CVAR_RENDERER, "toggle bump-map normalization" );
+idCVar r_skipGlowOverlay( "r_skipGlowOverlay", "0", CVAR_ARCHIVE | CVAR_RENDERER, "skip glow overlays when non-zero" );
+idCVar r_lowParticleDetail( "r_lowParticleDetail", "0", CVAR_ARCHIVE | CVAR_RENDERER, "reduce particle quality when non-zero" );
+idCVar r_useFastSkinning( "r_useFastSkinning", "0", CVAR_ARCHIVE | CVAR_RENDERER, "use fast skinning path when non-zero" );
+idCVar image_anisotropy( "image_anisotropy", "8", CVAR_ARCHIVE | CVAR_RENDERER, "texture anisotropy level" );
+idCVar s_musicvolume_dB( "s_musicvolume_dB", "0", CVAR_ARCHIVE | CVAR_SOUND, "music volume in decibels" );
+idCVar g_levelloadmusic( "g_levelloadmusic", "1", CVAR_ARCHIVE | CVAR_GAME, "play music while levels are loading" );
+idCVar s_reverse( "s_reverse", "0", CVAR_ARCHIVE | CVAR_SOUND, "reverse stereo channels" );
 
 // com_speeds times
 int				time_gameFrame;
@@ -464,7 +479,7 @@ void idCommonLocal::VPrintf( const char *fmt, va_list args ) {
 			ID_TIME_T aclock;
 			idStr fileName = com_logFileName.GetString()[0] ? com_logFileName.GetString() : "qconsole.log";
 			if ( fileName.Icmp( "auto" ) == 0 ) {
-				fileName = "logs/openq4_%Y%m%d_%H%M%S.log";
+				fileName = "logs/OpenPrey_%Y%m%d_%H%M%S.log";
 			}
 
 			char resolvedFileName[MAX_OSPATH];
@@ -2491,7 +2506,7 @@ void idCommonLocal::InitRenderSystem( void ) {
 	}
 
 	renderSystem->InitOpenGL();
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104343" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04343" ) );
 }
 
 /*
@@ -2515,6 +2530,27 @@ static int Common_CountVisibleSmallChars( const char *string ) {
 		s++;
 	}
 	return count;
+}
+
+static const idMaterial *Common_FindFirstResolvedMaterial( const char * const *materialNames, const int materialCount ) {
+	const idMaterial *fallback = NULL;
+
+	for ( int i = 0; i < materialCount; i++ ) {
+		const char *materialName = materialNames[ i ];
+		if ( materialName == NULL || materialName[ 0 ] == '\0' ) {
+			continue;
+		}
+
+		const idMaterial *material = declManager->FindMaterial( materialName, true );
+		if ( fallback == NULL ) {
+			fallback = material;
+		}
+		if ( material != NULL && material->GetState() != DS_DEFAULTED ) {
+			return material;
+		}
+	}
+
+	return fallback;
 }
 
 static void Common_DrawScaledSmallString( float x, float y, float charWidth, float charHeight,
@@ -2613,7 +2649,19 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 	renderSystem->SetColor( idVec4( 0.0f, 0.0f, 0.0f, 1.0f ) );
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
 	renderSystem->SetColor( idVec4( 1.0f, 1.0f, 1.0f, 1.0f ) );
-	renderSystem->DrawStretchPic( splashX, splashY, splashW, splashH, 0, 0, 1, 1, declManager->FindMaterial( "gfx/splashScreen" ) );
+	static const char *splashMaterialCandidates[] = {
+		"gfx/guis/loadscreens/generic",
+		"guis/assets/loading/loading",
+		"gfx/splashScreen",
+		"gfx/splashscreen"
+	};
+	const idMaterial *splashMaterial = Common_FindFirstResolvedMaterial(
+		splashMaterialCandidates,
+		sizeof( splashMaterialCandidates ) / sizeof( splashMaterialCandidates[ 0 ] )
+	);
+	if ( splashMaterial ) {
+		renderSystem->DrawStretchPic( splashX, splashY, splashW, splashH, 0, 0, 1, 1, splashMaterial );
+	}
 
 	const int charCount = Common_CountVisibleSmallChars( msg );
 	const float charWidth = SMALLCHAR_WIDTH * textScaleX;
@@ -2622,7 +2670,7 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 	const float textX = correctedX + ( correctedW - textWidth ) * 0.5f;
 	const float textY = correctedY + 410.0f * textScaleY;
 	Common_DrawScaledSmallString( textX, textY, charWidth, charHeight, msg,
-		idVec4( 0.94f, 0.62f, 0.05f, 1.0f ), true, declManager->FindMaterial( "fonts/english/bigchars", false ) );
+		idVec4( 0.94f, 0.62f, 0.05f, 1.0f ), true, declManager->FindMaterial( "textures/bigchars", false ) );
 	renderSystem->SetColor( idVec4( 1.0f, 1.0f, 1.0f, 1.0f ) );
 	renderSystem->EndFrame( NULL, NULL );
 }
@@ -2830,45 +2878,76 @@ void idCommonLocal::Async( void ) {
 	}
 }
 
-static bool OpenQ4_IsMultiplayerGameType( const char *gameType ) {
-	return gameType && gameType[0] && idStr::Icmp( gameType, "singleplayer" ) != 0;
-}
-
-static bool OpenQ4_IsValidGameModuleName( const char *moduleName ) {
+static bool OpenPrey_IsValidGameModuleName( const char *moduleName ) {
 	return moduleName
-		&& ( idStr::Icmp( moduleName, "game_sp" ) == 0 || idStr::Icmp( moduleName, "game_mp" ) == 0 );
+		&& ( idStr::Icmp( moduleName, "game" ) == 0
+			|| idStr::Icmp( moduleName, "game_sp" ) == 0
+			|| idStr::Icmp( moduleName, "game_mp" ) == 0 );
 }
 
-static const char *OpenQ4_SelectGameModuleBaseName( void ) {
+static const char *OpenPrey_SelectGameModuleBaseName( void ) {
 	const char *nextModule = cvarSystem->GetCVarString( "com_nextGameModule" );
-	if ( OpenQ4_IsValidGameModuleName( nextModule ) ) {
-		return idStr::Icmp( nextModule, "game_mp" ) == 0 ? "game_mp" : "game_sp";
+	if ( OpenPrey_IsValidGameModuleName( nextModule ) ) {
+		// Legacy split-module requests are mapped to the unified module.
+		return "game";
 	}
 
-	const char *gameType = cvarSystem->GetCVarString( "si_gameType" );
-	return OpenQ4_IsMultiplayerGameType( gameType ) ? "game_mp" : "game_sp";
+	return "game";
 }
 
 #if defined( _M_X64 ) || defined( __x86_64__ )
-	#define OPENQ4_MODULE_ARCH_TAG "x64"
+	#define OPENPREY_MODULE_ARCH_TAG "x64"
 #elif defined( _M_IX86 ) || defined( __i386__ )
-	#define OPENQ4_MODULE_ARCH_TAG "x86"
+	#define OPENPREY_MODULE_ARCH_TAG "x86"
 #elif defined( _M_ARM64 ) || defined( __aarch64__ )
-	#define OPENQ4_MODULE_ARCH_TAG "arm64"
+	#define OPENPREY_MODULE_ARCH_TAG "arm64"
 #else
-	#define OPENQ4_MODULE_ARCH_TAG "unknown"
+	#define OPENPREY_MODULE_ARCH_TAG "unknown"
 #endif
 
-static void OpenQ4_BuildGameModuleBinaryName( const char *moduleName, char outName[ MAX_OSPATH ] ) {
-	const char *variant = ( moduleName && idStr::Icmp( moduleName, "game_mp" ) == 0 ) ? "mp" : "sp";
-	idStr::snPrintf( outName, MAX_OSPATH, "game-%s_%s", variant, OPENQ4_MODULE_ARCH_TAG );
+static void OpenPrey_BuildUnifiedGameModuleBinaryName( char outName[ MAX_OSPATH ] ) {
+	idStr::snPrintf( outName, MAX_OSPATH, "game_%s", OPENPREY_MODULE_ARCH_TAG );
 }
 
-static void OpenQ4_DisableBSEWithWarning( const char *reason ) {
+static void OpenPrey_AddUniqueModuleCandidate( idStrList &candidates, const char *moduleName ) {
+	if ( !moduleName || !moduleName[ 0 ] ) {
+		return;
+	}
+
+	for ( int i = 0; i < candidates.Num(); i++ ) {
+		if ( idStr::Icmp( candidates[ i ].c_str(), moduleName ) == 0 ) {
+			return;
+		}
+	}
+
+	candidates.Append( moduleName );
+}
+
+static void OpenPrey_BuildGameModuleCandidateList( const char *moduleName, idStrList &candidates ) {
+	char unifiedModuleBinary[ MAX_OSPATH ];
+
+	candidates.Clear();
+	OpenPrey_BuildUnifiedGameModuleBinaryName( unifiedModuleBinary );
+	OpenPrey_AddUniqueModuleCandidate( candidates, unifiedModuleBinary );
+
+#if defined( _M_IX86 ) || defined( __i386__ )
+	OpenPrey_AddUniqueModuleCandidate( candidates, "gamex86" );
+#elif defined( _M_X64 ) || defined( __x86_64__ )
+	OpenPrey_AddUniqueModuleCandidate( candidates, "gamex64" );
+#endif
+
+	// Compatibility aliases for legacy installs.
+	OpenPrey_AddUniqueModuleCandidate( candidates, "game" );
+}
+
+static void OpenPrey_DisableBSEWithWarning( const char *reason ) {
 	static bool warnedConsole = false;
 	if ( !warnedConsole ) {
 		warnedConsole = true;
-		common->Warning( "BSE unavailable (%s). Effects will be disabled.", reason ? reason : "unknown reason" );
+		common->Warning(
+			"BSE unavailable (%s). Raven BSE effects will be disabled; Doom 3 FX/particle decl effects remain available.",
+			reason ? reason : "unknown reason"
+		);
 	}
 
 #if defined( _WIN32 ) && !defined( ID_DEDICATED )
@@ -2880,10 +2959,10 @@ static void OpenQ4_DisableBSEWithWarning( const char *reason ) {
 		idStr::snPrintf(
 			message,
 			sizeof( message ),
-			"Could not load BSE runtime library (libbse-q4).\n\nReason: %s\n\nEffects will be disabled.",
+			"Could not load BSE runtime library (libbse-q4).\n\nReason: %s\n\nRaven BSE effects will be disabled.\nDoom 3 FX/particle decl effects remain available.",
 			reason ? reason : "unknown reason"
 		);
-		::MessageBoxA( NULL, message, "OpenQ4 Warning", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL );
+		::MessageBoxA( NULL, message, "OpenPrey Warning", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL );
 	}
 #endif
 
@@ -2925,14 +3004,15 @@ void idCommonLocal::LoadBSEDLL( void ) {
 
 	fileSystem->FindDLL( "libbse-q4", dllPath, false );
 	if ( !dllPath[ 0 ] ) {
-		OpenQ4_DisableBSEWithWarning( "couldn't find dynamic library 'libbse-q4'" );
+		// Prey does not require the Quake 4 BSE runtime; keep this optional.
+		common->DPrintf( "BSE runtime libbse-q4 not found; continuing with Doom 3 FX/particle decl effects.\n" );
 		return;
 	}
 
 	common->DPrintf( "Loading BSE DLL: '%s'\n", dllPath );
 	bseDLL = sys->DLL_Load( dllPath );
 	if ( !bseDLL ) {
-		OpenQ4_DisableBSEWithWarning( "couldn't load dynamic library 'libbse-q4'" );
+		OpenPrey_DisableBSEWithWarning( "couldn't load dynamic library 'libbse-q4'" );
 		return;
 	}
 
@@ -2940,7 +3020,7 @@ void idCommonLocal::LoadBSEDLL( void ) {
 	if ( !GetBSEAPI ) {
 		Sys_DLL_Unload( bseDLL );
 		bseDLL = NULL;
-		OpenQ4_DisableBSEWithWarning( "couldn't find BSE DLL API entry point" );
+		OpenPrey_DisableBSEWithWarning( "couldn't find BSE DLL API entry point" );
 		return;
 	}
 
@@ -2966,14 +3046,14 @@ void idCommonLocal::LoadBSEDLL( void ) {
 	if ( !bseExportPtr ) {
 		Sys_DLL_Unload( bseDLL );
 		bseDLL = NULL;
-		OpenQ4_DisableBSEWithWarning( "BSE DLL API handshake failed" );
+		OpenPrey_DisableBSEWithWarning( "BSE DLL API handshake failed" );
 		return;
 	}
 	bseExport = *bseExportPtr;
 	if ( bseExport.version != BSE_API_VERSION || !bseExport.bse || !bseExport.AllocDeclEffect ) {
 		Sys_DLL_Unload( bseDLL );
 		bseDLL = NULL;
-		OpenQ4_DisableBSEWithWarning( "BSE DLL API version mismatch" );
+		OpenPrey_DisableBSEWithWarning( "BSE DLL API version mismatch" );
 		return;
 	}
 
@@ -3011,36 +3091,44 @@ idCommonLocal::LoadGameDLL
 void idCommonLocal::LoadGameDLL( void ) {
 #ifdef __DOOM_DLL__
 	char			dllPath[ MAX_OSPATH ];
-	char			preferredGameModuleBinary[ MAX_OSPATH ];
+	idStr			attemptedCandidates;
+	idStrList		gameModuleCandidates;
 	const char *	selectedModuleBinary;
 
 	gameImport_t	gameImport;
 	gameExport_t	gameExport;
 	GetGameAPI_t	GetGameAPI;
 
-	const char *gameModuleBaseName = OpenQ4_SelectGameModuleBaseName();
-	OpenQ4_BuildGameModuleBinaryName( gameModuleBaseName, preferredGameModuleBinary );
-	selectedModuleBinary = preferredGameModuleBinary;
-	fileSystem->FindDLL( selectedModuleBinary, dllPath, true );
-
-	if ( !dllPath[ 0 ] ) {
-		// Legacy fallback for existing installs that still ship game_sp/game_mp.
-		selectedModuleBinary = gameModuleBaseName;
-		fileSystem->FindDLL( selectedModuleBinary, dllPath, true );
+	const char *gameModuleBaseName = OpenPrey_SelectGameModuleBaseName();
+	dllPath[ 0 ] = '\0';
+	selectedModuleBinary = NULL;
+	OpenPrey_BuildGameModuleCandidateList( gameModuleBaseName, gameModuleCandidates );
+	for ( int i = 0; i < gameModuleCandidates.Num(); i++ ) {
+		fileSystem->FindDLL( gameModuleCandidates[ i ].c_str(), dllPath, true );
+		if ( dllPath[ 0 ] ) {
+			selectedModuleBinary = gameModuleCandidates[ i ].c_str();
+			break;
+		}
 	}
 
 	if ( !dllPath[ 0 ] ) {
+		for ( int i = 0; i < gameModuleCandidates.Num(); i++ ) {
+			if ( attemptedCandidates.Length() ) {
+				attemptedCandidates += ", ";
+			}
+			attemptedCandidates += gameModuleCandidates[ i ];
+		}
 		common->FatalError(
-			"couldn't find game dynamic library '%s' (or legacy '%s')",
-			preferredGameModuleBinary,
-			gameModuleBaseName
+			"couldn't find game dynamic library for module '%s' (tried: %s)",
+			gameModuleBaseName,
+			attemptedCandidates.c_str()
 		);
 		return;
 	}
 	common->DPrintf( "Loading game DLL: '%s'\n", dllPath );
 	gameDLL = sys->DLL_Load( dllPath );
 	if ( !gameDLL ) {
-		common->FatalError( "couldn't load game dynamic library '%s'", selectedModuleBinary );
+		common->FatalError( "couldn't load game dynamic library '%s'", selectedModuleBinary ? selectedModuleBinary : gameModuleBaseName );
 		return;
 	}
 
@@ -3066,7 +3154,6 @@ void idCommonLocal::LoadGameDLL( void ) {
 	gameImport.declManager				= ::declManager;
 	gameImport.AASFileManager			= ::AASFileManager;
 	gameImport.collisionModelManager	= ::collisionModelManager;
-	gameImport.bse						= ::bse;
 
 	gameExport							= *GetGameAPI( &gameImport );
 
@@ -3345,8 +3432,8 @@ void idCommonLocal::InitGame( void ) {
 	// initialize the file system
 	fileSystem->Init();
 
-	// load the external BSE module before decl initialization so DECL_EFFECT
-	// allocation can be provided by the runtime DLL.
+	// Optionally load the external Raven BSE module before decl initialization.
+	// Prey compatibility uses Doom 3 decl-based FX/particles and does not require it.
 	LoadBSEDLL();
 
 	// initialize the declaration manager
@@ -3376,7 +3463,7 @@ void idCommonLocal::InitGame( void ) {
 	// initialize string database right off so we can use it for loading messages
 	InitLanguageDict();
 
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104343" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04343" ) );
 
 	// load the font, etc
 	console->LoadGraphics();
@@ -3384,7 +3471,7 @@ void idCommonLocal::InitGame( void ) {
 	// init journalling, etc
 	eventLoop->Init();
 
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104343" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04344" ) );
 
 	// exec the startup scripts
 	if ( fileSystem->ReadFile( "editor.cfg", NULL ) >= 0 ) {
@@ -3420,12 +3507,12 @@ void idCommonLocal::InitGame( void ) {
 	// init the user command input code
 	usercmdGen->Init();
 
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104346" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04346" ) );
 
 	// start the sound system, but don't do any hardware operations yet
 	soundSystem->Init();
 
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104347" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04347" ) );
 
 	// init async network
 	idAsyncNetwork::Init();
@@ -3439,30 +3526,30 @@ void idCommonLocal::InitGame( void ) {
 		cvarSystem->SetCVarBool( "s_noSound", true );
 	} else {
 		// init OpenGL, which will open a window and connect sound and input hardware
-		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104348" ) );
+		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04348" ) );
 		InitRenderSystem();
 	}
 #endif
 
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104349" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04349" ) );
 
 	// initialize the user interfaces
 	uiManager->Init();
 
 	// initialize the BSE system before the game DLL starts creating effects
 	if ( bse && !bse->Init() ) {
-		OpenQ4_DisableBSEWithWarning( "BSE initialization failed" );
+		OpenPrey_DisableBSEWithWarning( "BSE initialization failed" );
 	}
 
 	// startup the script debugger
 	// DebuggerServerInit();
 
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104350" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04350" ) );
 
 	// load the game dll
 	LoadGameDLL();
 	
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104351" ) );
+	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04351" ) );
 
 	// init the session
 	session->Init();
@@ -3542,3 +3629,4 @@ void idCommonLocal::ShutdownGame( bool reloading ) {
 	// shut down the file system
 	fileSystem->Shutdown( reloading );
 }
+

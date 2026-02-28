@@ -99,7 +99,7 @@ bool idDeclSkin::Parse( const char *text, const int textLength ) {
 		mappings.Append( map );
 	}
 
-	return false;
+	return true;
 }
 
 /*

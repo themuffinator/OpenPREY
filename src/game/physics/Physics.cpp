@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -48,9 +50,6 @@ idPhysics::SnapTimeToPhysicsFrame
 */
 int idPhysics::SnapTimeToPhysicsFrame( int t ) {
 	int s;
-// RAVEN BEGIN
-// bdube: use GetMSec access rather than USERCMD_TIME
-	s = t + gameLocal.GetMSec() - 1;
-	return ( s - s % gameLocal.GetMSec() );
-// RAVEN END
+	s = t + USERCMD_MSEC - 1;
+	return ( s - s % USERCMD_MSEC );
 }

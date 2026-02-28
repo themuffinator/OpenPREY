@@ -783,10 +783,13 @@ void idCollisionModelManagerLocal::Translation( trace_t *results, const idVec3 &
 
 	memset( results, 0, sizeof( *results ) );
 
-	if (model == NULL) {
+	if ( model == NULL && models != NULL && numModels > 0 ) {
+		model = models[0];
+	}
+	if ( model == NULL ) {
 		static bool warnedNullModel = false;
 		if ( !warnedNullModel ) {
-			common->Warning( "%s: model passed was nullptr", __FUNCTION__ );
+			common->Warning( "%s: model passed was nullptr and no world model is available", __FUNCTION__ );
 			warnedNullModel = true;
 		}
 		results->fraction = 1.0f;

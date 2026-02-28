@@ -1,9 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_TARGET_H__
 #define __GAME_TARGET_H__
-
-//Used to compare two ammoData structs and see who has more.
-int					CompareAmmoData( const void* ammo1, const void* ammo2);
 
 
 /*
@@ -18,7 +17,7 @@ class idTarget : public idEntity {
 public:
 	CLASS_PROTOTYPE( idTarget );
 };
- 
+
 
 /*
 ===============================================================================
@@ -31,23 +30,6 @@ idTarget_Remove
 class idTarget_Remove : public idTarget {
 public:
 	CLASS_PROTOTYPE( idTarget_Remove );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
-
-/*
-===============================================================================
-
-idTarget_Show
-
-===============================================================================
-*/
-
-class idTarget_Show : public idTarget {
-public:
-	CLASS_PROTOTYPE( idTarget_Show );
 
 private:
 	void				Event_Activate( idEntity *activator );
@@ -100,7 +82,8 @@ class idTarget_EndLevel : public idTarget {
 public:
 	CLASS_PROTOTYPE( idTarget_EndLevel );
 
-private:
+protected:	// HUMANHEAD pdm
+	virtual	// HUMANHEAD pdm
 	void				Event_Activate( idEntity *activator );
 
 };
@@ -249,30 +232,8 @@ public:
 
 private:
 	void				Event_Activate( idEntity *activator );
-// RAVEN BEGIN
-// abahr: fixing issue with EV_Activate not taking NULL ptrs
-	void				Event_PostSpawn();
-// RAVEN END
 };
 
-
-/*
-===============================================================================
-
-idTarget_GiveEmail
-
-===============================================================================
-*/
-
-class idTarget_GiveEmail : public idTarget {
-public:
-	CLASS_PROTOTYPE( idTarget_GiveEmail );
-
-	void				Spawn( void );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
 
 /*
 ===============================================================================
@@ -290,49 +251,6 @@ public:
 
 private:
 	void				Event_Activate( idEntity *activator );
-};
-
-
-/*
-===============================================================================
-
-idTarget_SetInfluence
-
-===============================================================================
-*/
-
-class idTarget_SetInfluence : public idTarget {
-public:
-	CLASS_PROTOTYPE( idTarget_SetInfluence );
-
-						idTarget_SetInfluence( void );
-
-	void				Save( idSaveGame *savefile ) const;
-	void				Restore( idRestoreGame *savefile );
-
-	void				Spawn( void );
-
-private:
-	void				Event_Activate( idEntity *activator );
-	void				Event_RestoreInfluence();
-	void				Event_GatherEntities();
-	void				Event_Flash( float flash, int out );
-	void				Event_ClearFlash( float flash );
-	void				Think( void );
-
-	idList<int>			lightList;
-	idList<int>			guiList;
-	idList<int>			soundList;
-	idList<int>			genericList;
-	float				flashIn;
-	float				flashOut;
-	float				delay;
-	idStr				flashInSound;
-	idStr				flashOutSound;
-	idEntity *			switchToCamera;
-	idInterpolate<float>fovSetting;
-	bool				soundFaded;
-	bool				restoreOnTrigger;
 };
 
 
@@ -368,139 +286,12 @@ public:
 	void				Save( idSaveGame *savefile ) const;
 	void				Restore( idRestoreGame *savefile );
 
-	void				Think( void );
-
 private:
 	idInterpolate<int>	fovSetting;
 
 	void				Event_Activate( idEntity *activator );
 };
 
-
-/*
-===============================================================================
-
-idTarget_SetPrimaryObjective
-
-===============================================================================
-*/
-
-class idTarget_SetPrimaryObjective : public idTarget {
-public:
-	CLASS_PROTOTYPE( idTarget_SetPrimaryObjective );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
-// RAVEN BEGIN
-// bdube: added player database
-/*
-===============================================================================
-
-idTarget_AddDatabaseEntry
-
-===============================================================================
-*/
-
-class rvTarget_AddDatabaseEntry : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_AddDatabaseEntry );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
-// jshepard: secret area discovery
-
-/*
-===============================================================================
-
-idTarget_SecretArea
-
-===============================================================================
-*/
-
-class rvTarget_SecretArea : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_SecretArea );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
-/*
-===============================================================================
-
-rvTarget_BossBattle
-
-===============================================================================
-*/
-
-class rvTarget_BossBattle : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_BossBattle );
-
-private:
-	void				Event_Activate( idEntity *activator );
-	void				Event_SetShieldPercent( float percent );
-	void				Event_SetBossMaxHealth( float f );
-	void				Event_AllowShieldBar( float activate );
-	void				Event_AllowShieldWarningBar( float activate );
-
-};
-
-/*
-===============================================================================
-
-rvTarget_TetherAI
-
-===============================================================================
-*/
-
-class rvTarget_TetherAI : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_TetherAI );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
-
-/*
-===============================================================================
-
-rvTarget_Nailable
-
-===============================================================================
-*/
-
-class rvTarget_Nailable : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_Nailable );
-
-private:
-	void				Spawn( void );
-};
-
-
-// RAVEN END
-
-/*
-===============================================================================
-
-idTarget_LockDoor
-
-===============================================================================
-*/
-
-class idTarget_LockDoor: public idTarget {
-public:
-	CLASS_PROTOTYPE( idTarget_LockDoor );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
 
 /*
 ===============================================================================
@@ -522,7 +313,7 @@ private:
 /*
 ===============================================================================
 
-idTarget_LockDoor
+idTarget_EnableLevelWeapons
 
 ===============================================================================
 */
@@ -548,35 +339,18 @@ class idTarget_Tip : public idTarget {
 public:
 	CLASS_PROTOTYPE( idTarget_Tip );
 
-						idTarget_Tip( void );
-
+						idTarget_Tip();
 	void				Spawn( void );
-
 	void				Save( idSaveGame *savefile ) const;
 	void				Restore( idRestoreGame *savefile );
+	void				Disable();
 
 private:
-	idVec3				playerPos;
-
 	void				Event_Activate( idEntity *activator );
-	void				Event_TipOff( void );
-	void				Event_GetPlayerPos( void );
+	void				Event_CheckPlayerPos( void );
+
+	bool				bDisabled;
 };
-
-/*
-===============================================================================
-
-idTarget_GiveSecurity
-
-===============================================================================
-*/
-class idTarget_GiveSecurity : public idTarget {
-public:
-	CLASS_PROTOTYPE( idTarget_GiveSecurity );
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
 
 /*
 ===============================================================================
@@ -637,68 +411,4 @@ private:
 };
 
 
-/*
-===============================================================================
-
-rvTarget_LaunchProjectile
-
-===============================================================================
-*/
-
-class rvTarget_LaunchProjectile : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_LaunchProjectile );
-
-	void				Spawn( void );
-
-private:
-	void				Event_Activate( idEntity *activator );
-	void				Event_LaunchProjectile( idEntity *activator );
-};
-
-/*
-===============================================================================
-
-rvTarget_ExitAreaAlert
-
-===============================================================================
-*/
-
-class rvTarget_ExitAreaAlert : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_ExitAreaAlert );
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
-
-/*
-===============================================================================
-
-rvTarget_AmmoStash
-
-===============================================================================
-*/
-typedef struct	ammodata_s	{
-
-	int			ammoIndex;
-	idStr		ammoName;
-	int			ammoCount;
-	int			ammoMax;
-	float		percentFull;
-
-} ammodata_t;
-
-#define AMMO_ARRAY_SIZE 10
-
-class rvTarget_AmmoStash : public idTarget {
-public:
-	CLASS_PROTOTYPE( rvTarget_AmmoStash );
-
-	//used to detect which weapons need ammo. The values stored are 0 to 1, with -1 meaning don't check this out.
-	ammodata_t			AmmoArray[ AMMO_ARRAY_SIZE];
-
-private:
-	void				Event_Activate( idEntity *activator );
-};
 #endif /* !__GAME_TARGET_H__ */

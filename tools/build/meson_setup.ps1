@@ -121,11 +121,17 @@ if ($effectiveArgs.Count -eq 0) {
 }
 
 $commandName = $effectiveArgs[0].ToLowerInvariant()
-$gameLibsRepo = if ([string]::IsNullOrWhiteSpace($env:OPENQ4_GAMELIBS_REPO)) { "" } else { $env:OPENQ4_GAMELIBS_REPO }
+$gameLibsRepo = ""
+if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_GAMELIBS_REPO)) {
+    $gameLibsRepo = $env:OPENPREY_GAMELIBS_REPO
+} elseif (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_GAMELIBS_REPO)) {
+    $gameLibsRepo = $env:OPENQ4_GAMELIBS_REPO
+}
 $syncGameLibsScript = Join-Path $scriptDir "sync_gamelibs.ps1"
 $buildGameLibsScript = Join-Path $scriptDir "build_gamelibs.ps1"
 
-if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKIP_GAMELIBS_SYNC -ne "1") {
+$skipGameLibsSync = ($env:OPENPREY_SKIP_GAMELIBS_SYNC -eq "1") -or ($env:OPENQ4_SKIP_GAMELIBS_SYNC -eq "1")
+if (@("setup", "compile", "install").Contains($commandName) -and -not $skipGameLibsSync) {
     if (-not (Test-Path $syncGameLibsScript)) {
         throw "GameLibs sync script not found: '$syncGameLibsScript'."
     }
@@ -142,8 +148,9 @@ if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKI
     }
 }
 
-$buildGameLibs = $env:OPENQ4_BUILD_GAMELIBS -eq "1"
-if ($commandName -eq "compile" -and $buildGameLibs -and $env:OPENQ4_SKIP_GAMELIBS_BUILD -ne "1") {
+$buildGameLibs = ($env:OPENPREY_BUILD_GAMELIBS -eq "1") -or ($env:OPENQ4_BUILD_GAMELIBS -eq "1")
+$skipGameLibsBuild = ($env:OPENPREY_SKIP_GAMELIBS_BUILD -eq "1") -or ($env:OPENQ4_SKIP_GAMELIBS_BUILD -eq "1")
+if ($commandName -eq "compile" -and $buildGameLibs -and -not $skipGameLibsBuild) {
     if (-not (Test-Path $buildGameLibsScript)) {
         throw "GameLibs build script not found: '$buildGameLibsScript'."
     }
@@ -200,4 +207,32 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
 
 Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd
 $exitCode = [int]$LASTEXITCODE
+
+if ($exitCode -eq 0 -and $effectiveArgs.Length -gt 0 -and $effectiveArgs[0] -eq "install") {
+    $legacyModulePatterns = @(
+        "game-sp_*.dll", "game-sp_*.lib", "game-sp_*.pdb", "game-sp_*.exp",
+        "game-mp_*.dll", "game-mp_*.lib", "game-mp_*.pdb", "game-mp_*.exp",
+        "game_sp_*.dll", "game_sp_*.lib", "game_sp_*.pdb", "game_sp_*.exp",
+        "game_mp_*.dll", "game_mp_*.lib", "game_mp_*.pdb", "game_mp_*.exp"
+    )
+    $cleanupDirs = @(
+        (Join-Path $repoRoot ".install\openprey"),
+        (Join-Path $repoRoot "builddir\openprey"),
+        (Join-Path $repoRoot "install\openprey"),
+        (Join-Path $repoRoot "install\openbase"),
+        (Join-Path $repoRoot "builddir\openbase")
+    )
+    foreach ($cleanupDir in $cleanupDirs) {
+        if (-not (Test-Path $cleanupDir)) {
+            continue
+        }
+        foreach ($pattern in $legacyModulePatterns) {
+            Get-ChildItem -Path $cleanupDir -Filter $pattern -File -ErrorAction SilentlyContinue | ForEach-Object {
+                Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+                Write-Host "Removed legacy split module artifact: $($_.FullName)"
+            }
+        }
+    }
+}
+
 exit $exitCode

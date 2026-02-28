@@ -1,11 +1,11 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "AAS_local.h"
 #include "../Game_local.h"		// for cvars and debug drawing
-#include "AI.h"
-#include "AAS_Find.h"
 
 
 /*
@@ -27,7 +27,7 @@ void idAASLocal::DrawCone( const idVec3 &origin, const idVec3 &dir, float radius
 	lastp = center + radius * axis[1];
 
 	for ( i = 20; i <= 360; i += 20 ) {
-		p = center + idMath::Sin( DEG2RAD(i) ) * radius * axis[0] + idMath::Cos( DEG2RAD(i) ) * radius * axis[1];
+		p = center + sin( DEG2RAD(i) ) * radius * axis[0] + cos( DEG2RAD(i) ) * radius * axis[1];
 		gameRenderWorld->DebugLine( color, lastp, p, 0 );
 		gameRenderWorld->DebugLine( color, p, top, 0 );
 		lastp = p;
@@ -40,15 +40,21 @@ idAASLocal::DrawReachability
 ============
 */
 void idAASLocal::DrawReachability( const idReachability *reach ) const {
+#ifdef HUMANHEAD
+	idVec3 dir = (reach->end - reach->start).ToNormal() * 10;
+	gameRenderWorld->DebugArrow( colorCyan, reach->start - dir, reach->end + dir, 2 );
+	gameRenderWorld->DrawText( va( "%d", reach->toAreaNum ), ( reach->start + reach->end ) * 0.5f, 0.1f, colorCyan, gameLocal.GetLocalPlayer()->viewAxis );
+#else
 	gameRenderWorld->DebugArrow( colorCyan, reach->start, reach->end, 2 );
 
 	if ( gameLocal.GetLocalPlayer() ) {
 		gameRenderWorld->DrawText( va( "%d", reach->edgeNum ), ( reach->start + reach->end ) * 0.5f, 0.1f, colorWhite, gameLocal.GetLocalPlayer()->viewAxis );
 	}
+#endif
 
 	switch( reach->travelType ) {
 		case TFL_WALK: {
-//			const idReachability_Walk *walk = static_cast<const idReachability_Walk *>(reach);
+			const idReachability_Walk *walk = static_cast<const idReachability_Walk *>(reach);
 			break;
 		}
 		default: {
@@ -62,16 +68,15 @@ void idAASLocal::DrawReachability( const idReachability *reach ) const {
 idAASLocal::DrawEdge
 ============
 */
-void idAASLocal::DrawEdge( int edgeNum, bool arrow ) const {
+// HUMANHEAD nla - Added color parameterv
+void idAASLocal::DrawEdge( int edgeNum, bool arrow, idVec4 *color ) const {
 	const aasEdge_t *edge;
-	idVec4 *color;
 
 	if ( !file ) {
 		return;
 	}
 
 	edge = &file->GetEdge( edgeNum );
-	color = &colorRed;
 	if ( arrow ) {
 		gameRenderWorld->DebugArrow( *color, file->GetVertex( edge->vertexNum[0] ), file->GetVertex( edge->vertexNum[1] ), 1 );
 	} else {
@@ -88,7 +93,8 @@ void idAASLocal::DrawEdge( int edgeNum, bool arrow ) const {
 idAASLocal::DrawFace
 ============
 */
-void idAASLocal::DrawFace( int faceNum, bool side ) const {
+// HUMANHEAD nla - Added color parameter
+void idAASLocal::DrawFace( int faceNum, bool side, idVec4 *color ) const {
 	int i, j, numEdges, firstEdge;
 	const aasFace_t *face;
 	idVec3 mid, end;
@@ -101,14 +107,9 @@ void idAASLocal::DrawFace( int faceNum, bool side ) const {
 	numEdges = face->numEdges;
 	firstEdge = face->firstEdge;
 
-	if ( !numEdges )
-	{//wtf?  A face with no edges?!
-		return;
-	}
-
 	mid = vec3_origin;
 	for ( i = 0; i < numEdges; i++ ) {
-		DrawEdge( abs( file->GetEdgeIndex( firstEdge + i ) ), ( face->flags & FACE_FLOOR ) != 0 );
+		DrawEdge( abs( file->GetEdgeIndex( firstEdge + i ) ), ( face->flags & FACE_FLOOR ) != 0, color );
 		j = file->GetEdgeIndex( firstEdge + i );
 		mid += file->GetVertex( file->GetEdge( abs( j ) ).vertexNum[ j < 0 ] );
 	}
@@ -124,38 +125,6 @@ void idAASLocal::DrawFace( int faceNum, bool side ) const {
 
 /*
 ============
-idAASLocal::DrawAreaBounds
-============
-*/
-void idAASLocal::DrawAreaBounds( int areaNum ) const {
-	const aasArea_t *area;
-	if ( !file ) {
-		return;
-	}
-	area = &file->GetArea( areaNum );
-
-	idVec3 points[8];
-	bool	drawn[8][8];
-	memset( drawn, false, sizeof( drawn ) );
-	
-	area->bounds.ToPoints( points );
-	for ( int p1 = 0; p1 < 8; p1++ ) {
-		for ( int p2 = 0; p2 < 8; p2++ ) {
-			if ( !drawn[p2][p1] ) {
-				if ( (points[p1].x == points[p2].x && (points[p1].y == points[p2].y||points[p1].z == points[p2].z))
-					|| (points[p1].y == points[p2].y && (points[p1].x == points[p2].x||points[p1].z == points[p2].z))
-					|| (points[p1].z == points[p2].z && (points[p1].x == points[p2].x||points[p1].y == points[p2].y)) ) {
-					//an edge
-					gameRenderWorld->DebugLine( colorRed, points[p1], points[p2] );
-					drawn[p1][p2] = true;
-				}
-			}
-		}
-	}
-}
-
-/*
-============
 idAASLocal::DrawArea
 ============
 */
@@ -163,41 +132,23 @@ void idAASLocal::DrawArea( int areaNum ) const {
 	int i, numFaces, firstFace;
 	const aasArea_t *area;
 	idReachability *reach;
+
 	if ( !file ) {
 		return;
 	}
 
 	area = &file->GetArea( areaNum );
-
-	if ( aas_showAreaBounds.GetBool() ) {
-		if ( (area->flags&AREA_FLOOR)  ) {
-			idVec3 areaTop = area->center;
-			areaTop.z = area->ceiling;
-			gameRenderWorld->DebugArrow( colorCyan, area->center, areaTop, 1 );
-			gameRenderWorld->DrawText( va( "%4.2f", floor(area->ceiling-area->center.z) ), ( area->center + areaTop ) * 0.5f, 0.1f, colorCyan, gameLocal.GetLocalPlayer()->viewAxis );
-		} else {//air area
-			DrawAreaBounds( areaNum );
-		}
-	}
-
 	numFaces = area->numFaces;
 	firstFace = area->firstFace;
 
 	for ( i = 0; i < numFaces; i++ ) {
-		DrawFace( abs( file->GetFaceIndex( firstFace + i ) ), file->GetFaceIndex( firstFace + i ) < 0 );
+		// HUMANHEAD nla - added color parameter
+		DrawFace( abs( file->GetFaceIndex( firstFace + i ) ), file->GetFaceIndex( firstFace + i ) < 0,
+			&colorRed );
 	}
 
-	if (aas_showRevReach.GetInteger())
- 	{
- 		for ( reach = area->rev_reach; reach; reach = reach->rev_next ) {
- 			DrawReachability( reach );
- 		}
- 	}
- 	else
- 	{
- 		for ( reach = area->reach; reach; reach = reach->next ) {
- 			DrawReachability( reach );
- 		}
+	for ( reach = area->reach; reach; reach = reach->next ) {
+		DrawReachability( reach );
 	}
 }
 
@@ -267,363 +218,6 @@ void idAASLocal::ShowArea( const idVec3 &origin ) const {
 
 	DrawArea( areaNum );
 }
-
-// RAVEN BEGIN 
-// rjohnson: added more debug drawing
-/*
-============
-idAASLocal::DrawSimpleEdge
-============
-*/
-void idAASLocal::DrawSimpleEdge( int edgeNum ) const {
-	const aasEdge_t *edge;
-	const idVec4	*color;
-
-	if ( !file ) {
-		return;
-	}
-
-	edge = &file->GetEdge( edgeNum );
-	color = &file->GetSettings().debugColor;
-
-	gameRenderWorld->DebugLine( *color, file->GetVertex( edge->vertexNum[0] ), file->GetVertex( edge->vertexNum[1] ) );
-}
-
-/*
-============
-idAASLocal::DrawSimpleFace
-============
-*/
-const int 	MAX_AAS_WALL_EDGES			= 256;
-
-// RAVEN BEGIN
-// cdr: added visited check
-void idAASLocal::DrawSimpleFace( int faceNum, bool visited ) const {
-// RAVEN END
-	int				i, numEdges, firstEdge, edgeNum;
-	const			aasFace_t *face;
-	idVec3			sides[MAX_AAS_WALL_EDGES];
-	const aasEdge_t *edge, *nextEdge;
-	idVec4			color2;
-
-	if ( !file ) {
-		return;
-	}
-
-	face = &file->GetFace( faceNum );
-	numEdges = face->numEdges;
-	firstEdge = face->firstEdge;
-
-	for ( i = 0; i < numEdges; i++ ) {
-		DrawSimpleEdge( abs( file->GetEdgeIndex( firstEdge + i ) ) );
-	}
-
-	if ( numEdges >= 2 && numEdges <= MAX_AAS_WALL_EDGES ) {
-		edgeNum = abs( file->GetEdgeIndex( firstEdge ) );
-		edge = &file->GetEdge( abs( edgeNum ) );
-		edgeNum = abs( file->GetEdgeIndex( firstEdge + 1 ) );
-		nextEdge = &file->GetEdge( abs( edgeNum ) );
-
-		// need to find the first common edge so that we go form the polygon in the right direction
-		if ( file->GetVertex( edge->vertexNum[0] ) == file->GetVertex( nextEdge->vertexNum[0] ) || 
-			file->GetVertex( edge->vertexNum[0] ) == file->GetVertex( nextEdge->vertexNum[1] ) ) {
-			sides[ 0 ] = file->GetVertex( edge->vertexNum[0] );
-		} else {
-			sides[ 0 ] = file->GetVertex( edge->vertexNum[1] );
-		}
-
-		for ( i = 1; i < numEdges; i++ ) {
-			edgeNum = abs( file->GetEdgeIndex( firstEdge + i ) );
-			edge = &file->GetEdge( abs( edgeNum ) );
-
-			if ( sides[ i-1 ] == file->GetVertex( edge->vertexNum[0] ) ) {
-				sides[ i ] = file->GetVertex( edge->vertexNum[1] );
-			} else {
-				sides[ i ] = file->GetVertex( edge->vertexNum[0] );
-			}
-		}
-
-		color2 = file->GetSettings().debugColor;
-		color2[3] = 0.20f;
-
-		// RAVEN BEGIN
-		// cdr: added visited check
-		if (!visited)
-		{
-			color2[3] = 0.05f;
-		}
-		// RAVEN END
-		idWinding winding( sides, numEdges ); 
-		gameRenderWorld->DebugPolygon( color2, winding, 0, true );
-	}
-}
-
-
-/*
-============
-idAASLocal::DrawSimpleArea
-============
-*/
-void idAASLocal::DrawSimpleArea( int areaNum ) const {
-	int				i, numFaces, firstFace;
-	const aasArea_t *area;
-
-	if ( !file ) {
-		return;
-	}
-
-	area = &file->GetArea( areaNum );
-
-	if ( aas_showAreaBounds.GetBool() ) {
-		if ( (area->flags&AREA_FLOOR) ) {
-			idVec3 areaTop = area->center;
-			areaTop.z = area->ceiling;
-			gameRenderWorld->DebugArrow( colorCyan, area->center, areaTop, 1 );
-			gameRenderWorld->DrawText( va( "%4.2f", floor(area->ceiling-area->center.z) ), ( area->center + areaTop ) * 0.5f, 0.1f, colorCyan, gameLocal.GetLocalPlayer()->viewAxis );
-		} else {//air area
-			DrawAreaBounds( areaNum );
-		}
-	}
-
-	numFaces = area->numFaces;
-	firstFace = area->firstFace;
-
-	for ( i = 0; i < numFaces; i++ ) {
-		DrawSimpleFace( abs( file->GetFaceIndex( firstFace + i )), true );
-	}
-}
-
-/*
-============
-idAASLocal::IsValid
-============
-*/
-bool idAASLocal::IsValid( void ) const {
-	if ( !file ) {
-		return false;
-	}
-
-	return true;
-}
-
-/*
-============
-idAASLocal::ShowAreas
-============
-*/
-void idAASLocal::ShowAreas( const idVec3 &origin, bool ShowProblemAreas ) const {
-	int				i, areaNum;
-	idPlayer		*player;
-	int				*areaQueue, curArea, queueStart, queueEnd;
-	byte			*areasVisited;
-	const aasArea_t *area;
-	idReachability	*reach;
-	int				travelFlags = (TFL_WALK);
-	const idBounds	bounds = idBounds( origin ).Expand( 256.0f );
-
-	if ( !file ) {
-		return;
-	}
-
-	player = gameLocal.GetLocalPlayer();
-	if ( !player ) {
-		return;
-	}
-
-	areaNum = PointReachableAreaNum( origin, DefaultSearchBounds(), (AREA_REACHABLE_WALK|AREA_REACHABLE_FLY) );
-
-	areasVisited = (byte *) _alloca16( file->GetNumAreas() );
-	memset( areasVisited, 0, file->GetNumAreas() * sizeof( byte ) );
-	areaQueue = (int *) _alloca16( file->GetNumAreas() * sizeof( int ) );
-
-	queueStart = 0;
-	queueEnd = 1;
-	areaQueue[0] = areaNum;
-	areasVisited[areaNum] = true;
-
-	for ( curArea = areaNum; queueStart < queueEnd; curArea = areaQueue[++queueStart] ) {
-		area = &file->GetArea( curArea );
-
-		// add new areas to the queue
-		for ( reach = area->reach; reach; reach = reach->next ) {
-			if ( reach->travelType & travelFlags ) {
-				// if the area the reachability leads to hasn't been visited yet and the area bounds touch the search bounds
-				if ( !areasVisited[reach->toAreaNum] && bounds.IntersectsBounds( file->GetArea( reach->toAreaNum ).bounds ) ) {
-					areaQueue[queueEnd++] = reach->toAreaNum;
-					areasVisited[reach->toAreaNum] = true;
-				}
-			}
-		}
-	}
-
-	if ( ShowProblemAreas ) {
-		for ( i = 0; i < queueEnd; i++ ) {
-			ShowProblemArea( areaQueue[ i ] );
-		}
-	} else {
-		for ( i = 0; i < queueEnd; i++ ) {
-			DrawSimpleArea( areaQueue[ i ] );
-		}
-	}
-}
-
-/*
-============
-idAASLocal::ShowProblemEdge
-============
-*/
-void idAASLocal::ShowProblemEdge( int edgeNum ) const {
-	const aasEdge_t	*edge;
-	const idVec4	*color;
-	idVec4			color2;
-	idTraceModel	trm;
-	idClipModel		mdl;
-	idVec3			sides[4];
-	trace_t			results;
-	idVec3			forward, forwardNormal, left, down, start, end;
-	float			hullSize, hullHeight;
-
-	if ( !file ) {
-		return;
-	}
-
-	edge = &file->GetEdge( edgeNum );
-
-	start = (idVec3)file->GetVertex( edge->vertexNum[0] );
-	end = (idVec3)file->GetVertex( edge->vertexNum[1] );
-	forward =  end - start ;
-	forward.Normalize();
-	forwardNormal = forward;
-	forward.NormalVectors( left, down );
-
-	hullSize = ( ( file->GetSettings().boundingBoxes[0][1][0] - file->GetSettings().boundingBoxes[0][0][0] ) / 2.0f ) - 1.0f;	// assumption that x and y are the same size
-	hullHeight = ( file->GetSettings().boundingBoxes[0][1][2] - file->GetSettings().boundingBoxes[0][0][2] );	
-
-	left *= hullSize;
-	forward *= hullSize;
-
-	sides[0] = -left + idVec3( 0.0f, 0.0f, file->GetSettings().boundingBoxes[0][0][2] + 1.0f );
-	sides[1] = left + idVec3( 0.0f, 0.0f, file->GetSettings().boundingBoxes[0][0][2] + 1.0f );
-	sides[2] = left + idVec3( 0.0f, 0.0f, file->GetSettings().boundingBoxes[0][1][2] - 1.0f );
-	sides[3] = -left + idVec3( 0.0f, 0.0f, file->GetSettings().boundingBoxes[0][1][2] - 1.0f );
-	trm.SetupPolygon( sides, 4 );
-	mdl.LoadModel( trm, NULL );
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	gameLocal.Translation( gameLocal.GetLocalPlayer(), results, start, end, &mdl, mat3_identity, MASK_MONSTERSOLID, gameLocal.GetLocalPlayer() );
-// RAVEN END
-
-	if ( results.fraction != 1.0f ) {
-		color = &file->GetSettings().debugColor;
-		gameRenderWorld->DebugLine( *color, start - left, end - left );
-		gameRenderWorld->DebugLine( *color, start + left, end + left );
-
-		color = &colorYellow;
-		gameRenderWorld->DebugLine( *color, start, end );
-
-		color2 = colorOrange;
-		color2[3] = 0.25f;
-		sides[0] += results.endpos;
-		sides[1] += results.endpos;
-		sides[2] += results.endpos;
-		sides[3] += results.endpos;
-		idWinding winding( sides, 4 );
-		gameRenderWorld->DebugPolygon( color2, winding );
-	}
-}
-
-/*
-============
-idAASLocal::ShowProblemFace
-============
-*/
-void idAASLocal::ShowProblemFace( int faceNum ) const {
-	int		i, numEdges, firstEdge;
-	const	aasFace_t *face;
-
-	if ( !file ) {
-		return;
-	}
-
-	face = &file->GetFace( faceNum );
-	numEdges = face->numEdges;
-	firstEdge = face->firstEdge;
-
-	for ( i = 0; i < numEdges; i++ ) {
-		ShowProblemEdge( abs( file->GetEdgeIndex( firstEdge + i ) ) );
-	}
-}
-
-/*
-============
-idAASLocal::ShowProblemArea
-============
-*/
-void idAASLocal::ShowProblemArea( int areaNum ) const {
-	int				i, numFaces, firstFace;
-	const aasArea_t *area;
-	idEntity *		entityList[ MAX_GENTITIES ];
-	int				numListedEntities;
-	idBounds		bounds;
-	float			hullSize;
-
-	if ( !file ) {
-		return;
-	}
-
-	area = &file->GetArea( areaNum );
-	numFaces = area->numFaces;
-	firstFace = area->firstFace;
-
-	hullSize = ( ( file->GetSettings().boundingBoxes[0][1][0] - file->GetSettings().boundingBoxes[0][0][0] ) / 2.0f );	// assumption that x and y are the same size
-
-	bounds = area->bounds;
-	bounds.Expand( hullSize );
-// RAVEN BEGIN
-// ddynerman: multiple clip world
-	numListedEntities = gameLocal.EntitiesTouchingBounds( gameLocal.GetLocalPlayer(), bounds, -1, entityList, MAX_GENTITIES );
-// RAVEN END
-	for( i = 0; i < numListedEntities; i++) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( entityList[ i ]->IsType( idMoveable::GetClassType() )  ||
-			 entityList[ i ]->IsType( idMover::GetClassType() ) ||
-			 entityList[ i ]->IsType( idAI::GetClassType() ) ) {
-// RAVEN END
-			entityList[ i ]->GetPhysics()->DisableClip();
-			continue;
-		}
-
-		entityList[ i ] = NULL;
-	}
-
-	for ( i = 0; i < numFaces; i++ ) {
-		ShowProblemFace( abs( file->GetFaceIndex( firstFace + i ) ) );
-	}
-
-	for( i = 0; i < numListedEntities; i++) {
-		if ( entityList[ i ] ) {
-			entityList[ i ]->GetPhysics()->EnableClip();
-		}
-	}
-}
-
-/*
-============
-idAASLocal::ShowProblemArea
-============
-*/
-void idAASLocal::ShowProblemArea( const idVec3 &origin ) const {
-	static int	lastAreaNum;
-	int			areaNum;
-	idVec3		org;
-
-	areaNum = PointReachableAreaNum( origin, DefaultSearchBounds(), (AREA_REACHABLE_WALK|AREA_REACHABLE_FLY) );
-
-	ShowProblemArea( areaNum );
-}
-
-// RAVEN END
 
 /*
 ============
@@ -761,8 +355,8 @@ void idAASLocal::ShowHideArea( const idVec3 &origin, int targetAreaNum ) const {
 
 	DrawCone( target, idVec3(0,0,1), 16.0f, colorYellow );
 
-	rvAASFindGoalForHide findHide ( target );
-	if ( FindNearestGoal( goal, areaNum, origin, target, TFL_WALK|TFL_AIR, 0.0f, 0.0f, obstacles, numObstacles, findHide ) ) {
+	idAASFindCover findCover( target );
+	if ( FindNearestGoal( goal, areaNum, origin, target, TFL_WALK|TFL_AIR, obstacles, numObstacles, findCover ) ) {
 		DrawArea( goal.areaNum );
 		ShowWalkPath( origin, goal.areaNum, goal.origin );
 		DrawCone( goal.origin, idVec3(0,0,1), 16.0f, colorWhite );
@@ -860,6 +454,56 @@ void idAASLocal::ShowPushIntoArea( const idVec3 &origin ) const {
 
 /*
 ============
+idAASLocal::DrawBounds
+============
+*/
+// HUMANHEAD nla
+void idAASLocal::DrawBounds( int areaNum ) const {
+	const aasArea_t	*area;
+	const idBounds	*bounds;
+	const idVec3		*p0, *p1;
+
+	area = &file->GetArea(areaNum);
+	if (area->numFaces < -1) {	// Not a valid area
+		return;
+	}
+	
+	bounds = &area->bounds;
+	
+	for (int i = 0; i < 2; ++i) {
+		p0 = &(*bounds)[i];
+		p1 = &(*bounds)[(i + 1) % 2];
+		for (int j = 0; j < 3; ++j) {
+			DrawBoundsEdge(*p0, *p1, j, 0);
+		}
+	}
+}
+
+
+/*
+============
+idAASLocal::DrawBoundsEdge
+============
+*/
+// HUMANHEAD nla
+void idAASLocal::DrawBoundsEdge( const idVec3 &p0, const idVec3 &ip1, int keep, int draw ) const {
+	idVec3 p1((*(keep == 0 ? &p0 : &ip1))[0],
+			  (*(keep == 1 ? &p0 : &ip1))[1], 
+			  (*(keep == 2 ? &p0 : &ip1))[2]);
+
+
+	if (draw) {
+		gameRenderWorld->DebugLine( colorWhite, p0, p1);
+	}
+	else {
+		for (int i = 1; i < 3; ++i) {
+			DrawBoundsEdge(p0, p1, (keep + i) % 3, true);
+		}
+	}
+}
+
+/*
+============
 idAASLocal::Test
 ============
 */
@@ -885,21 +529,36 @@ void idAASLocal::Test( const idVec3 &origin ) {
 	if ( ( aas_showHideArea.GetInteger() > 0 ) && ( aas_showHideArea.GetInteger() < file->GetNumAreas() ) ) {
 		ShowHideArea( origin, aas_showHideArea.GetInteger() );
 	}
-// RAVEN BEGIN 
-// rjohnson: added more debug drawing
-	if ( aas_showAreas.GetInteger() == 1 ) {
-		ShowArea( origin );
+	if ( ai_debugPath.GetBool() ) {
+		int i, areaNum, numEdges, edges[1024];
+		idVec3 start, end;
+		if ( gameLocal.GetLocalPlayer() ) {
+			areaNum = PointReachableAreaNum( origin, DefaultSearchBounds(), (AREA_REACHABLE_WALK|AREA_REACHABLE_FLY) );
+			numEdges = GetWallEdges( areaNum, idBounds( origin ).Expand( 256.0f ), TFL_WALK, edges, 1024 );
+			for ( i = 0; i < numEdges; i++ ) {
+				GetEdge( edges[i], start, end );
+				gameRenderWorld->DebugLine( colorWhite, start, end );
+			}
+		}
 	}
-	else if ( aas_showAreas.GetInteger() == 2 ) {
-		ShowAreas( origin );
+	if ( aas_showAreas.GetBool() ) {
+		//HUMANHEAD nla		
+		if (aas_showAreas.GetInteger() > 2) {
+			int counter;
+
+			for (counter = 0; counter < file->GetNumAreas(); counter++) {
+				if (aas_showAreas.GetInteger() > 3) {
+					DrawBounds(counter);
+				}
+				else {
+					DrawArea(counter);
+				}
+			}
+		}
+		else {
+			ShowArea( origin );
+		}
 	}
-	if ( aas_showProblemAreas.GetInteger() == 1 ) {
-		ShowProblemArea( origin );
-	}
-	else if ( aas_showProblemAreas.GetInteger() == 2 ) {
-		ShowAreas( origin, true );
-	}
-// RAVEN END
 	if ( aas_showWallEdges.GetBool() ) {
 		ShowWallEdges( origin );
 	}

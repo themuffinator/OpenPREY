@@ -590,22 +590,32 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 		WriteLoadMap();
 	}
 
-	if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILE_ID ) ) {
-		common->Printf( "idRenderWorldLocal::InitFromMap: bad id '%s' instead of '%s'\n", token.c_str(), PROC_FILE_ID );
+	if ( !src->ReadToken( &token ) ) {
+		common->Printf( "idRenderWorldLocal::InitFromMap: missing proc id in '%s'\n", filename.c_str() );
 		delete src;
 		return false;
 	}
 
-// jmarshall: quake 4 proc format
-	if (!src->ReadToken(&token) || token.Icmp(PROC_FILEVERSION)) {
-		common->Printf("idRenderWorldLocal::InitFromMap: bad version '%s' instead of '%s'\n", token.c_str(), PROC_FILEVERSION);
+	const bool isQ4Proc = ( token.Icmp( PROC_FILE_ID ) == 0 );
+	const bool isD3Proc = ( token.Icmp( "mapProcFile003" ) == 0 );
+
+	if ( !isQ4Proc && !isD3Proc ) {
+		common->Printf( "idRenderWorldLocal::InitFromMap: bad id '%s' (expected '%s' or 'mapProcFile003')\n", token.c_str(), PROC_FILE_ID );
 		delete src;
 		return false;
 	}
 
-	// Map CRC, we aren't going to use it.
-	src->ReadToken(&token);
-// jmarshall end
+	// Quake 4 proc files prepend a separate version and map CRC token after the id.
+	if ( isQ4Proc ) {
+		if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILEVERSION ) ) {
+			common->Printf( "idRenderWorldLocal::InitFromMap: bad version '%s' instead of '%s'\n", token.c_str(), PROC_FILEVERSION );
+			delete src;
+			return false;
+		}
+
+		// Map CRC (unused in runtime parser).
+		src->ReadToken( &token );
+	}
 
 	// parse the file
 	while ( 1 ) {

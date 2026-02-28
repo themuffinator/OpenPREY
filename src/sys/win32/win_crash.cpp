@@ -49,10 +49,10 @@ typedef BOOL(WINAPI* MiniDumpWriteDumpFn)(
 static volatile LONG g_crashHandlerEntered = 0;
 static LPTOP_LEVEL_EXCEPTION_FILTER g_prevExceptionFilter = NULL;
 
-static const DWORD OPENQ4_EXCEPTION_INVALID_PARAMETER = 0xE0000001;
-static const DWORD OPENQ4_EXCEPTION_PURECALL = 0xE0000002;
-static const DWORD OPENQ4_EXCEPTION_ABORT = 0xE0000003;
-static const DWORD OPENQ4_EXCEPTION_TERMINATE = 0xE0000004;
+static const DWORD OPENPREY_EXCEPTION_INVALID_PARAMETER = 0xE0000001;
+static const DWORD OPENPREY_EXCEPTION_PURECALL = 0xE0000002;
+static const DWORD OPENPREY_EXCEPTION_ABORT = 0xE0000003;
+static const DWORD OPENPREY_EXCEPTION_TERMINATE = 0xE0000004;
 
 /*
 ====================
@@ -122,10 +122,10 @@ static const char* Sys_GetExceptionCodeName(DWORD code) {
 	case EXCEPTION_PRIV_INSTRUCTION: return "EXCEPTION_PRIV_INSTRUCTION";
 	case EXCEPTION_SINGLE_STEP: return "EXCEPTION_SINGLE_STEP";
 	case EXCEPTION_STACK_OVERFLOW: return "EXCEPTION_STACK_OVERFLOW";
-	case OPENQ4_EXCEPTION_INVALID_PARAMETER: return "OPENQ4_INVALID_PARAMETER";
-	case OPENQ4_EXCEPTION_PURECALL: return "OPENQ4_PURECALL";
-	case OPENQ4_EXCEPTION_ABORT: return "OPENQ4_ABORT";
-	case OPENQ4_EXCEPTION_TERMINATE: return "OPENQ4_TERMINATE";
+	case OPENPREY_EXCEPTION_INVALID_PARAMETER: return "OPENPREY_INVALID_PARAMETER";
+	case OPENPREY_EXCEPTION_PURECALL: return "OPENPREY_PURECALL";
+	case OPENPREY_EXCEPTION_ABORT: return "OPENPREY_ABORT";
+	case OPENPREY_EXCEPTION_TERMINATE: return "OPENPREY_TERMINATE";
 	default: return "EXCEPTION_UNKNOWN";
 	}
 }
@@ -145,7 +145,7 @@ Sys_InvalidParameterHandler
 ====================
 */
 static void __cdecl Sys_InvalidParameterHandler(const wchar_t*, const wchar_t*, const wchar_t*, unsigned int, uintptr_t) {
-	Sys_RaiseSyntheticException(OPENQ4_EXCEPTION_INVALID_PARAMETER);
+	Sys_RaiseSyntheticException(OPENPREY_EXCEPTION_INVALID_PARAMETER);
 }
 
 /*
@@ -154,7 +154,7 @@ Sys_PurecallHandler
 ====================
 */
 static void __cdecl Sys_PurecallHandler(void) {
-	Sys_RaiseSyntheticException(OPENQ4_EXCEPTION_PURECALL);
+	Sys_RaiseSyntheticException(OPENPREY_EXCEPTION_PURECALL);
 }
 
 /*
@@ -163,7 +163,7 @@ Sys_AbortSignalHandler
 ====================
 */
 static void __cdecl Sys_AbortSignalHandler(int) {
-	Sys_RaiseSyntheticException(OPENQ4_EXCEPTION_ABORT);
+	Sys_RaiseSyntheticException(OPENPREY_EXCEPTION_ABORT);
 }
 
 /*
@@ -172,7 +172,7 @@ Sys_TerminateHandler
 ====================
 */
 static void __cdecl Sys_TerminateHandler(void) {
-	Sys_RaiseSyntheticException(OPENQ4_EXCEPTION_TERMINATE);
+	Sys_RaiseSyntheticException(OPENPREY_EXCEPTION_TERMINATE);
 }
 
 /*
@@ -216,7 +216,7 @@ static bool Sys_GetCrashBaseName(char* outBaseName, size_t outBaseNameSize) {
 	return Sys_StringPrintf(
 		outBaseName,
 		outBaseNameSize,
-		"openq4_crash_%04u%02u%02u_%02u%02u%02u_%lu_%lu",
+		"openprey_crash_%04u%02u%02u_%02u%02u%02u_%lu_%lu",
 		(unsigned)localTime.wYear,
 		(unsigned)localTime.wMonth,
 		(unsigned)localTime.wDay,
@@ -356,7 +356,7 @@ static void Sys_WriteCrashLog(
 	Sys_StringPrintf(
 		logBuffer,
 		ARRAYSIZE(logBuffer),
-		"OpenQ4 debug crash report\r\n"
+		"OpenPrey debug crash report\r\n"
 		"Timestamp: %04u-%02u-%02u %02u:%02u:%02u.%03u\r\n"
 		"ProcessId: %lu\r\n"
 		"ThreadId: %lu\r\n"
@@ -479,7 +479,7 @@ static LONG WINAPI Sys_DebugUnhandledExceptionFilter(LPEXCEPTION_POINTERS except
 		Sys_StringPrintf(
 			message,
 			ARRAYSIZE(message),
-			"OpenQ4 encountered an unhandled exception.\n\n"
+			"OpenPrey encountered an unhandled exception.\n\n"
 			"Crash log:\n%s\n\n"
 			"Crash dump:\n%s\n\n"
 			"Please attach both files when reporting this issue.",
@@ -491,7 +491,7 @@ static LONG WINAPI Sys_DebugUnhandledExceptionFilter(LPEXCEPTION_POINTERS except
 		Sys_StringPrintf(
 			message,
 			ARRAYSIZE(message),
-			"OpenQ4 encountered an unhandled exception.\n\n"
+			"OpenPrey encountered an unhandled exception.\n\n"
 			"Crash log:\n%s\n\n"
 			"Failed to create crash dump (error 0x%08lX).",
 			logPath,
@@ -499,7 +499,7 @@ static LONG WINAPI Sys_DebugUnhandledExceptionFilter(LPEXCEPTION_POINTERS except
 		);
 	}
 
-	MessageBoxA(NULL, message, "OpenQ4 Debug Crash", MB_ICONERROR | MB_OK | MB_SYSTEMMODAL);
+	MessageBoxA(NULL, message, "OpenPrey Debug Crash", MB_ICONERROR | MB_OK | MB_SYSTEMMODAL);
 
 	return EXCEPTION_EXECUTE_HANDLER;
 }

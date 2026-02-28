@@ -379,12 +379,14 @@ void idChoiceWindow::Draw(int time, float x, float y) {
 	if ( textShadow ) {
 		idStr shadowText = choices[currentChoice];
 		idRectangle shadowRect = textRect;
+		idVec4 shadowColor = colorBlack;
 
 		shadowText.RemoveColors();
 		shadowRect.x += textShadow;
 		shadowRect.y += textShadow;
+		shadowColor[3] = color[3];
 
-		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, false, -1 );
+		dc->DrawText( shadowText, textScale, textAlign, shadowColor, shadowRect, false, -1 );
 	}
 
 	if ( hover && !noEvents && Contains(gui->CursorX(), gui->CursorY()) ) {

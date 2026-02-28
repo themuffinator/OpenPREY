@@ -9,12 +9,12 @@
 
 // RAVEN BEGIN
 // rjohnson: this is the name of the game we are making
-#define PROJECT_NAME					"OpenQ4"
+#define PROJECT_NAME					"OpenPrey"
 #define PROJECT_AUTHOR					"themuffinator"
 #define PROJECT_COMPANY				"DarkMatter Productions"
 #define PROJECT_VERSION				"0.0.1"
 #define PROJECT_WEBSITE				"www.darkmatter-quake.com"
-#define PROJECT_REPO					"https://github.com/themuffinator/OpenQ4"
+#define PROJECT_REPO					"https://github.com/themuffinator/OpenPrey"
 
 #define GAME_NAME						PROJECT_NAME			// appears on window titles and errors
 #define GAME_ICON						"q4icon.bmp"
@@ -38,28 +38,30 @@
 #endif
 
 // paths
-#define	CD_BASEDIR						"OpenQ4"
-#define	BASE_GAMEDIR					"q4base"
-#define	BASE_MPGAMEDIR					"q4mp"
-#define OPENQ4_GAMEDIR					"openbase"
+#define	CD_BASEDIR						"OpenPrey"
+#define	BASE_GAMEDIR					"base"
+#define	BASE_MPGAMEDIR					"base"
+#define OPENPREY_GAMEDIR				"openprey"
 #define	DEMO_GAMEDIR					"demo"
+#define	GAME_PLAYERDEFNAME				"player_tommy"
+#define GAME_PLAYERDEFNAME_MP			"player_tommy_mp"
 
 // filenames
 #if defined( _M_X64 ) || defined( __x86_64__ )
-	#define OPENQ4_BINARY_ARCH			"x64"
+	#define OPENPREY_BINARY_ARCH		"x64"
 #elif defined( _M_IX86 ) || defined( __i386__ )
-	#define OPENQ4_BINARY_ARCH			"x86"
+	#define OPENPREY_BINARY_ARCH		"x86"
 #elif defined( _M_ARM64 ) || defined( __aarch64__ )
-	#define OPENQ4_BINARY_ARCH			"arm64"
+	#define OPENPREY_BINARY_ARCH		"arm64"
 #else
-	#define OPENQ4_BINARY_ARCH			"unknown"
+	#define OPENPREY_BINARY_ARCH		"unknown"
 #endif
-#define	CD_EXE							PROJECT_NAME "-client_" OPENQ4_BINARY_ARCH ".exe"
+#define	CD_EXE							PROJECT_NAME "-client_" OPENPREY_BINARY_ARCH ".exe"
 
 #ifdef _XENON
-#define CONFIG_FILE						"save:/OpenQ4Config.cfg"
+#define CONFIG_FILE						"save:/OpenPreyConfig.cfg"
 #else
-#define CONFIG_FILE						"OpenQ4Config.cfg"
+#define CONFIG_FILE						"OpenPreyConfig.cfg"
 #endif
 
 // base folder where the source code lives
@@ -125,21 +127,21 @@
 #define EDITOR_WINDOWTEXT				"QuakeEdit"
 
 // win32 info
-#define WIN32_CONSOLE_CLASS				"OpenQ4 WinConsole"
-#define WIN32_SPLASH_CLASS				"OpenQ4 Splash"
-#define	WIN32_WINDOW_CLASS_NAME			"OpenQ4"
-#define	WIN32_FAKE_WINDOW_CLASS_NAME	"OPENQ4_WGL_FAKE"
+#define WIN32_CONSOLE_CLASS				"OpenPrey WinConsole"
+#define WIN32_SPLASH_CLASS				"OpenPrey Splash"
+#define	WIN32_WINDOW_CLASS_NAME			"OpenPrey"
+#define	WIN32_FAKE_WINDOW_CLASS_NAME	"OPENPREY_WGL_FAKE"
 
 #ifdef __linux__
-	#define DEFAULT_BASE_PATH				"/usr/local/games/openq4"
+	#define DEFAULT_BASE_PATH				"/usr/local/games/openprey"
 #elif defined( MACOS_X )
-	#define DEFAULT_BASE_PATH				"/Applications/OpenQ4"
+	#define DEFAULT_BASE_PATH				"/Applications/OpenPrey"
 #endif
 
 // CD Key file info
-#define CDKEY_FILE						"quake4key"
+#define CDKEY_FILE						"preykey"
 #define CDKEY_TEXT						"\n// Do not give this file to ANYONE.\n" \
-										"// id Software, Raven Software or Activision will NOT ask you to send this file to them.\n"
+										"// Human Head Studios and 2K Games will NOT ask you to send this file to them.\n"
 
 // FIXME: Update to Doom
 // Product ID. Stored in "productid.txt".
@@ -150,3 +152,44 @@
 #define PRODUCT_ID_LENGTH				152
 
 #define CONFIG_SPEC						"config.spec"
+
+// Prey compatibility feature toggles.
+#define SINGLE_MAP_BUILD				1
+#define PARTICLE_BOUNDS					1
+#define SOUND_TOOLS_BUILD				1
+#define GUIS_IN_DEMOS					1
+#define MUSICAL_LEVELLOADS				1
+#define GAMEPORTAL_PVS					1
+#define GAMEPORTAL_SOUND				1
+#define DEATHWALK_AUTOLOAD				1
+#define AUTOMAP							0
+#define _HH_RENDERDEMO_HACKS			1
+#define _HH_CLIP_FASTSECTORS			1
+#define NEW_MESH_TRANSFORM				1
+#define SIMD_SHADOW						0
+#define MULTICORE						0
+#define DEBUG_SOUND_LOG					0
+#define _HH_SECUROM						0
+#define _HH_INLINED_PROC_CLIPMODELS		0
+
+#ifdef ID_DEDICATED
+#define _HH_MYGAMES_SAVES				0
+#else
+#define _HH_MYGAMES_SAVES				1
+#endif
+
+#if 1
+#define GOLD							1
+#define CONSOLE_IDENTITY				0
+#define REMOTE_DMAP						0
+#else
+#define GOLD							0
+#define CONSOLE_IDENTITY				1
+#define REMOTE_DMAP						1
+#endif
+
+#ifdef _GERMAN_BUILD_
+	#define GERMAN_VERSION				1
+#else
+	#define GERMAN_VERSION				0
+#endif

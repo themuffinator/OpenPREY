@@ -1,55 +1,56 @@
-# Official Quake 4 PK4 Checksums (q4base)
+# Official Prey (2006) PK4 Checksums
 
-This table captures the PK4 checksums loaded from the installed game directory:
+This document tracks the official PK4 checksum baseline used by OpenPrey startup validation.
 
-- Install path: `C:\Program Files (x86)\Steam\steamapps\common\Quake 4\q4base`
-- Source: `logs/openq4.log` startup lines (`Loaded pk4 ... with checksum ...`) under `fs_savepath\<gameDir>\`
-- Checksum format: engine PK4 checksum (`MD4` of zip-entry CRC list, as computed in `src/framework/FileSystem.cpp`)
+## Status
 
-## Required official baseline
+OpenPrey now tracks two known official Prey base pack layouts:
 
-These are required by OpenQ4 startup validation (`fs_validateOfficialPaks 1`, default):
+1. Classic retail CD/DVD naming (`pak000` ... `pak004`).
+2. Consolidated naming seen in legacy digital distributions (`pak_data`, `pak_sound`, `pak_en_v`, `pak_en_t`).
 
-| PK4 | Checksum |
-|---|---|
-| `game000.pk4` | `0xb3abe28c` |
-| `game100.pk4` | `0x74b379d9` |
-| `game200.pk4` | `0xa3c810d9` |
-| `game300.pk4` | `0x68fb90b1` |
-| `pak001.pk4` | `0xf2cbc998` |
-| `pak002.pk4` | `0x7f8d80d1` |
-| `pak003.pk4` | `0x1b57b207` |
-| `pak004.pk4` | `0x385aa578` |
-| `pak005.pk4` | `0x60d50a1d` |
-| `pak006.pk4` | `0x9099ed11` |
-| `pak007.pk4` | `0xaf301fff` |
-| `pak008.pk4` | `0x4ac6f6d9` |
-| `pak009.pk4` | `0x36030c7d` |
-| `pak010.pk4` | `0x4b80fbda` |
-| `pak011.pk4` | `0x8acf4cfa` |
-| `pak012.pk4` | `0xbe4120b0` |
-| `pak013.pk4` | `0x6ad67f40` |
-| `pak014.pk4` | `0xee51cd59` |
-| `pak015.pk4` | `0xf5bf4e0c` |
-| `pak016.pk4` | `0x2196f58c` |
-| `pak017.pk4` | `0x91118a35` |
-| `pak018.pk4` | `0x98a14f03` |
-| `pak019.pk4` | `0xbc82ac79` |
-| `pak020.pk4` | `0xce74cda5` |
-| `pak021.pk4` | `0x2ba6e70c` |
-| `pak022.pk4` | `0x4e390eec` |
-| `pak023.pk4` | `0x7c1fd3a5` |
-| `pak024.pk4` | `0x5546d551` |
-| `pak025.pk4` | `0xcaeec1fd` |
+## Capture Method
 
-## Additional official PK4s detected
+1. Launch OpenPrey against a clean Prey installation.
+2. Enable startup logging (`logFile 2`) and inspect `logs/openprey.log` under `fs_savepath`.
+3. Record `Loaded pk4 ... with checksum ...` lines.
+4. Populate required and optional PK4 tables below.
+
+## Required Baseline: Classic Naming
 
 | PK4 | Checksum |
 |---|---|
-| `q4cmp_pak001.pk4` | `0xd0813943` |
-| `zpak_english.pk4` | `0x5868f530` |
-| `zpak_english_01.pk4` | `0xd9f04b8b` |
-| `zpak_english_02.pk4` | `0x9dbd91fd` |
-| `zpak_english_03.pk4` | `0x02eb6ad8` |
-| `zpak_english_04.pk4` | `0xd3fefaa1` |
-| `zpak_english_05.pk4` | `0x8596af60` |
+| `base/pak000.pk4` | `TBD` |
+| `base/pak001.pk4` | `TBD` |
+| `base/pak002.pk4` | `TBD` |
+| `base/pak003.pk4` | `TBD` |
+| `base/pak004.pk4` | `TBD` |
+
+## Required Baseline: Consolidated Naming
+
+| PK4 | Checksum |
+|---|---|
+| `base/pak_data.pk4` | `0xbe295ead` |
+| `base/pak_sound.pk4` | `0xe0c27ee2` |
+| `base/pak_en_v.pk4` | `0x952b910e` |
+| `base/pak_en_t.pk4` | `0x6625f12d` |
+
+## Additional Official PK4s (Optional)
+
+| PK4 | Checksum |
+|---|---|
+| `base/pak005.pk4` | `TBD` |
+| `base/pak006.pk4` | `TBD` |
+| `base/pak020.pk4` | `TBD` |
+| `base/pak040.pk4` | `TBD` |
+| `base/game00.pk4` | `TBD` |
+| `base/game01.pk4` | `TBD` |
+| `base/game02.pk4` | `TBD` |
+| `base/game03.pk4` | `TBD` |
+
+## Notes
+
+- Checksum format is the engine PK4 checksum generated in `src/framework/FileSystem.cpp`.
+- The consolidated checksums were captured from an installed retail-media layout via OpenPrey runtime logging (`Loaded pk4 ... checksum ...`).
+- Classic naming entries remain presence-only until canonical checksums are captured.
+- Keep this list synchronized with any strict validation policy changes.

@@ -219,6 +219,8 @@ public:
 
 	virtual void				BeginLevelLoad();
 	virtual void				EndLevelLoad();
+	virtual void				SetInsideLevelLoad( bool inside );
+	virtual bool				GetInsideLevelLoad( void ) const;
 	virtual void				RegisterDeclType( const char *typeName, declType_t type, idDecl *(*allocator)( void ) );
 	virtual void				RegisterDeclFolder( const char *folder, const char *extension, declType_t defaultType );
 	virtual int					GetChecksum( void ) const;
@@ -1039,9 +1041,10 @@ void idDeclManagerLocal::Init( void ) {
 	RegisterDeclType(	"playerModel",		DECL_PLAYER_MODEL, idDeclAllocator<rvDeclPlayerModel>);
 // jmarshall end
 
-// jmarshall: Raven Decl Support
-	//RegisterDeclType( "fx",					DECL_FX,			idDeclAllocator<idDeclFX> );
-	//RegisterDeclType( "particle",			DECL_PARTICLE,		idDeclAllocator<idDeclParticle> );
+	// jmarshall: Raven Decl Support
+	RegisterDeclType( "fx",					DECL_FX,			idDeclAllocator<idDeclFX> );
+	RegisterDeclType( "particle",			DECL_PARTICLE,		idDeclAllocator<idDeclParticle> );
+	RegisterDeclType( "beam",				DECL_BEAM,			idDeclAllocator<hhDeclBeam> );
 // jmarshall end
 	RegisterDeclType( "articulatedFigure",	DECL_AF,			idDeclAllocator<idDeclAF> );
 
@@ -1061,6 +1064,7 @@ void idDeclManagerLocal::Init( void ) {
 	RegisterDeclFolder("lipsync",			".lipsync",			DECL_LIPSYNC);
 	RegisterDeclFolder("playbacks",			".playback",		DECL_PLAYBACK);
 	RegisterDeclFolder("effects",			".fx",				DECL_EFFECT);
+	RegisterDeclFolder("beams",				".beam",			DECL_BEAM);
 // jmarshall end
 
 	// add console commands
@@ -1075,8 +1079,9 @@ void idDeclManagerLocal::Init( void ) {
 	cmdSystem->AddCommand( "listSoundShaders", idListDecls_f<DECL_SOUND>, CMD_FL_SYSTEM, "lists sound shaders", idCmdSystem::ArgCompletion_String<listDeclStrings> );
 
 	cmdSystem->AddCommand( "listEntityDefs", idListDecls_f<DECL_ENTITYDEF>, CMD_FL_SYSTEM, "lists entity defs", idCmdSystem::ArgCompletion_String<listDeclStrings> );
-	//cmdSystem->AddCommand( "listFX", idListDecls_f<DECL_FX>, CMD_FL_SYSTEM, "lists FX systems", idCmdSystem::ArgCompletion_String<listDeclStrings> );
-	//cmdSystem->AddCommand( "listParticles", idListDecls_f<DECL_PARTICLE>, CMD_FL_SYSTEM, "lists particle systems", idCmdSystem::ArgCompletion_String<listDeclStrings> //);
+	cmdSystem->AddCommand( "listFX", idListDecls_f<DECL_FX>, CMD_FL_SYSTEM, "lists FX systems", idCmdSystem::ArgCompletion_String<listDeclStrings> );
+	cmdSystem->AddCommand( "listParticles", idListDecls_f<DECL_PARTICLE>, CMD_FL_SYSTEM, "lists particle systems", idCmdSystem::ArgCompletion_String<listDeclStrings> );
+	cmdSystem->AddCommand( "listBeams", idListDecls_f<DECL_BEAM>, CMD_FL_SYSTEM, "lists beam systems", idCmdSystem::ArgCompletion_String<listDeclStrings> );
 	cmdSystem->AddCommand( "listAF", idListDecls_f<DECL_AF>, CMD_FL_SYSTEM, "lists articulated figures", idCmdSystem::ArgCompletion_String<listDeclStrings>);
 
 	//cmdSystem->AddCommand( "listPDAs", idListDecls_f<DECL_PDA>, CMD_FL_SYSTEM, "lists PDAs", idCmdSystem::ArgCompletion_String<listDeclStrings> );
@@ -1090,8 +1095,8 @@ void idDeclManagerLocal::Init( void ) {
 	cmdSystem->AddCommand( "printSoundShader", idPrintDecls_f<DECL_SOUND>, CMD_FL_SYSTEM, "prints a sound shader", idCmdSystem::ArgCompletion_Decl<DECL_SOUND> );
 
 	cmdSystem->AddCommand( "printEntityDef", idPrintDecls_f<DECL_ENTITYDEF>, CMD_FL_SYSTEM, "prints an entity def", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF> );
-	//cmdSystem->AddCommand( "printFX", idPrintDecls_f<DECL_FX>, CMD_FL_SYSTEM, "prints an FX system", idCmdSystem::ArgCompletion_Decl<DECL_FX> );
-//	cmdSystem->AddCommand( "printParticle", idPrintDecls_f<DECL_PARTICLE>, CMD_FL_SYSTEM, "prints a particle system", idCmdSystem::ArgCompletion_Decl<DECL_PARTICLE> );
+	cmdSystem->AddCommand( "printFX", idPrintDecls_f<DECL_FX>, CMD_FL_SYSTEM, "prints an FX system", idCmdSystem::ArgCompletion_Decl<DECL_FX> );
+	cmdSystem->AddCommand( "printParticle", idPrintDecls_f<DECL_PARTICLE>, CMD_FL_SYSTEM, "prints a particle system", idCmdSystem::ArgCompletion_Decl<DECL_PARTICLE> );
 	cmdSystem->AddCommand( "printAF", idPrintDecls_f<DECL_AF>, CMD_FL_SYSTEM, "prints an articulated figure", idCmdSystem::ArgCompletion_Decl<DECL_AF> );
 
 	cmdSystem->AddCommand( "printPDA", idPrintDecls_f<DECL_PDA>, CMD_FL_SYSTEM, "prints an PDA", idCmdSystem::ArgCompletion_Decl<DECL_PDA> );
@@ -1392,6 +1397,24 @@ void idDeclManagerLocal::EndLevelLoad() {
 
 	// we don't need to do anything here, but the image manager, model manager,
 	// and sound sample manager will need to free media that was not referenced
+}
+
+/*
+===================
+idDeclManagerLocal::SetInsideLevelLoad
+===================
+*/
+void idDeclManagerLocal::SetInsideLevelLoad( bool inside ) {
+	insideLevelLoad = inside;
+}
+
+/*
+===================
+idDeclManagerLocal::GetInsideLevelLoad
+===================
+*/
+bool idDeclManagerLocal::GetInsideLevelLoad( void ) const {
+	return insideLevelLoad;
 }
 
 /*

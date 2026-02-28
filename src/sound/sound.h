@@ -44,13 +44,10 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-// unfortunately, our minDistance / maxDistance is specified in meters, and
-// we have far too many of them to change at this time.
-// 
-// jmarshall - quake 4 doesn't use these
-const float DOOM_TO_METERS = 1.0f;					// doom to meters
-const float METERS_TO_DOOM = 1.0f;	// meters to doom
-// jmarshall end
+// Sound shader minDistance / maxDistance are authored in meters.
+// Convert engine world units (Doom units / inches) to meters for attenuation.
+const float DOOM_TO_METERS = 0.0254f;					// doom to meters
+const float METERS_TO_DOOM = ( 1.0f / DOOM_TO_METERS );	// meters to doom
 
 const float DB_SILENCE = -60.0f;
 
@@ -68,6 +65,7 @@ static const int	SSF_UNCLAMPED =			BIT( 7 );	// don't clamp calculated volumes a
 static const int	SSF_NO_FLICKER =		BIT( 8 );	// always return 1.0 for volume queries
 static const int	SSF_NO_DUPS =			BIT( 9 );	// try not to play the same sound twice in a row
 static const int	SSF_VO =				BIT( 10 ); // VO - direct a portion of the sound through the center channel (set automatically on shaders that contain files that start with "sound/vo/")
+static const int	SSF_VOICEAMPLITUDE =	SSF_VO;		// legacy alias used by Prey game code
 static const int	SSF_MUSIC =				BIT( 11 ); // Music - Muted when the player is playing his own music
 
 // RAVEN BEGIN
@@ -89,6 +87,10 @@ typedef struct
 	float					shakes;
 	int						soundShaderFlags;		// SSF_* bit flags
 	int						soundClass;				// for global fading of sounds
+	int						subIndex;				// Prey subtitle index
+	int						profanityIndex;			// Prey profanity subtitle index
+	float					profanityDelay;			// Prey profanity subtitle delay
+	float					profanityDuration;		// Prey profanity subtitle duration
 
 // RAVEN BEGIN
 // bdube: frequency shift
@@ -99,9 +101,60 @@ typedef struct
 // RAVEN END	
 } soundShaderParms_t;
 
+// Prey compatibility modifier used by game code to patch selected channel parms.
+class hhSoundShaderParmsModifier {
+public:
+	hhSoundShaderParmsModifier() {
+		memset( &parms, 0, sizeof( soundShaderParms_t ) );
+		minDistanceIsSet = false;
+		maxDistanceIsSet = false;
+		volumeIsSet = false;
+		shakesIsSet = false;
+		soundShaderFlagsIsSet = false;
+	}
+
+	void ModifyParms( soundShaderParms_t &parmsToModify ) const {
+		if ( minDistanceIsSet ) {
+			parmsToModify.minDistance = parms.minDistance;
+		}
+		if ( maxDistanceIsSet ) {
+			parmsToModify.maxDistance = parms.maxDistance;
+		}
+		if ( volumeIsSet ) {
+			// Prey APIs pass volume in dB while this engine stores linear scale.
+			parmsToModify.volume = idMath::Pow( 2.0f, parms.volume / 6.0f );
+		}
+		if ( shakesIsSet ) {
+			parmsToModify.shakes = parms.shakes;
+		}
+		if ( soundShaderFlagsIsSet ) {
+			parmsToModify.soundShaderFlags = parms.soundShaderFlags;
+		}
+	}
+
+	void SetMinDistance( const float minDistance ) { parms.minDistance = minDistance; minDistanceIsSet = true; }
+	void SetMaxDistance( const float maxDistance ) { parms.maxDistance = maxDistance; maxDistanceIsSet = true; }
+	void SetVolume( const float volume ) { parms.volume = volume; volumeIsSet = true; }
+	void SetShakes( const float shakes ) { parms.shakes = shakes; shakesIsSet = true; }
+	void SetSoundShaderFlags( const int flags ) { parms.soundShaderFlags = flags; soundShaderFlagsIsSet = true; }
+
+protected:
+	soundShaderParms_t		parms;
+	bool					minDistanceIsSet;
+	bool					maxDistanceIsSet;
+	bool					volumeIsSet;
+	bool					shakesIsSet;
+	bool					soundShaderFlagsIsSet;
+};
+
 // sound classes are used to fade most sounds down inside cinematics, leaving dialog
-// flagged with a non-zero class full volume
-const int		SOUND_MAX_CLASSES		= 4;
+// flagged with a non-zero class full volume.
+const int		SOUNDCLASS_NORMAL		= 0;
+const int		SOUNDCLASS_VOICEDUCKER	= 1;
+const int		SOUNDCLASS_SPIRITWALK	= 2;
+const int		SOUNDCLASS_VOICE		= 3;
+const int		SOUNDCLASS_MUSIC		= 4;
+const int		SOUND_MAX_CLASSES		= 5;
 
 // it is somewhat tempting to make this a virtual class to hide the private
 // details here, but that doesn't fit easily with the decl manager at the moment.
@@ -204,6 +257,29 @@ public:
 	// to is in Db, over is in seconds
 	virtual void			FadeSound( const s_channelType channel, float to, float over ) = 0;
 
+	virtual void			ModifySound( idSoundShader *shader, const s_channelType channel, const hhSoundShaderParmsModifier &parmModifier ) {
+		(void)shader;
+		soundShaderParms_t *parms = GetSoundParms( shader, channel );
+		if ( parms == NULL ) {
+			return;
+		}
+		soundShaderParms_t modified = *parms;
+		parmModifier.ModifyParms( modified );
+		ModifySound( channel, &modified );
+	}
+	virtual soundShaderParms_t *GetSoundParms( idSoundShader *shader, const s_channelType channel ) {
+		(void)shader;
+		(void)channel;
+		return NULL;
+	}
+	virtual float			CurrentAmplitude( const s_channelType channel ) {
+		(void)channel;
+		return CurrentAmplitude();
+	}
+	virtual float			CurrentVoiceAmplitude( const s_channelType channel ) {
+		return CurrentAmplitude( channel );
+	}
+
 	// returns true if there are any sounds playing from this emitter.  There is some conservative
 	// slop at the end to remove inconsistent race conditions with the sound thread updates.
 	// FIXME: network game: on a dedicated server, this will always be false
@@ -246,14 +322,24 @@ public:
 
 	// query sound samples from all emitters reaching a given listener
 	virtual float			CurrentShakeAmplitude() = 0;
+	virtual float			CurrentShakeAmplitudeForPosition( const int time, const idVec3 &listenerPosition ) {
+		return CurrentShakeAmplitude();
+	}
 
 	// where is the camera/microphone
 	// listenerId allows listener-private and antiPrivate sounds to be filtered
 	virtual void			PlaceListener( const idVec3& origin, const idMat3& axis, const int listenerId ) = 0;
+	virtual void			PlaceListener( const idVec3& origin, const idMat3& axis, const int listenerId, const int gameTime, const idStr& areaName ) {
+		(void)gameTime;
+		(void)areaName;
+		PlaceListener( origin, axis, listenerId );
+	}
 
 	// fade all sounds in the world with a given shader soundClass
 	// to is in Db, over is in seconds
 	virtual void			FadeSoundClasses( const int soundClass, const float to, const float over ) = 0;
+	virtual void			RegisterLocation( int area, const char *locationName ) {}
+	virtual void			ClearAreaLocations( void ) {}
 
 	// menu sounds
 	virtual	int				PlayShaderDirectly( const char* name, int channel = -1 ) = 0;
@@ -291,6 +377,8 @@ public:
 
 	virtual void			SetSlowmoSpeed( float speed ) = 0;
 	virtual void			SetEnviroSuit( bool active ) = 0;
+	virtual void			SetSpiritWalkEffect( bool active ) {}
+	virtual void			SetVoiceDucker( bool active ) {}
 };
 
 

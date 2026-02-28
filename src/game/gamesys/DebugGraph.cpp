@@ -1,5 +1,7 @@
-
-
+// Copyright (C) 2004 Id Software, Inc.
+//
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -59,10 +61,7 @@ void idDebugGraph::Draw( const idVec4 &color, float scale ) const {
 		vec1 = pos + axis[ 2 ] * value1 - axis[ 1 ] * ( i - 1 ) + axis[ 0 ] * samples.Num();
 		vec2 = pos + axis[ 2 ] * value2 - axis[ 1 ] * i + axis[ 0 ] * samples.Num();
 
-// RAVEN BEGIN
-// bdube: use GetMSec access rather than USERCMD_TIME
-		gameRenderWorld->DebugLine( color, vec1, vec2, gameLocal.GetMSec ( ), false );
-// RAVEN END
+		gameRenderWorld->DebugLine( color, vec1, vec2, gameLocal.msec, false );
 		value1 = value2;
 	}
 }

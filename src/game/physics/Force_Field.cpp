@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -21,11 +23,6 @@ idForce_Field::idForce_Field( void ) {
 	playerOnly		= false;
 	monsterOnly		= false;
 	clipModel		= NULL;
-// RAVEN BEGIN
-// bdube: added last apply time
-	lastApplyTime   = -1;
-	owner			= NULL;
-// RAVEN END
 }
 
 /*
@@ -53,9 +50,6 @@ void idForce_Field::Save( idSaveGame *savefile ) const {
 	savefile->WriteBool( playerOnly );
 	savefile->WriteBool( monsterOnly );
 	savefile->WriteClipModel( clipModel );
-
-	savefile->WriteInt ( lastApplyTime );	// cnicholson: Added unsaved var
-	// TOSAVE: idEntity*			owner;
 }
 
 /*
@@ -72,8 +66,6 @@ void idForce_Field::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( playerOnly );
 	savefile->ReadBool( monsterOnly );
 	savefile->ReadClipModel( clipModel );
-
-	savefile->ReadInt ( lastApplyTime );	// cnicholson: Added unrestored var
 }
 
 /*
@@ -138,14 +130,13 @@ void idForce_Field::Evaluate( int time ) {
 	idBounds bounds;
 	idVec3 force, torque, angularVelocity;
 	idClipModel *cm, *clipModelList[ MAX_GENTITIES ];
+	//HUMANHEAD: aob
+	idVec3 linearVelocity;
 
 	assert( clipModel );
 
 	bounds.FromTransformedBounds( clipModel->GetBounds(), clipModel->GetOrigin(), clipModel->GetAxis() );
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	numClipModels = gameLocal.ClipModelsTouchingBounds( owner, bounds, -1, clipModelList, MAX_GENTITIES );
-// RAVEN END
+	numClipModels = gameLocal.clip.ClipModelsTouchingBounds( bounds, -1, clipModelList, MAX_GENTITIES );
 
 	for ( i = 0; i < numClipModels; i++ ) {
 		cm = clipModelList[ i ];
@@ -163,41 +154,26 @@ void idForce_Field::Evaluate( int time ) {
 		idPhysics *physics = entity->GetPhysics();
 
 		if ( playerOnly ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			if ( !physics->IsType( idPhysics_Player::GetClassType() ) ) {
-// RAVEN END
+			if ( !physics->IsType( idPhysics_Player::Type ) ) {
 				continue;
 			}
 		} else if ( monsterOnly ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			if ( !physics->IsType( idPhysics_Monster::GetClassType() ) ) {
-
+			if ( !physics->IsType( idPhysics_Monster::Type ) ) {
 				continue;
 			}
 		}
 
-// nrausch: It was undesireable to have gibs and discarded weapons bouncing on jump pads
-		if ( gameLocal.isMultiplayer ) {
-			if ( entity->IsType( idItem::GetClassType() ) ) {
+		//HUMANHEAD: aob - should ignore players that noclip
+		if ( !monsterOnly ) {
+			idEntity* entity = cm->GetEntity();
+			if ( entity->IsType( idPlayer::Type ) && static_cast<idPlayer *>(entity)->noclip ) {
 				continue;
 			}
-			if ( entity->IsType( rvClientPhysics::GetClassType() ) ) {
-				continue;
-			}
-			if ( entity->IsType( idPlayer::GetClassType() ) ) {
-				if ( ((idPlayer*)entity)->health <= 0 ) {
-					continue;
-				}
-			}			
-		
 		}
+		//HUMANHEAD END
 
-// ddynerman: multiple clip worlds
-		if ( !gameLocal.ContentsModel( owner, cm->GetOrigin(), cm, cm->GetAxis(), -1,
-									clipModel->GetCollisionModel(), clipModel->GetOrigin(), clipModel->GetAxis() ) ) {
-// RAVEN END
+		if ( !gameLocal.clip.ContentsModel( cm->GetOrigin(), cm, cm->GetAxis(), -1,
+									clipModel->Handle(), clipModel->GetOrigin(), clipModel->GetAxis() ) ) {
 			continue;
 		}
 
@@ -263,10 +239,5 @@ void idForce_Field::Evaluate( int time ) {
 				break;
 			}
 		}
-
-// RAVEN BEGIN
-// bdube: added last apply time			
-		lastApplyTime = time;
-// RAVEN END
 	}
 }

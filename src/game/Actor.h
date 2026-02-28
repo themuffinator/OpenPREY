@@ -1,7 +1,5 @@
-// RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// Copyright (C) 2004 Id Software, Inc.
 //
-// MERGE_DATE 09/30/2004
 
 #ifndef __GAME_ACTOR_H__
 #define __GAME_ACTOR_H__
@@ -29,39 +27,20 @@ extern const idEventDef AI_PlayCycle;
 extern const idEventDef AI_AnimDone;
 extern const idEventDef AI_SetBlendFrames;
 extern const idEventDef AI_GetBlendFrames;
-extern const idEventDef AI_ScriptedMove;
-extern const idEventDef AI_ScriptedDone;
-extern const idEventDef AI_ScriptedStop;
+extern const idEventDef EV_FootprintLeft;	// HUMANHEAD JRM
+extern const idEventDef EV_FootprintRight;	// HUMANHEAD JRM	
+extern const idEventDef AI_DisablePain;		// HUMANHEAD JRM
+extern const idEventDef AI_EnablePain;		// HUMANHEAD JRM
 
-// RAVEN BEGIN
-// bdube: added flashlight
-extern const idEventDef AI_Flashlight;
-extern const idEventDef AI_EnterVehicle;
-extern const idEventDef AI_ExitVehicle;
-// nmckenzie:
-extern const idEventDef AI_OverrideAnim;
-extern const idEventDef AI_IdleAnim;
-extern const idEventDef AI_SetState;
-// jshepard: adjust animation speed
-extern const idEventDef AI_SetAnimRate;
-//MCG: damage over time
-extern const idEventDef EV_DamageOverTime;
-extern const idEventDef EV_DamageOverTimeEffect;
-//MCG: script-callable joint crawl effect
-extern const idEventDef EV_JointCrawlEffect;
+class idDeclParticle;
+class hhVehicle;		// HUMANHEAD pdm
+class hhBindController;	// HUMANHEAD pdm
 
-// abahr:
-extern const idEventDef AI_LookAt;
-extern const idEventDef AI_FaceEnemy;
-extern const idEventDef AI_FaceEntity;
-extern const idEventDef	AI_JumpDown;
-extern const idEventDef AI_SetLeader;
-// RAVEN END
 
 class idAnimState {
 public:
-
 	bool					idleAnim;
+	idStr					state;
 	int						animBlendFrames;
 	int						lastAnimBlendFrames;		// allows override anims to blend based on the last transition time
 
@@ -72,10 +51,9 @@ public:
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
 
-	void					Init( idEntity *owner, idAnimator *_animator, int animchannel );
+	void					Init( idActor *owner, idAnimator *_animator, int animchannel );
 	void					Shutdown( void );
-	void					SetState		( const char *name, int blendFrames, int flags = 0 );
-	void					PostState		( const char* name, int blendFrames = 0, int delay = 0, int flags = 0 );
+	void					SetState( const char *name, int blendFrames );
 	void					StopAnim( int frames );
 	void					PlayAnim( int anim );
 	void					CycleAnim( int anim );
@@ -88,24 +66,17 @@ public:
 	bool					IsIdle( void ) const;
 	animFlags_t				GetAnimFlags( void ) const;
 
-	rvStateThread&			GetStateThread	( void );
-
-	idAnimator *			GetAnimator( void ) const {return animator;};
+	bool	   		 		InGravityZone(void); // HUMANHEAD mdl:  Returns true if the player is inside an hhGravityZoneBase entity
+#ifdef HUMANHEAD //jsh
+	void					PlayAnimSkip( int anim, int delay );
+#endif
 private:
-// RAVEN BEGIN
-// bdube: converted self to entity ptr so any entity can use it
-	idEntity *				self;
-// RAVEN END
+	idActor *				self;
 	idAnimator *			animator;
+	idThread *				thread;
 	int						channel;
 	bool					disabled;
-	
-	rvStateThread			stateThread;
 };
-
-ID_INLINE rvStateThread& idAnimState::GetStateThread ( void ) {
-	return stateThread;
-}
 
 class idAttachInfo {
 public:
@@ -113,18 +84,27 @@ public:
 	int						channel;
 };
 
+typedef struct {
+	jointModTransform_t		mod;
+	jointHandle_t			from;
+	jointHandle_t			to;
+} copyJoints_t;
+
 class idActor : public idAFEntity_Gibbable {
 public:
 	CLASS_PROTOTYPE( idActor );
 
 	int						team;
-	idLinkList<idActor>		teamNode;
 	int						rank;				// monsters don't fight back if the attacker's rank is higher
 	idMat3					viewAxis;			// view axis of the actor
 
 	idLinkList<idActor>		enemyNode;			// node linked into an entity's enemy list for quick lookups of who is attacking him
 	idLinkList<idActor>		enemyList;			// list of characters that have targeted the player as their enemy
 
+	// HUMANHEAD nla	
+	idScriptBool			AI_BOUND;			// HUMANHEAD pdm
+	idScriptBool			AI_VEHICLE;			// HUMANHEAD pdm
+	// HUMANHEAD END
 public:
 							idActor( void );
 	virtual					~idActor( void );
@@ -135,64 +115,109 @@ public:
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
 
+	//HUMANHEAD rww - general network handling of all actors
+	virtual void			WriteToSnapshot( idBitMsgDelta &msg ) const;
+	virtual void			ReadFromSnapshot( const idBitMsgDelta &msg );
+	virtual void			ClientPredictionThink( void );
+	virtual void			SetSkin( const idDeclSkin *skin );
+	//HUMANHEAD END
+
 	virtual void			Hide( void );
 	virtual void			Show( void );
 	virtual int				GetDefaultSurfaceType( void ) const;
 	virtual void			ProjectOverlay( const idVec3 &origin, const idVec3 &dir, float size, const char *material );
 
-	virtual bool			LoadAF( const char* keyname = NULL, bool purgeAF = false );
+	virtual bool			LoadAF( void );
 	void					SetupBody( void );
 
-	virtual void			CheckBlink( void );
-
-	bool					PointVisible(const idVec3& point) const;
+	void					CheckBlink( void );
 
 	virtual bool			GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis );
 	virtual bool			GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis );
 
 							// script state management
-	void					ShutdownThreads		( void );
-	void					UpdateState			( void );
-	
-	virtual void			OnStateThreadClear ( const char *statename, int flags = 0 );
-	void					SetState		( const char *statename, int flags = 0 );
-	void					PostState		( const char* statename, int delay = 0, int flags = 0 );
-	void					InterruptState	( const char* statename, int delay = 0, int flags = 0 );
+	void					ShutdownThreads( void );
+	virtual bool			ShouldConstructScriptObjectAtSpawn( void ) const;
+	virtual idThread *		ConstructScriptObject( void );
+	void					UpdateScript( void );
+	const function_t		*GetScriptFunction( const char *funcname );
+	void					SetState( const function_t *newState );
+	void					SetState( const char *statename );
 
 							// vision testing
+	virtual // HUMANHEAD aob: made virtual
 	void					SetEyeHeight( float height );
-	void					SetChestHeight ( float height );
+	virtual	// HUMANHEAD aob: made virtual and made const
 	float					EyeHeight( void ) const;
+	virtual	// HUMANHEAD aob: made virtual and made const
+	idVec3					EyeOffset( void ) const;
+	virtual	// HUMANHEAD aob: made virtual
+	idVec3					GetEyePosition( void ) const;
+	virtual void			GetViewPos( idVec3 &origin, idMat3 &axis );		//HUMANHEAD
+	void					SetFOV( float fov );
+	virtual // HUMANHEAD jrm - made virtual
+	bool					CheckFOV( const idVec3 &pos ) const;
+	// HUMANHEAD JRM - made virtual
+	virtual 
+#ifdef HUMANHEAD
+	bool					CanSee( idEntity *ent, bool useFOV );
+#else
+	bool					CanSee( idEntity *ent, bool useFOV ) const;
+#endif
+	bool					PointVisible( const idVec3 &point ) const;
+	virtual void			GetAIAimTargets( const idVec3 &lastSightPos, idVec3 &headPos, idVec3 &chestPos );
 
-	virtual idVec3			GetEyePosition( void ) const;
-	virtual idVec3			GetChestPosition ( void ) const;
-	idEntity*				GetGroundEntity ( void ) const;
-	virtual idEntity*		GetGroundElevator( idEntity* testElevator=NULL ) const;
+	// HUMANHEAD
+	void					SetAnimPrefix( const char *prefix );
+	const char *			GetAnimPrefix( void );
+	idMat3					GetGravViewAxis(void)	const;	// HUMANHEAD JRM - returns clipmodel axis * viewAxis
+	virtual float			EyeHeightIdeal( void ) const;
+	virtual bool			ShouldRemainAlignedToAxial() const;
+	virtual bool			IsWallWalking() const { return(false); }
+	virtual bool			Give(const char *statname, const char *value);
+	virtual void			Possess( idEntity *possessor ); // HUMANHEAD aob
+	virtual void			Unpossess(); // HUMANHEAD aob
+	virtual bool			CanBePossessed( void ); // HUMANHEAD cjr
 
-	void					Present( void );
+	virtual void			UpdateOrientation( const idAngles& _untransformedViewAngles ) {}
+	virtual void			DetermineOwnerPosition( idVec3 &ownerOrigin, idMat3 &ownerAxis );//aob
+	virtual idVec3			ApplyLandDeflect( const idVec3& pos, float scale ) { return pos; }
+	virtual const idMat3&	GetAxis( int id = 0 ) const { return viewAxis; }
+	virtual void			PlayFootstepSound();
+	virtual void			PlayFootstepSoundMatter( const trace_t& trace );
+	virtual void			Event_AnimSyncLegs();			// nla
+	virtual idVec3 			GetAimPosition() const;
 
-	virtual void			GetViewPos	( idVec3 &origin, idMat3 &axis ) const;
-	void					SetFOV		( float fov, float fovClose );
-	bool					CheckFOV	( const idVec3 &pos, float ang = -1.0f ) const;
-	virtual bool			HasFOV		( idEntity *ent );
-	virtual	bool			CanSee		( const idEntity *ent, bool useFOV ) const;
-	virtual	bool			CanSeeFrom	( const idVec3& from, const idEntity *ent, bool useFOV ) const;
-	virtual	bool			CanSeeFrom	( const idVec3& from, const idVec3& toPos, bool useFOV ) const;
+	virtual void			EnterVehicle( hhVehicle* vehicle );
+	virtual void			ExitVehicle( hhVehicle* vehicle );
+	virtual void			GetPilotInput( usercmd_t& pilotCmds, idAngles& pilotViewAngles ) {}
+	virtual void			ResetClipModel();
+	class hhPilotVehicleInterface*	GetVehicleInterface();
+	const hhPilotVehicleInterface*	GetVehicleInterface() const;
+	void					SetVehicleInterface( hhPilotVehicleInterface* newVehicleInterface );
+	bool					InVehicle() const;
+	void					DisableIK()							{	walkIK.DisableAll();	}
+	void					EnableIK()							{	walkIK.EnableAll();		}
+	virtual void			BecameBound(hhBindController *b)	{}
+	virtual void			BecameUnbound(hhBindController *b)	{}
+	bool					PlayCrashLandSound( const trace_t& trace, const float volumeScale );
+	idVec3					DetermineDeltaCollisionVelocity( const idVec3& currentVel, const trace_t& trace );
+	virtual void			PlayPainSound();
+	idAnimState*			GetLegsAnim(void)	{return &legsAnim;}
+	idAnimState*			GetTorsoAnim(void)	{return &torsoAnim;}
+	idAnimState*			GetHeadAnim(void)	{return &headAnim;}
+	virtual void			SetAxis( const idMat3& axis ) { viewAxis = axis; UpdateVisuals(); }
+	virtual void			SetShaderParm( int parmnum, float value );
+	idEntity *				GetHead();
+	// HUMANHEAD END
 
 							// damage
 	void					SetupDamageGroups( void );
-
 	virtual	void			Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location );
-// RAVEN BEGIN
-// nmckenzie: a final hook in the middle of the damage function
-	virtual void			AdjustHealthByDamage ( int inDamage ){health -= inDamage;}
-// RAVEN END
-
-	virtual int				GetDamageForLocation( int damage, int location );
+	int						GetDamageForLocation( int damage, int location );
 	const char *			GetDamageGroup( int location );
 	void					ClearPain( void );
 	virtual bool			Pain( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
-	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, idEntity* inflictor );
 
 							// model/combat model/ragdoll
 	void					SetCombatModel( void );
@@ -208,92 +233,65 @@ public:
 	void					SetDeltaViewAngles( const idAngles &delta );
 
 	bool					HasEnemies( void ) const;
-	idActor *				ClosestEnemyToPoint( const idVec3 &pos, float maxRange=0.0f, bool returnFirst=false, bool checkPVS=false );
+	idActor *				ClosestEnemyToPoint( const idVec3 &pos );
 	idActor *				EnemyWithMostHealth();
 
-	virtual bool			OnLadder			( void ) const;
-	virtual void			OnStateChange		( int channel );
-	virtual void			OnFriendlyFire		( idActor* attacker );
+	virtual bool			OnLadder( void ) const;
 
 	virtual void			GetAASLocation( idAAS *aas, idVec3 &pos, int &areaNum ) const;
 
 	void					Attach( idEntity *ent );
-	idEntity*				FindAttachment( const char* attachmentName );
-	void					HideAttachment( const char* attachmentName );
-	void					ShowAttachment( const char* attachmentName );
-	idEntity*				GetHead() { return head; }
 
 	virtual void			Teleport( const idVec3 &origin, const idAngles &angles, idEntity *destination );
 
 	virtual	renderView_t *	GetRenderView();	
-
-	// Animation
-	int						PlayAnim				( int channel, const char *name, int blendFrames );
-	bool					PlayCycle				( int channel, const char *name, int blendFrames );
-	void					IdleAnim				( int channel, const char *name, int blendFrames );
-	void					OverrideAnim			( int channel );
-	bool					HasAnim					( int channel, const char *name, bool forcePrefix = false );
-	int						GetAnim					( int channel, const char *name, bool forcePrefix = false );
-	bool					AnimDone				( int channel, int blendFrames );
 	
-	// animation state control
-	void					UpdateAnimState			( void );
-	void					SetAnimState			( int channel, const char *name, int blendFrames = 0, int flags = 0 );
-	void					PostAnimState			( int channel, const char *name, int blendFrames = 0, int delay = 0, int flags = 0 );
-	void					StopAnimState			( int channel );
-	bool					InAnimState				( int channel, const char *name );
-	
+							// animation state control
+	int						GetAnim( int channel, const char *name );
+	void					UpdateAnimState( void );
+	void					SetAnimState( int channel, const char *name, int blendFrames );
+	const char *			GetAnimState( int channel ) const;
+	bool					InAnimState( int channel, const char *name ) const;
+	const char *			WaitState( void ) const;
+	void					SetWaitState( const char *_waitstate );
+	bool					AnimDone( int channel, int blendFrames ) const;
 	virtual void			SpawnGibs( const idVec3 &dir, const char *damageDefName );
 
-// RAVEN BEGIN
-// bdube: added for vehicle
-	bool					IsInVehicle ( void ) const;
-	rvVehicleController&	GetVehicleController ( void );
-	virtual void			GuidedProjectileIncoming( idGuidedProjectile * projectile );
-
-	bool					DebugFilter	(const idCVar& test) const;
-// RAVEN END
-	virtual bool			IsCrouching				( void ) const {return false;};
-
-	virtual bool			SkipImpulse( idEntity* ent, int id );
-
-	int						lightningNextTime;
-	int						lightningEffects;
+	bool					InGravityZone( void ); // HUMANHEAD mdl
+	virtual void			Portalled(idEntity *portal); // HUMANHEAD mdl
 
 protected:
 	friend class			idAnimState;
 
 	float					fovDot;				// cos( fovDegrees )
-	float					fovCloseDot;		// cos( fovDegreesClose )
-	float					fovCloseRange;		// range within to use fovCloseDot
 	idVec3					eyeOffset;			// offset of eye relative to physics origin
-	idVec3					chestOffset;		// offset of chest relative to physics origin
 	idVec3					modelOffset;		// offset of visual model relative to the physics origin
 
 	idAngles				deltaViewAngles;	// delta angles relative to view input angles
 
 	int						pain_debounce_time;	// next time the actor can show pain
 	int						pain_delay;			// time between playing pain sound
+	int						pain_threshold;		// how much damage monster can take at any one time before playing pain animation
 
 	idStrList				damageGroups;		// body damage groups
 	idList<float>			damageScale;		// damage scale per damage gruop
-	bool					inDamageEvent;		// hacky-ass bool to prevent us from starting a new EV_DamageOverTime in our ::Damage
 
-	bool					use_combat_bbox;	// whether to use the bounding box for combat collision
-	
+	bool						use_combat_bbox;	// whether to use the bounding box for combat collision
+	idEntityPtr<idAFAttachment>	head;
+	idList<copyJoints_t>		copyJoints;			// copied from the body animation to the head model
+
+	// state variables
+	const function_t		*state;
+	const function_t		*idealState;
+
 	// joint handles
 	jointHandle_t			leftEyeJoint;
 	jointHandle_t			rightEyeJoint;
 	jointHandle_t			soundJoint;
-	jointHandle_t			eyeOffsetJoint;
-	jointHandle_t			chestOffsetJoint;
-	jointHandle_t			neckJoint;
-	jointHandle_t			headJoint;
 
 	idIK_Walk				walkIK;
 
 	idStr					animPrefix;
-	idStr					painType;
 	idStr					painAnim;
 
 	// blinking
@@ -302,15 +300,18 @@ protected:
 	int						blink_min;
 	int						blink_max;
 
+	//HUMANHEAD: aob
+	hhPilotVehicleInterface*	vehicleInterface;
+	//HUMANHEAD END
+
+	// script variables
+	idThread *				scriptThread;
+	idStr					waitState;
 	idAnimState				headAnim;
 	idAnimState				torsoAnim;
 	idAnimState				legsAnim;
-	
-	rvStateThread			stateThread;
 
-	idEntityPtr<idAFAttachment>	head;				// safe pointer to attached head
-
-	bool					disablePain;
+	bool					allowPain;
 	bool					allowEyeFocus;
 	bool					finalBoss;
 
@@ -318,53 +319,32 @@ protected:
 
 	idList<idAttachInfo>	attachments;
 
-	virtual void			Gib( const idVec3 &dir, const char *damageDefName );
-	void					CheckDeathObjectives( void );
+	int						solidTest; // HUMANHEAD mdl
 
-// RAVEN BEGIN
-// bdube: vehicles
-	virtual bool			EnterVehicle ( idEntity* vehicle );
-	virtual bool			ExitVehicle	 ( bool force = false );
-// RAVEN END
+	//HUMANHEAD bjk
+	int						basePushTime;
+	idVec3					basePush;
+	int						basePushJoint;
+	//HUMANHEAD END
+
+	virtual void			Gib( const idVec3 &dir, const char *damageDefName );
+	void					AddBasePush( const idVec3& dir, int location, const idDict* damageDict );	//HUMANHEAD bjk
+	void					ApplyBasePush();	//HUMANHEAD bjk
 
 							// removes attachments with "remove" set for when character dies
 	void					RemoveAttachments( void );
-	
-// RAVEN BEGIN
-// bdube: vehicles
-	rvVehicleController		vehicleController;
-// bdube: flashlights
-	renderLight_t			flashlight;
-	int						flashlightHandle;
-	jointHandle_t			flashlightJoint;
-	idVec3					flashlightOffset;
 
-// bdube: death force
-	int						deathPushTime;
-	idVec3					deathPushForce;
-	jointHandle_t			deathPushJoint;
-
-	void					FlashlightUpdate	( bool forceOn = false );
-	void					InitDeathPush		( const idVec3& dir, int location, const idDict* damageDict, float pushScale = 1.0f );
-	void					DeathPush			( void );
-
-	// Add some dynamic externals for debugging
-	virtual void			GetDebugInfo		( debugInfoProc_t proc, void* userData );
-// RAVEN END	
-
-protected:
-
-	virtual void			FootStep			( void );
-	virtual void			SetupHead( const char* headDefName = "", idVec3 headOffset = idVec3(0, 0, 0) );
+							// copies animation from body to head joints
+	void					CopyJointsFromBodyToHead( void );
 
 private:
+protected:			// nla - Added so we can access.
 	void					SyncAnimChannels( int channel, int syncToChannel, int blendFrames );
 	void					FinishSetup( void );
-	
+	void					SetupHead( void );
+
 	void					Event_EnableEyeFocus( void );
 	void					Event_DisableEyeFocus( void );
-	void					Event_EnableBlink( void );
-	void					Event_DisableBlink( void );
 	void					Event_Footstep( void );
 	void					Event_EnableWalkIK( void );
 	void					Event_DisableWalkIK( void );
@@ -375,6 +355,7 @@ private:
 	void					Event_PreventPain( float duration );
 	void					Event_DisablePain( void );
 	void					Event_EnablePain( void );
+	void					Event_GetPainAnim( void );
 	void					Event_StopAnim( int channel, int frames );
 	void					Event_PlayAnim( int channel, const char *name );
 	void					Event_PlayCycle( int channel, const char *name );
@@ -384,45 +365,78 @@ private:
 	void					Event_EnableAnim( int channel, int blendFrames );
 	void					Event_SetBlendFrames( int channel, int blendFrames );
 	void					Event_GetBlendFrames( int channel );
+	void					Event_AnimState( int channel, const char *name, int blendFrames );
+	void					Event_GetAnimState( int channel );
+	void					Event_InAnimState( int channel, const char *name );
+	void					Event_FinishAction( const char *name );
+	void					Event_AnimDone( int channel, int blendFrames );
+	void					Event_HasAnim( int channel, const char *name );
+	void					Event_CheckAnim( int channel, const char *animname );
+	void					Event_ChooseAnim( int channel, const char *animname );
+	void					Event_AnimLength( int channel, const char *animname );
+	void					Event_AnimDistance( int channel, const char *animname );
 	void					Event_HasEnemies( void );
 	void					Event_NextEnemy( idEntity *ent );
 	void					Event_ClosestEnemyToPoint( const idVec3 &pos );
 	void					Event_StopSound( int channel, int netsync );
+	void					Event_SetNextState( const char *name );
+	void					Event_SetState( const char *name );
+	void					Event_GetState( void );
 	void					Event_GetHead( void );
 
-	void					Event_Teleport		( idVec3 &newPos, idVec3 &newAngles );
-	void					Event_Flashlight	( bool enable );
-	void					Event_EnterVehicle	( idEntity* vehicle );
-	void					Event_ExitVehicle	( bool force );
-	void					Event_PreExitVehicle( bool force );
-
-	void					Event_SetAnimRate	( float multiplier );
-	void					Event_DamageOverTime ( int endTime, int interval, idEntity *inflictor, idEntity *attacker, idVec3 &dir, const char *damageDefName, const float damageScale, int location );
-	virtual void			Event_DamageOverTimeEffect	( int endTime, int interval, const char *damageDefName );
-	void					Event_JointCrawlEffect ( const char *effectKeyName, float crawlSecs );
-
-	CLASS_STATES_PROTOTYPE ( idActor );
-
-protected:
-
-	// Wait states
-	stateResult_t			State_Wait_LegsAnim		( const stateParms_t& parms );
-	stateResult_t			State_Wait_TorsoAnim	( const stateParms_t& parms );
-	stateResult_t			State_Wait_Frame		( const stateParms_t& parms );
-
-	void					DisableAnimState		( int channel );
-	void					EnableAnimState			( int channel );
-	idAnimState&			GetAnimState			( int channel );
+// HUMANHEAD START JRM	
+	virtual void			Event_Footprint_Left( void );
+	virtual void			Event_Footprint_Right( void );	
+#ifdef HUMANHEAD //jsh
+	virtual void			Event_PlayAnimSkip( int channel, const char *name, float skip );	
+#endif
+	void					Event_AFTestSolid(void); // mdl
+// HUMANHEAD END
 };
 
-ID_INLINE bool idActor::IsInVehicle( void ) const {
-	return vehicleController.IsDriving();
+// HUMANHEAD
+/*
+=====================
+idActor::EyeHeightIdeal
+=====================
+*/
+ID_INLINE float idActor::EyeHeightIdeal( void ) const {
+	return eyeOffset.z;
 }
 
-ID_INLINE rvVehicleController& idActor::GetVehicleController( void ) {
-	return vehicleController;
+/*
+=====================
+idActor::ShouldRemainAlignedToAxial
+=====================
+*/
+ID_INLINE bool idActor::ShouldRemainAlignedToAxial() const {
+	return false;//true;
 }
+
+/*
+=====================
+idActor::Give
+	HUMANHEAD aob
+AOBFIXME: Why is this function inline?  Move to cpp file and get rid of inline. --pdm
+=====================
+*/
+#define DETERMINE_AMOUNT_GIVEN( current, delta, max ) ( (((current) + (delta)) > (max)) ? (max) - (current) : (delta) )
+ID_INLINE bool idActor::Give( const char *statname, const char *value) {
+	float	deltaAmount = 0.0f;
+	int		localMaxHealth = GetMaxHealth();
+	int		localHealth = GetHealth();
+	bool	processed = false;
+	float	localAmountGiven = 0.0f;
+
+	if ( !idStr::Icmp( statname, "health" ) ) {
+		deltaAmount = atoi( value ); 
+		localAmountGiven = DETERMINE_AMOUNT_GIVEN( localHealth, deltaAmount, localMaxHealth );
+		SetHealth( localHealth + localAmountGiven );
+		processed = true;
+	}
+	
+	return processed;
+}
+// HUMANHEAD END
 
 #endif /* !__GAME_ACTOR_H__ */
-
-// RAVEN END

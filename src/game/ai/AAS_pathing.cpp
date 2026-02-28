@@ -1,10 +1,9 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
-
-
-// RAVEN BEGIN
-#include "../Game_local.h"
-// RAVEN END
 #include "AAS_local.h"
 
 #define SUBSAMPLE_WALK_PATH		1
@@ -46,8 +45,6 @@ bool idAASLocal::EdgeSplitPoint( idVec3 &split, int edgeNum, const idPlane &plan
 	return true;
 }
 
-// RAVEN BEGIN
-// rjohnson: optimized function
 /*
 ============
 idAASLocal::FloorEdgeSplitPoint
@@ -62,85 +59,50 @@ bool idAASLocal::FloorEdgeSplitPoint( idVec3 &bestSplit, int areaNum, const idPl
 	const aasFace_t *face;
 	idVec3 split;
 	float dist, bestDist;
-	const aasEdge_t *edge;
-	idVec3 v1, v2;
-	float d1, d2;
 
-	area = &file->GetArea( areaNum );
 	if ( closest ) {
 		bestDist = maxWalkPathDistance;
+	} else {
+		bestDist = -0.1f;
+	}
 
-		for ( i = area->numFaces-1; i >= 0; i-- ) {
-			faceNum = file->GetFaceIndex( area->firstFace + i );
-			face = &file->GetFace( abs(faceNum) );
+	area = &file->GetArea( areaNum );
 
-			if ( !(face->flags & FACE_FLOOR ) ) {
+	for ( i = 0; i < area->numFaces; i++ ) {
+		faceNum = file->GetFaceIndex( area->firstFace + i );
+		face = &file->GetFace( abs(faceNum) );
+
+		if ( !(face->flags & FACE_FLOOR ) ) {
+			continue;
+		}
+
+		for ( j = 0; j < face->numEdges; j++ ) {
+			edgeNum = file->GetEdgeIndex( face->firstEdge + j );
+
+			if ( !EdgeSplitPoint( split, abs( edgeNum ), pathPlane ) ) {
 				continue;
 			}
-
-			for ( j = face->numEdges-1; j >= 0; j-- ) {
-				edgeNum = file->GetEdgeIndex( face->firstEdge + j );
-
-				edge = &file->GetEdge( abs( edgeNum ) );
-				v1 = file->GetVertex( edge->vertexNum[0] );
-				v2 = file->GetVertex( edge->vertexNum[1] );
-				d1 = v1 * pathPlane.Normal() - pathPlane.Dist();
-				d2 = v2 * pathPlane.Normal() - pathPlane.Dist();
-
-				//if ( (d1 < CM_CLIP_EPSILON && d2 < CM_CLIP_EPSILON) || (d1 > -CM_CLIP_EPSILON && d2 > -CM_CLIP_EPSILON) ) {
-				if ( FLOATSIGNBITSET( d1 ) == FLOATSIGNBITSET( d2 ) ) {
-					continue;
-				}
-
-				split = v1 + (d1 / (d1 - d2)) * (v2 - v1);
-				dist = frontPlane.Distance( split );
+			dist = frontPlane.Distance( split );
+			if ( closest ) {
 				if ( dist >= -0.1f && dist < bestDist ) {
 					bestDist = dist;
 					bestSplit = split;
 				}
-			}
-		}
-
-		return ( bestDist < maxWalkPathDistance );
-
-	} else {
-		bestDist = -0.1f;
-
-		for ( i = area->numFaces-1; i >= 0; i-- ) {
-			faceNum = file->GetFaceIndex( area->firstFace + i );
-			face = &file->GetFace( abs(faceNum) );
-
-			if ( !(face->flags & FACE_FLOOR ) ) {
-				continue;
-			}
-
-			for ( j = face->numEdges-1; j >= 0; j-- ) {
-				edgeNum = file->GetEdgeIndex( face->firstEdge + j );
-
-				edge = &file->GetEdge( abs( edgeNum ) );
-				v1 = file->GetVertex( edge->vertexNum[0] );
-				v2 = file->GetVertex( edge->vertexNum[1] );
-				d1 = v1 * pathPlane.Normal() - pathPlane.Dist();
-				d2 = v2 * pathPlane.Normal() - pathPlane.Dist();
-
-				//if ( (d1 < CM_CLIP_EPSILON && d2 < CM_CLIP_EPSILON) || (d1 > -CM_CLIP_EPSILON && d2 > -CM_CLIP_EPSILON) ) {
-				if ( FLOATSIGNBITSET( d1 ) == FLOATSIGNBITSET( d2 ) ) {
-					continue;
-				}
-
-				split = v1 + (d1 / (d1 - d2)) * (v2 - v1);
-				dist = frontPlane.Distance( split );
+			} else {
 				if ( dist > bestDist ) {
 					bestDist = dist;
 					bestSplit = split;
 				}
 			}
 		}
+	}
 
+	if ( closest ) {
+		return ( bestDist < maxWalkPathDistance );
+	} else {
 		return ( bestDist > -0.1f );
 	}
 }
-// RAVEN END
 
 /*
 ============
@@ -293,7 +255,7 @@ idAASLocal::WalkPathToGoal
 */
 bool idAASLocal::WalkPathToGoal( aasPath_t &path, int areaNum, const idVec3 &origin, int goalAreaNum, const idVec3 &goalOrigin, int travelFlags ) const {
 	int i, travelTime, curAreaNum, lastAreas[4], lastAreaIndex, endAreaNum;
-	idReachability *reach = NULL;
+	idReachability *reach;
 	idVec3 endPos;
 
 	path.type = PATHTYPE_WALK;
@@ -321,11 +283,6 @@ bool idAASLocal::WalkPathToGoal( aasPath_t &path, int areaNum, const idVec3 &ori
 		if ( !reach ) {
 			return false;
 		}
-
- 		// RAVEN BEGIN
- 		// cdr: Alternate Routes Bug
- 		path.reachability = reach;
- 		// RAVEN END
 
 		// no need to check through the first area
 		if ( areaNum != curAreaNum ) {
@@ -403,6 +360,11 @@ bool idAASLocal::WalkPathToGoal( aasPath_t &path, int areaNum, const idVec3 &ori
 			path.secondaryGoal = reach->end;
 			path.reachability = reach;
 			break;
+/*	    case TFL_FLY:	// HUMANHEAD nla REmoved per AAS error
+			path.type |= PATHTYPE_FLY;
+			path.secondaryGoal = reach->end;
+			path.reachability = reach;
+			*/			
 		default:
 			break;
 	}
@@ -474,7 +436,7 @@ idAASLocal::FlyPathToGoal
 */
 bool idAASLocal::FlyPathToGoal( aasPath_t &path, int areaNum, const idVec3 &origin, int goalAreaNum, const idVec3 &goalOrigin, int travelFlags ) const {
 	int i, travelTime, curAreaNum, lastAreas[4], lastAreaIndex, endAreaNum;
-	idReachability *reach = NULL;
+	idReachability *reach;
 	idVec3 endPos;
 
 	path.type = PATHTYPE_WALK;

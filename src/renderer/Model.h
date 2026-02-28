@@ -501,6 +501,12 @@ public:
 	// returns value != 0.0f if the model requires the depth hack
 	virtual float				DepthHack( void ) const = 0;
 
+	// Prey compatibility: deform liquid-style models from gameplay bounds.
+	virtual void				IntersectBounds( const idBounds &bounds, float displacement ) {
+		(void)bounds;
+		(void)displacement;
+	}
+
 // RAVEN BEGIN
 // dluetscher: added call to determine if a collision surface exists within this model
 	//virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const = 0;
@@ -560,6 +566,9 @@ public:
 	virtual bool				HasSeparateSilTraceMeshes( void ) const;		
 #endif
 // RAVEN END
+
+	// Prey compatibility hook used by game-side dynamic models.
+	virtual void				SetGameUpdatedModel( bool gum ) { (void)gum; }
 
 // RAVEN END
 };

@@ -1,20 +1,28 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
 #define	MAX_SECTOR_DEPTH				12
 #define MAX_SECTORS						((1<<(MAX_SECTOR_DEPTH+1))-1)
 
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 typedef struct clipSector_s {
 	int						contents;
 	int						dynamicContents;
 	struct clipLink_s *		clipLinks;
 } clipSector_t;
-// RAVEN END
+#else
+typedef struct clipSector_s {
+	int						axis;		// -1 = leaf node
+	float					dist;
+	struct clipSector_s *	children[2];
+	struct clipLink_s *		clipLinks;
+} clipSector_t;
+#endif //HUMANHEAD END
 
 typedef struct clipLink_s {
 	idClipModel *			clipModel;
@@ -30,71 +38,11 @@ typedef struct trmCache_s {
 	float					volume;
 	idVec3					centerOfMass;
 	idMat3					inertiaTensor;
-	const idMaterial *		material;
-	idCollisionModel *		collisionModel;
-	int						hash; // only used to identify non-hashed trm's in a save.
 } trmCache_t;
 
 idVec3 vec3_boxEpsilon( CM_BOX_EPSILON, CM_BOX_EPSILON, CM_BOX_EPSILON );
 
-// RAVEN BEGIN
-// jnewquist: Mark memory tags for idBlockAlloc
-idBlockAlloc<clipLink_t, 1024, MA_PHYSICS>	clipLinkAllocator;
-// RAVEN END
-
-typedef enum {
-	CPT_NONE = -1,
-	CPT_TRANSLATION,
-	CPT_CONTACTS,
-	CPT_CONTENTS,
-
-	CPT_MAX_TYPES
-} CLIP_PROFILE_TYPES;
-
-#if 0
-
-static idTimer				clipProfileTimer[ CPT_MAX_TYPES ];
-static CLIP_PROFILE_TYPES	currentProfileType = CPT_NONE;
-static int					clipProfileDepth = 0;
-
-static void BeginClipProfile( CLIP_PROFILE_TYPES type ) {
-	clipProfileDepth++;
-
-	if ( clipProfileDepth == 1 ) {
-		clipProfileTimer[ type ].Start();
-		currentProfileType = type;
-	}
-}
-
-static void EndClipProfile( CLIP_PROFILE_TYPES type ) {
-	clipProfileDepth--;
-
-	if ( clipProfileDepth == 0 ) {
-		clipProfileTimer[ currentProfileType ].Stop();
-		currentProfileType = CPT_NONE;
-	}
-}
-
-void ClearClipProfile( void ) {
-	for( int i = 0; i < CPT_MAX_TYPES; i++ ) {
-		clipProfileTimer[ i ].Clear();
-	}
-}
-
-void DisplayClipProfile( void ) {
-	for( int i = 0; i < CPT_MAX_TYPES; i++ ) {
-		common->Printf( "%d:%d  ", i, ( int )clipProfileTimer[ i ].Milliseconds() );
-	}
-	common->Printf( "\n" );
-}
-#else
-
-#define BeginClipProfile( type )
-
-#define EndClipProfile( type )
-
-#endif
-
+idBlockAlloc<clipLink_t, 1024>	clipLinkAllocator;
 
 /*
 ===============================================================
@@ -113,31 +61,8 @@ idClipModel::ClearTraceModelCache
 ===============
 */
 void idClipModel::ClearTraceModelCache( void ) {
-	int i;
-
-	for ( i = 0; i < traceModelCache.Num(); i++ ) {
-// jmarshall
-		//collisionModelManager->FreeModel( traceModelCache[i]->collisionModel );
-// jmarshall
-		traceModelCache[i]->collisionModel = NULL;
-	}
 	traceModelCache.DeleteContents( true );
 	traceModelHash.Free();
-}
-
-/*
-===============
-idClipModel::CacheCollisionModels
-===============
-*/
-void idClipModel::CacheCollisionModels( void ) {
-	int i;
-
-	for ( i = 0; i < traceModelCache.Num(); i++ ) {
-		if ( traceModelCache[i]->collisionModel == NULL ) {
-			traceModelCache[i]->collisionModel = collisionModelManager->ModelFromTrm( gameLocal.GetMapName(), va( "traceModel%d", i ), traceModelCache[i]->trm, traceModelCache[i]->material );
-		}
-	}
 }
 
 /*
@@ -154,65 +79,26 @@ int idClipModel::TraceModelCacheSize( void ) {
 idClipModel::AllocTraceModel
 ===============
 */
-int idClipModel::AllocTraceModel( const idTraceModel &trm, const idMaterial *material, bool notHashed ) {
+int idClipModel::AllocTraceModel( const idTraceModel &trm ) {
 	int i, hashKey, traceModelIndex;
 	trmCache_t *entry;
-	
-	if ( notHashed ) {
-		hashKey = 0xffffffff;
-	} else {
-		hashKey = GetTraceModelHashKey( trm );
-		
-		for ( i = traceModelHash.First( hashKey ); i >= 0; i = traceModelHash.Next( i ) ) {
-			if ( traceModelCache[i]->trm == trm ) {
-				traceModelCache[i]->refCount++;
-				return i;
-			}
+
+	hashKey = GetTraceModelHashKey( trm );
+	for ( i = traceModelHash.First( hashKey ); i >= 0; i = traceModelHash.Next( i ) ) {
+		if ( traceModelCache[i]->trm == trm ) {
+			traceModelCache[i]->refCount++;
+			return i;
 		}
 	}
-	
 
 	entry = new trmCache_t;
 	entry->trm = trm;
 	entry->trm.GetMassProperties( 1.0f, entry->volume, entry->centerOfMass, entry->inertiaTensor );
 	entry->refCount = 1;
-	entry->material = material;
-	entry->hash = hashKey;
+
 	traceModelIndex = traceModelCache.Append( entry );
-	
-	if ( !notHashed ) {
-		traceModelHash.Add( hashKey, traceModelIndex );
-	}
-
-	entry->collisionModel = collisionModelManager->ModelFromTrm( gameLocal.GetMapName(), va( "traceModel%d", traceModelIndex ), trm, material );
-
+	traceModelHash.Add( hashKey, traceModelIndex );
 	return traceModelIndex;
-}
-
-/*
-===============
-idClipModel::Replace
-===============
-*/
-void idClipModel::ReplaceTraceModel( int index, const idTraceModel &trm, const idMaterial *material, bool notHashed ) {
-	if ( !notHashed ) {
-		common->Error( "ReplaceTraceModel was misused. Replace can only be used on non-hashed models right now.\n" );
-		return;
-	}
-	
-	trmCache_t *entry = traceModelCache[ index ];
-	entry->trm = trm;
-	entry->trm.GetMassProperties( 1.0f, entry->volume, entry->centerOfMass, entry->inertiaTensor );
-	entry->refCount = 1;
-	entry->hash = 0xffffffff;
-	entry->material = material;
-// jmarshall
-	//if(entry->collisionModel)
-	//{
-	//	collisionModelManager->FreeModel( entry->collisionModel );
-	//}
-// jmarshall end
-	entry->collisionModel = collisionModelManager->ModelFromTrm( gameLocal.GetMapName(), va( "traceModel%d", index ), trm, material );
 }
 
 /*
@@ -230,34 +116,11 @@ void idClipModel::FreeTraceModel( int traceModelIndex ) {
 
 /*
 ===============
-idClipModel::CopyTraceModel
-===============
-*/
-int idClipModel::CopyTraceModel( const int traceModelIndex ) {
-	if ( traceModelIndex < 0 || traceModelIndex >= traceModelCache.Num() || traceModelCache[traceModelIndex]->refCount <= 0 ) {
-		gameLocal.Warning( "idClipModel::CopyTraceModel: tried to copy an uncached trace model" );
-		return -1;
-	}
-	traceModelCache[traceModelIndex]->refCount++;
-	return traceModelIndex;
-}
-
-/*
-===============
 idClipModel::GetCachedTraceModel
 ===============
 */
 idTraceModel *idClipModel::GetCachedTraceModel( int traceModelIndex ) {
 	return &traceModelCache[traceModelIndex]->trm;
-}
-
-/*
-===============
-idClipModel::GetCachedTraceModel
-===============
-*/
-idCollisionModel *idClipModel::GetCachedCollisionModel( int traceModelIndex ) {
-	return traceModelCache[traceModelIndex]->collisionModel;
 }
 
 /*
@@ -281,13 +144,11 @@ void idClipModel::SaveTraceModels( idSaveGame *savefile ) {
 	savefile->WriteInt( traceModelCache.Num() );
 	for ( i = 0; i < traceModelCache.Num(); i++ ) {
 		trmCache_t *entry = traceModelCache[i];
-
-		savefile->Write( &entry->trm, sizeof( entry->trm ) );
+		
+		savefile->WriteTraceModel( entry->trm );
 		savefile->WriteFloat( entry->volume );
 		savefile->WriteVec3( entry->centerOfMass );
 		savefile->WriteMat3( entry->inertiaTensor );
-		savefile->WriteMaterial( entry->material );
-		savefile->WriteInt( entry->hash );
 	}
 }
 
@@ -303,26 +164,20 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 
 	savefile->ReadInt( num );
 	traceModelCache.SetNum( num );
+
 	for ( i = 0; i < num; i++ ) {
 		trmCache_t *entry = new trmCache_t;
+		
+		savefile->ReadTraceModel( entry->trm );
 
-		savefile->Read( &entry->trm, sizeof( entry->trm ) );
 		savefile->ReadFloat( entry->volume );
 		savefile->ReadVec3( entry->centerOfMass );
 		savefile->ReadMat3( entry->inertiaTensor );
-		savefile->ReadMaterial( entry->material );
-		savefile->ReadInt( entry->hash );
-
 		entry->refCount = 0;
-		entry->collisionModel = NULL;
 
 		traceModelCache[i] = entry;
-		if ( entry->hash != 0xffffffff ) {
-			traceModelHash.Add( GetTraceModelHashKey( entry->trm ), i );
-		}
+		traceModelHash.Add( GetTraceModelHashKey( entry->trm ), i );
 	}
-
-	CacheCollisionModels();
 }
 
 
@@ -334,30 +189,7 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 ===============================================================
 */
 
-/*
-================
-idClipModel::FreeModel
-================
-*/
-void idClipModel::FreeModel( void ) {
-
-	if ( traceModelIndex != -1 ) {
-		FreeTraceModel( traceModelIndex );
-		traceModelIndex = -1;
-	}
-
-	if ( collisionModel != NULL ) {
-// jmarshall
-		//collisionModelManager->FreeModel( collisionModel );
-// jmarshall
-		collisionModel = NULL;
-	}
-
-	renderModelHandle = -1;
-}
-
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 /*
 ================
 idClipModel::UpdateDynamicContents
@@ -366,7 +198,7 @@ idClipModel::UpdateDynamicContents
 void idClipModel::UpdateDynamicContents( void ) {
 	idClip::UpdateDynamicContents( this );
 }
-// RAVEN END
+#endif //HUMANHEAD END
 
 /*
 ================
@@ -374,13 +206,15 @@ idClipModel::LoadModel
 ================
 */
 bool idClipModel::LoadModel( const char *name ) {
-	FreeModel();
-// jmarshall: added precache flag
-	collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), name, false );
-// jmarshall end
-	if ( collisionModel != NULL ) {
-		collisionModel->GetBounds( bounds );
-		collisionModel->GetContents( contents );
+	renderModelHandle = -1;
+	if ( traceModelIndex != -1 ) {
+		FreeTraceModel( traceModelIndex );
+		traceModelIndex = -1;
+	}
+	collisionModelHandle = collisionModelManager->LoadModel( name, false );
+	if ( collisionModelHandle ) {
+		collisionModelManager->GetModelBounds( collisionModelHandle, bounds );
+		collisionModelManager->GetModelContents( collisionModelHandle, contents );
 		return true;
 	} else {
 		bounds.Zero();
@@ -393,14 +227,13 @@ bool idClipModel::LoadModel( const char *name ) {
 idClipModel::LoadModel
 ================
 */
-void idClipModel::LoadModel( const idTraceModel &trm, const idMaterial *material, bool notHashed ) {
-	if ( !notHashed || traceModelIndex == -1 ) {
-		FreeModel();
-		traceModelIndex = AllocTraceModel( trm, material, notHashed );
-	} else {
-		ReplaceTraceModel( traceModelIndex, trm, material, notHashed );
+void idClipModel::LoadModel( const idTraceModel &trm ) {
+	collisionModelHandle = 0;
+	renderModelHandle = -1;
+	if ( traceModelIndex != -1 ) {
+		FreeTraceModel( traceModelIndex );
 	}
-	
+	traceModelIndex = AllocTraceModel( trm );
 	bounds = trm.bounds;
 }
 
@@ -410,13 +243,17 @@ idClipModel::LoadModel
 ================
 */
 void idClipModel::LoadModel( const int renderModelHandle ) {
-	FreeModel();
+	collisionModelHandle = 0;
 	this->renderModelHandle = renderModelHandle;
 	if ( renderModelHandle != -1 ) {
 		const renderEntity_t *renderEntity = gameRenderWorld->GetRenderEntity( renderModelHandle );
 		if ( renderEntity ) {
 			bounds = renderEntity->bounds;
 		}
+	}
+	if ( traceModelIndex != -1 ) {
+		FreeTraceModel( traceModelIndex );
+		traceModelIndex = -1;
 	}
 }
 
@@ -428,22 +265,24 @@ idClipModel::Init
 void idClipModel::Init( void ) {
 	enabled = true;
 	entity = NULL;
-	id = 0;
+	//HUMANHEAD: aob - invalid id is actually -1
+	id = JOINT_HANDLE_TO_CLIPMODEL_ID( INVALID_JOINT );
+	//HUMANHEAD END
 	owner = NULL;
 	origin.Zero();
 	axis.Identity();
 	bounds.Zero();
 	absBounds.Zero();
+	material = NULL;
 	contents = CONTENTS_BODY;
-	collisionModel = NULL;
+	collisionModelHandle = 0;
 	renderModelHandle = -1;
 	traceModelIndex = -1;
 	clipLinks = NULL;
 	touchCount = -1;
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	checked = false;
-// RAVEN END
+#endif //HUMANHEAD END
 }
 
 /*
@@ -470,9 +309,9 @@ idClipModel::idClipModel( const char *name ) {
 idClipModel::idClipModel
 ================
 */
-idClipModel::idClipModel( const idTraceModel &trm, const idMaterial *material ) {
+idClipModel::idClipModel( const idTraceModel &trm ) {
 	Init();
-	LoadModel( trm, material );
+	LoadModel( trm );
 }
 
 /*
@@ -500,24 +339,19 @@ idClipModel::idClipModel( const idClipModel *model ) {
 	axis = model->axis;
 	bounds = model->bounds;
 	absBounds = model->absBounds;
+	material = model->material;
 	contents = model->contents;
-	collisionModel = NULL;
-	if ( model->collisionModel != NULL ) {
-// jmarshall - added precache flag
-		collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), model->collisionModel->GetName(), false );
-// jmarshall end
-	}
+	collisionModelHandle = model->collisionModelHandle;
 	traceModelIndex = -1;
 	if ( model->traceModelIndex != -1 ) {
-		traceModelIndex = CopyTraceModel( model->traceModelIndex );
+		LoadModel( *GetCachedTraceModel( model->traceModelIndex ) );
 	}
 	renderModelHandle = model->renderModelHandle;
 	clipLinks = NULL;
 	touchCount = -1;
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	checked = false;
-// RAVEN END
+#endif //HUMANHEAD END
 }
 
 /*
@@ -528,7 +362,9 @@ idClipModel::~idClipModel
 idClipModel::~idClipModel( void ) {
 	// make sure the clip model is no longer linked
 	Unlink();
-	FreeModel();
+	if ( traceModelIndex != -1 ) {
+		FreeTraceModel( traceModelIndex );
+	}
 }
 
 /*
@@ -545,9 +381,10 @@ void idClipModel::Save( idSaveGame *savefile ) const {
 	savefile->WriteMat3( axis );
 	savefile->WriteBounds( bounds );
 	savefile->WriteBounds( absBounds );
+	savefile->WriteMaterial( material );
 	savefile->WriteInt( contents );
-	if ( collisionModel != NULL ) {
-		savefile->WriteString( collisionModel->GetName() );
+	if ( collisionModelHandle != NULL ) {
+		savefile->WriteString( collisionModelManager->GetModelName( collisionModelHandle ) );
 	} else {
 		savefile->WriteString( "" );
 	}
@@ -556,7 +393,9 @@ void idClipModel::Save( idSaveGame *savefile ) const {
 	savefile->WriteBool( clipLinks != NULL );
 	savefile->WriteInt( touchCount );
 
-	savefile->WriteBool ( checked );	// cnicholson: Added unsaved var
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
+	savefile->WriteBool ( checked );
+#endif //HUMANHEAD END
 }
 
 /*
@@ -576,14 +415,13 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	savefile->ReadMat3( axis );
 	savefile->ReadBounds( bounds );
 	savefile->ReadBounds( absBounds );
+	savefile->ReadMaterial( material );
 	savefile->ReadInt( contents );
 	savefile->ReadString( collisionModelName );
 	if ( collisionModelName.Length() ) {
-// jmarshall - added precache flag
-		collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), collisionModelName, false );
-// jmarshall end
+		collisionModelHandle = collisionModelManager->LoadModel( collisionModelName, false );
 	} else {
-		collisionModel = NULL;
+		collisionModelHandle = NULL;
 	}
 	savefile->ReadInt( traceModelIndex );
 	if ( traceModelIndex >= 0 ) {
@@ -593,7 +431,9 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( linked );
 	savefile->ReadInt( touchCount );
 
-	savefile->ReadBool ( checked );	// cnicholson: Added unrestored var
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
+	savefile->ReadBool ( checked );
+#endif //HUMANHEAD END
 
 	// the render model will be set when the clip model is linked
 	renderModelHandle = -1;
@@ -601,10 +441,7 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	touchCount = -1;
 
 	if ( linked ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		Link( entity, id, origin, axis, renderModelHandle );
-// RAVEN END
+		Link( gameLocal.clip, entity, id, origin, axis, renderModelHandle );
 	}
 }
 
@@ -623,20 +460,18 @@ void idClipModel::SetPosition( const idVec3 &newOrigin, const idMat3 &newAxis ) 
 
 /*
 ================
-idClipModel::GetCollisionModel
+idClipModel::Handle
 ================
 */
-idCollisionModel * idClipModel::GetCollisionModel( void ) const {
+cmHandle_t idClipModel::Handle( void ) const {
 	assert( renderModelHandle == -1 );
-	if ( collisionModel != NULL ) {
-		return collisionModel;
+	if ( collisionModelHandle ) {
+		return collisionModelHandle;
 	} else if ( traceModelIndex != -1 ) {
-		return GetCachedCollisionModel( traceModelIndex );
+		return collisionModelManager->SetupTrmModel( *GetCachedTraceModel( traceModelIndex ), material );
 	} else {
 		// this happens in multiplayer on the combat models
-		if ( entity ) {
-			gameLocal.Warning( "idClipModel::GetCollisionModel: clip model %d on '%s' (%x) is not a collision or trace model", id, entity->name.c_str(), entity->entityNumber );
-		}
+		gameLocal.Warning( "idClipModel::Handle: clip model %d on '%s' (%x) is not a collision or trace model", id, entity->name.c_str(), entity->entityNumber );
 		return 0;
 	}
 }
@@ -675,10 +510,9 @@ void idClipModel::Unlink( void ) {
 		if ( link->nextInSector ) {
 			link->nextInSector->prevInSector = link->prevInSector;
 		}
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 		idClip::UpdateDynamicContents( link->sector );
-// RAVEN END
+#endif //HUMANHEAD END
 
 		clipLinkAllocator.Free( link );
 	}
@@ -686,19 +520,49 @@ void idClipModel::Unlink( void ) {
 
 /*
 ===============
+idClipModel::Link_r
+===============
+*/
+#if !_HH_CLIP_FASTSECTORS //HUMANHEAD rww
+void idClipModel::Link_r( struct clipSector_s *node ) {
+	clipLink_t *link;
+
+	while( node->axis != -1 ) {
+		if ( absBounds[0][node->axis] > node->dist ) {
+			node = node->children[0];
+		} else if ( absBounds[1][node->axis] < node->dist ) {
+			node = node->children[1];
+		} else {
+			Link_r( node->children[0] );
+			node = node->children[1];
+		}
+	}
+
+	link = clipLinkAllocator.Alloc();
+	link->clipModel = this;
+	link->sector = node;
+	link->nextInSector = node->clipLinks;
+	link->prevInSector = NULL;
+	if ( node->clipLinks ) {
+		node->clipLinks->prevInSector = link;
+	}
+	node->clipLinks = link;
+	link->nextLink = clipLinks;
+	clipLinks = link;
+}
+#endif //HUMANHEAD END
+
+/*
+===============
 idClipModel::Link
 ===============
 */
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-void idClipModel::Link( void ) {
+void idClipModel::Link( idClip &clp ) {
 
 	assert( idClipModel::entity );
 	if ( !idClipModel::entity ) {
 		return;
 	}
-
-	idClip* clp = gameLocal.GetEntityClipWorld( idClipModel::entity );
 
 	if ( clipLinks ) {
 		Unlink();	// unlink from old position
@@ -722,15 +586,15 @@ void idClipModel::Link( void ) {
 	// we must fully check even when bounding boxes don't quite touch
 	absBounds[0] -= vec3_boxEpsilon;
 	absBounds[1] += vec3_boxEpsilon;
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	int coords[ 4 ];
-	clp->CoordsForBounds( coords, absBounds );
+	clp.CoordsForBounds( coords, absBounds );
 
 	int x, y;
 	for( x = coords[ 0 ]; x < coords[ 2 ]; x++ ) {
 		for( y = coords[ 1 ]; y < coords[ 3 ]; y++ ) {
-			clipSector_t* sector = &clp->clipSectors[ x + ( y << CLIPSECTOR_DEPTH ) ];
+			clipSector_t* sector = &clp.clipSectors[ x + ( y << CLIPSECTOR_DEPTH ) ];
 
 			sector->dynamicContents |= GetContents();
 
@@ -747,7 +611,9 @@ void idClipModel::Link( void ) {
 			clipLinks = link;
 		}
 	}
-// RAVEN END
+#else
+	Link_r( clp.clipSectors );
+#endif //HUMANHEAD END
 }
 
 /*
@@ -755,9 +621,8 @@ void idClipModel::Link( void ) {
 idClipModel::Link
 ===============
 */
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-void idClipModel::Link( idEntity *ent, int newId, const idVec3 &newOrigin, const idMat3 &newAxis, int renderModelHandle ) {
+void idClipModel::Link( idClip &clp, idEntity *ent, int newId, const idVec3 &newOrigin, const idMat3 &newAxis, int renderModelHandle ) {
+
 	this->entity = ent;
 	this->id = newId;
 	this->origin = newOrigin;
@@ -769,9 +634,17 @@ void idClipModel::Link( idEntity *ent, int newId, const idVec3 &newOrigin, const
 			this->bounds = renderEntity->bounds;
 		}
 	}
-	this->Link();
+	this->Link( clp );
 }
-// RAVEN END
+
+/*
+============
+idClipModel::CheckModel
+============
+*/
+cmHandle_t idClipModel::CheckModel( const char *name ) {
+	return collisionModelManager->LoadModel( name, false );
+}
 
 
 /*
@@ -782,35 +655,14 @@ void idClipModel::Link( idEntity *ent, int newId, const idVec3 &newOrigin, const
 ===============================================================
 */
 
-// RAVEN BEGIN
-// ddynerman: change to static
-idClipModel idClip::defaultClipModel;
-
-idClipModel *idClip::DefaultClipModel( void ) {
-	// initialize a default clip model
-	if( defaultClipModel.traceModelIndex == -1 ) {
-		defaultClipModel.LoadModel( idTraceModel( idBounds( idVec3( 0, 0, 0 ) ).Expand( 8 ) ), NULL );
-	}
-
-	return &defaultClipModel;
-}
-
-void idClip::FreeDefaultClipModel( void ) {
-	if ( defaultClipModel.traceModelIndex != -1 ) {
-		idClipModel::FreeTraceModel( defaultClipModel.traceModelIndex );
-		defaultClipModel.traceModelIndex = -1;
-	}
-}
-// RAVEN END
-
 /*
 ===============
 idClip::idClip
 ===============
 */
 idClip::idClip( void ) {
+	numClipSectors = 0;
 	clipSectors = NULL;
-	world = NULL;
 	worldBounds.Zero();
 	numRotations = numTranslations = numMotions = numRenderModelTraces = numContents = numContacts = 0;
 }
@@ -823,8 +675,7 @@ Builds a uniformly subdivided tree for the given world size
 ===============
 */
 clipSector_t *idClip::CreateClipSectors_r( const int depth, const idBounds &bounds, idVec3 &maxSector ) {
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	if( clipSectors ) {
 		delete[] clipSectors;
 		clipSectors = NULL;
@@ -833,31 +684,55 @@ clipSector_t *idClip::CreateClipSectors_r( const int depth, const idBounds &boun
 
 	int i;
 	for( i = 0; i < 3; i++ ) {		
-//jshepard: this crashes too often
-#ifdef _DEBUG
-		if( bounds[ 1 ][ i ] - bounds[ 0 ][ i ] )	{
-			nodeScale[ i ] = depth / ( bounds[ 1 ][ i ] - bounds[ 0 ][ i ] );
-		} else {
-			gameLocal.Error("zero size bounds while creating clipsectors");
-			nodeScale[ i ] = depth;
-		}
-		if( nodeScale[ i ] ) {	
-			nodeOffset[ i ] = nodeOffsetVisual[ i ] + ( 0.5f / nodeScale[ i ] );
-		} else {
-			gameLocal.Error("zero size nodeScale while creating clipsectors");
-			nodeOffset[ i] = nodeOffset[ i] + 0.5f;
-		}
-#else 
 		nodeScale[ i ] = depth / ( bounds[ 1 ][ i ] - bounds[ 0 ][ i ] );
 		nodeOffset[ i ] = nodeOffsetVisual[ i ] + ( 0.5f / nodeScale[ i ] );
-
-#endif
 	}
 
 	clipSectors = new clipSector_t[ Square( depth ) ];
 	memset( clipSectors, 0, Square( depth ) * sizeof( clipSector_t ) );
 	return clipSectors;
-// RAVEN END
+#else
+	int				i;
+	clipSector_t	*anode;
+	idVec3			size;
+	idBounds		front, back;
+
+	anode = &clipSectors[idClip::numClipSectors];
+	idClip::numClipSectors++;
+
+	if ( depth == MAX_SECTOR_DEPTH ) {
+		anode->axis = -1;
+		anode->children[0] = anode->children[1] = NULL;
+
+		for ( i = 0; i < 3; i++ ) {
+			if ( bounds[1][i] - bounds[0][i] > maxSector[i] ) {
+				maxSector[i] = bounds[1][i] - bounds[0][i];
+			}
+		}
+		return anode;
+	}
+
+	size = bounds[1] - bounds[0];
+	if ( size[0] >= size[1] && size[0] >= size[2] ) {
+		anode->axis = 0;
+	} else if ( size[1] >= size[0] && size[1] >= size[2] ) {
+		anode->axis = 1;
+	} else {
+		anode->axis = 2;
+	}
+
+	anode->dist = 0.5f * ( bounds[1][anode->axis] + bounds[0][anode->axis] );
+
+	front = bounds;
+	back = bounds;
+	
+	front[0][anode->axis] = back[1][anode->axis] = anode->dist;
+	
+	anode->children[0] = CreateClipSectors_r( depth+1, front, maxSector );
+	anode->children[1] = CreateClipSectors_r( depth+1, back, maxSector );
+
+	return anode;
+#endif //HUMANHEAD END
 }
 
 /*
@@ -866,28 +741,43 @@ idClip::Init
 ===============
 */
 void idClip::Init( void ) {
+	cmHandle_t h;
 	idVec3 size, maxSector = vec3_origin;
 
+	// clear clip sectors
+	clipSectors = new clipSector_t[MAX_SECTORS];
+	memset( clipSectors, 0, MAX_SECTORS * sizeof( clipSector_t ) );
+	numClipSectors = 0;
+	touchCount = -1;
 	// get world map bounds
-// jmarshall - added precache flag
-	world = collisionModelManager->LoadModel( gameLocal.GetMapName(), WORLD_MODEL_NAME, false );
-// jmarshall end
-	world->GetBounds( worldBounds );
+	h = collisionModelManager->LoadModel( "worldMap", false );
+	collisionModelManager->GetModelBounds( h, worldBounds );
+
+// HUMANHEAD pdm: Support for level appending
+#if DEATHWALK_AUTOLOAD
+	if (gameLocal.bShouldAppend) {
+		idBounds dwBounds;
+		h = collisionModelManager->LoadModel( "dw_worldMap", false );	// TODO: Handle failure here
+		collisionModelManager->GetModelBounds( h, dwBounds );
+		worldBounds += dwBounds;
+	}
+#endif
+// HUMANHEAD END
 
 	// create world sectors
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	CreateClipSectors_r( CLIPSECTOR_WIDTH, worldBounds, maxSector );
 	GetClipSectorsStaticContents();
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
+#else
+	CreateClipSectors_r( 0, worldBounds, maxSector );
+#endif //HUMANHEAD END
 
 	size = worldBounds[1] - worldBounds[0];
 	gameLocal.Printf( "map bounds are (%1.1f, %1.1f, %1.1f)\n", size[0], size[1], size[2] );
 	gameLocal.Printf( "max clip sector is (%1.1f, %1.1f, %1.1f)\n", maxSector[0], maxSector[1], maxSector[2] );
+
+	// initialize a default clip model
+	defaultClipModel.LoadModel( idTraceModel( idBounds( idVec3( 0, 0, 0 ) ).Expand( 8 ) ) );
 
 	// set counters to zero
 	numRotations = numTranslations = numMotions = numRenderModelTraces = numContents = numContacts = 0;
@@ -901,13 +791,17 @@ idClip::Shutdown
 void idClip::Shutdown( void ) {
 	delete[] clipSectors;
 	clipSectors = NULL;
-	world = NULL;
-	worldBounds.Zero();
 
 	// free the trace model used for the temporaryClipModel
 	if ( temporaryClipModel.traceModelIndex != -1 ) {
 		idClipModel::FreeTraceModel( temporaryClipModel.traceModelIndex );
 		temporaryClipModel.traceModelIndex = -1;
+	}
+
+	// free the trace model used for the defaultClipModel
+	if ( defaultClipModel.traceModelIndex != -1 ) {
+		idClipModel::FreeTraceModel( defaultClipModel.traceModelIndex );
+		defaultClipModel.traceModelIndex = -1;
 	}
 
 	clipLinkAllocator.Shutdown();
@@ -926,6 +820,97 @@ typedef struct listParms_s {
 	int				maxCount;
 } listParms_t;
 
+#if !_HH_CLIP_FASTSECTORS //HUMANHEAD rww
+void idClip::ClipModelsTouchingBounds_r( const struct clipSector_s *node, listParms_t &parms ) const {
+
+	while( node->axis != -1 ) {
+		if ( parms.bounds[0][node->axis] > node->dist ) {
+			node = node->children[0];
+		} else if ( parms.bounds[1][node->axis] < node->dist ) {
+			node = node->children[1];
+		} else {
+			ClipModelsTouchingBounds_r( node->children[0], parms );
+			node = node->children[1];
+		}
+	}
+
+	for ( clipLink_t *link = node->clipLinks; link; link = link->nextInSector ) {
+		idClipModel	*check = link->clipModel;
+
+		// if the clip model is enabled
+		if ( !check->enabled ) {
+			continue;
+		}
+
+		// avoid duplicates in the list
+		if ( check->touchCount == touchCount ) {
+			continue;
+		}
+
+		// if the clip model does not have any contents we are looking for
+		if ( !( check->contents & parms.contentMask ) ) {
+			continue;
+		}
+
+		// if the bounds really do overlap
+		if (	check->absBounds[0][0] > parms.bounds[1][0] ||
+				check->absBounds[1][0] < parms.bounds[0][0] ||
+				check->absBounds[0][1] > parms.bounds[1][1] ||
+				check->absBounds[1][1] < parms.bounds[0][1] ||
+				check->absBounds[0][2] > parms.bounds[1][2] ||
+				check->absBounds[1][2] < parms.bounds[0][2] ) {
+			continue;
+		}
+
+		if ( parms.count >= parms.maxCount ) {
+			gameLocal.Warning( "idClip::ClipModelsTouchingBounds_r: max count" );
+			return;
+		}
+
+		check->touchCount = touchCount;
+		parms.list[parms.count] = check;
+		parms.count++;
+	}
+}
+#endif //HUMANHEAD END
+
+#if !GOLD //HUMANHEAD rww
+bool idClip::CheckClipEntMatch( const struct clipSector_s *node, const idClipModel *currentClip, const idEntity *ent ) const {
+#if !_HH_CLIP_FASTSECTORS
+	if (!node) {
+		node = clipSectors;
+	}
+
+	if (node->axis != -1) {
+		if (CheckClipEntMatch(node->children[0], currentClip, ent)) {
+			return true;
+		}
+		if (CheckClipEntMatch(node->children[1], currentClip, ent)) {
+			return true;
+		}
+	}
+
+	for ( clipLink_t *link = node->clipLinks; link; link = link->nextInSector ) {
+		idClipModel	*check = link->clipModel;
+
+		//the entity's current clip model will get removed when its physics object is destroyed
+		if (check == currentClip) {
+			continue;
+		}
+
+		// if the clip model is enabled
+		if ( !check->enabled ) {
+			continue;
+		}
+
+		if (check->GetEntity() == ent) {
+			return true;
+		}
+	}
+#endif
+	return false;
+}
+#endif //HUMANHEAD END
 
 /*
 ================
@@ -935,8 +920,7 @@ idClip::ClipModelsTouchingBounds
 int idClip::ClipModelsTouchingBounds( const idBounds &bounds, int contentMask, idClipModel **clipModelList, int maxCount ) const {
 	listParms_t parms;
 
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	int clipCount = 0;
 	static idClipModel* clipModels[ MAX_GENTITIES ];
 
@@ -944,7 +928,7 @@ int idClip::ClipModelsTouchingBounds( const idBounds &bounds, int contentMask, i
 	if( maxCount > MAX_GENTITIES ) {
 		maxCount = MAX_GENTITIES;
 	}
-// RAVEN END
+#endif //HUMANHEAD END
 
 	if (	bounds[0][0] > bounds[1][0] ||
 			bounds[0][1] > bounds[1][1] ||
@@ -961,8 +945,7 @@ int idClip::ClipModelsTouchingBounds( const idBounds &bounds, int contentMask, i
 	parms.count = 0;
 	parms.maxCount = maxCount;
 
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 	int coords[ 4 ];
 	CoordsForBounds( coords, parms.bounds );
 
@@ -1012,7 +995,10 @@ int idClip::ClipModelsTouchingBounds( const idBounds &bounds, int contentMask, i
 
 		parms.list[ parms.count++ ] = model;
 	}
-// RAVEN END
+#else
+	touchCount++;
+	ClipModelsTouchingBounds_r( clipSectors, parms );
+#endif //HUMANHEAD END
 
 	return parms.count;
 }
@@ -1048,189 +1034,7 @@ int idClip::EntitiesTouchingBounds( const idBounds &bounds, int contentMask, idE
 	return entCount;
 }
 
-// RAVEN BEGIN
-// ddynerman: MP helper function
-/*
-================
-idClip::PlayersTouchingBounds
-================
-*/
-int idClip::PlayersTouchingBounds( const idBounds &bounds, int contentMask, idPlayer **playerList, int maxCount ) const {
-	idClipModel *clipModelList[MAX_GENTITIES];
-	int i, j, count, playerCount;
-
-	count = idClip::ClipModelsTouchingBounds( bounds, contentMask, clipModelList, MAX_GENTITIES );
-	playerCount = 0;
-	for ( i = 0; i < count; i++ ) {
-		// entity could already be in the list because an entity can use multiple clip models
-		for ( j = 0; j < playerCount; j++ ) {
-			if ( playerList[j] == clipModelList[i]->entity ) {
-				break;
-			}
-		}
-		if ( j >= playerCount ) {
-			if ( playerCount >= maxCount ) {
-				gameLocal.Warning( "idClip::EntitiesTouchingBounds: max count" );
-				return playerCount;
-			}
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			if ( clipModelList[i]->entity->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
-				playerList[playerCount] = static_cast<idPlayer*>(clipModelList[i]->entity);
-				playerCount++;
-			}
-		}
-	}
-
-	return playerCount;
-}
-// RAVEN END
-
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
-
-/*
-====================
-idClip::DrawAreaClipSectors
-====================
-*/
-void idClip::DrawAreaClipSectors( float range ) const {
-	idClipModel* clipModels[ MAX_GENTITIES ];
-
-	idPlayer* player = gameLocal.GetLocalPlayer();
-	if ( !player ) {
-		return;
-	}
-
-	idBounds bounds;
-	bounds[0] = player->GetPhysics()->GetOrigin() - idVec3( range, range, range );
-	bounds[1] = player->GetPhysics()->GetOrigin() + idVec3( range, range, range );
-
-	int count = ClipModelsTouchingBounds( bounds, MASK_ALL, clipModels, MAX_GENTITIES );
-
-	int i;
-	for ( i = 0; i < count; i++ ) {
-		idEntity* owner = clipModels[ i ]->GetEntity();
-
-		const idVec3& org = clipModels[ i ]->GetOrigin();
-		const idBounds& bounds = clipModels[ i ]->GetBounds();
-
-		gameRenderWorld->DebugBounds( colorCyan, bounds, org );
-		gameRenderWorld->DrawText( owner->GetClassname(), org, 0.5f, colorCyan, player->viewAngles.ToMat3(), 1 );
-	}
-}
-
-/*
-====================
-idClip::DrawClipSectors
-====================
-*/
-void idClip::DrawClipSectors( void ) const {
-	idBounds bounds;
-
-	idPlayer* player = gameLocal.GetLocalPlayer();
-	if ( !player ) {
-		return;
-	}
-
-	int i;
-	idVec3 inverseNodeScale;
-	for( i = 0; i < 3; i++ ) {
-		inverseNodeScale[ i ] = 1 / nodeScale[ i ];
-	}
-
-	const char* filter = g_showClipSectorFilter.GetString();
-	idTypeInfo* type = idClass::GetClass( filter );
-
-	int x;
-	for( x = 0; x < CLIPSECTOR_WIDTH; x++ ) {
-		int y;
-		for( y = 0; y < CLIPSECTOR_WIDTH; y++ ) {
-//			idWinding w( 4 );
-
-			bounds[ 0 ].x = ( inverseNodeScale.x * x ) + nodeOffsetVisual.x + 1;
-			bounds[ 0 ].y = ( inverseNodeScale.y * y ) + nodeOffsetVisual.y + 1;
-			bounds[ 0 ].z = player->GetPhysics()->GetBounds()[0].z;
-
-			bounds[ 1 ].x = ( inverseNodeScale.x * ( x + 1 ) ) + nodeOffsetVisual.x - 1;
-			bounds[ 1 ].y = ( inverseNodeScale.y * ( y + 1 ) ) + nodeOffsetVisual.y - 1;
-			bounds[ 1 ].z = player->GetPhysics()->GetBounds()[1].z;
-
-			idVec3 point;
-			point.x = ( bounds[ 0 ].x + bounds[ 1 ].x ) * 0.5f;
-			point.y = ( bounds[ 0 ].y + bounds[ 1 ].y ) * 0.5f;
-			point.z = 0.f;
-
-/*			point.x = bounds[ 0 ].x;
-			point.y = bounds[ 0 ].y;
-			w.AddPoint( point );
-
-			point.x = bounds[ 1 ].x;
-			point.y = bounds[ 0 ].y;
-			w.AddPoint( point );
-
-			point.x = bounds[ 1 ].x;
-			point.y = bounds[ 1 ].y;
-			w.AddPoint( point );
-
-			point.x = bounds[ 0 ].x;
-			point.y = bounds[ 1 ].y;
-			w.AddPoint( point );*/
-
-			clipSector_t* sector = &clipSectors[ x + ( y << CLIPSECTOR_DEPTH ) ];
-
-			clipLink_t* link = sector->clipLinks;
-			while ( link ) {
-				if ( type && !link->clipModel->GetEntity()->IsType( *type ) ) {
-					link = link->nextInSector;
-				} else {
-					break;
-				}
-			}
-
-			if( link ) {
-				
-				gameRenderWorld->DrawText( link->clipModel->GetEntity()->GetClassname(), point, 0.5f, colorCyan, player->viewAngles.ToMat3(), 1 );
-				gameRenderWorld->DebugBounds( colorMagenta, bounds );
-				gameRenderWorld->DebugBounds( colorYellow, link->clipModel->GetBounds(), link->clipModel->GetOrigin() );
-
-			} else {
-
-//				gameRenderWorld->DrawText( sector->clipLinks->clipModel->GetEntity()->GetClassname(), point, 0.08f, colorCyan, gameLocal.GetLocalPlayer()->viewAngles.ToMat3(), 1 );
-
-			}
-		}
-	}
-}
-
-/*
-============
-idClip::PointContents
-============
-*/
-int idClip::PointContents(const idVec3 p)
-{
-	int contents = -1;
-
-	contents = collisionModelManager->Contents( p, NULL, mat3_identity, -1, world, vec3_origin, mat3_identity );
-	if (contents > 0)
-	{
-		return contents;
-	}
-
-	//for (int i = 0; i < collisionModelManager->GetNumInlinedProcClipModels(); i++)
-	//{
-	//	idCollisionModel* cm = collisionModelManager->GetCollisionModel(i + 1);
-	//	if (cm == NULL)
-	//		continue;
-	//
-	//	contents = collisionModelManager->PointContents(p, cm);
-	//}
-
-	return contents;
-}
-
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 /*
 ====================
 idClip::GetClipSectorsStaticContents
@@ -1259,15 +1063,13 @@ void idClip::GetClipSectorsStaticContents( void ) {
 			org.x = ( x / nodeScale.x ) + nodeOffset.x;
 			org.y = ( y / nodeScale.y ) + nodeOffset.y;
 
-			int contents = collisionModelManager->Contents( org, trm, mat3_identity, -1, world, vec3_origin, mat3_default );
+			int contents = collisionModelManager->Contents( org, trm, mat3_identity, -1, 0, vec3_origin, mat3_default );
 			clipSectors[ x + ( y << CLIPSECTOR_DEPTH ) ].contents = contents;
 		}
 	}
-	// mwhitlock: Fix leak in SD's code.
 	delete trm;
 }
-
-// RAVEN END
+#endif //HUMANHEAD END
 
 /*
 ====================
@@ -1280,10 +1082,7 @@ idClip::GetTraceClipModels
   cm->owner == passOwner ( don't interact with other missiles from same owner )
 ====================
 */
-// RAVEN BEGIN
-// nmckenzie: had to add a second pass entity so we can safely ignore both a guy and his target in some cases
-int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const idEntity *passEntity, idClipModel **clipModelList, const idEntity *passEntity2 ) const {
-// RAVEN END
+int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const idEntity *passEntity, idClipModel **clipModelList ) const {
 	int i, num;
 	idClipModel	*cm;
 	idEntity *passOwner;
@@ -1307,18 +1106,17 @@ int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const i
 		// check if we should ignore this entity
 		if ( cm->entity == passEntity ) {
 			clipModelList[i] = NULL;			// don't clip against the pass entity
-		}
-// RAVEN BEGIN
-// nmckenzie: we have cases where both a guy and his target need to be ignored by a translation
-		else if ( cm->entity == passEntity2 ){
-			clipModelList[i] = NULL;
-// RAVEN END
 		} else if ( cm->entity == passOwner ) {
 			clipModelList[i] = NULL;			// missiles don't clip with their owner
+		// HUMANHEAD pdm: Disallowed shuttles hitting their own pilots with projectiles, which happens in rare cases
+		} else if ( cm->entity && cm->entity->GetBindMaster() && passOwner &&
+			cm->entity->GetBindMaster() == passOwner ) {
+			clipModelList[i] = NULL;			// missiles don't clip with things bound to their owner (player bound to shuttle)
+		// HUMANHEAD END
 		} else if ( cm->owner ) {
 			if ( cm->owner == passEntity ) {
 				clipModelList[i] = NULL;		// don't clip against own missiles
-			} else if ( cm->owner == passOwner ) {
+			} else if ( cm->owner == passOwner && !(cm->GetContents() & CONTENTS_OWNER_TO_OWNER) ) {	//HUMANHEAD bjk
 				clipModelList[i] = NULL;		// don't clip against other missiles from same owner
 			}
 		}
@@ -1352,12 +1150,6 @@ void idClip::TraceRenderModel( trace_t &trace, const idVec3 &start, const idVec3
 			trace.c.trmFeature = 0;
 			trace.c.contents = modelTrace.material->GetContentFlags();
 			trace.c.material = modelTrace.material;
-
-// RAVEN BEGIN
-// jscott: for material types
-			trace.c.materialType = modelTrace.materialType;
-// RAVEN END
-
 			// NOTE: trace.c.id will be the joint number
 			touch->id = JOINT_HANDLE_TO_CLIPMODEL_ID( modelTrace.jointNumber );
 		}
@@ -1398,7 +1190,6 @@ ID_INLINE bool TestHugeTranslation( trace_t &results, const idClipModel *mdl, co
 		results.endAxis = trmAxis;
 		memset( &results.c, 0, sizeof( results.c ) );
 		results.c.point = start;
-		results.c.entityNum = ENTITYNUM_WORLD;
 
 		if ( mdl->GetEntity() ) {
 			gameLocal.Printf( "huge translation for clip model %d on entity %d '%s'\n", mdl->GetId(), mdl->GetEntity()->entityNumber, mdl->GetEntity()->GetName() );
@@ -1415,17 +1206,16 @@ ID_INLINE bool TestHugeTranslation( trace_t &results, const idClipModel *mdl, co
 idClip::TranslationEntities
 ============
 */
-// RAVEN BEGIN
-// nmckenzie: had to add a second pass entity so we can safely ignore both a guy and his target in some cases
 void idClip::TranslationEntities( trace_t &results, const idVec3 &start, const idVec3 &end,
-						const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, const idEntity *passEntity2 ) {
-// RAVEN END
+						const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
 	int i, num;
 	idClipModel *touch, *clipModelList[MAX_GENTITIES];
 	idBounds traceBounds;
 	float radius;
 	trace_t trace;
 	const idTraceModel *trm;
+	idEntity *portalEntity = NULL; // HUMANHEAD CJR PCF 04/26/06
+	float portalFraction = 1.0f; // HUMANHEAD CJR PCF 04/26/06
 
 	if ( TestHugeTranslation( results, mdl, start, end, trmAxis ) ) {
 		return;
@@ -1445,10 +1235,7 @@ void idClip::TranslationEntities( trace_t &results, const idVec3 &start, const i
 		radius = trm->bounds.GetRadius();
 	}
 
-// RAVEN BEGIN
-// nmckenzie: had to add a second pass entity so we can safely ignore both a guy and his target in some cases
-	num = GetTraceClipModels( traceBounds, contentMask, passEntity, clipModelList, passEntity2 );
-// RAVEN END
+	num = GetTraceClipModels( traceBounds, contentMask, passEntity, clipModelList );
 
 	for ( i = 0; i < num; i++ ) {
 		touch = clipModelList[i];
@@ -1463,10 +1250,18 @@ void idClip::TranslationEntities( trace_t &results, const idVec3 &start, const i
 		} else {
 			idClip::numTranslations++;
 			collisionModelManager->Translation( &trace, start, end, trm, trmAxis, contentMask,
-									touch->GetCollisionModel(), touch->origin, touch->axis );
+									touch->Handle(), touch->origin, touch->axis );
 		}
 
 		if ( trace.fraction < results.fraction ) {
+			if ( touch->entity->CheckPortal( mdl, contentMask) ) { // HUMANHEAD CJR PCF 04/26/06
+				if ( trace.fraction < portalFraction ) {
+					portalFraction = trace.fraction;
+					portalEntity = touch->entity;
+				}
+				continue; // Don't collide with portals
+			} // END HUMANHEAD CJR PCF 04/26/06
+
 			results = trace;
 			results.c.entityNum = touch->entity->entityNumber;
 			results.c.id = touch->id;
@@ -1475,6 +1270,11 @@ void idClip::TranslationEntities( trace_t &results, const idVec3 &start, const i
 			}
 		}
 	}
+
+	// HUMANHEAD CJR PCF 04/26/06
+	if ( portalFraction < 1.0f && portalEntity ) {
+		portalEntity->CollideWithPortal( mdl );
+	} // HUMANHEAD CJR PCF 04/26/06
 }
 
 /*
@@ -1482,49 +1282,31 @@ void idClip::TranslationEntities( trace_t &results, const idVec3 &start, const i
 idClip::Translation
 ============
 */
-// RAVEN BEGIN
-// nmckenzie: we have cases where both a guy and his target need to be ignored by a translation
-bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &end,
-						const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, const idEntity *passEntity2 ) {
-// RAVEN END
-	BeginClipProfile( CPT_TRANSLATION );
 
+bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &end,
+						const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
 	int i, num;
 	idClipModel *touch, *clipModelList[MAX_GENTITIES];
 	idBounds traceBounds;
 	float radius;
 	trace_t trace;
 	const idTraceModel *trm;
-
-// RAVEN BEGIN
-// rjohnson: added debug line drawing for traces
-	if ( g_showCollisionTraces.GetInteger() >= 2 && !g_stopTime.GetBool() ) {
-		gameRenderWorld->DebugLine( colorCyan, start, end, 1000 );
-	}
-// RAVEN END
+	idEntity *portalEntity = NULL; // HUMANHEAD CJR PCF 04/26/06
+	float portalFraction = 1.0f; // HUMANHEAD CJR PCF 04/26/06
 
 	if ( TestHugeTranslation( results, mdl, start, end, trmAxis ) ) {
-		EndClipProfile( CPT_TRANSLATION );
 		return true;
 	}
 
 	trm = TraceModelForClipModel( mdl );
 
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
-		if ( world ) {
-			// test world
-			idClip::numTranslations++;
-			collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
-			results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
-			if ( results.fraction == 0.0f ) {
-				EndClipProfile( CPT_TRANSLATION );
-				return true;		// blocked immediately by the world
-			}
-		} else {
-			memset( &results, 0, sizeof( results ) );
-			results.fraction = 1.0f;
-			results.endpos = end;
-			results.endAxis = trmAxis;
+		// test world
+		idClip::numTranslations++;
+		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+		if ( results.fraction == 0.0f ) {
+			return true;		// blocked immediately by the world
 		}
 	} else {
 		memset( &results, 0, sizeof( results ) );
@@ -1541,10 +1323,7 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 		radius = trm->bounds.GetRadius();
 	}
 
-// RAVEN BEGIN
-// nmckenzie: we have cases where both a guy and his target need to be ignored by a translation
-	num = GetTraceClipModels( traceBounds, contentMask, passEntity, clipModelList, passEntity2 );
-// RAVEN END
+	num = GetTraceClipModels( traceBounds, contentMask, passEntity, clipModelList );
 
 	for ( i = 0; i < num; i++ ) {
 		touch = clipModelList[i];
@@ -1557,43 +1336,138 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 			idClip::numRenderModelTraces++;
 			TraceRenderModel( trace, start, end, radius, trmAxis, touch );
 		} else {
-			idCollisionModel *touchModel = touch->GetCollisionModel();
-			if ( touchModel == NULL ) {
-				continue;
-			}
 			idClip::numTranslations++;
 			collisionModelManager->Translation( &trace, start, end, trm, trmAxis, contentMask,
-									touchModel, touch->origin, touch->axis );
+									touch->Handle(), touch->origin, touch->axis );
 		}
 
 		if ( trace.fraction < results.fraction ) {
+			// HUMANHEAD CJR:  If the hit entity is a portal, then inform the portal it was touched
+			if ( touch->entity->CheckPortal( mdl, contentMask) ) { // HUMANHEAD CJR PCF 04/26/06
+				if ( trace.fraction < portalFraction ) {
+					portalFraction = trace.fraction;
+					portalEntity = touch->entity;
+				}
+				continue; // Don't collide with portals
+			} // END HUMANHEAD CJR PCF 04/26/06
+
 			results = trace;
-			if ( touch->entity == NULL ) {
-				continue;
-			}
 			results.c.entityNum = touch->entity->entityNumber;
 			results.c.id = touch->id;
-
-// RAVEN BEGIN
-// jscott: for material types
-			results.c.materialType = trace.c.materialType;
-
-// mekberg: copy contents
-			if ( touch->IsTraceModel( ) ) {
-				results.c.contents = touch->GetContents( );
-			}
-// RAVEN END
-
 			if ( results.fraction == 0.0f ) {
 				break;
 			}
 		}
 	}
 
-	EndClipProfile( CPT_TRANSLATION );
+	// HUMANHEAD CJR PCF 04/26/06
+	if ( portalFraction < 1.0f && portalEntity ) {
+		portalEntity->CollideWithPortal( mdl );
+	} // END HUMANHEAD CJR PCF 04/26/06
 
 	return ( results.fraction < 1.0f );
 }
+
+//HUMANHEAD rww
+/*
+============
+idClip::TranslationWithExceptions
+============
+*/
+bool idClip::TranslationWithExceptions( trace_t &results, const idVec3 &start, const idVec3 &end, idEntity *ent,
+									   const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
+	int i, num;
+	idClipModel *touch, *clipModelList[MAX_GENTITIES];
+	idBounds traceBounds;
+	float radius;
+	trace_t trace;
+	const idTraceModel *trm;
+	idEntity *portalEntity = NULL; // HUMANHEAD CJR PCF 04/26/06
+	float portalFraction = 1.0f; // HUMANHEAD CJR PCF 04/26/06
+
+	if ( TestHugeTranslation( results, mdl, start, end, trmAxis ) ) {
+		return true;
+	}
+
+	trm = TraceModelForClipModel( mdl );
+
+	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
+		// test world
+		idClip::numTranslations++;
+		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+		if ( results.fraction == 0.0f ) {
+			return true;		// blocked immediately by the world
+		}
+	} else {
+		memset( &results, 0, sizeof( results ) );
+		results.fraction = 1.0f;
+		results.endpos = end;
+		results.endAxis = trmAxis;
+	}
+
+	if ( !trm ) {
+		traceBounds.FromPointTranslation( start, results.endpos - start );
+		radius = 0.0f;
+	} else {
+		traceBounds.FromBoundsTranslation( trm->bounds, start, trmAxis, results.endpos - start );
+		radius = trm->bounds.GetRadius();
+	}
+
+	num = GetTraceClipModels( traceBounds, contentMask, passEntity, clipModelList );
+
+	for ( i = 0; i < num; i++ ) {
+		touch = clipModelList[i];
+
+		if ( !touch ) {
+			continue;
+		}
+
+		// HUMANHEAD CJR PCF 04/26/06:  Only let this function collide with func statics or the world if ent is NULL
+		if ( ent == NULL && touch->entity && touch->entity->entityNumber != ENTITYNUM_WORLD && !touch->entity->IsType( idStaticEntity::Type ) ) {
+			continue;
+		} // END HUMANHEAD CJR
+
+		if ( touch->renderModelHandle != -1 ) {
+			idClip::numRenderModelTraces++;
+			TraceRenderModel( trace, start, end, radius, trmAxis, touch );
+		} else {
+			idClip::numTranslations++;
+			collisionModelManager->Translation( &trace, start, end, trm, trmAxis, contentMask,
+									touch->Handle(), touch->origin, touch->axis );
+		}
+
+		if ( trace.fraction < results.fraction ) {
+			if ( touch->entity->CheckPortal( mdl, contentMask) ) { // HUMANHEAD CJR PCF 04/26/06
+				if ( trace.fraction < portalFraction ) {
+					portalFraction = trace.fraction;
+					portalEntity = touch->entity;
+				}
+				continue; // Don't collide with portals
+			} // END HUMANHEAD CJR PCF 04/26/06
+			//HUMANHEAD PCF rww 04/27/06 - readd AllowCollision check after previous change accidentally removed
+			else if ( ent && !ent->AllowCollision(trace) ) {
+				continue;
+			}
+			//HUMANHEAD END
+
+			results = trace;
+			results.c.entityNum = touch->entity->entityNumber;
+			results.c.id = touch->id;
+			if ( results.fraction == 0.0f ) {
+				break;
+			}
+		}
+	}
+
+	// HUMANHEAD CJR PCF 04/26/06
+	if ( portalFraction < 1.0f && portalEntity ) {
+		portalEntity->CollideWithPortal( mdl );
+	} // END HUMANHEAD CJR PCF 04/26/06
+
+	return ( results.fraction < 1.0f );
+}
+//HUMANHEAD END
 
 /*
 ============
@@ -1607,13 +1481,15 @@ bool idClip::Rotation( trace_t &results, const idVec3 &start, const idRotation &
 	idBounds traceBounds;
 	trace_t trace;
 	const idTraceModel *trm;
+	idEntity *portalEntity = NULL; // HUMANHEAD CJR PCF 04/26/06
+	float portalFraction = 1.0f; // HUMANHEAD CJR PCF 04/26/06
 
 	trm = TraceModelForClipModel( mdl );
 
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numRotations++;
-		collisionModelManager->Rotation( &results, start, rotation, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+		collisionModelManager->Rotation( &results, start, rotation, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
 		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 		if ( results.fraction == 0.0f ) {
 			return true;		// blocked immediately by the world
@@ -1647,9 +1523,18 @@ bool idClip::Rotation( trace_t &results, const idVec3 &start, const idRotation &
 
 		idClip::numRotations++;
 		collisionModelManager->Rotation( &trace, start, rotation, trm, trmAxis, contentMask,
-							touch->GetCollisionModel(), touch->origin, touch->axis );
+							touch->Handle(), touch->origin, touch->axis );
 
 		if ( trace.fraction < results.fraction ) {
+			// HUMANHEAD CJR:  If the hit entity is a portal, then inform the portal it was touched
+			if ( touch->entity->CheckPortal( mdl, contentMask) ) { // HUMANHEAD CJR PCF 04/26/06
+				if ( trace.fraction < portalFraction ) {
+					portalFraction = trace.fraction;
+					portalEntity = touch->entity;
+				}
+				continue; // Don't collide with portals
+			} // END HUMANHEAD CJR PCF 04/26/06
+
 			results = trace;
 			results.c.entityNum = touch->entity->entityNumber;
 			results.c.id = touch->id;
@@ -1658,6 +1543,11 @@ bool idClip::Rotation( trace_t &results, const idVec3 &start, const idRotation &
 			}
 		}
 	}
+
+	// HUMANHEAD CJR PCF 04/26/06
+	if ( portalFraction < 1.0f && portalEntity ) {
+		portalEntity->CollideWithPortal( mdl );
+	} // END HUMANHEAD CJR PCF 04/26/06
 
 	return ( results.fraction < 1.0f );
 }
@@ -1677,6 +1567,8 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 	trace_t translationalTrace, rotationalTrace, trace;
 	idRotation endRotation;
 	const idTraceModel *trm;
+	idEntity *portalEntity = NULL; // HUMANHEAD CJR PCF 04/26/06
+	float portalFraction = 1.0f; // HUMANHEAD CJR PCF 04/26/06
 
 	assert( rotation.GetOrigin() == start );
 
@@ -1708,7 +1600,7 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// translational collision with world
 		idClip::numTranslations++;
-		collisionModelManager->Translation( &translationalTrace, start, end, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+		collisionModelManager->Translation( &translationalTrace, start, end, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
 		translationalTrace.c.entityNum = translationalTrace.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 	} else {
 		memset( &translationalTrace, 0, sizeof( translationalTrace ) );
@@ -1745,10 +1637,19 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 			} else {
 				idClip::numTranslations++;
 				collisionModelManager->Translation( &trace, start, end, trm, trmAxis, contentMask,
-										touch->GetCollisionModel(), touch->origin, touch->axis );
+										touch->Handle(), touch->origin, touch->axis );
 			}
 
 			if ( trace.fraction < translationalTrace.fraction ) {
+				// HUMANHEAD CJR:  If the hit entity is a portal, then inform the portal it was touched
+				if ( touch->entity->CheckPortal( mdl, contentMask) ) { // HUMANHEAD CJR PCF 04/26/06
+					if ( trace.fraction < portalFraction ) {
+						portalFraction = trace.fraction;
+						portalEntity = touch->entity;
+					}
+					continue; // Don't collide with portals
+				} // END HUMANHEAD CJR PCF 04/26/06
+
 				translationalTrace = trace;
 				translationalTrace.c.entityNum = touch->entity->entityNumber;
 				translationalTrace.c.id = touch->id;
@@ -1757,6 +1658,11 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 				}
 			}
 		}
+
+		// HUMANHEAD CJR PCF 04/26/06
+		if ( portalFraction < 1.0f && portalEntity ) {
+			portalEntity->CollideWithPortal( mdl );
+		} // END HUMANHEAD CJR PCF 04/26/06
 	} else {
 		num = -1;
 	}
@@ -1765,10 +1671,13 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 	endRotation = rotation;
 	endRotation.SetOrigin( endPosition );
 
+	portalFraction = 1.0f; // HUMANHEAD CJR PCF 04/26/06
+	portalEntity = NULL; // HUMANHEAD CJR PCF 04/26/06
+
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// rotational collision with world
 		idClip::numRotations++;
-		collisionModelManager->Rotation( &rotationalTrace, endPosition, endRotation, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+		collisionModelManager->Rotation( &rotationalTrace, endPosition, endRotation, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
 		rotationalTrace.c.entityNum = rotationalTrace.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 	} else {
 		memset( &rotationalTrace, 0, sizeof( rotationalTrace ) );
@@ -1798,9 +1707,18 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 
 			idClip::numRotations++;
 			collisionModelManager->Rotation( &trace, endPosition, endRotation, trm, trmAxis, contentMask,
-								touch->GetCollisionModel(), touch->origin, touch->axis );
+								touch->Handle(), touch->origin, touch->axis );
 
 			if ( trace.fraction < rotationalTrace.fraction ) {
+				// HUMANHEAD CJR:  If the hit entity is a portal, then inform the portal it was touched
+				if ( touch->entity->CheckPortal( mdl, contentMask) ) { // HUMANHEAD CJR PCF 04/26/06
+					if ( trace.fraction < portalFraction ) {
+						portalFraction = trace.fraction;
+						portalEntity = touch->entity;
+					}
+					continue; // Don't collide with portals
+				} // END HUMANHEAD CJR PCF 04/26/06
+
 				rotationalTrace = trace;
 				rotationalTrace.c.entityNum = touch->entity->entityNumber;
 				rotationalTrace.c.id = touch->id;
@@ -1820,6 +1738,11 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 
 	results.fraction = Max( translationalTrace.fraction, rotationalTrace.fraction );
 
+	// HUMANHEAD CJR PCF 04/26/06
+	if ( portalFraction < 1.0f && portalEntity ) {
+		portalEntity->CollideWithPortal( mdl );
+	} // END HUMANHEAD CJR PCF 04/26/06
+
 	return ( translationalTrace.fraction < 1.0f || rotationalTrace.fraction < 1.0f );
 }
 
@@ -1830,8 +1753,6 @@ idClip::Contacts
 */
 int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVec3 &start, const idVec6 &dir, const float depth,
 					 const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
-	BeginClipProfile( CPT_CONTACTS );
-
 	int i, j, num, n, numContacts;
 	idClipModel *touch, *clipModelList[MAX_GENTITIES];
 	idBounds traceBounds;
@@ -1842,7 +1763,7 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numContacts++;
-		numContacts = collisionModelManager->Contacts( contacts, maxContacts, start, dir, depth, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+		numContacts = collisionModelManager->Contacts( contacts, maxContacts, start, dir, depth, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
 	} else {
 		numContacts = 0;
 	}
@@ -1853,7 +1774,6 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 	}
 
 	if ( numContacts >= maxContacts ) {
-		EndClipProfile( CPT_CONTACTS );
 		return numContacts;
 	}
 
@@ -1878,10 +1798,16 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 			continue;
 		}
 
+		// HUMANHEAD CJR:  Don't allow portals to influence the contents checks
+		if ( touch->entity->CheckPortal( mdl, contentMask ) ) {
+			touch->entity->CollideWithPortal( mdl ); // HUMANHEAD CJR PCF 04/26/06
+			continue;
+		} // HUMANHEAD END
+
 		idClip::numContacts++;
 		n = collisionModelManager->Contacts( contacts + numContacts, maxContacts - numContacts,
 								start, dir, depth, trm, trmAxis, contentMask,
-									touch->GetCollisionModel(), touch->origin, touch->axis );
+									touch->Handle(), touch->origin, touch->axis );
 
 		for ( j = 0; j < n; j++ ) {
 			contacts[numContacts].entityNum = touch->entity->entityNumber;
@@ -1894,8 +1820,6 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 		}
 	}
 
-	EndClipProfile( CPT_CONTACTS );
-
 	return numContacts;
 }
 
@@ -1904,12 +1828,7 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 idClip::Contents
 ============
 */
-// RAVEN BEGIN
-// AReis: Added ability to get the entity that was touched as well.
-int idClip::Contents( const idVec3 &start, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity, idEntity **touchedEntity ) {
-// RAVEN END
-	BeginClipProfile( CPT_CONTENTS );
-
+int idClip::Contents( const idVec3 &start, const idClipModel *mdl, const idMat3 &trmAxis, int contentMask, const idEntity *passEntity ) {
 	int i, num, contents;
 	idClipModel *touch, *clipModelList[MAX_GENTITIES];
 	idBounds traceBounds;
@@ -1920,7 +1839,7 @@ int idClip::Contents( const idVec3 &start, const idClipModel *mdl, const idMat3 
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numContents++;
-		contents = collisionModelManager->Contents( start, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+		contents = collisionModelManager->Contents( start, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
 	} else {
 		contents = 0;
 	}
@@ -1959,21 +1878,17 @@ int idClip::Contents( const idVec3 &start, const idClipModel *mdl, const idMat3 
 			continue;
 		}
 
+		// HUMANHEAD CJR:  Don't allow portals to influence the contents checks
+		if ( touch->entity->CheckPortal( mdl, contentMask ) ) {
+			touch->entity->CollideWithPortal( mdl ); // HUMANHEAD CJR PCF 04/26/06
+			continue;
+		} // HUMANHEAD END
+
 		idClip::numContents++;
-		if ( collisionModelManager->Contents( start, trm, trmAxis, contentMask, touch->GetCollisionModel(), touch->origin, touch->axis ) ) {
+		if ( collisionModelManager->Contents( start, trm, trmAxis, contentMask, touch->Handle(), touch->origin, touch->axis ) ) {
 			contents |= ( touch->contents & contentMask );
 		}
-
-// RAVEN BEGIN
-		// Only sends back one entity for now. Ahh well, if this is a problem, have it send back a list...
-		if ( touchedEntity )
-		{
-			*touchedEntity = touch->GetEntity();
-		}
-// RAVEN END
 	}
-
-	EndClipProfile( CPT_CONTENTS );
 
 	return contents;
 }
@@ -1985,7 +1900,7 @@ idClip::TranslationModel
 */
 void idClip::TranslationModel( trace_t &results, const idVec3 &start, const idVec3 &end,
 					const idClipModel *mdl, const idMat3 &trmAxis, int contentMask,
-					idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
+					cmHandle_t model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
 	const idTraceModel *trm = TraceModelForClipModel( mdl );
 	idClip::numTranslations++;
 	collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
@@ -1998,7 +1913,7 @@ idClip::RotationModel
 */
 void idClip::RotationModel( trace_t &results, const idVec3 &start, const idRotation &rotation,
 					const idClipModel *mdl, const idMat3 &trmAxis, int contentMask,
-					idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
+					cmHandle_t model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
 	const idTraceModel *trm = TraceModelForClipModel( mdl );
 	idClip::numRotations++;
 	collisionModelManager->Rotation( &results, start, rotation, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
@@ -2011,7 +1926,7 @@ idClip::ContactsModel
 */
 int idClip::ContactsModel( contactInfo_t *contacts, const int maxContacts, const idVec3 &start, const idVec6 &dir, const float depth,
 					const idClipModel *mdl, const idMat3 &trmAxis, int contentMask,
-					idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
+					cmHandle_t model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
 	const idTraceModel *trm = TraceModelForClipModel( mdl );
 	idClip::numContacts++;
 	return collisionModelManager->Contacts( contacts, maxContacts, start, dir, depth, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
@@ -2024,7 +1939,7 @@ idClip::ContentsModel
 */
 int idClip::ContentsModel( const idVec3 &start,
 					const idClipModel *mdl, const idMat3 &trmAxis, int contentMask,
-					idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
+					cmHandle_t model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
 	const idTraceModel *trm = TraceModelForClipModel( mdl );
 	idClip::numContents++;
 	return collisionModelManager->Contents( start, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
@@ -2037,44 +1952,44 @@ idClip::GetModelContactFeature
 */
 bool idClip::GetModelContactFeature( const contactInfo_t &contact, const idClipModel *clipModel, idFixedWinding &winding ) const {
 	int i;
-	idCollisionModel *model;
+	cmHandle_t handle;
 	idVec3 start, end;
 
-	model = NULL;
+	handle = NULL;
 	winding.Clear();
 
 	if ( clipModel == NULL ) {
-		model = NULL;
+		handle = 0;
 	} else {
 		if ( clipModel->renderModelHandle != -1 ) {
 			winding += contact.point;
 			return true;
 		} else if ( clipModel->traceModelIndex != -1 ) {
-			model = idClipModel::GetCachedCollisionModel( clipModel->traceModelIndex );
+			handle = collisionModelManager->SetupTrmModel( *idClipModel::GetCachedTraceModel( clipModel->traceModelIndex ), clipModel->material );
 		} else {
-			model = clipModel->collisionModel;
+			handle = clipModel->collisionModelHandle;
 		}
 	}
 
 	// if contact with a collision model
-	if ( model != NULL ) {
+	if ( handle != NULL ) {
 		switch( contact.type ) {
 			case CONTACT_EDGE: {
 				// the model contact feature is a collision model edge
-				model->GetEdge( contact.modelFeature, start, end );
+				collisionModelManager->GetModelEdge( handle, contact.modelFeature, start, end );
 				winding += start;
 				winding += end;
 				break;
 			}
 			case CONTACT_MODELVERTEX: {
 				// the model contact feature is a collision model vertex
-				model->GetVertex( contact.modelFeature, start );
+				collisionModelManager->GetModelVertex( handle, contact.modelFeature, start );
 				winding += start;
 				break;
 			}
 			case CONTACT_TRMVERTEX: {
 				// the model contact feature is a collision model polygon
-				model->GetPolygon( contact.modelFeature, winding );
+				collisionModelManager->GetModelPolygon( handle, contact.modelFeature, winding );
 				break;
 			}
 		}
@@ -2097,11 +2012,9 @@ idClip::PrintStatistics
 ============
 */
 void idClip::PrintStatistics( void ) {
-// RAVEN BEGIN
-// rjohnson: added trace model cache size
-	gameLocal.Printf( "t=%-3d, r=%-3d, m=%-3d, render=%-3d, contents=%-3d, contacts=%-3d, cache=%d\n",
-						numTranslations, numRotations, numMotions, numRenderModelTraces, numContents, numContacts, traceModelCache.Num() * sizeof( idTraceModel ) );
-// RAVEN END
+	gameLocal.Printf( "t = %-3d, r = %-3d, m = %-3d, render = %-3d, contents = %-3d, contacts = %-3d\n",
+					numTranslations, numRotations, numMotions, numRenderModelTraces, numContents, numContacts );
+	numRotations = numTranslations = numMotions = numRenderModelTraces = numContents = numContacts = 0;
 }
 
 /*
@@ -2109,7 +2022,7 @@ void idClip::PrintStatistics( void ) {
 idClip::DrawClipModels
 ============
 */
-void idClip::DrawClipModels( const idVec3 &eye, const float radius, const idEntity *passEntity, const idTypeInfo* type ) {
+void idClip::DrawClipModels( const idVec3 &eye, const float radius, const idEntity *passEntity ) {
 	int				i, num;
 	idBounds		bounds;
 	idClipModel		*clipModelList[MAX_GENTITIES];
@@ -2124,17 +2037,10 @@ void idClip::DrawClipModels( const idVec3 &eye, const float radius, const idEnti
 		if ( clipModel->GetEntity() == passEntity ) {
 			continue;
 		}
-		if ( type && !clipModel->GetEntity()->IsType( *type ) ) {
-			continue;
-		}
 		if ( clipModel->renderModelHandle != -1 ) {
 			gameRenderWorld->DebugBounds( colorCyan, clipModel->GetAbsBounds() );
-			continue;
-		}
-
-		idCollisionModel *model = clipModel->GetCollisionModel();
-		if ( model != NULL ) {
-			collisionModelManager->DrawModel( model, clipModel->GetOrigin(), clipModel->GetAxis(), eye, mat3_identity, radius );
+		} else {
+			collisionModelManager->DrawModel( clipModel->Handle(), clipModel->GetOrigin(), clipModel->GetAxis(), eye, radius );
 		}
 	}
 }
@@ -2172,28 +2078,7 @@ bool idClip::DrawModelContactFeature( const contactInfo_t &contact, const idClip
 	return true;
 }
 
-// RAVEN BEGIN
-// rjohnson: added debug hud support
-
-void idClip::DebugHudStatistics( void )
-{
-	gameDebug.SetInt( "physics_translations", numTranslations );
-	gameDebug.SetInt( "physics_rotations", numRotations );
-	gameDebug.SetInt( "physics_motions", numMotions );
-	gameDebug.SetInt( "physics_render_model_traces", numRenderModelTraces );
-	gameDebug.SetInt( "physics_contents", numContents );
-	gameDebug.SetInt( "physics_contacts", numContacts );
-}
-
-void idClip::ClearStatistics( void )
-{
-	numRotations = numTranslations = numMotions = numRenderModelTraces = numContents = numContacts = 0;
-}
-
-// RAVEN END
-
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
+#if _HH_CLIP_FASTSECTORS //HUMANHEAD rww
 /*
 ============
 idClip::UpdateDynamicContents
@@ -2220,4 +2105,4 @@ void idClip::UpdateDynamicContents( idClipModel* clipModel ) {
 		link = link->nextLink;
 	}
 }
-// RAVEN END
+#endif //HUMANHEAD END

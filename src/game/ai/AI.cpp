@@ -1,125 +1,341 @@
-/*
-================
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-AI.cpp
-
-================
-*/
-
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
+#include "../../prey/game_portal.h" // HUMANHEAD
 
-#include "AI.h"
-#include "AI_Manager.h"
-#include "AI_Util.h"
-#include "../Projectile.h"
-#include "../spawner.h"
-#include "AI_Tactical.h"
-
-const char* aiTalkMessageString [ ] = {
-	"None",
-	"primary",
-	"secondary",
-	"loop"
+static const char *moveCommandString[ NUM_MOVE_COMMANDS ] = {
+	"MOVE_NONE",
+	"MOVE_FACE_ENEMY",
+	"MOVE_FACE_ENTITY",
+	"MOVE_TO_ENEMY",
+	"MOVE_TO_ENEMYHEIGHT",
+	"MOVE_TO_ENTITY",
+	"MOVE_OUT_OF_RANGE",
+	"MOVE_TO_ATTACK_POSITION",
+	"MOVE_TO_COVER",
+	"MOVE_TO_POSITION",
+	"MOVE_TO_POSITION_DIRECT",
+	"MOVE_SLIDE_TO_POSITION",
+	"MOVE_WANDER"
 };
 
-static const float AI_SIGHTDELAYSCALE	= 5000.0f;			// Full sight delay at 5 seconds or more of not seeing enemy
-
+/*
+=====================
+idMoveState::idMoveState
+=====================
+*/
+idMoveState::idMoveState() {
+	moveType			= MOVETYPE_ANIM;
+	moveCommand			= MOVE_NONE;
+	moveStatus			= MOVE_STATUS_DONE;
+	moveDest.Zero();
+	moveDir.Set( 1.0f, 0.0f, 0.0f );
+	goalEntity			= NULL;
+	goalEntityOrigin.Zero();
+	toAreaNum			= 0;
+	startTime			= 0;
+	duration			= 0;
+	speed				= 0.0f;
+	range				= 0.0f;
+	wanderYaw			= 0;
+	nextWanderTime		= 0;
+	blockTime			= 0;
+	obstacle			= NULL;
+	lastMoveOrigin		= vec3_origin;
+	lastMoveTime		= 0;
+	anim				= 0;
+	bEnemyBlocks		= false; // HUMANHEAD mdl
+}
 
 /*
-===============================================================================
-
-	idAI
-
-===============================================================================
+=====================
+idMoveState::Save
+=====================
 */
+void idMoveState::Save( idSaveGame *savefile ) const {
+	savefile->WriteInt( (int)moveType );
+	savefile->WriteInt( (int)moveCommand );
+	savefile->WriteInt( (int)moveStatus );
+	savefile->WriteVec3( moveDest );
+	savefile->WriteVec3( moveDir );
+	goalEntity.Save( savefile );
+	savefile->WriteVec3( goalEntityOrigin );
+	savefile->WriteInt( toAreaNum );
+	savefile->WriteInt( startTime );
+	savefile->WriteInt( duration );
+	savefile->WriteFloat( speed );
+	savefile->WriteFloat( range );
+	savefile->WriteFloat( wanderYaw );
+	savefile->WriteInt( nextWanderTime );
+	savefile->WriteInt( blockTime );
+	obstacle.Save( savefile );
+	savefile->WriteVec3( lastMoveOrigin );
+	savefile->WriteInt( lastMoveTime );
+	savefile->WriteInt( anim );
+	savefile->WriteBool( bEnemyBlocks ); // HUMANHEAD mdl
+}
+
+/*
+=====================
+idMoveState::Restore
+=====================
+*/
+void idMoveState::Restore( idRestoreGame *savefile ) {
+	savefile->ReadInt( (int &)moveType );
+	savefile->ReadInt( (int &)moveCommand );
+	savefile->ReadInt( (int &)moveStatus );
+	savefile->ReadVec3( moveDest );
+	savefile->ReadVec3( moveDir );
+	goalEntity.Restore( savefile );
+	savefile->ReadVec3( goalEntityOrigin );
+	savefile->ReadInt( toAreaNum );
+	savefile->ReadInt( startTime );
+	savefile->ReadInt( duration );
+	savefile->ReadFloat( speed );
+	savefile->ReadFloat( range );
+	savefile->ReadFloat( wanderYaw );
+	savefile->ReadInt( nextWanderTime );
+	savefile->ReadInt( blockTime );
+	obstacle.Restore( savefile );
+	savefile->ReadVec3( lastMoveOrigin );
+	savefile->ReadInt( lastMoveTime );
+	savefile->ReadInt( anim );
+	savefile->ReadBool( bEnemyBlocks ); // HUMANHEAD mdl
+}
+
+/*
+============
+idAASFindCover::idAASFindCover
+============
+*/
+idAASFindCover::idAASFindCover( const idVec3 &hideFromPos ) {
+	int			numPVSAreas;
+	idBounds	bounds( hideFromPos - idVec3( 16, 16, 0 ), hideFromPos + idVec3( 16, 16, 64 ) );
+
+	// setup PVS
+	numPVSAreas = gameLocal.pvs.GetPVSAreas( bounds, PVSAreas, idEntity::MAX_PVS_AREAS );
+	hidePVS		= gameLocal.pvs.SetupCurrentPVS( PVSAreas, numPVSAreas );
+}
+
+/*
+============
+idAASFindCover::~idAASFindCover
+============
+*/
+idAASFindCover::~idAASFindCover() {
+	gameLocal.pvs.FreeCurrentPVS( hidePVS );
+}
+
+/*
+============
+idAASFindCover::TestArea
+============
+*/
+bool idAASFindCover::TestArea( const idAAS *aas, int areaNum ) {
+	idVec3	areaCenter;
+	int		numPVSAreas;
+	int		PVSAreas[ idEntity::MAX_PVS_AREAS ];
+
+	areaCenter = aas->AreaCenter( areaNum );
+	areaCenter[ 2 ] += 1.0f;
+
+	numPVSAreas = gameLocal.pvs.GetPVSAreas( idBounds( areaCenter ).Expand( 16.0f ), PVSAreas, idEntity::MAX_PVS_AREAS );
+	if ( !gameLocal.pvs.InCurrentPVS( hidePVS, PVSAreas, numPVSAreas ) ) {
+		return true;
+	}
+
+	return false;
+}
+
+/*
+============
+idAASFindAreaOutOfRange::idAASFindAreaOutOfRange
+============
+*/
+idAASFindAreaOutOfRange::idAASFindAreaOutOfRange( const idVec3 &targetPos, float maxDist ) {
+	this->targetPos		= targetPos;
+	this->maxDistSqr	= maxDist * maxDist;
+}
+
+/*
+============
+idAASFindAreaOutOfRange::TestArea
+============
+*/
+bool idAASFindAreaOutOfRange::TestArea( const idAAS *aas, int areaNum ) {
+	const idVec3 &areaCenter = aas->AreaCenter( areaNum );
+	trace_t	trace;
+	float dist;
+
+	dist = ( targetPos.ToVec2() - areaCenter.ToVec2() ).LengthSqr();
+
+	if ( ( maxDistSqr > 0.0f ) && ( dist < maxDistSqr ) ) {
+		return false;
+	}
+
+	gameLocal.clip.TracePoint( trace, targetPos, areaCenter + idVec3( 0.0f, 0.0f, 1.0f ), MASK_OPAQUE, NULL );
+	if ( trace.fraction < 1.0f ) {
+		return false;
+	}
+
+	return true;
+}
+
+/*
+============
+idAASFindAttackPosition::idAASFindAttackPosition
+============
+*/
+idAASFindAttackPosition::idAASFindAttackPosition( const idAI *self, const idMat3 &gravityAxis, idEntity *target, const idVec3 &targetPos, const idVec3 &fireOffset ) {
+	int	numPVSAreas;
+
+	this->target		= target;
+	this->targetPos		= targetPos;
+	this->fireOffset	= fireOffset;
+	this->self			= self;
+	this->gravityAxis	= gravityAxis;
+
+	excludeBounds		= idBounds( idVec3( -64.0, -64.0f, -8.0f ), idVec3( 64.0, 64.0f, 64.0f ) );
+	excludeBounds.TranslateSelf( self->GetPhysics()->GetOrigin() );	
+
+	// setup PVS
+	idBounds bounds( targetPos - idVec3( 16, 16, 0 ), targetPos + idVec3( 16, 16, 64 ) );
+	numPVSAreas = gameLocal.pvs.GetPVSAreas( bounds, PVSAreas, idEntity::MAX_PVS_AREAS );
+	targetPVS	= gameLocal.pvs.SetupCurrentPVS( PVSAreas, numPVSAreas );
+}
+
+/*
+============
+idAASFindAttackPosition::~idAASFindAttackPosition
+============
+*/
+idAASFindAttackPosition::~idAASFindAttackPosition() {
+	gameLocal.pvs.FreeCurrentPVS( targetPVS );
+}
+
+/*
+============
+idAASFindAttackPosition::TestArea
+============
+*/
+bool idAASFindAttackPosition::TestArea( const idAAS *aas, int areaNum ) {
+	idVec3	dir;
+	idVec3	local_dir;
+	idVec3	fromPos;
+	idMat3	axis;
+	idVec3	areaCenter;
+	int		numPVSAreas;
+	int		PVSAreas[ idEntity::MAX_PVS_AREAS ];
+
+	areaCenter = aas->AreaCenter( areaNum );
+	areaCenter[ 2 ] += 1.0f;
+
+	if ( excludeBounds.ContainsPoint( areaCenter ) ) {
+		// too close to where we already are
+		return false;
+	}
+
+	numPVSAreas = gameLocal.pvs.GetPVSAreas( idBounds( areaCenter ).Expand( 16.0f ), PVSAreas, idEntity::MAX_PVS_AREAS );
+	if ( !gameLocal.pvs.InCurrentPVS( targetPVS, PVSAreas, numPVSAreas ) ) {
+		return false;
+	}
+
+	// calculate the world transform of the launch position
+	dir = targetPos - areaCenter;
+	gravityAxis.ProjectVector( dir, local_dir );
+	local_dir.z = 0.0f;
+	local_dir.ToVec2().Normalize();
+	axis = local_dir.ToMat3();
+	fromPos = areaCenter + fireOffset * axis;
+
+	return self->GetAimDir( fromPos, target, self, dir );
+}
 
 /*
 =====================
 idAI::idAI
 =====================
 */
-idAI::idAI ( void ) {
+idAI::idAI() {
+	aas					= NULL;
+	travelFlags			= TFL_WALK|TFL_AIR;
+
+	kickForce			= 2048.0f;
+	ignore_obstacles	= false;
+	blockedRadius		= 0.0f;
+	blockedMoveTime		= 750;
+	blockedAttackTime	= 750;
+	turnRate			= 360.0f;
+	turnVel				= 0.0f;
+	anim_turn_yaw		= 0.0f;
+	anim_turn_amount	= 0.0f;
+	anim_turn_angles	= 0.0f;
+	fly_offset			= 0;
+	fly_seek_scale		= 1.0f;
+	fly_roll_scale		= 0.0f;
+	fly_roll_max		= 0.0f;
+	fly_roll			= 0.0f;
+	fly_pitch_scale		= 0.0f;
+	fly_pitch_max		= 0.0f;
+	fly_pitch			= 0.0f;
+	allowMove			= false;
+	allowHiddenMovement	= false;
+	fly_speed			= 0.0f;
+	fly_bob_strength	= 0.0f;
+	fly_bob_vert		= 0.0f;
+	fly_bob_horz		= 0.0f;
+	lastHitCheckResult	= false;
+	lastHitCheckTime	= 0;
+	lastAttackTime		= 0;
+	melee_range			= 0.0f;
 	projectile_height_to_distance_ratio = 1.0f;
+	projectileDef		= NULL;
+	projectile			= NULL;
+	projectileClipModel	= NULL;
+	projectileRadius	= 0.0f;
+	projectileVelocity	= vec3_origin;
+	projectileGravity	= vec3_origin;
+	projectileSpeed		= 0.0f;
+	chat_snd			= NULL;
+	chat_min			= 0;
+	chat_max			= 0;
+	chat_time			= 0;
+	talk_state			= TALK_NEVER;
+	talkTarget			= NULL;
 
-	aas						= NULL;
-	aasSensor				= NULL;
-	aasFind					= NULL;
+	particles.Clear();
+	restartParticles	= true;
+	useBoneAxis			= false;
 
-	lastHitCheckResult		= false;
-	lastHitCheckTime		= 0;
-	lastAttackTime			= 0;
-	projectile				= NULL;
-	projectileClipModel		= NULL;
-	chatterTime				= 0;
-	talkState				= TALK_NEVER;
-	talkTarget				= NULL;
-	talkMessage				= TALKMSG_NONE;
-	talkBusyCount			= 0;
+	wakeOnFlashlight	= false;
+	memset( &worldMuzzleFlash, 0, sizeof ( worldMuzzleFlash ) );
+	worldMuzzleFlashHandle = -1;
 
-	enemy.ent					= NULL;
-	enemy.lastVisibleChangeTime	= 0;
-	enemy.lastVisibleTime		= 0;
+	enemy				= NULL;
+	lastVisibleEnemyPos.Zero();
+	lastVisibleEnemyEyeOffset.Zero();
+	lastVisibleReachableEnemyPos.Zero();
+	lastReachableEnemyPos.Zero();
+	shrivel_rate		= 0.0f;
+	shrivel_start		= 0;
+	fl.neverDormant		= false;		// AI's can go dormant
+	current_yaw			= 0.0f;
+	ideal_yaw			= 0.0f;
 
-	fl.neverDormant			= false;		// AI's can go dormant
+	num_cinematics		= 0;
+	current_cinematic	= 0;
 
-	allowEyeFocus			= true;
-	disablePain				= false;
-	allowJointMod			= true;
-	focusEntity				= NULL;
-	focusTime				= 0;
-	alignHeadTime			= 0;
-	forceAlignHeadTime		= 0;
-
-	orientationJoint		= INVALID_JOINT;
-
-	eyeVerticalOffset		= 0.0f;
-	eyeHorizontalOffset 	= 0.0f;
-	headFocusRate			= 0.0f;
-	eyeFocusRate			= 0.0f;
-	focusAlignTime			= 0;
-	focusRange				= 0.0f;
-	focusType				= AIFOCUS_NONE;
-
-	memset ( &combat.fl, 0, sizeof(combat.fl) );
-	combat.max_chasing_turn			= 0;
-	combat.shotAtTime				= 0;
-	combat.shotAtAngle				= 0.0f;
-	combat.meleeRange				= 0.0f;
- 	combat.tacticalPainTaken		= 0;
- 	combat.tacticalFlinches			= 0;
- 	combat.investigateTime			= 0;
- 	combat.aggressiveScale			= 1.0f;
-
-	passive.animFidgetPrefix.Clear ( );
-	passive.animIdlePrefix.Clear ( );
-	passive.animTalkPrefix.Clear ( );
-	passive.idleAnim.Clear();
-	passive.prefix.Clear();
-	passive.idleAnimChangeTime		= 0;
-	passive.fidgetTime				= 0;
-	passive.talkTime				= 0;
-	memset ( &passive.fl, 0, sizeof(passive.fl) );
-			
-	pain.lastTakenTime				= 0;
-	pain.takenThisFrame				= 0;
-	pain.loopEndTime				= 0;
-		
-	enemy.range = 0;
-	enemy.range2d = 0;
-	enemy.smoothedLinearVelocity.Zero ( );
-	enemy.smoothedPushedVelocity.Zero ( );
-	enemy.lastKnownPosition.Zero ( );
-	enemy.lastVisibleEyePosition.Zero ( );
-	enemy.lastVisibleChestPosition.Zero ( );
-	enemy.lastVisibleFromEyePosition.Zero ( );
-	enemy.checkTime = 0;
-	enemy.changeTime = 0;
-	enemy.lastVisibleChangeTime = 0;
-	enemy.lastVisibleTime = 0;
-	memset ( &enemy.fl, 0, sizeof(enemy.fl) );
+	allowEyeFocus		= true;
+	allowPain			= true;
+	allowJointMod		= true;
+	focusEntity			= NULL;
+	focusTime			= 0;
+	alignHeadTime		= 0;
+	forceAlignHeadTime	= 0;
 
 	currentFocusPos.Zero();
 	eyeAng.Zero();
@@ -130,15 +346,31 @@ idAI::idAI ( void ) {
 
 	eyeMin.Zero();
 	eyeMax.Zero();
-	
-	helperCurrent	= NULL;
-	helperIdeal		= NULL;
+	muzzleFlashEnd		= 0;
+	flashTime			= 0;
+	flashJointWorld		= INVALID_JOINT;
 
-	speakTime		= 0;
+	focusJoint			= INVALID_JOINT;
+	orientationJoint	= INVALID_JOINT;
+	flyTiltJoint		= INVALID_JOINT;
 
-	actionAnimNum	= 0;
-	actionSkipTime	= 0;
-	actionTime		= 0;
+	eyeVerticalOffset	= 0.0f;
+	eyeHorizontalOffset = 0.0f;
+	eyeFocusRate		= 0.0f;
+	headFocusRate		= 0.0f;
+	focusAlignTime		= 0;
+
+#ifdef GRAPHS
+	zeroGraph.SetNumSamples( 240 );
+	diffGraph.SetNumSamples( 240 );
+	turnVelGraph.SetNumSamples( 240 );
+	idealYawGraph.SetNumSamples( 240 );
+	yawGraph.SetNumSamples( 240 );
+#endif
+
+//HUMANHEAD mdc - added to support multiple projectiles
+	projectileDefaultDefIndex = -1;
+//HUMANHEAD END
 }
 
 /*
@@ -147,16 +379,13 @@ idAI::~idAI
 =====================
 */
 idAI::~idAI() {
-	// Make sure we arent stuck in the simple think list
-	simpleThinkNode.Remove ( );
-
-	delete aasFind;
-	delete aasSensor;
 	delete projectileClipModel;
 	DeconstructScriptObject();
 	scriptObject.Free();
-	aiManager.RemoveTeammate ( this );
-	SetPhysics( NULL );
+	if ( worldMuzzleFlashHandle != -1 ) {
+		gameRenderWorld->FreeLightDef( worldMuzzleFlashHandle );
+		worldMuzzleFlashHandle = -1;
+	}
 }
 
 /*
@@ -167,54 +396,78 @@ idAI::Save
 void idAI::Save( idSaveGame *savefile ) const {
 	int i;
 
-// cnicholson: These 3 vars are intentionally not saved, as noted in the restore
-	// NOSAVE: idLinkList<idAI>		simpleThinkNode;
-	// NOSAVE: idAAS*				aas;
-	// NOSAVE: idAASCallback*		aasFind;
-	// NOTE That some AAS stuff is done at end of ::Restore
-
-	// Movement
+	savefile->WriteInt( travelFlags );
 	move.Save( savefile );
 	savedMove.Save( savefile );
-	
+	savefile->WriteFloat( kickForce );
+	savefile->WriteBool( ignore_obstacles );
+	savefile->WriteFloat( blockedRadius );
+	savefile->WriteInt( blockedMoveTime );
+	savefile->WriteInt( blockedAttackTime );
+
+	savefile->WriteFloat( ideal_yaw );
+	savefile->WriteFloat( current_yaw );
+	savefile->WriteFloat( turnRate );
+	savefile->WriteFloat( turnVel );
+	savefile->WriteFloat( anim_turn_yaw );
+	savefile->WriteFloat( anim_turn_amount );
+	savefile->WriteFloat( anim_turn_angles );
+
 	savefile->WriteStaticObject( physicsObj );
-	savefile->WriteBool( GetPhysics() == static_cast<const idPhysics *>(&physicsObj) );
+
+	savefile->WriteFloat( fly_speed );
+	savefile->WriteFloat( fly_bob_strength );
+	savefile->WriteFloat( fly_bob_vert );
+	savefile->WriteFloat( fly_bob_horz );
+	savefile->WriteInt( fly_offset );
+	savefile->WriteFloat( fly_seek_scale );
+	savefile->WriteFloat( fly_roll_scale );
+	savefile->WriteFloat( fly_roll_max );
+	savefile->WriteFloat( fly_roll );
+	savefile->WriteFloat( fly_pitch_scale );
+	savefile->WriteFloat( fly_pitch_max );
+	savefile->WriteFloat( fly_pitch );
+
+	savefile->WriteBool( allowMove );
+	savefile->WriteBool( allowHiddenMovement );
+	savefile->WriteBool( disableGravity );
+	savefile->WriteBool( af_push_moveables );
 
 	savefile->WriteBool( lastHitCheckResult );
 	savefile->WriteInt( lastHitCheckTime );
 	savefile->WriteInt( lastAttackTime );
+	savefile->WriteFloat( melee_range );
 	savefile->WriteFloat( projectile_height_to_distance_ratio );
 
-	savefile->WriteInt( attackAnimInfo.Num() );
-	for( i = 0; i < attackAnimInfo.Num(); i++ ) {
-		savefile->WriteVec3( attackAnimInfo[ i ].attackOffset );
-		savefile->WriteVec3( attackAnimInfo[ i ].eyeOffset );
+	savefile->WriteInt( missileLaunchOffset.Num() );
+	for( i = 0; i < missileLaunchOffset.Num(); i++ ) {
+		savefile->WriteVec3( missileLaunchOffset[ i ] );
 	}
-	
-	// TOSAVE: mutable idClipModel*	projectileClipModel;
-	projectile.Save ( savefile );
 
-	// Talking
-	savefile->WriteInt( chatterTime );
-//	savefile->WriteInt( chatterRateCombat );	// NOSAVE:
-//	savefile->WriteInt( chatterRateIdle );		// NOSAVE:
-	savefile->WriteInt( talkState );
+	idStr projectileName;
+	spawnArgs.GetString( "def_projectile", "", projectileName );
+	savefile->WriteString( projectileName );
+	savefile->WriteFloat( projectileRadius );
+	savefile->WriteFloat( projectileSpeed );
+	savefile->WriteVec3( projectileVelocity );
+	savefile->WriteVec3( projectileGravity );
+	projectile.Save( savefile );
+	savefile->WriteString( attack );
+
+	savefile->WriteSoundShader( chat_snd );
+	savefile->WriteInt( chat_min );
+	savefile->WriteInt( chat_max );
+	savefile->WriteInt( chat_time );
+	savefile->WriteInt( talk_state );
 	talkTarget.Save( savefile );
-	savefile->WriteInt( talkMessage );
-	savefile->WriteInt( talkBusyCount );
-	savefile->WriteInt ( speakTime );
 
-	// Focus
-	lookTarget.Save ( savefile );
-	savefile->WriteInt( focusType );
-	focusEntity.Save ( savefile );
-	savefile->WriteFloat ( focusRange );
-	savefile->WriteInt ( focusAlignTime );
-	savefile->WriteInt ( focusTime );
-	savefile->WriteVec3( currentFocusPos );
+	savefile->WriteInt( num_cinematics );
+	savefile->WriteInt( current_cinematic );
 
-	// Looking
 	savefile->WriteBool( allowJointMod );
+	focusEntity.Save( savefile );
+	savefile->WriteVec3( currentFocusPos );
+	savefile->WriteInt( focusTime );
 	savefile->WriteInt( alignHeadTime );
 	savefile->WriteInt( forceAlignHeadTime );
 	savefile->WriteAngles( eyeAng );
@@ -229,128 +482,59 @@ void idAI::Save( idSaveGame *savefile ) const {
 		savefile->WriteAngles( lookJointAngles[ i ] );
 	}
 
-	savefile->WriteFloat( eyeVerticalOffset );
-	savefile->WriteFloat( eyeHorizontalOffset );
-	savefile->WriteFloat( headFocusRate );
-	savefile->WriteFloat( eyeFocusRate );
+	// HUMANHEAD pdm: Added support for look joints in head entities
+	savefile->WriteInt( headLookJoints.Num() );
+	for( i = 0; i < headLookJoints.Num(); i++ ) {
+		savefile->WriteJoint( headLookJoints[ i ] );
+		savefile->WriteAngles( headLookJointAngles[ i ] );
+	}
+	// HUMANHEAD END
 
-	// Joint Controllers
+	savefile->WriteFloat( shrivel_rate );
+	savefile->WriteInt( shrivel_start );
+
+	savefile->WriteInt( particles.Num() );
+	for  ( i = 0; i < particles.Num(); i++ ) {
+		savefile->WriteParticle( particles[i].particle );
+		savefile->WriteInt( particles[i].time );
+		savefile->WriteJoint( particles[i].joint );
+	}
+	savefile->WriteBool( restartParticles );
+	savefile->WriteBool( useBoneAxis );
+
+	enemy.Save( savefile );
+	savefile->WriteVec3( lastVisibleEnemyPos );
+	savefile->WriteVec3( lastVisibleEnemyEyeOffset );
+	savefile->WriteVec3( lastVisibleReachableEnemyPos );
+	savefile->WriteVec3( lastReachableEnemyPos );
+	savefile->WriteBool( wakeOnFlashlight );
+
 	savefile->WriteAngles( eyeMin );
 	savefile->WriteAngles( eyeMax );
+
+	savefile->WriteFloat( eyeVerticalOffset );
+	savefile->WriteFloat( eyeHorizontalOffset );
+	savefile->WriteFloat( eyeFocusRate );
+	savefile->WriteFloat( headFocusRate );
+	savefile->WriteInt( focusAlignTime );
+
+	savefile->WriteJoint( flashJointWorld );
+	savefile->WriteInt( muzzleFlashEnd );
+
+	savefile->WriteJoint( focusJoint );
 	savefile->WriteJoint( orientationJoint );
+	savefile->WriteJoint( flyTiltJoint );
 
-	pusher.Save( savefile );			// cnicholson: Added unsaved var
-	scriptedActionEnt.Save( savefile ); // cnicholson: Added unsaved var
-    
-	savefile->Write( &aifl, sizeof( aifl ) );
+	savefile->WriteBool( GetPhysics() == static_cast<const idPhysics *>(&physicsObj) );
 
-	// Misc
-	savefile->WriteInt ( actionAnimNum );
-	savefile->WriteInt ( actionTime );
-	savefile->WriteInt ( actionSkipTime );
-	savefile->WriteInt ( flagOverrides );
-
-	// Combat variables
-	savefile->Write( &combat.fl, sizeof( combat.fl ) );
-	savefile->WriteFloat ( combat.max_chasing_turn );
-	savefile->WriteFloat ( combat.shotAtTime );
-	savefile->WriteFloat ( combat.shotAtAngle );
-	savefile->WriteVec2 ( combat.hideRange );
-	savefile->WriteVec2 ( combat.attackRange );
-	savefile->WriteInt ( combat.attackSightDelay );
-	savefile->WriteFloat ( combat.meleeRange );
-	savefile->WriteFloat ( combat.aggressiveRange );
-	savefile->WriteFloat ( combat.aggressiveScale );
-	savefile->WriteInt ( combat.investigateTime );	
-	savefile->WriteFloat ( combat.visStandHeight );
-	savefile->WriteFloat ( combat.visCrouchHeight );
-	savefile->WriteFloat ( combat.visRange );
-	savefile->WriteFloat ( combat.earRange );
-	savefile->WriteFloat ( combat.awareRange );
-	savefile->WriteInt ( combat.tacticalMaskAvailable );
-	savefile->WriteInt ( (int&)combat.tacticalCurrent );	
-	savefile->WriteInt ( combat.tacticalUpdateTime );	
-	savefile->WriteInt ( combat.tacticalPainTaken );	
-	savefile->WriteInt ( combat.tacticalPainThreshold );	
-	savefile->WriteInt ( combat.tacticalFlinches );	
-	savefile->WriteInt ( combat.maxLostVisTime );	
-	savefile->WriteFloat ( combat.threatBase );
-	savefile->WriteFloat ( combat.threatCurrent );
-	savefile->WriteInt	 ( combat.coverValidTime );
-	savefile->WriteInt   ( combat.maxInvalidCoverTime );
-
-	// Passive state variables
-	savefile->WriteString ( passive.prefix );
-	savefile->WriteString ( passive.animFidgetPrefix );
-	savefile->WriteString ( passive.animIdlePrefix);
-	savefile->WriteString ( passive.animTalkPrefix );
-	savefile->WriteString ( passive.idleAnim );
-	savefile->WriteInt	  ( passive.idleAnimChangeTime );
-	savefile->WriteInt	  ( passive.fidgetTime );
-	savefile->WriteInt	  ( passive.talkTime );
-	savefile->Write ( &passive.fl, sizeof(passive.fl) );
-
-	// Enemy 
-	enemy.ent.Save ( savefile );
-	savefile->Write ( &enemy.fl, sizeof(enemy.fl) );
-	savefile->WriteInt ( enemy.lastVisibleChangeTime );
-	savefile->WriteVec3 ( enemy.lastKnownPosition );
-	savefile->WriteVec3 ( enemy.smoothedLinearVelocity );
-	savefile->WriteVec3 ( enemy.smoothedPushedVelocity );
-	savefile->WriteVec3 ( enemy.lastVisibleEyePosition );
-	savefile->WriteVec3 ( enemy.lastVisibleChestPosition );
-	savefile->WriteVec3 ( enemy.lastVisibleFromEyePosition );
-	savefile->WriteInt ( enemy.lastVisibleTime );
-	savefile->WriteFloat ( enemy.range );
-	savefile->WriteFloat ( enemy.range2d );
-	savefile->WriteInt ( enemy.changeTime );
-	savefile->WriteInt ( enemy.checkTime );
-
-	// Pain variables
-	savefile->WriteFloat ( pain.threshold );
-	savefile->WriteFloat ( pain.takenThisFrame );
-	savefile->WriteInt ( pain.lastTakenTime );
-	savefile->WriteInt ( pain.loopEndTime );
-	savefile->WriteString ( pain.loopType );
-
-	// Functions
-	funcs.first_sight.Save ( savefile );
-	funcs.sight.Save ( savefile );
-	funcs.pain.Save ( savefile );
-	funcs.damage.Save ( savefile );
-	funcs.death.Save ( savefile );
-	funcs.attack.Save ( savefile );
-	funcs.init.Save ( savefile );
-	funcs.onclick.Save ( savefile );
-	funcs.launch_projectile.Save ( savefile );
-	funcs.footstep.Save ( savefile );
-
-	mPlayback.Save( savefile );		// cnicholson: Added save functionality
-	mLookPlayback.Save( savefile );	// cnicholson: Added save functionality
-
-	// Tactical Sensor
-	aasSensor->Save( savefile );
-
-	// Helpers
-	tether.Save ( savefile );
-	helperCurrent.Save ( savefile );
-	helperIdeal.Save ( savefile );
-	leader.Save ( savefile );
-	spawner.Save ( savefile );
-
-	// Action timers
-	actionTimerRangedAttack.Save ( savefile );
-	actionTimerEvade.Save ( savefile );
-	actionTimerSpecialAttack.Save ( savefile );
-	actionTimerPain.Save ( savefile );
-	
-	// Actions
-	actionEvadeLeft.Save ( savefile );
-	actionEvadeRight.Save ( savefile );
-	actionRangedAttack.Save ( savefile );
-	actionMeleeAttack.Save ( savefile );
-	actionLeapAttack.Save ( savefile );
-	actionJumpBack.Save ( savefile );
+	// HUMANHEAD mdl
+	savefile->WriteInt( projectileDefaultDefIndex );
+	savefile->WriteFloat( clipModelXYDiameter );
+	savefile->WriteInt( enemyEntityNum );
+	savefile->WriteStaticObject( vehicleInterfaceLocal );
+	savefile->WriteObject( vehicleInterfaceLocal.GetVehicle() );
+	savefile->WriteBool( frozen );
+	// HUMANHEAD END
 }
 
 /*
@@ -364,62 +548,88 @@ void idAI::Restore( idRestoreGame *savefile ) {
 	int			num;
 	idBounds	bounds;
 
-	InitNonPersistentSpawnArgs ( );
-
-	// INTENTIONALLY NOT SAVED: idLinkList<idAI>	simpleThinkNode;
-	// INTENTIONALLY NOT SAVED: idAAS*				aas;
-	// INTENTIONALLY NOT SAVED: idAASCallback*		aasFind;
-	// NOTE That some AAS stuff is done at end of ::Restore
-
+	savefile->ReadInt( travelFlags );
 	move.Restore( savefile );
 	savedMove.Restore( savefile );
+	savefile->ReadFloat( kickForce );
+	savefile->ReadBool( ignore_obstacles );
+	savefile->ReadFloat( blockedRadius );
+	savefile->ReadInt( blockedMoveTime );
+	savefile->ReadInt( blockedAttackTime );
+
+	savefile->ReadFloat( ideal_yaw );
+	savefile->ReadFloat( current_yaw );
+	savefile->ReadFloat( turnRate );
+	savefile->ReadFloat( turnVel );
+	savefile->ReadFloat( anim_turn_yaw );
+	savefile->ReadFloat( anim_turn_amount );
+	savefile->ReadFloat( anim_turn_angles );
 
 	savefile->ReadStaticObject( physicsObj );
-	savefile->ReadBool( restorePhysics );
-	if ( restorePhysics ) {
-		RestorePhysics( &physicsObj );
-	}
+
+	savefile->ReadFloat( fly_speed );
+	savefile->ReadFloat( fly_bob_strength );
+	savefile->ReadFloat( fly_bob_vert );
+	savefile->ReadFloat( fly_bob_horz );
+	savefile->ReadInt( fly_offset );
+	savefile->ReadFloat( fly_seek_scale );
+	savefile->ReadFloat( fly_roll_scale );
+	savefile->ReadFloat( fly_roll_max );
+	savefile->ReadFloat( fly_roll );
+	savefile->ReadFloat( fly_pitch_scale );
+	savefile->ReadFloat( fly_pitch_max );
+	savefile->ReadFloat( fly_pitch );
+
+	savefile->ReadBool( allowMove );
+	savefile->ReadBool( allowHiddenMovement );
+	savefile->ReadBool( disableGravity );
+	savefile->ReadBool( af_push_moveables );
 
 	savefile->ReadBool( lastHitCheckResult );
 	savefile->ReadInt( lastHitCheckTime );
 	savefile->ReadInt( lastAttackTime );
+	savefile->ReadFloat( melee_range );
 	savefile->ReadFloat( projectile_height_to_distance_ratio );
 
 	savefile->ReadInt( num );
-	attackAnimInfo.SetGranularity( 1 );
-	attackAnimInfo.SetNum( num );
+	missileLaunchOffset.SetGranularity( 1 );
+	missileLaunchOffset.SetNum( num );
 	for( i = 0; i < num; i++ ) {
-		savefile->ReadVec3( attackAnimInfo[ i ].attackOffset );
-		savefile->ReadVec3( attackAnimInfo[ i ].eyeOffset );
+		savefile->ReadVec3( missileLaunchOffset[ i ] );
 	}
 
-	// TORESTORE: mutable idClipModel*	projectileClipModel;
+	idStr projectileName;
+	savefile->ReadString( projectileName );
+	if ( projectileName.Length() ) {
+		projectileDef = gameLocal.FindEntityDefDict( projectileName );
+		if ( !projectileDef ) {
+			gameLocal.Warning( "Unknown projectileDef '%s'", projectileName );
+		}
+	} else {
+		projectileDef = NULL;
+	}
+	savefile->ReadFloat( projectileRadius );
+	savefile->ReadFloat( projectileSpeed );
+	savefile->ReadVec3( projectileVelocity );
+	savefile->ReadVec3( projectileGravity );
 	projectile.Restore( savefile );
+	savefile->ReadString( attack );
 
-	// Talking
-	savefile->ReadInt( chatterTime );
-//	savefile->ReadInt( chatterRateCombat );		// Don't save
-//	savefile->ReadInt( chatterRateIdle );		// Don't save
+	savefile->ReadSoundShader( chat_snd );
+	savefile->ReadInt( chat_min );
+	savefile->ReadInt( chat_max );
+	savefile->ReadInt( chat_time );
 	savefile->ReadInt( i );
-	talkState = static_cast<talkState_t>( i );
+	talk_state = static_cast<talkState_t>( i );
 	talkTarget.Restore( savefile );
-	savefile->ReadInt( i );
-	talkMessage = static_cast<talkMessage_t>( i );
-	savefile->ReadInt( talkBusyCount );
-	savefile->ReadInt ( speakTime );
 
-	// Focus
-	lookTarget.Restore ( savefile );
-	savefile->ReadInt( i );
-	focusType = static_cast<aiFocus_t>( i );
-	focusEntity.Restore ( savefile );
-	savefile->ReadFloat ( focusRange );
-	savefile->ReadInt ( focusAlignTime );
-	savefile->ReadInt ( focusTime );
-	savefile->ReadVec3( currentFocusPos );
-	
-	// Looking
+	savefile->ReadInt( num_cinematics );
+	savefile->ReadInt( current_cinematic );
+
 	savefile->ReadBool( allowJointMod );
+	focusEntity.Restore( savefile );
+	savefile->ReadVec3( currentFocusPos );
+	savefile->ReadInt( focusTime );
 	savefile->ReadInt( alignHeadTime );
 	savefile->ReadInt( forceAlignHeadTime );
 	savefile->ReadAngles( eyeAng );
@@ -438,160 +648,113 @@ void idAI::Restore( idRestoreGame *savefile ) {
 		savefile->ReadAngles( lookJointAngles[ i ] );
 	}
 
-	savefile->ReadFloat( eyeVerticalOffset );
-	savefile->ReadFloat( eyeHorizontalOffset );
-	savefile->ReadFloat( headFocusRate );
-	savefile->ReadFloat( eyeFocusRate );
+	// HUMANHEAD pdm: Added support for look joints in head entities
+	savefile->ReadInt( num );
+	headLookJoints.SetGranularity( 1 );
+	headLookJoints.SetNum( num );
+	headLookJointAngles.SetGranularity( 1 );
+	headLookJointAngles.SetNum( num );
+	for( i = 0; i < num; i++ ) {
+		savefile->ReadJoint( headLookJoints[ i ] );
+		savefile->ReadAngles( headLookJointAngles[ i ] );
+	}
+	// HUMANHEAD END
 
-	// Joint Controllers
+
+	savefile->ReadFloat( shrivel_rate );
+	savefile->ReadInt( shrivel_start );
+
+	savefile->ReadInt( num );
+	particles.SetNum( num );
+	for  ( i = 0; i < particles.Num(); i++ ) {
+		savefile->ReadParticle( particles[i].particle );
+		savefile->ReadInt( particles[i].time );
+		savefile->ReadJoint( particles[i].joint );
+	}
+	savefile->ReadBool( restartParticles );
+	savefile->ReadBool( useBoneAxis );
+
+	enemy.Restore( savefile );
+	savefile->ReadVec3( lastVisibleEnemyPos );
+	savefile->ReadVec3( lastVisibleEnemyEyeOffset );
+	savefile->ReadVec3( lastVisibleReachableEnemyPos );
+	savefile->ReadVec3( lastReachableEnemyPos );
+
+	savefile->ReadBool( wakeOnFlashlight );
+
 	savefile->ReadAngles( eyeMin );
 	savefile->ReadAngles( eyeMax );
+
+	savefile->ReadFloat( eyeVerticalOffset );
+	savefile->ReadFloat( eyeHorizontalOffset );
+	savefile->ReadFloat( eyeFocusRate );
+	savefile->ReadFloat( headFocusRate );
+	savefile->ReadInt( focusAlignTime );
+
+	savefile->ReadJoint( flashJointWorld );
+	savefile->ReadInt( muzzleFlashEnd );
+
+	savefile->ReadJoint( focusJoint );
 	savefile->ReadJoint( orientationJoint );
+	savefile->ReadJoint( flyTiltJoint );
 
-	pusher.Restore( savefile );				// cnicholson: Added unrestored var
-	scriptedActionEnt.Restore ( savefile ); // cnicholson: Added unrestored var
-
-	savefile->Read( &aifl, sizeof( aifl ) );
-
-	// Misc
-	savefile->ReadInt ( actionAnimNum );
-	savefile->ReadInt ( actionTime );
-	savefile->ReadInt ( actionSkipTime );
-	savefile->ReadInt ( flagOverrides );
-
-	// Combat variables
-	savefile->Read ( &combat.fl, sizeof( combat.fl ) );
-	savefile->ReadFloat ( combat.max_chasing_turn );
-	savefile->ReadFloat ( combat.shotAtTime );
-	savefile->ReadFloat ( combat.shotAtAngle );
-	savefile->ReadVec2 ( combat.hideRange );
-	savefile->ReadVec2 ( combat.attackRange );
-	savefile->ReadInt ( combat.attackSightDelay );
-	savefile->ReadFloat ( combat.meleeRange );
-	savefile->ReadFloat ( combat.aggressiveRange );
-	savefile->ReadFloat ( combat.aggressiveScale );
-	savefile->ReadInt ( combat.investigateTime );	
-	savefile->ReadFloat ( combat.visStandHeight );
-	savefile->ReadFloat ( combat.visCrouchHeight );
-	savefile->ReadFloat ( combat.visRange );
-	savefile->ReadFloat ( combat.earRange );
-	savefile->ReadFloat ( combat.awareRange );
-	savefile->ReadInt ( combat.tacticalMaskAvailable );	
-	savefile->ReadInt ( (int&)combat.tacticalCurrent );	
-	savefile->ReadInt ( combat.tacticalUpdateTime );	
-	savefile->ReadInt ( combat.tacticalPainTaken );	
-	savefile->ReadInt ( combat.tacticalPainThreshold );	
-	savefile->ReadInt ( combat.tacticalFlinches );	
-	savefile->ReadInt ( combat.maxLostVisTime );	
-	savefile->ReadFloat ( combat.threatBase );
-	savefile->ReadFloat ( combat.threatCurrent );
-	savefile->ReadInt	 ( combat.coverValidTime );
-	savefile->ReadInt   ( combat.maxInvalidCoverTime );
-
-	// Passive state variables
-	savefile->ReadString ( passive.prefix );
-	savefile->ReadString ( passive.animFidgetPrefix );
-	savefile->ReadString ( passive.animIdlePrefix);
-	savefile->ReadString ( passive.animTalkPrefix );
-	savefile->ReadString ( passive.idleAnim );
-	savefile->ReadInt	 ( passive.idleAnimChangeTime );
-	savefile->ReadInt	 ( passive.fidgetTime );
-	savefile->ReadInt	 ( passive.talkTime );
-	savefile->Read ( &passive.fl, sizeof(passive.fl) );
-
-	// Enemy 
-	enemy.ent.Restore ( savefile );
-	savefile->Read ( &enemy.fl, sizeof(enemy.fl) );
-	savefile->ReadInt ( enemy.lastVisibleChangeTime );
-	savefile->ReadVec3 ( enemy.lastKnownPosition );
-	savefile->ReadVec3 ( enemy.smoothedLinearVelocity );
-	savefile->ReadVec3 ( enemy.smoothedPushedVelocity );
-	savefile->ReadVec3 ( enemy.lastVisibleEyePosition );
-	savefile->ReadVec3 ( enemy.lastVisibleChestPosition );
-	savefile->ReadVec3 ( enemy.lastVisibleFromEyePosition );
-	savefile->ReadInt ( enemy.lastVisibleTime );
-	savefile->ReadFloat ( enemy.range );
-	savefile->ReadFloat ( enemy.range2d );
-	savefile->ReadInt ( enemy.changeTime );
-	savefile->ReadInt ( enemy.checkTime );
-
-	// Pain variables
-	savefile->ReadFloat ( pain.threshold );
-	savefile->ReadFloat ( pain.takenThisFrame );
-	savefile->ReadInt ( pain.lastTakenTime );
-	savefile->ReadInt ( pain.loopEndTime );
-	savefile->ReadString ( pain.loopType );
-
-	// Functions
-	funcs.first_sight.Restore ( savefile );
-	funcs.sight.Restore ( savefile );
-	funcs.pain.Restore ( savefile );
-	funcs.damage.Restore ( savefile );
-	funcs.death.Restore ( savefile );
-	funcs.attack.Restore ( savefile );
-	funcs.init.Restore ( savefile );
-	funcs.onclick.Restore ( savefile );
-	funcs.launch_projectile.Restore ( savefile );
-	funcs.footstep.Restore ( savefile );
-
-	mPlayback.Restore( savefile );		// cnicholson: Added restore functionality
-	mLookPlayback.Restore( savefile );	// cnicholson: Added restore functionality
-
-	// Tactical Sensor
-	aasSensor->Restore( savefile );
-
-	// Helpers
-	tether.Restore ( savefile );
-	helperCurrent.Restore( savefile );
-	helperIdeal.Restore ( savefile );
-	leader.Restore ( savefile );
-	spawner.Restore ( savefile );
-
-	// Action timers
-	actionTimerRangedAttack.Restore ( savefile );
-	actionTimerEvade.Restore ( savefile );
-	actionTimerSpecialAttack.Restore ( savefile );
-	actionTimerPain.Restore ( savefile );
-	
-	// Actions
-	actionEvadeLeft.Restore ( savefile );
-	actionEvadeRight.Restore ( savefile );
-	actionRangedAttack.Restore ( savefile );
-	actionMeleeAttack.Restore ( savefile );
-	actionLeapAttack.Restore ( savefile );
-	actionJumpBack.Restore ( savefile );
+	savefile->ReadBool( restorePhysics );
 
 	// Set the AAS if the character has the correct gravity vector
 	idVec3 gravity = spawnArgs.GetVector( "gravityDir", "0 0 -1" );
 	gravity *= g_gravity.GetFloat();
-	if ( gravity == gameLocal.GetGravity() ) {
+	if ( !AI_VEHICLE && gravity == gameLocal.GetGravity() ) {
 		SetAAS();
 	}
-	
-	// create combat collision hull for exact collision detection, do initial set un-hidden
+
 	SetCombatModel();
 	LinkCombat();
-}
 
-/*
-=====================
-idAI::InitNonPersistentSpawnArgs
-=====================
-*/
-void idAI::InitNonPersistentSpawnArgs ( void ) {
-	aasSensor = rvAASTacticalSensor::CREATE_SENSOR(this);
-	aasFind   = NULL;
+	InitMuzzleFlash();
 
-	simpleThinkNode.Remove ( );
-	simpleThinkNode.SetOwner ( this );
-	
-	chatterRateIdle	  = SEC2MS ( spawnArgs.GetFloat ( "chatter_rate_idle", "0" ) );
-	chatterRateCombat = SEC2MS ( spawnArgs.GetFloat ( "chatter_rate_combat", "0" ) );
-	chatterTime		  = 0;	
-	
-	combat.tacticalMaskUpdate = 0;
-		
-	enemy.smoothVelocityRate = spawnArgs.GetFloat ( "smoothVelocityRate", "0.1" );
+	// Link the script variables back to the scriptobject
+	LinkScriptVariables();
+
+	if ( restorePhysics ) {
+		RestorePhysics( &physicsObj );
+	}
+
+	// HUMANHEAD mdl
+	projectileInfos.Clear();
+	idStr projectileInfoStr;
+	if( spawnArgs.GetString("def_projectileInfo", "", projectileInfoStr) && projectileInfoStr.Length() ) {	//find our def_projectileInfo key (list of projectiles we will use)
+		idList<idStr> parmList;
+		hhUtils::SplitString( projectileInfoStr, parmList, ',' );
+		for( int i = 0; i < parmList.Num(); i++ ) {
+			projectileInfo_t projInfo;
+			projectileDef = gameLocal.FindEntityDefDict( parmList[ i ].c_str() );
+			if( projectileDef ) {
+				//create the projectile so we can extract info about it
+				CreateProjectile( vec3_origin, viewAxis[ 0 ] );
+				projInfo.projectileDef = projectileDef;
+				projInfo.projectileRadius = projectile.GetEntity()->GetPhysics()->GetClipModel()->GetBounds().GetRadius();
+				projInfo.projectileVelocity = idProjectile::GetVelocity( projectileDef );
+				projInfo.projectileGravity = idProjectile::GetGravity( projectileDef );
+				projInfo.projectileSpeed = projInfo.projectileVelocity.Length();
+				projectileInfos.Append( projInfo );
+				delete projectile.GetEntity();
+				projectile = NULL;
+			}
+		}
+	}
+
+	savefile->ReadInt( projectileDefaultDefIndex );
+	savefile->ReadFloat( clipModelXYDiameter );
+	savefile->ReadInt( enemyEntityNum );
+	savefile->ReadStaticObject( vehicleInterfaceLocal );
+	SetVehicleInterface( &vehicleInterfaceLocal );
+	hhVehicle *vehicle;
+    savefile->ReadObject( reinterpret_cast<idClass *&> ( vehicle ) );
+	if (vehicle) {
+		vehicle->RestorePilot( &vehicleInterfaceLocal );
+	}
+	savefile->ReadBool( frozen );
+	// HUMANHEAD END
 }
 
 /*
@@ -600,88 +763,65 @@ idAI::Spawn
 =====================
 */
 void idAI::Spawn( void ) {
-	const char*			jointname;
-	const idKeyValue*	kv;
+	const char			*jointname;
+	const idKeyValue	*kv;
 	idStr				jointName;
 	idAngles			jointScale;
 	jointHandle_t		joint;
 	idVec3				local_dir;
+	bool				talks;
 
-	// Are all monsters disabled?
 	if ( !g_monsters.GetBool() ) {
 		PostEventMS( &EV_Remove, 0 );
 		return;
 	}
 
-	// Initialize the non saved spawn args
-	InitNonPersistentSpawnArgs ( );	
-
 	spawnArgs.GetInt(	"team",					"1",		team );
 	spawnArgs.GetInt(	"rank",					"0",		rank );
+	spawnArgs.GetInt(	"fly_offset",			"0",		fly_offset );
+	spawnArgs.GetFloat( "fly_speed",			"100",		fly_speed );
+	spawnArgs.GetFloat( "fly_bob_strength",		"50",		fly_bob_strength );
+	spawnArgs.GetFloat( "fly_bob_vert",			"2",		fly_bob_horz );
+	spawnArgs.GetFloat( "fly_bob_horz",			"2.7",		fly_bob_vert );
+	spawnArgs.GetFloat( "fly_seek_scale",		"4",		fly_seek_scale );
+	spawnArgs.GetFloat( "fly_roll_scale",		"90",		fly_roll_scale );
+	spawnArgs.GetFloat( "fly_roll_max",			"60",		fly_roll_max );
+	spawnArgs.GetFloat( "fly_pitch_scale",		"45",		fly_pitch_scale );
+	spawnArgs.GetFloat( "fly_pitch_max",		"30",		fly_pitch_max );
 
-	animPrefix = spawnArgs.GetString ( "animPrefix", "" );
-
-	// Standard flags
-	fl.notarget		= spawnArgs.GetBool ( "notarget", "0" );
-	fl.quickBurn	= false;
-
-	// AI flags
-	flagOverrides = 0;
-	memset ( &aifl, 0, sizeof(aifl) );
-	aifl.ignoreFlashlight 		= spawnArgs.GetBool ( "ignore_flashlight", "1" );
-	aifl.lookAtPlayer	  		= spawnArgs.GetBool ( "lookAtPlayer", "0" );
-	aifl.disableLook	  		= spawnArgs.GetBool ( "noLook", "0" );
-	aifl.undying		  		= spawnArgs.GetBool ( "undying", "0" );
-	aifl.killerGuard			= spawnArgs.GetBool ( "killer_guard", "0" );
-	aifl.scriptedEndWithIdle	= true;
-
-	// Setup Move Data
-	move.Spawn( spawnArgs );
-
-	pain.threshold		= spawnArgs.GetInt ( "painThreshold", "0" );
-	pain.takenThisFrame	= 0;		
-	
-	// Initialize combat variables
- 	combat.fl.aware					= spawnArgs.GetBool ( "ambush", "0" );
- 	combat.fl.tetherNoBreak			= spawnArgs.GetBool ( "tetherNoBreak", "0" );
- 	combat.fl.noChatter				= spawnArgs.GetBool ( "noCombatChatter" );
-	combat.hideRange				= spawnArgs.GetVec2 ( "hideRange", "150 750" );
-	combat.attackRange				= spawnArgs.GetVec2 ( "attackRange", "0 1000" );
-	combat.attackSightDelay			= SEC2MS ( spawnArgs.GetFloat ( "attackSightDelay", "1" ) );
- 	combat.visRange					= spawnArgs.GetFloat( "visRange", "2048" );
- 	combat.visStandHeight			= spawnArgs.GetFloat( "visStandHeight", "68" );
- 	combat.visCrouchHeight			= spawnArgs.GetFloat( "visCrouchHeight", "48" );
- 	combat.earRange					= spawnArgs.GetFloat( "earRange", "2048" );
- 	combat.awareRange				= spawnArgs.GetFloat( "awareRange", "150" );
- 	combat.aggressiveRange			= spawnArgs.GetFloat( "aggressiveRange", "0" );
- 	combat.maxLostVisTime			= SEC2MS ( spawnArgs.GetFloat ( "maxLostVisTime", "10" ) );
- 	combat.tacticalPainThreshold    = spawnArgs.GetInt ( "tactical_painThreshold", va("%d", health / 4) );
-	combat.coverValidTime			= 0;
-	combat.maxInvalidCoverTime		= SEC2MS ( spawnArgs.GetFloat ( "maxInvalidCoverTime", "1" ) );
-	combat.threatBase				= spawnArgs.GetFloat ( "threatBase", "1" );
-	combat.threatCurrent			= combat.threatBase;
-
-	SetPassivePrefix ( spawnArgs.GetString ( "passivePrefix" ) );
-
-	disablePain = spawnArgs.GetBool ( "nopain", "0" );
-
-	spawnArgs.GetFloat( "melee_range",			"64",		combat.meleeRange );
+	spawnArgs.GetFloat( "melee_range",			"64",		melee_range );
 	spawnArgs.GetFloat( "projectile_height_to_distance_ratio",	"1", projectile_height_to_distance_ratio );
 	
-	//melee superhero -- take far reduced damage from melee.
-	if ( spawnArgs.GetString( "objectivetitle_failed", NULL ) && spawnArgs.GetBool( "meleeSuperhero", "1")   )  {
-		aifl.meleeSuperhero = true;
-	} else	{
-		aifl.meleeSuperhero = false;
+	spawnArgs.GetFloat( "turn_rate",			"360",		turnRate );
+
+	spawnArgs.GetBool( "talks",					"0",		talks );
+	if ( spawnArgs.GetString( "npc_name", NULL ) != NULL ) {
+		if ( talks ) {
+			talk_state = TALK_OK;
+		} else {
+			talk_state = TALK_BUSY;
+		}
+	} else {
+		talk_state = TALK_NEVER;
 	}
 
-	//announce rate
-	announceRate = spawnArgs.GetFloat( "announceRate" );
-	if( 0.0f == announceRate )	{
-		announceRate = AISPEAK_CHANCE;
-	}
+	spawnArgs.GetBool( "animate_z",				"0",		disableGravity );
+	spawnArgs.GetBool( "af_push_moveables",		"0",		af_push_moveables );
+	spawnArgs.GetFloat( "kick_force",			"4096",		kickForce );
+	spawnArgs.GetBool( "ignore_obstacles",		"0",		ignore_obstacles );
+	spawnArgs.GetFloat( "blockedRadius",		"-1",		blockedRadius );
+	spawnArgs.GetInt( "blockedMoveTime",		"750",		blockedMoveTime );
+	spawnArgs.GetInt( "blockedAttackTime",		"750",		blockedAttackTime );
 
-	fl.takedamage = !spawnArgs.GetBool( "noDamage" );
+	spawnArgs.GetInt(	"num_cinematics",		"0",		num_cinematics );
+	current_cinematic = 0;
+
+	LinkScriptVariables();
+
+	fl.takedamage		= !spawnArgs.GetBool( "noDamage" );
+	enemy				= NULL;
+	allowMove			= true;
+	allowHiddenMovement = false;
 
 	animator.RemoveOriginOffset( true );
 
@@ -721,12 +861,58 @@ void idAI::Spawn( void ) {
 	eyeMax				= spawnArgs.GetAngles( "eye_turn_max", "10 30 0" );
 	eyeVerticalOffset	= spawnArgs.GetFloat( "eye_verticle_offset", "5" );
 	eyeHorizontalOffset = spawnArgs.GetFloat( "eye_horizontal_offset", "-8" );
-	headFocusRate		= spawnArgs.GetFloat( "head_focus_rate", "0.06" );
 	eyeFocusRate		= spawnArgs.GetFloat( "eye_focus_rate", "0.5" );
-	focusRange			= spawnArgs.GetFloat( "focus_range", "0" );
+	headFocusRate		= spawnArgs.GetFloat( "head_focus_rate", "0.1" );
 	focusAlignTime		= SEC2MS( spawnArgs.GetFloat( "focus_align_time", "1" ) );
 
-	jointname = spawnArgs.GetString( "joint_orientation" );
+	flashJointWorld = animator.GetJointHandle( spawnArgs.GetString( "bone_flash" ) );
+
+	if ( head.GetEntity() ) {
+		idAnimator *headAnimator = head.GetEntity()->GetAnimator();
+
+		// HUMANHEAD pdm: Added support for look joints in head entities
+		headLookJoints.SetGranularity( 1 );
+		headLookJointAngles.SetGranularity( 1 );
+		kv = spawnArgs.MatchPrefix( "headlook_joint", NULL );
+		while( kv ) {
+			jointName = kv->GetKey();
+			jointName.StripLeadingOnce( "headlook_joint " );
+			joint = headAnimator->GetJointHandle( jointName );
+			if ( joint == INVALID_JOINT ) {
+				gameLocal.Warning( "Unknown headlook_joint '%s' on entity %s", jointName.c_str(), name.c_str() );
+			} else {
+				jointScale = spawnArgs.GetAngles( kv->GetKey(), "0 0 0" );
+				jointScale.roll = 0.0f;
+
+				// if no scale on any component, then don't bother adding it.  this may be done to
+				// zero out rotation from an inherited entitydef.
+				if ( jointScale != ang_zero ) {
+					headLookJoints.Append( joint );
+					headLookJointAngles.Append( jointScale );
+				}
+			}
+			kv = spawnArgs.MatchPrefix( "headlook_joint", kv );
+		}
+		// HUMANHEAD END
+
+		jointname = spawnArgs.GetString( "bone_focus" );
+		if ( *jointname ) {
+			focusJoint = headAnimator->GetJointHandle( jointname );
+			if ( focusJoint == INVALID_JOINT ) {
+				gameLocal.Warning( "Joint '%s' not found on head on '%s'", jointname, name.c_str() );
+			}
+		}
+	} else {
+		jointname = spawnArgs.GetString( "bone_focus" );
+		if ( *jointname ) {
+			focusJoint = animator.GetJointHandle( jointname );
+			if ( focusJoint == INVALID_JOINT ) {
+				gameLocal.Warning( "Joint '%s' not found on '%s'", jointname, name.c_str() );
+			}
+		}
+	}
+
+	jointname = spawnArgs.GetString( "bone_orientation" );
 	if ( *jointname ) {
 		orientationJoint = animator.GetJointHandle( jointname );
 		if ( orientationJoint == INVALID_JOINT ) {
@@ -734,13 +920,15 @@ void idAI::Spawn( void ) {
 		}
 	}
 
-	jointname = spawnArgs.GetString( "joint_flytilt" );
+	jointname = spawnArgs.GetString( "bone_flytilt" );
 	if ( *jointname ) {
-		move.flyTiltJoint = animator.GetJointHandle( jointname );
-		if ( move.flyTiltJoint == INVALID_JOINT ) {
+		flyTiltJoint = animator.GetJointHandle( jointname );
+		if ( flyTiltJoint == INVALID_JOINT ) {
 			gameLocal.Warning( "Joint '%s' not found on '%s'", jointname, name.c_str() );
 		}
 	}
+
+	InitMuzzleFlash();
 
 	physicsObj.SetSelf( this );
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
@@ -761,26 +949,82 @@ void idAI::Spawn( void ) {
 	// move up to make sure the monster is at least an epsilon above the floor
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() + idVec3( 0, 0, CM_CLIP_EPSILON ) );
 	
-	idVec3 gravity = spawnArgs.GetVector( "gravityDir", "0 0 -1" );
-	gravity *= g_gravity.GetFloat();
-	physicsObj.SetGravity( gravity );
+	if ( num_cinematics ) {
+		physicsObj.SetGravity( vec3_origin );
+	} else {
+		idVec3 gravity = spawnArgs.GetVector( "gravityDir", "0 0 -1" );
+		gravity *= g_gravity.GetFloat();
+		physicsObj.SetGravity( gravity );
+	}
 
 	SetPhysics( &physicsObj );
 
 	physicsObj.GetGravityAxis().ProjectVector( viewAxis[ 0 ], local_dir );
-	move.current_yaw		= local_dir.ToYaw();
-	move.ideal_yaw			= idMath::AngleNormalize180( move.current_yaw );
-	
-	lookAng.Zero ( );
-	lookAng.yaw		= move.current_yaw;
+	current_yaw		= local_dir.ToYaw();
+	ideal_yaw		= idMath::AngleNormalize180( current_yaw );
 
+	move.blockTime = 0;
+	move.bEnemyBlocks = false; // HUMANHEAD mdl:  By default, ignore enemy
 
 	SetAAS();
 
-	projectile		= NULL;
-	projectileClipModel	= NULL;
+//HUMANHEAD mdc - added to support multiple projectiles
+	projectileInfos.Clear();
+	idStr projectileInfoStr;
+	if( spawnArgs.GetString("def_projectileInfo", "", projectileInfoStr) && projectileInfoStr.Length() ) {	//find our def_projectileInfo key (list of projectiles we will use)
+		idList<idStr> parmList;
+		hhUtils::SplitString( projectileInfoStr, parmList, ',' );
+		for( int i = 0; i < parmList.Num(); i++ ) {
+			projectileInfo_t projInfo;
+			projectileDef = gameLocal.FindEntityDefDict( parmList[ i ].c_str() );
+			if( projectileDef ) {
+				//create the projectile so we can extract info about it
+				CreateProjectile( vec3_origin, viewAxis[ 0 ] );
+				projInfo.projectileDef = projectileDef;
+				projInfo.projectileRadius = projectile.GetEntity()->GetPhysics()->GetClipModel()->GetBounds().GetRadius();
+				projInfo.projectileVelocity = idProjectile::GetVelocity( projectileDef );
+				projInfo.projectileGravity = idProjectile::GetGravity( projectileDef );
+				projInfo.projectileSpeed = projInfo.projectileVelocity.Length();
+				projectileInfos.Append( projInfo );
+				delete projectile.GetEntity();
+				projectile = NULL;
+			}
+		}
+	}
+	projectileDefaultDefIndex = -1;
+//HUMANHEAD END
 
-	if ( spawnArgs.GetBool( "hide" ) || spawnArgs.GetBool( "trigger_anim" ) ) {
+	projectile		= NULL;
+	projectileDef	= NULL;
+	projectileClipModel	= NULL;
+	idStr projectileName;
+	if ( spawnArgs.GetString( "def_projectile", "", projectileName ) && projectileName.Length() ) {
+		projectileDef = gameLocal.FindEntityDefDict( projectileName );
+		//HUMANHEAD mdc - added to support multiple projectiles
+		projectileDefaultDefIndex = FindProjectileInfo( projectileDef );	//try to match up with an existing projectileInfo
+		if( projectileDef && projectileDefaultDefIndex < 0 ) {	//didn't find this, either it isn't listed in our info list, or we don't have any in our info list, so fall back to old-style
+//			projectileDef = gameLocal.FindEntityDefDict( projectileName );
+		//HUMANHEAD END
+			CreateProjectile( vec3_origin, viewAxis[ 0 ] );
+			projectileRadius	= projectile.GetEntity()->GetPhysics()->GetClipModel()->GetBounds().GetRadius();
+			projectileVelocity	= idProjectile::GetVelocity( projectileDef );
+			projectileGravity	= idProjectile::GetGravity( projectileDef );
+			projectileSpeed		= projectileVelocity.Length();
+			delete projectile.GetEntity();
+			projectile = NULL;
+		//HUMANHEAD mdc - added to support multiple projectiles
+		} else {
+			SetCurrentProjectile( projectileDefaultDefIndex );		//set our current projectile to the defaultIndex
+		}
+		//HUMANHEAD END
+	}
+
+	particles.Clear();
+	restartParticles = true;
+	useBoneAxis = spawnArgs.GetBool( "useBoneAxis" );
+	SpawnParticles( "smokeParticleSystem" );
+
+	if ( num_cinematics || spawnArgs.GetBool( "hide" ) || spawnArgs.GetBool( "teleport" ) || spawnArgs.GetBool( "trigger_anim" ) ) {
 		fl.takedamage = false;
 		physicsObj.SetContents( 0 );
 		physicsObj.GetClipModel()->Unlink();
@@ -795,187 +1039,53 @@ void idAI::Spawn( void ) {
 		health = 1;
 	}
 
+	// set up monster chatter
+	SetChatSound();
+
 	BecomeActive( TH_THINK );
 
-	if ( move.fl.allowPushMovables ) {
+	if ( af_push_moveables ) {
 		af.SetupPose( this, gameLocal.time );
 		af.GetPhysics()->EnableClip();
 	}
 
 	// init the move variables
 	StopMove( MOVE_STATUS_DONE );
-	
-	// Initialize any scripts
-	idStr prefix = "script_";
-	for ( kv = spawnArgs.MatchPrefix ( prefix.c_str(), NULL );
-		  kv;
-		  kv = spawnArgs.MatchPrefix ( prefix.c_str(), kv ) ) {
-			  SetScript ( kv->GetKey().c_str() + prefix.Length(), kv->GetValue() );
-	}
-	
-	// Initialize actions	
-	actionEvadeLeft.Init		( spawnArgs, "action_evadeLeft",		NULL,					0 );
-	actionEvadeRight.Init		( spawnArgs, "action_evadeRight",		NULL, 					0 );
-	actionRangedAttack.Init		( spawnArgs, "action_rangedAttack",		NULL, 					AIACTIONF_ATTACK );
-	actionMeleeAttack.Init		( spawnArgs, "action_meleeAttack",		NULL, 					AIACTIONF_ATTACK|AIACTIONF_MELEE );
-	actionLeapAttack.Init		( spawnArgs, "action_leapAttack",		NULL, 					AIACTIONF_ATTACK );
-	actionJumpBack.Init			( spawnArgs, "action_jumpBack",			NULL, 					0 );
-			
-	// Global action timers
-	actionTimerRangedAttack.Init	( spawnArgs, "actionTimer_RangedAttack" );
-	actionTimerEvade.Init			( spawnArgs, "actionTimer_Evade" );
-	actionTimerSpecialAttack.Init	( spawnArgs, "actionTimer_SpecialAttack" );
-	actionTimerPain.Init			( spawnArgs, "actionTimer_pain" );
 
-	// Available tactical options	
-	combat.tacticalUpdateTime = 0;
-	combat.tacticalCurrent    = AITACTICAL_NONE;
-	combat.tacticalMaskUpdate = 0;
-	combat.tacticalMaskAvailable  = AITACTICAL_TURRET_BIT|AITACTICAL_MOVE_FOLLOW_BIT|AITACTICAL_MOVE_TETHER_BIT;
-	combat.tacticalMaskAvailable |= (spawnArgs.GetBool ( "tactical_cover",   "0" )		? AITACTICAL_COVER_BITS				: 0);
-	combat.tacticalMaskAvailable |= (spawnArgs.GetBool ( "tactical_ranged",  "0" ) 		? AITACTICAL_RANGED_BITS			: 0);
-	combat.tacticalMaskAvailable |= (spawnArgs.GetBool ( "tactical_hide",    "0" ) 		? AITACTICAL_HIDE_BIT				: 0);	
-	combat.tacticalMaskAvailable |= (spawnArgs.GetBool ( "tactical_rush",    "0" ) 		? AITACTICAL_MELEE_BIT				: 0);
-	combat.tacticalMaskAvailable |= (spawnArgs.GetBool ( "tactical_passive", "0" ) 		? AITACTICAL_PASSIVE_BIT			: 0);
-	combat.tacticalMaskAvailable |= (spawnArgs.GetBool ( "allowPlayerPush",  "0" )		? AITACTICAL_MOVE_PLAYERPUSH_BIT	: 0);
-	
-	// Talking?
-	const char* npc;
-	if ( spawnArgs.GetString( "npc_name", NULL, &npc ) != NULL && *npc ) {
-		if ( spawnArgs.GetBool ( "follows", "0" ) ) {
-			SetTalkState ( TALK_FOLLOW );
-		} else {
-			switch ( spawnArgs.GetInt( "talks" ) )
-			{
-			case 2:
-				SetTalkState ( TALK_WAIT );
-				break;
-			case 1:
-				SetTalkState ( TALK_OK );
-				break;
-			case 0:
-			default:
-				SetTalkState ( TALK_BUSY );
-				break;
-			}
-		}
-	} else {
-		SetTalkState ( TALK_NEVER );
-	}
-
-	// Passive or aggressive ai?
-	if ( spawnArgs.GetBool ( "passive" ) ) {
-		Event_BecomePassive ( true );
-		
-		if ( spawnArgs.GetInt ( "passive" ) > 1 ) {
-			aifl.disableLook = true;
-		}
-	}
-	
-	// Print out a warning about any AI that is spawned unhidden since they will be all thinking
-	if( gameLocal.GameState ( ) == GAMESTATE_STARTUP && !spawnArgs.GetInt( "hide" ) && !spawnArgs.GetInt( "trigger_anim" ) && !spawnArgs.GetInt( "trigger_cover" ) && !spawnArgs.GetInt( "trigger_move" ) ){
-		gameLocal.Warning( "Unhidden AI placed in map (will be constantly active): %s (%s)", name.c_str(), GetPhysics()->GetOrigin().ToString() );
-	}
-
-	Begin ( );
-
-	// RAVEN BEGIN
-	// twhitaker: needed this for difficulty settings
-	PostEventMS( &EV_PostSpawn, 0 );
-	// RAVEN END
+	//HUMANHEAD: aob
+	SetVehicleInterface( &vehicleInterfaceLocal );
+	//HUMANHEAD END
 }
 
 /*
 ===================
-idAI::Begin
+idAI::InitMuzzleFlash
 ===================
 */
-void idAI::Begin ( void ) {
-	const char* temp;
-	bool		animWalk;
-	bool		animRun;
+void idAI::InitMuzzleFlash( void ) {
+	const char			*shader;
+	idVec3				flashColor;
 
-	// Look for the lack of a run or walk animation and force the opposite
-	animWalk = HasAnim ( ANIMCHANNEL_LEGS, "walk" );
-	animRun  = HasAnim ( ANIMCHANNEL_LEGS, "run" );
-	if ( !animWalk && animRun ) {
-		move.fl.noWalk = true;
-	} else if ( !animRun && animWalk ) {
-		move.fl.noRun = true;
-	}
+	spawnArgs.GetString( "mtr_flashShader", "muzzleflash", &shader );
+	spawnArgs.GetVector( "flashColor", "0 0 0", flashColor );
+	idVec3 flashRadius = spawnArgs.GetVector( "flashRadius", "10 10 10" );	
+	flashTime = SEC2MS( spawnArgs.GetFloat( "flashTime", "0.25" ) );
+	idVec3 flashOffset = spawnArgs.GetVector( "flashOffset", "0 0 0" );
 
-	// If a trigger anim or hide is specified then wait until activated before waking up
-	if ( spawnArgs.GetString ( "trigger_anim", "", &temp ) || spawnArgs.GetBool ( "hide" ) ) {	
-		Hide();
-		PostState ( "Wait_Activated" );
-		PostState ( "State_WakeUp", SEC2MS(spawnArgs.GetFloat ( "wait" ) ) );
-	// Wake up
-	} else {
-		PostState ( "State_WakeUp", SEC2MS(spawnArgs.GetFloat ( "wait" ) ) );
-	}
-}
+	memset( &worldMuzzleFlash, 0, sizeof ( worldMuzzleFlash ) );
 
-/*
-===================
-idAI::WakeUp
-===================
-*/
-void idAI::WakeUp ( void ) {
-	const char* temp;
+	worldMuzzleFlash.pointLight = true;
+	worldMuzzleFlash.shader = declManager->FindMaterial( shader, false );
+	worldMuzzleFlash.shaderParms[ SHADERPARM_RED ] = flashColor[0];
+	worldMuzzleFlash.shaderParms[ SHADERPARM_GREEN ] = flashColor[1];
+	worldMuzzleFlash.shaderParms[ SHADERPARM_BLUE ] = flashColor[2];
+	worldMuzzleFlash.shaderParms[ SHADERPARM_ALPHA ] = 1.0f;
+	worldMuzzleFlash.shaderParms[ SHADERPARM_TIMESCALE ] = 1.0f;
+	worldMuzzleFlash.lightRadius = flashRadius;
+	worldMuzzleFlash.lightCenter = -flashOffset;
+	worldMuzzleFlash.noShadows = true;
 
-	// Already awake?
-	if ( aifl.awake ) {
-		return;
-	}	
-
-	// Find the closest helper
-	UpdateHelper ( );
-
-	aifl.awake = true;
-
-	// If the monster is flying then start them with the flying movement type	
-	if ( spawnArgs.GetBool ( "static" ) ) {
-		SetMoveType ( MOVETYPE_STATIC );
-	} else if ( spawnArgs.GetBool ( "flying" ) ) {
-		SetMoveType ( MOVETYPE_FLY );
-		move.moveDest = physicsObj.GetOrigin();
-		move.moveDest.z += move.fly_offset;
-	} else {
-		SetMoveType ( MOVETYPE_ANIM );
-	}	
-	
-	// Wake up any linked entities
-	WakeUpTargets ( );
-
-	// Default enemy?
-	if ( !combat.fl.ignoreEnemies ) {
-		if ( spawnArgs.GetString ( "enemy", "", &temp ) && *temp ) {	
-			SetEnemy ( gameLocal.FindEntity ( temp ) );
-		} else if ( spawnArgs.GetBool ( "forceEnemy", "0" ) ) {
-			SetEnemy ( FindEnemy ( false, true ) );
-		}
-	}
-
-	// Default leader?
- 	if ( spawnArgs.GetString ( "leader", "", &temp ) && *temp ) {
-		SetLeader ( gameLocal.FindEntity ( temp ) );
- 	}
- 	
- 	// If hidden and face enemy is specified we should orient ourselves toward our enemy immediately
- 	if ( enemy.ent && IsHidden ( ) && spawnArgs.GetBool ( "faceEnemy" ) ) {
-		TurnToward ( enemy.ent->GetPhysics()->GetOrigin() );
-		move.current_yaw = move.ideal_yaw;
-		viewAxis = idAngles( 0, move.current_yaw, 0 ).ToMat3();
-	} 
-
-	Show ( );
-
-	aiManager.AddTeammate ( this );
-
-	// External script functions
-	ExecScriptFunction( funcs.init, this );
-	
-	OnWakeUp ( );
+	worldMuzzleFlashHandle = -1;
 }
 
 /*
@@ -984,71 +1094,32 @@ idAI::List_f
 ===================
 */
 void idAI::List_f( const idCmdArgs &args ) {
-	int			e;
-	int			i;
-	idEntity*	check;
-	int			count;
-	idDict		countsFixed;
-	idDict		countsSpawned;
+	int		e;
+	idAI	*check;
+	int		count;
+	const char *statename;
 
 	count = 0;
 
 	gameLocal.Printf( "%-4s  %-20s %s\n", " Num", "EntityDef", "Name" );
 	gameLocal.Printf( "------------------------------------------------\n" );
-	for( e = 0; e < MAX_GENTITIES; e++ ) {		
-		check = gameLocal.entities[ e ];
-		if ( !check ) {
+	for( e = 0; e < MAX_GENTITIES; e++ ) {
+		check = static_cast<idAI *>(gameLocal.entities[ e ]);
+		if ( !check || !check->IsType( idAI::Type ) ) {
 			continue;
 		}
-		
-		if ( check->IsType ( idAI::Type ) ) {
-			idAI* checkAI = static_cast<idAI*>(check);
 
-			// Skip spawned AI
-			if ( checkAI->spawner ) {
-				continue;
-			}
-			countsFixed.SetInt ( check->GetEntityDefName(), countsFixed.GetInt ( check->GetEntityDefName(), "0" ) + 1 );
-
-			gameLocal.Printf( "%4i: %-20s %-20s move: %d\n", e, check->GetEntityDefName(), check->name.c_str(), checkAI->move.fl.allowAnimMove );
-			count++;
-		} else if ( check->IsType ( rvSpawner::GetClassType() ) ) {			
-			const idKeyValue*	kv;	
-			rvSpawner*			checkSpawner = static_cast<rvSpawner*>(check);
-			for ( kv = check->spawnArgs.MatchPrefix( "def_spawn", NULL ); kv; kv = check->spawnArgs.MatchPrefix( "def_spawn", kv ) ) {
-				countsSpawned.SetInt ( kv->GetValue(), countsSpawned.GetInt ( kv->GetValue(), "0" ) + 1 );
-			}
-			for ( i = 0; i < checkSpawner->GetNumSpawnPoints(); i ++ ) {
-				check = checkSpawner->GetSpawnPoint ( i );
-				if ( !check ) {
-					continue;
-				}
-				for ( kv = check->spawnArgs.MatchPrefix( "def_spawn", NULL ); kv; kv = check->spawnArgs.MatchPrefix( "def_spawn", kv ) ) {
-					countsSpawned.SetInt ( kv->GetValue(), countsSpawned.GetInt ( kv->GetValue(), "0" ) + 1 );
-				}
-			}
+		if ( check->state ) {
+			statename = check->state->Name();
+		} else {
+			statename = "NULL state";
 		}
+
+		gameLocal.Printf( "%4i: %-20s %-20s %s  move: %d\n", e, check->GetEntityDefName(), check->name.c_str(), statename, check->allowMove );
+		count++;
 	}
 
-	// Combine the two lists
-	for ( e = 0; e < countsSpawned.GetNumKeyVals(); e ++ ) {
-		const char* keyName = countsSpawned.GetKeyVal ( e )->GetKey();
-		countsFixed.Set ( keyName, va("(%s) %3d", 
-						  countsSpawned.GetKeyVal ( e )->GetValue().c_str(),
-						  countsFixed.GetInt ( keyName, "0" ) + atoi(countsSpawned.GetKeyVal ( e )->GetValue()) ) );
-	}	
-
-	// Print out total counts
-	if ( countsFixed.GetNumKeyVals() ) {
-		gameLocal.Printf( "------------------------------------------------\n" );
-		for ( e = 0; e < countsFixed.GetNumKeyVals(); e ++ ) {
-			const idKeyValue* kv = countsFixed.GetKeyVal ( e );
-			gameLocal.Printf( "%10s: %-20s\n", kv->GetValue().c_str(), kv->GetKey().c_str() );
-		}
-	}
-	
-	gameLocal.Printf( "------------------------------------------------\n" );
-	gameLocal.Printf( "...%d monsters (%d unique types)\n", count, countsFixed.GetNumKeyVals() );
+	gameLocal.Printf( "...%d monsters\n", count );
 }
 
 /*
@@ -1061,6 +1132,12 @@ called when entity becomes dormant
 void idAI::DormantBegin( void ) {
 	// since dormant happens on a timer, we wont get to update particles to
 	// hidden through the think loop, but we need to hide them though.
+	if ( particles.Num() ) {
+		for ( int i = 0; i < particles.Num(); i++ ) {
+			particles[i].time = 0;
+		}
+	}
+
 	if ( enemyNode.InList() ) {
 		// remove ourselves from the enemy's enemylist
 		enemyNode.Remove();
@@ -1076,58 +1153,18 @@ called when entity wakes from being dormant
 ================
 */
 void idAI::DormantEnd( void ) {
-	if ( enemy.ent && !enemyNode.InList() ) {
+	if ( enemy.GetEntity() && !enemyNode.InList() ) {
 		// let our enemy know we're back on the trail
-		idActor *enemyEnt = dynamic_cast< idActor *>( enemy.ent.GetEntity() );
-		if( enemyEnt ){
-			enemyNode.AddToEnd( enemyEnt->enemyList );
-		}
-	}
-	idActor::DormantEnd();
-}
-
-/*
-=====================
-idAI::ValidateCover
-
-Validate the reserved cover feature with current conditions.  Also quickly tests if
-cover does not face enemy at all, which triggers an instant update (ignoring maxCoverInvalidTime)
-=====================
-*/
-bool idAI::ValidateCover( ) {
-	if ( !InCoverMode( ) ) {
-		return false;
+		enemyNode.AddToEnd( enemy.GetEntity()->enemyList );
 	}
 	
-	if ( aasSensor->TestValidWithCurrentState() && (!enemy.ent || enemy.range > combat.awareRange ) ) {
-		combat.coverValidTime = gameLocal.time;
-	} else if ( combat.coverValidTime && !IsCoverValid ( ) ) {
-		combat.coverValidTime = 0;
-		OnCoverInvalidated();
+	if ( particles.Num() ) {
+		for ( int i = 0; i < particles.Num(); i++ ) {
+			particles[i].time = gameLocal.time;
+		}
 	}
 
-	return IsCoverValid();
-}
-
-/*
-=====================
-idAI::DoDormantTests
-=====================
-*/
-bool idAI::DoDormantTests ( void ) {
-	// If in a scripted move that we should never go dormant in
-	if ( aifl.scripted && aifl.scriptedNeverDormant ) {
-		return false;
-	}
-	// If following a player never go dormant
-	if ( leader && leader->IsType ( idPlayer::GetClassType ( ) ) ) {
-		return false;
-	}
-	// AI should no longer go dormant when outside of tether
-	if ( IsTethered () && !IsWithinTether ( ) ) {
-		return false;
-	}
-	return idActor::DoDormantTests ( );
+	idActor::DormantEnd();
 }
 
 /*
@@ -1136,328 +1173,2198 @@ idAI::Think
 =====================
 */
 void idAI::Think( void ) {
+	PROFILE_SCOPE("AI", PROFMASK_NORMAL|PROFMASK_AI);
+	assert(0);	// I assume this is no longer used, as we have our own version, comment out eventually --pdm
 
+#ifndef HUMANHEAD
 	// if we are completely closed off from the player, don't do anything at all
 	if ( CheckDormant() ) {
 		return;
 	}
+#endif	// HUMANHEAD
 
-	// Simple think this frame?
-	aifl.simpleThink = aiManager.IsSimpleThink ( this );
-
-	aiManager.thinkCount++;
-
-	// AI Speeds
-	if ( ai_speeds.GetBool ( ) ) {
-		aiManager.timerThink.Start ( );
-	}
-
-	if ( thinkFlags & TH_THINK ) {	
+	if ( thinkFlags & TH_THINK ) {
 		// clear out the enemy when he dies or is hidden
-		idEntity* enemyEnt = enemy.ent;
-		idActor*  enemyAct = dynamic_cast<idActor*>( enemyEnt );
-		
-		// Clear our enemy if necessary
+		idActor *enemyEnt = enemy.GetEntity();
 		if ( enemyEnt ) {
-			if (enemyAct && enemyAct->IsInVehicle()) {
-				SetEnemy(enemyAct->GetVehicleController().GetVehicle());	// always get angry at the enemy's vehicle first, not the enemy himself
-			} else {
-				bool enemyDead = (enemyEnt->fl.takedamage && enemyEnt->health <= 0);
-				if ( enemyDead || enemyEnt->fl.notarget || enemyEnt->IsHidden() || (enemyAct && enemyAct->team == team)) {
-					ClearEnemy ( enemyDead );
-				}
+			if ( enemyEnt->health <= 0 ) {
+				EnemyDead();
 			}
 		}
 
-		// Action time is stopped when the torso is not idle
-		if ( !aifl.action ) {
-			actionTime += gameLocal.msec;
-		}
+	    //HUMANHEAD: aob - vehicle updates our viewAxis
+	    if( !InVehicle() ) {
+		    current_yaw += deltaViewAngles.yaw;
+		    ideal_yaw = idMath::AngleNormalize180( ideal_yaw + deltaViewAngles.yaw );
+		    deltaViewAngles.Zero();
+		    viewAxis = idAngles( 0, current_yaw, 0 ).ToMat3();
+	    }
+	    //HUMANHEAD END
 
-		ValidateCover();
-
-		move.current_yaw += deltaViewAngles.yaw;
-		move.ideal_yaw = idMath::AngleNormalize180( move.ideal_yaw + deltaViewAngles.yaw );
-		deltaViewAngles.Zero();
-
-		if( move.moveType != MOVETYPE_PLAYBACK ){
-			viewAxis = idAngles( 0, move.current_yaw, 0 ).ToMat3();
-		}
-
-		if ( !move.fl.allowHiddenMove && IsHidden() ) {
+		if ( num_cinematics ) {
+			if ( !IsHidden() && torsoAnim.AnimDone( 0 ) ) {
+				PlayCinematic();
+			}
+			RunPhysics();
+		} else if ( !allowHiddenMovement && IsHidden() ) {
 			// hidden monsters
-			UpdateStates ();
-		} else if( !ai_freeze.GetBool() ) {
-			Prethink(); 
+			UpdateAIScript();
+		// HUMANHEAD pdm: Vehicle support
+		} else if ( InVehicle() ) {
+			UpdateScript();			
+			//GetVehicleInterface()->UpdateCommands();			
+			UpdateAnimState();
+		// HUMANHEAD END
 
+		} else {
 			// clear the ik before we do anything else so the skeleton doesn't get updated twice
 			walkIK.ClearJointMods();
 
-			// update enemy position if not dead
-			if ( !aifl.dead ) {
-				UpdateEnemy ( );
-			}
+		    // HUMANHEAD NLA
+		    physicsObj.ResetNumTouchEnt(0);
+		    // HUMANHEAD END
+			switch( move.moveType ) {
+			case MOVETYPE_DEAD :
+				// dead monsters
+				UpdateAIScript();
+				DeadMove();
+				break;
 
-			// update state machine
-			UpdateStates();
-
-			// run all movement commands
-			Move();
-
-			// if not dead, chatter and blink
-			if( move.moveType != MOVETYPE_DEAD ){
-				UpdateChatter();
+			case MOVETYPE_FLY :
+				// flying monsters
+                                // HUMANHEAD JRM
+				//UpdateEnemyPosition();
+				UpdateAIScript();
+				FlyMove();
+				PlayChatter();
 				CheckBlink();
-			}
+				break;
 
-			Postthink();
-		} else {
-			DrawTactical ( );
+			case MOVETYPE_STATIC :
+				// static monsters
+                                // HUMANHEAD JRM
+				//UpdateEnemyPosition();
+				UpdateAIScript();
+				StaticMove();
+				PlayChatter();
+				CheckBlink();
+				break;
+
+			case MOVETYPE_ANIM :
+				// animation based movement
+                                // HUMANHEAD JRM
+				//UpdateEnemyPosition();
+				UpdateAIScript();
+				AnimMove();
+				PlayChatter();
+				CheckBlink();
+				break;
+
+			case MOVETYPE_SLIDE :
+				// velocity based movement
+                                // HUMANHEAD JRM
+				//UpdateEnemyPosition();
+				UpdateAIScript();
+				SlideMove();
+				PlayChatter();
+				CheckBlink();
+				break;
+			}
+		    // HUMANHEAD NLA
+		    ClientImpacts();
+		    // HUMANHEAD END
 		}
 
 		// clear pain flag so that we recieve any damage between now and the next time we run the script
-		aifl.pain = false;
-		aifl.damage = false;
-		aifl.pushed = false;
-		pusher = NULL;
+		AI_PAIN = false;
+		AI_SPECIAL_DAMAGE = 0;
+		AI_PUSHED = false;
 	} else if ( thinkFlags & TH_PHYSICS ) {
 		RunPhysics();
 	}
 
-	if ( move.fl.allowPushMovables ) {
+	// HUMANHEAD jrm - need to call ticker function per aaron
+	if (thinkFlags & TH_TICKER) {
+		Ticker();
+	}
+
+	if ( af_push_moveables ) {
 		PushWithAF();
 	}
 
-	if ( fl.hidden && move.fl.allowHiddenMove ) {
+	if ( fl.hidden && allowHiddenMovement ) {
 		// UpdateAnimation won't call frame commands when hidden, so call them here when we allow hidden movement
 		animator.ServiceAnims( gameLocal.previousTime, gameLocal.time );
 	}
+/*	this still draws in retail builds.. not sure why.. don't care at this point.
+	if ( !aas && developer.GetBool() && !fl.hidden && !num_cinematics ) {
+		gameRenderWorld->DrawText( "No AAS", physicsObj.GetAbsBounds().GetCenter(), 0.1f, colorWhite, gameLocal.GetLocalPlayer()->viewAngles.ToMat3(), 1, gameLocal.msec );
+	}
+*/
 
-	aasSensor->Update();
-
+	UpdateMuzzleFlash();
 	UpdateAnimation();
+	UpdateParticles();
 	Present();
+	UpdateDamageEffects();
 	LinkCombat();
-
-	// AI Speeds
-	if ( ai_speeds.GetBool ( ) ) {
-		aiManager.timerThink.Stop ( );
-	}
 }
 
+/***********************************************************************
+
+	AI script state management
+
+***********************************************************************/
+
 /*
-============
-idAI::UpdateFocus
-============
+=====================
+idAI::LinkScriptVariables
+=====================
 */
-void idAI::UpdateFocus ( const idMat3& orientationAxis ) {	
-	// Alwasy look at enemy	
-	if ( !allowJointMod || !allowEyeFocus ) {
-		SetFocus ( AIFOCUS_NONE, 0 );
-	} else if ( IsBehindCover() && !aifl.action && !IsSpeaking() ) {
-		SetFocus ( AIFOCUS_NONE, 0 );
-	} else if ( !aifl.scripted && (IsEnemyRecentlyVisible(2.0f) || gameLocal.GetTime()-lastAttackTime<1000) ) {
-		//not scripted and: have an enemy OR we shot at an enemy recently (for when we kill an enemy in the middle of a volley)
-		SetFocus ( AIFOCUS_ENEMY, 1000 );
-	} else if ( move.fl.moving && InCoverMode ( ) && DistanceTo ( aasSensor->ReservedOrigin() ) < move.walkRange * 2.0f ) {
-		SetFocus ( AIFOCUS_COVER, 1000 );
-	} else if ( InLookAtCoverMode() ) {
-		SetFocus ( AIFOCUS_COVERLOOK, 1000 );
-	} else if ( talkTarget && gameLocal.time < passive.talkTime ) {
-		SetFocus ( AIFOCUS_TALK, 100 );
-	} else if ( lookTarget ) {
-		SetFocus ( AIFOCUS_TARGET, 100 );
-	} else if ( !IsBehindCover() && tether && DistanceTo ( move.moveDest ) < move.walkRange * 2.0f ) {
-		SetFocus ( AIFOCUS_TETHER, 100 );
-	} else if ( IsTethered() && (move.fl.moving || IsBehindCover()) ) {
-		//tethered and at cover or moving - don't look at leader or player
-		SetFocus ( AIFOCUS_NONE, 0 );
-	} else if ( helperCurrent && helperCurrent->IsCombat ( ) ) {
-		SetFocus ( AIFOCUS_HELPER, 100 );		
-	} else if ( !aifl.scripted && !move.fl.moving ) {
-		idEntity*	lookat   = NULL;
-		aiFocus_t	newfocus = AIFOCUS_NONE;
-		
-		if ( leader ) {
-			idVec3 dir2Leader = leader->GetPhysics()->GetOrigin()-GetPhysics()->GetOrigin();
-			if ( (viewAxis[0] * dir2Leader) > 0.0f ) {
-				//leader is in front of me
-				newfocus  = AIFOCUS_LEADER;
-				lookat	  = leader;
-			} else if ( focusType == AIFOCUS_LEADER ) {
-				//stop looking at him!
-				SetFocus ( AIFOCUS_NONE, 0 );
-			}
-		} else if ( aifl.lookAtPlayer && !move.fl.moving ) {
-			newfocus  = AIFOCUS_PLAYER;
-			lookat	  = gameLocal.GetLocalPlayer();
-		}
-		
-		if ( newfocus != AIFOCUS_NONE && lookat ) {
-			if ( DistanceTo ( lookat ) < focusRange * (move.fl.moving?2.0f:1.0f) && CheckFOV ( lookat->GetPhysics()->GetOrigin() ) ) {
-				SetFocus ( newfocus, 1000 );
-			}		
-		}
-	}	
-	
-	// Make sure cover look wasnt invalidated	
-	if ( focusType == AIFOCUS_COVERLOOK && !aasSensor->Look() ) {
-		focusType = AIFOCUS_NONE;
-	} else if ( focusType == AIFOCUS_COVER && !aasSensor->Reserved ( ) ) {
-		focusType = AIFOCUS_NONE;
-	} else if ( focusType == AIFOCUS_HELPER && !helperCurrent ) {
-		focusType = AIFOCUS_NONE;
-	} else if ( focusType == AIFOCUS_TETHER && !tether ) {
-		focusType = AIFOCUS_NONE;
-	}
-	
-	// Update focus type to none when the focus time runs out
-	if ( focusType != AIFOCUS_NONE ) {
-		if ( gameLocal.time > focusTime ) {
-			focusType = AIFOCUS_NONE;
-		}	
-	}
-
-	// Calculate the focus position
-	if ( focusType == AIFOCUS_NONE ) {
-		currentFocusPos = GetEyePosition() + orientationAxis[ 0 ] * 64.0f;
-	} else if ( focusType == AIFOCUS_COVER ) {
-		currentFocusPos = GetEyePosition() + aasSensor->Reserved()->Normal() * 64.0f;
-	} else if ( focusType == AIFOCUS_COVERLOOK ) {
-		currentFocusPos = GetEyePosition() + aasSensor->Look()->Normal() * 64.0f;
-	} else if ( focusType == AIFOCUS_ENEMY ) {
-		currentFocusPos = enemy.lastVisibleEyePosition;
-	} else if ( focusType == AIFOCUS_HELPER ) {
-		currentFocusPos = helperCurrent->GetPhysics()->GetOrigin() + helperCurrent->GetDirection ( this );
-	} else if ( focusType == AIFOCUS_TETHER ) {
-		currentFocusPos = GetEyePosition() + tether->GetPhysics()->GetAxis()[0] * 64.0f;
-	} else { 
-		idEntity* focusEnt = NULL;
-		switch ( focusType ) {
-			case AIFOCUS_LEADER:		focusEnt = leader;						break;
-			case AIFOCUS_PLAYER:		focusEnt = gameLocal.GetLocalPlayer();	break;
-			case AIFOCUS_TALK:			focusEnt = talkTarget;					break;
-			case AIFOCUS_TARGET:		focusEnt = lookTarget;					break;
-		}
-		if ( focusEnt ) {
-			if ( focusEnt->IsType ( idActor::GetClassType ( ) ) ) {
-				currentFocusPos = static_cast<idActor*>(focusEnt)->GetEyePosition() - eyeVerticalOffset * focusEnt->GetPhysics()->GetGravityNormal();
-			} else {
-				currentFocusPos = focusEnt->GetPhysics()->GetOrigin();
-			}
-		} else { 
-			currentFocusPos = GetEyePosition() + orientationAxis[ 0 ] * 64.0f;
-		}
-	}
-
-	//draw it so we can see what they think they're looking at!
-	if ( DebugFilter(ai_debugMove) ) { // Cyan & Blue = currentFocusPos
-		if ( focusType != AIFOCUS_NONE ) {
-			gameRenderWorld->DebugArrow( colorCyan, GetEyePosition(), currentFocusPos, 0 );
-		} else {
-			gameRenderWorld->DebugArrow( colorBlue, GetEyePosition(), currentFocusPos, 0 );
-		}
-	}
+void idAI::LinkScriptVariables( void ) {
+	AI_TALK.LinkTo(				scriptObject, "AI_TALK" );
+	AI_DAMAGE.LinkTo(			scriptObject, "AI_DAMAGE" );
+	AI_PAIN.LinkTo(				scriptObject, "AI_PAIN" );
+	AI_SPECIAL_DAMAGE.LinkTo(	scriptObject, "AI_SPECIAL_DAMAGE" );
+	AI_DEAD.LinkTo(				scriptObject, "AI_DEAD" );
+	AI_ENEMY_VISIBLE.LinkTo(	scriptObject, "AI_ENEMY_VISIBLE" );
+	AI_ENEMY_IN_FOV.LinkTo(		scriptObject, "AI_ENEMY_IN_FOV" );
+	AI_ENEMY_DEAD.LinkTo(		scriptObject, "AI_ENEMY_DEAD" );
+	AI_MOVE_DONE.LinkTo(		scriptObject, "AI_MOVE_DONE" );
+	AI_ONGROUND.LinkTo(			scriptObject, "AI_ONGROUND" );
+	AI_ACTIVATED.LinkTo(		scriptObject, "AI_ACTIVATED" );
+	AI_FORWARD.LinkTo(			scriptObject, "AI_FORWARD" );
+	AI_JUMP.LinkTo(				scriptObject, "AI_JUMP" );
+	AI_ENEMY_REACHABLE.LinkTo(	scriptObject, "AI_ENEMY_REACHABLE" );
+	AI_BLOCKED.LinkTo(			scriptObject, "AI_BLOCKED" );
+	AI_DEST_UNREACHABLE.LinkTo( scriptObject, "AI_DEST_UNREACHABLE" );
+	AI_HIT_ENEMY.LinkTo(		scriptObject, "AI_HIT_ENEMY" );
+	AI_OBSTACLE_IN_PATH.LinkTo(	scriptObject, "AI_OBSTACLE_IN_PATH" );
+	AI_PUSHED.LinkTo(			scriptObject, "AI_PUSHED" );	
 }
 
 /*
 =====================
-idAI::UpdateStates
+idAI::UpdateAIScript
 =====================
 */
-void idAI::UpdateStates ( void ) {
-	MEM_SCOPED_TAG(tag,MA_DEFAULT);
-
-	// Continue updating tactical state if for some reason we dont have one 
-	if ( !aifl.dead && !aifl.scripted && !aifl.action && stateThread.IsIdle ( ) && aifl.scriptedEndWithIdle ) {
-		UpdateTactical ( 0 );
-	} else {
-		UpdateState();
-	}
+void idAI::UpdateAIScript( void ) {
+	UpdateScript();
 
 	// clear the hit enemy flag so we catch the next time we hit someone
-	aifl.hitEnemy = false;
+	AI_HIT_ENEMY = false;
 
-	if ( move.fl.allowHiddenMove || !IsHidden() ) {
+	if ( allowHiddenMovement || !IsHidden() ) {
 		// update the animstate if we're not hidden
 		UpdateAnimState();
 	}
 }
 
-/*
-=====================
-idAI::OnStateChange
-=====================
-*/
-void idAI::OnStateChange ( int channel ) {
-}
+/***********************************************************************
+
+	navigation
+
+***********************************************************************/
 
 /*
-=====================
-idAI::OverrideFlag
-=====================
+============
+idAI::KickObstacles
+============
 */
-void idAI::OverrideFlag ( aiFlagOverride_t flag, bool value ) {
-	bool oldValue;
-	
-	switch ( flag ) {
-		case AIFLAGOVERRIDE_DISABLEPAIN:	oldValue = disablePain;				break;
-		case AIFLAGOVERRIDE_DAMAGE:			oldValue = fl.takedamage;			break;
-		case AIFLAGOVERRIDE_NOTURN:			oldValue = move.fl.noTurn;		break;
-		case AIFLAGOVERRIDE_NOGRAVITY:		oldValue = move.fl.noGravity;	break;
-		default:
-			return;
-	}
+void idAI::KickObstacles( const idVec3 &dir, float force, idEntity *alwaysKick ) {
+	int i, numListedClipModels;
+	idBounds clipBounds;
+	idEntity *obEnt;
+	idClipModel *clipModel;
+	idClipModel *clipModelList[ MAX_GENTITIES ];
+	int clipmask;
+	idVec3 org;
+	idVec3 forceVec;
+	idVec3 delta;
+	idVec2 perpendicular;
 
-	if ( oldValue == value ) {
-		return;
-	}
-	
-	int flagOverride		= 1 << (flag * 2);
-	int flagOverrideValue	= 1 << ((flag * 2) + 1);
-	
-	if ( (flagOverrides & flagOverride) && !!(flagOverrides & flagOverrideValue) == value ) {
-		flagOverrides &= ~flagOverride;
-	} else {
-		if ( oldValue ) {
-			flagOverrides |= flagOverrideValue;
-		} else {
-			flagOverrides &= ~flagOverrideValue;
+	org = physicsObj.GetOrigin();
+
+	// find all possible obstacles
+	clipBounds = physicsObj.GetAbsBounds();
+	clipBounds.TranslateSelf( dir * 32.0f );
+	clipBounds.ExpandSelf( 8.0f );
+	clipBounds.AddPoint( org );
+	clipmask = physicsObj.GetClipMask();
+	numListedClipModels = gameLocal.clip.ClipModelsTouchingBounds( clipBounds, clipmask, clipModelList, MAX_GENTITIES );
+	for ( i = 0; i < numListedClipModels; i++ ) {
+		clipModel = clipModelList[i];
+		obEnt = clipModel->GetEntity();
+		if ( obEnt == alwaysKick ) {
+			// we'll kick this one outside the loop
+			continue;
 		}
-		flagOverrides |= flagOverride;
+
+		if ( !clipModel->IsTraceModel() ) {
+			continue;
+		}
+
+		if ( obEnt->IsType( idMoveable::Type ) && obEnt->GetPhysics()->IsPushable() ) {
+			delta = obEnt->GetPhysics()->GetOrigin() - org;
+			delta.NormalizeFast();
+			perpendicular.x = -delta.y;
+			perpendicular.y = delta.x;
+			delta.z += 0.5f;
+			delta.ToVec2() += perpendicular * gameLocal.random.CRandomFloat() * 0.5f;
+			forceVec = delta * force * obEnt->GetPhysics()->GetMass();
+			obEnt->ApplyImpulse( this, 0, obEnt->GetPhysics()->GetOrigin(), forceVec );
+		}
 	}
-	
-	switch ( flag ) {
-		case AIFLAGOVERRIDE_DISABLEPAIN:	disablePain = value;			break;
-		case AIFLAGOVERRIDE_DAMAGE:			fl.takedamage = value;			break;
-		case AIFLAGOVERRIDE_NOTURN:			move.fl.noTurn = value;		break;
-		case AIFLAGOVERRIDE_NOGRAVITY:		move.fl.noGravity = value;	break;
+
+	if ( alwaysKick ) {
+		delta = alwaysKick->GetPhysics()->GetOrigin() - org;
+		delta.NormalizeFast();
+		perpendicular.x = -delta.y;
+		perpendicular.y = delta.x;
+		delta.z += 0.5f;
+		delta.ToVec2() += perpendicular * gameLocal.random.CRandomFloat() * 0.5f;
+		forceVec = delta * force * alwaysKick->GetPhysics()->GetMass();
+		alwaysKick->ApplyImpulse( this, 0, alwaysKick->GetPhysics()->GetOrigin(), forceVec );
+	}
+}
+
+/*
+============
+ValidForBounds
+============
+*/
+bool ValidForBounds( const idAASSettings *settings, const idBounds &bounds ) {
+	int i;
+
+	for ( i = 0; i < 3; i++ ) {
+		if ( bounds[0][i] < settings->boundingBoxes[0][0][i] ) {
+			return false;
+		}
+		if ( bounds[1][i] > settings->boundingBoxes[0][1][i] ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+=====================
+idAI::SetAAS
+=====================
+*/
+void idAI::SetAAS( void ) {
+	idStr use_aas;
+
+	spawnArgs.GetString( "use_aas", NULL, use_aas );
+	aas = gameLocal.GetAAS( use_aas );
+	if ( aas ) {
+		const idAASSettings *settings = aas->GetSettings();
+		if ( settings ) {
+			if ( !ValidForBounds( settings, physicsObj.GetBounds() ) ) {
+				gameLocal.Error( "%s cannot use use_aas %s\n", name.c_str(), use_aas.c_str() );
+			}
+			float height = settings->maxStepHeight;
+			physicsObj.SetMaxStepHeight( height );
+			return;
+		} else {
+			aas = NULL;
+		}
+	}
+	// HUMANHEAD pdm: Applied our override for creatures that don't use AAS
+	if ( spawnArgs.GetBool("noaas_warning", "1") ) {
+		gameLocal.DPrintf( "AI '%s' has no AAS file\n", name.c_str() );
 	}
 }
 
 /*
 =====================
-idAI::RestoreFlag
+idAI::DrawRoute
 =====================
 */
-void idAI::RestoreFlag ( aiFlagOverride_t flag ) {
-	int flagOverride		= 1 << (flag * 2);
-	int flagOverrideValue	= 1 << ((flag * 2) + 1);
-	bool value;
+void idAI::DrawRoute( void ) const {
+	if ( aas && move.toAreaNum && move.moveCommand != MOVE_NONE && move.moveCommand != MOVE_WANDER && move.moveCommand != MOVE_FACE_ENEMY && move.moveCommand != MOVE_FACE_ENTITY && move.moveCommand != MOVE_TO_POSITION_DIRECT ) {
+		if ( move.moveType == MOVETYPE_FLY ) {
+			aas->ShowFlyPath( physicsObj.GetOrigin(), move.toAreaNum, move.moveDest );
+		} else {
+			aas->ShowWalkPath( physicsObj.GetOrigin(), move.toAreaNum, move.moveDest );
+		}
+	}
+}
+
+/*
+=====================
+idAI::ReachedPos
+=====================
+*/
+bool idAI::ReachedPos( const idVec3 &pos, const moveCommand_t moveCommand ) const {
+	if ( move.moveType == MOVETYPE_SLIDE ) {
+		idBounds bnds( idVec3( -4, -4.0f, -8.0f ), idVec3( 4.0f, 4.0f, 64.0f ) );
+		bnds.TranslateSelf( physicsObj.GetOrigin() );	
+		if ( bnds.ContainsPoint( pos ) ) {
+			return true;
+		}
+	} else {
+		if ( ( moveCommand == MOVE_TO_ENEMY ) || ( moveCommand == MOVE_TO_ENTITY ) ) {
+			if ( physicsObj.GetAbsBounds().IntersectsBounds( idBounds( pos ).Expand( 8.0f ) ) ) {
+				return true;
+			}
+		} else {
+			idBounds bnds( idVec3( -16.0, -16.0f, -8.0f ), idVec3( 16.0, 16.0f, 64.0f ) );
+			bnds.TranslateSelf( physicsObj.GetOrigin() );	
+			if ( bnds.ContainsPoint( pos ) ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/*
+=====================
+idAI::PointReachableAreaNum
+=====================
+*/
+int idAI::PointReachableAreaNum( const idVec3 &pos, const float boundsScale ) const {
+	int areaNum;
+	idVec3 size;
+	idBounds bounds;
+
+	if ( !aas ) {
+		return 0;
+	}
+
+	size = aas->GetSettings()->boundingBoxes[0][1] * boundsScale;
+	bounds[0] = -size;
+	size.z = 32.0f;
+	bounds[1] = size;
+
+	if ( move.moveType == MOVETYPE_FLY ) {
+		areaNum = aas->PointReachableAreaNum( pos, bounds, AREA_REACHABLE_WALK | AREA_REACHABLE_FLY );
+	} else {
+		areaNum = aas->PointReachableAreaNum( pos, bounds, AREA_REACHABLE_WALK );
+	}
+
+	return areaNum;
+}
+
+/*
+=====================
+idAI::PathToGoal
+=====================
+*/
+bool idAI::PathToGoal( aasPath_t &path, int areaNum, const idVec3 &origin, int goalAreaNum, const idVec3 &goalOrigin ) const {
+	idVec3 org;
+	idVec3 goal;
+
+	if ( !aas ) {
+		return false;
+	}
+
+	org = origin;
+	aas->PushPointIntoAreaNum( areaNum, org );
+	if ( !areaNum ) {
+		return false;
+	}
+
+	goal = goalOrigin;
+	aas->PushPointIntoAreaNum( goalAreaNum, goal );
+	if ( !goalAreaNum ) {
+		return false;
+	}
+
+	if ( move.moveType == MOVETYPE_FLY ) {
+		return aas->FlyPathToGoal( path, areaNum, org, goalAreaNum, goal, travelFlags );
+	} else {
+		return aas->WalkPathToGoal( path, areaNum, org, goalAreaNum, goal, travelFlags );
+	}
+}
+
+/*
+=====================
+idAI::TravelDistance
+
+Returns the approximate travel distance from one position to the goal, or if no AAS, the straight line distance.
+
+This is feakin' slow, so it's not good to do it too many times per frame.  It also is slower the further you
+are from the goal, so try to break the goals up into shorter distances.
+=====================
+*/
+float idAI::TravelDistance( const idVec3 &start, const idVec3 &end ) const {
+	int			fromArea;
+	int			toArea;
+	float		dist;
+	idVec2		delta;
+	aasPath_t	path;
+
+	if ( !aas ) {
+		// no aas, so just take the straight line distance
+		delta = end.ToVec2() - start.ToVec2();
+		dist = delta.LengthFast();
+
+		if ( ai_debugMove.GetBool() ) {
+			gameRenderWorld->DebugLine( colorBlue, start, end, gameLocal.msec, false );
+			gameRenderWorld->DrawText( va( "%d", ( int )dist ), ( start + end ) * 0.5f, 0.1f, colorWhite, gameLocal.GetLocalPlayer()->viewAngles.ToMat3() );
+		}
+
+		return dist;
+	}
+
+	fromArea = PointReachableAreaNum( start );
+	toArea = PointReachableAreaNum( end );
+
+	if ( !fromArea || !toArea ) {
+		// can't seem to get there
+		return -1;
+	}
+
+	if ( fromArea == toArea ) {
+		// same area, so just take the straight line distance
+		delta = end.ToVec2() - start.ToVec2();
+		dist = delta.LengthFast();
+
+		if ( ai_debugMove.GetBool() ) {
+			gameRenderWorld->DebugLine( colorBlue, start, end, gameLocal.msec, false );
+			gameRenderWorld->DrawText( va( "%d", ( int )dist ), ( start + end ) * 0.5f, 0.1f, colorWhite, gameLocal.GetLocalPlayer()->viewAngles.ToMat3() );
+		}
+
+		return dist;
+	}
+
+	idReachability *reach;
+	int travelTime;
+	if ( !aas->RouteToGoalArea( fromArea, start, toArea, travelFlags, travelTime, &reach ) ) {
+		return -1;
+	}
+
+	if ( ai_debugMove.GetBool() ) {
+		if ( move.moveType == MOVETYPE_FLY ) {
+			aas->ShowFlyPath( start, toArea, end );
+		} else {
+			aas->ShowWalkPath( start, toArea, end );
+		}
+	}
+
+	return travelTime;
+}
+
+/*
+=====================
+idAI::StopMove
+=====================
+*/
+void idAI::StopMove( moveStatus_t status ) {
+	AI_MOVE_DONE		= true;
+	AI_FORWARD			= false;
+	move.moveCommand	= MOVE_NONE;
+	move.moveStatus		= status;
+	move.toAreaNum		= 0;
+	move.goalEntity		= NULL;
+	move.moveDest		= physicsObj.GetOrigin();
+	AI_DEST_UNREACHABLE	= false;
+	AI_OBSTACLE_IN_PATH = false;
+	AI_BLOCKED			= false;
+	move.startTime		= gameLocal.time;
+	move.duration		= 0;
+	move.range			= 0.0f;
+	move.speed			= 0.0f;
+	move.anim			= 0;
+	move.moveDir.Zero();
+	move.lastMoveOrigin.Zero();
+	move.lastMoveTime	= gameLocal.time;
+	move.bEnemyBlocks	= false;  // HUMANHEAD mdl:  Added bEnemyBlocks flag
+}
+
+/*
+=====================
+idAI::FaceEnemy
+
+Continually face the enemy's last known position.  MoveDone is always true in this case.
+=====================
+*/
+bool idAI::FaceEnemy( void ) {
+	idActor *enemyEnt = enemy.GetEntity();
+	if ( !enemyEnt ) {
+		StopMove( MOVE_STATUS_DEST_NOT_FOUND );
+		return false;
+	}
+
+	TurnToward( lastVisibleEnemyPos );
+	move.goalEntity		= enemyEnt;
+	move.moveDest		= physicsObj.GetOrigin();
+	move.moveCommand	= MOVE_FACE_ENEMY;
+	move.moveStatus		= MOVE_STATUS_WAITING;
+	move.startTime		= gameLocal.time;
+	move.speed			= 0.0f;
+	AI_MOVE_DONE		= true;
+	// HUMANHEAD JRM - removed so we can move/face enemy at same time
+	//AI_FORWARD			= false;
+	AI_DEST_UNREACHABLE = false;
+
+	return true;
+}
+
+/*
+=====================
+idAI::FaceEntity
+
+Continually face the entity position.  MoveDone is always true in this case.
+=====================
+*/
+bool idAI::FaceEntity( idEntity *ent ) {
+	if ( !ent ) {
+		StopMove( MOVE_STATUS_DEST_NOT_FOUND );
+		return false;
+	}
+
+	idVec3 entityOrg = ent->GetPhysics()->GetOrigin();
+	TurnToward( entityOrg );
+	move.goalEntity		= ent;
+	move.moveDest		= physicsObj.GetOrigin();
+	move.moveCommand	= MOVE_FACE_ENTITY;
+	move.moveStatus		= MOVE_STATUS_WAITING;
+	move.startTime		= gameLocal.time;
+	move.speed			= 0.0f;
+	AI_MOVE_DONE		= true;
+	AI_FORWARD			= false;
+	AI_DEST_UNREACHABLE = false;
+
+	return true;
+}
+
+/*
+=====================
+idAI::DirectMoveToPosition
+=====================
+*/
+bool idAI::DirectMoveToPosition( const idVec3 &pos ) {
+	if ( ReachedPos( pos, move.moveCommand ) ) {
+		StopMove( MOVE_STATUS_DONE );
+		return true;
+	}
+
+	move.moveDest		= pos;
+	move.goalEntity		= NULL;
+	move.moveCommand	= MOVE_TO_POSITION_DIRECT;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.startTime		= gameLocal.time;
+	move.speed			= fly_speed;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= true;
+
+	if ( move.moveType == MOVETYPE_FLY ) {
+		idVec3 dir = pos - physicsObj.GetOrigin();
+		dir.Normalize();
+		dir *= fly_speed;
+		physicsObj.SetLinearVelocity( dir );
+	}
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveToEnemyHeight
+=====================
+*/
+bool idAI::MoveToEnemyHeight( void ) {
+	idActor	*enemyEnt = enemy.GetEntity();
+
+	if ( !enemyEnt || ( move.moveType != MOVETYPE_FLY ) ) {
+		StopMove( MOVE_STATUS_DEST_NOT_FOUND );
+		return false;
+	}
+
+	move.moveDest.z		= lastVisibleEnemyPos.z + enemyEnt->EyeOffset().z + fly_offset;
+	move.goalEntity		= enemyEnt;
+	move.moveCommand	= MOVE_TO_ENEMYHEIGHT;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.startTime		= gameLocal.time;
+	move.speed			= 0.0f;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= false;
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveToEnemy
+=====================
+*/
+bool idAI::MoveToEnemy( void ) {
+	int			areaNum;
+	aasPath_t	path;
+	idActor		*enemyEnt = enemy.GetEntity();
+
+	if ( !enemyEnt ) {
+		StopMove( MOVE_STATUS_DEST_NOT_FOUND );
+		return false;
+	}
+
+	if ( ReachedPos( lastVisibleReachableEnemyPos, MOVE_TO_ENEMY ) ) {
+		if ( !ReachedPos( lastVisibleEnemyPos, MOVE_TO_ENEMY ) || !AI_ENEMY_VISIBLE ) {
+			StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+			AI_DEST_UNREACHABLE = true;
+			return false;
+		}
+		StopMove( MOVE_STATUS_DONE );
+		return true;
+	}
+
+	idVec3 pos = lastVisibleReachableEnemyPos;
+
+	move.toAreaNum = 0;
+	if ( aas ) {
+		move.toAreaNum = PointReachableAreaNum( pos );
+		aas->PushPointIntoAreaNum( move.toAreaNum, pos );
+
+		areaNum	= PointReachableAreaNum( physicsObj.GetOrigin() );
+		if ( !PathToGoal( path, areaNum, physicsObj.GetOrigin(), move.toAreaNum, pos ) ) {
+			AI_DEST_UNREACHABLE = true;
+			return false;
+		}
+	}
+
+	if ( !move.toAreaNum ) {
+		// if only trying to update the enemy position
+		if ( move.moveCommand == MOVE_TO_ENEMY ) {
+			if ( !aas ) {
+				// keep the move destination up to date for wandering
+				move.moveDest = pos;
+			}
+			return false;
+		}
+
+		if ( !NewWanderDir( pos ) ) {
+			StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+			AI_DEST_UNREACHABLE = true;
+			return false;
+		}
+	}
+
+	if ( move.moveCommand != MOVE_TO_ENEMY ) {
+		move.moveCommand	= MOVE_TO_ENEMY;
+		move.startTime		= gameLocal.time;
+	}
+
+	move.moveDest		= pos;
+	move.goalEntity		= enemyEnt;
+	move.speed			= fly_speed;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= true;
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveToEntity
+=====================
+*/
+bool idAI::MoveToEntity( idEntity *ent ) {
+	int			areaNum;
+	aasPath_t	path;
+	idVec3		pos;
+
+	if ( !ent ) {
+		StopMove( MOVE_STATUS_DEST_NOT_FOUND );
+		return false;
+	}
+
+	pos = ent->GetPhysics()->GetOrigin();
 	
-	if ( !(flagOverrides&flagOverride) ) {
+	if ( ( move.moveType != MOVETYPE_FLY ) && ( ( move.moveCommand != MOVE_TO_ENTITY ) || ( move.goalEntityOrigin != pos ) ) ) {
+		ent->GetFloorPos( 64.0f, pos );
+	}
+
+	if ( ReachedPos( pos, MOVE_TO_ENTITY ) ) {
+		StopMove( MOVE_STATUS_DONE );
+		return true;
+	}
+
+	move.toAreaNum = 0;
+	if ( aas ) {
+		move.toAreaNum = PointReachableAreaNum( pos );
+		aas->PushPointIntoAreaNum( move.toAreaNum, pos );
+
+		areaNum	= PointReachableAreaNum( physicsObj.GetOrigin() );
+		if ( !PathToGoal( path, areaNum, physicsObj.GetOrigin(), move.toAreaNum, pos ) ) {
+			AI_DEST_UNREACHABLE = true;
+			return false;
+		}
+	}
+
+	if ( !move.toAreaNum ) {
+		// if only trying to update the entity position
+		if ( move.moveCommand == MOVE_TO_ENTITY ) {
+			if ( !aas ) {
+				// keep the move destination up to date for wandering
+				move.moveDest = pos;
+			}
+			return false;
+		}
+
+		if ( !NewWanderDir( pos ) ) {
+			StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+			AI_DEST_UNREACHABLE = true;
+			return false;
+		}
+	}
+
+	if ( ( move.moveCommand != MOVE_TO_ENTITY ) || ( move.goalEntity.GetEntity() != ent ) ) {
+		move.startTime		= gameLocal.time;
+		move.goalEntity		= ent;
+		move.moveCommand	= MOVE_TO_ENTITY;
+	}
+
+	move.moveDest			= pos;
+	move.goalEntityOrigin	= ent->GetPhysics()->GetOrigin();
+	move.moveStatus			= MOVE_STATUS_MOVING;
+	move.speed				= fly_speed;
+	AI_MOVE_DONE			= false;
+	AI_DEST_UNREACHABLE		= false;
+	AI_FORWARD				= true;
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveOutOfRange
+=====================
+*/
+bool idAI::MoveOutOfRange( idEntity *ent, float range ) {
+	int				areaNum;
+	aasObstacle_t	obstacle;
+	aasGoal_t		goal;
+	idBounds		bounds;
+	idVec3			pos;
+
+	if ( !aas || !ent ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	const idVec3 &org = physicsObj.GetOrigin();
+	areaNum	= PointReachableAreaNum( org );
+
+	// consider the entity the monster is getting close to as an obstacle
+	obstacle.absBounds = ent->GetPhysics()->GetAbsBounds();
+
+	if ( ent == enemy.GetEntity() ) {
+		pos = lastVisibleEnemyPos;
+	} else {
+		pos = ent->GetPhysics()->GetOrigin();
+	}
+
+	idAASFindAreaOutOfRange findGoal( pos, range );
+	if ( !aas->FindNearestGoal( goal, areaNum, org, pos, travelFlags, &obstacle, 1, findGoal ) ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	if ( ReachedPos( goal.origin, move.moveCommand ) ) {
+		StopMove( MOVE_STATUS_DONE );
+		return true;
+	}
+
+	move.moveDest		= goal.origin;
+	move.toAreaNum		= goal.areaNum;
+	move.goalEntity		= ent;
+	move.moveCommand	= MOVE_OUT_OF_RANGE;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.range			= range;
+	move.speed			= fly_speed;
+	move.startTime		= gameLocal.time;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= true;
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveToAttackPosition
+=====================
+*/
+bool idAI::MoveToAttackPosition( idEntity *ent, int attack_anim ) {
+	int				areaNum;
+	aasObstacle_t	obstacle;
+	aasGoal_t		goal;
+	idBounds		bounds;
+	idVec3			pos;
+
+	if ( !aas || !ent ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	const idVec3 &org = physicsObj.GetOrigin();
+	areaNum	= PointReachableAreaNum( org );
+
+	// consider the entity the monster is getting close to as an obstacle
+	obstacle.absBounds = ent->GetPhysics()->GetAbsBounds();
+
+	if ( ent == enemy.GetEntity() ) {
+		pos = lastVisibleEnemyPos;
+	} else {
+		pos = ent->GetPhysics()->GetOrigin();
+	}
+
+	idAASFindAttackPosition findGoal( this, physicsObj.GetGravityAxis(), ent, pos, missileLaunchOffset[ attack_anim ] );
+	if ( !aas->FindNearestGoal( goal, areaNum, org, pos, travelFlags, &obstacle, 1, findGoal ) ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	move.moveDest		= goal.origin;
+	move.toAreaNum		= goal.areaNum;
+	move.goalEntity		= ent;
+	move.moveCommand	= MOVE_TO_ATTACK_POSITION;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.speed			= fly_speed;
+	move.startTime		= gameLocal.time;
+	move.anim			= attack_anim;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= true;
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveToPosition
+=====================
+*/
+bool idAI::MoveToPosition( const idVec3 &pos, bool enemyBlocks ) { // HUMANHEAD mdl:  Added enemyBlocks flag
+	idVec3		org;
+	int			areaNum;
+	aasPath_t	path;
+
+	if ( ReachedPos( pos, move.moveCommand ) ) {
+		StopMove( MOVE_STATUS_DONE );
+		return true;
+	}
+
+	org = pos;
+	move.toAreaNum = 0;
+	if ( aas ) {
+		move.toAreaNum = PointReachableAreaNum( org );
+		aas->PushPointIntoAreaNum( move.toAreaNum, org );
+
+		areaNum	= PointReachableAreaNum( physicsObj.GetOrigin() );
+		if ( !PathToGoal( path, areaNum, physicsObj.GetOrigin(), move.toAreaNum, org ) ) {
+			StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+			AI_DEST_UNREACHABLE = true;
+			return false;
+		}
+	}
+
+	if ( !move.toAreaNum && !NewWanderDir( org ) ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	move.moveDest		= org;
+	move.goalEntity		= NULL;
+	move.moveCommand	= MOVE_TO_POSITION;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.startTime		= gameLocal.time;
+	move.speed			= fly_speed;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= true;
+	move.bEnemyBlocks	= enemyBlocks; // HUMANHEAD mdl:  Added enemyBlocks flag
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveToCover
+=====================
+*/
+bool idAI::MoveToCover( idEntity *entity, const idVec3 &hideFromPos ) {
+	int				areaNum;
+	aasObstacle_t	obstacle;
+	aasGoal_t		hideGoal;
+	idBounds		bounds;
+
+	if ( !aas || !entity ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	const idVec3 &org = physicsObj.GetOrigin();
+	areaNum	= PointReachableAreaNum( org );
+
+	// consider the entity the monster tries to hide from as an obstacle
+	obstacle.absBounds = entity->GetPhysics()->GetAbsBounds();
+
+	idAASFindCover findCover( hideFromPos );
+	if ( !aas->FindNearestGoal( hideGoal, areaNum, org, hideFromPos, travelFlags, &obstacle, 1, findCover ) ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	if ( ReachedPos( hideGoal.origin, move.moveCommand ) ) {
+		StopMove( MOVE_STATUS_DONE );
+		return true;
+	}
+
+	move.moveDest		= hideGoal.origin;
+	move.toAreaNum		= hideGoal.areaNum;
+	move.goalEntity		= entity;
+	move.moveCommand	= MOVE_TO_COVER;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.startTime		= gameLocal.time;
+	move.speed			= fly_speed;
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= true;
+
+	return true;
+}
+
+/*
+=====================
+idAI::SlideToPosition
+=====================
+*/
+bool idAI::SlideToPosition( const idVec3 &pos, float time ) {
+	StopMove( MOVE_STATUS_DONE );
+
+	move.moveDest		= pos;
+	move.goalEntity		= NULL;
+	move.moveCommand	= MOVE_SLIDE_TO_POSITION;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.startTime		= gameLocal.time;
+	move.duration		= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( time ) );
+	AI_MOVE_DONE		= false;
+	AI_DEST_UNREACHABLE = false;
+	AI_FORWARD			= false;
+
+	if ( move.duration > 0 ) {
+		move.moveDir = ( pos - physicsObj.GetOrigin() ) / MS2SEC( move.duration );
+		if ( move.moveType != MOVETYPE_FLY ) {
+			move.moveDir.z = 0.0f;
+		}
+		move.speed = move.moveDir.LengthFast();
+	}
+
+	return true;
+}
+
+/*
+=====================
+idAI::WanderAround
+=====================
+*/
+bool idAI::WanderAround( void ) {
+	StopMove( MOVE_STATUS_DONE );
+	
+	move.moveDest = physicsObj.GetOrigin() + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 256.0f;
+	if ( !NewWanderDir( move.moveDest ) ) {
+		StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+		AI_DEST_UNREACHABLE = true;
+		return false;
+	}
+
+	move.moveCommand	= MOVE_WANDER;
+	move.moveStatus		= MOVE_STATUS_MOVING;
+	move.startTime		= gameLocal.time;
+	move.speed			= fly_speed;
+	AI_MOVE_DONE		= false;
+	AI_FORWARD			= true;
+
+	return true;
+}
+
+/*
+=====================
+idAI::MoveDone
+=====================
+*/
+bool idAI::MoveDone( void ) const {
+	return ( move.moveCommand == MOVE_NONE );
+}
+
+/*
+================
+idAI::StepDirection
+================
+*/
+bool idAI::StepDirection( float dir ) {
+	predictedPath_t path;
+	idVec3 org;
+
+	move.wanderYaw = dir;
+	move.moveDir = idAngles( 0, move.wanderYaw, 0 ).ToForward();
+
+	org = physicsObj.GetOrigin();
+
+	idAI::PredictPath( this, aas, org, move.moveDir * 48.0f, 1000, 1000, ( move.moveType == MOVETYPE_FLY ) ? SE_BLOCKED : ( SE_ENTER_OBSTACLE | SE_BLOCKED | SE_ENTER_LEDGE_AREA ), path );
+
+	if ( path.blockingEntity && ( ( move.moveCommand == MOVE_TO_ENEMY ) || ( move.moveCommand == MOVE_TO_ENTITY ) ) && ( path.blockingEntity == move.goalEntity.GetEntity() ) ) {
+		// don't report being blocked if we ran into our goal entity
+		return true;
+	}
+
+	if ( ( move.moveType == MOVETYPE_FLY ) && ( path.endEvent == SE_BLOCKED ) ) {
+		float z;
+
+		move.moveDir = path.endVelocity * 1.0f / 48.0f;
+
+		// trace down to the floor and see if we can go forward
+		idAI::PredictPath( this, aas, org, idVec3( 0.0f, 0.0f, -1024.0f ), 1000, 1000, SE_BLOCKED, path );
+
+		idVec3 floorPos = path.endPos;
+		idAI::PredictPath( this, aas, floorPos, move.moveDir * 48.0f, 1000, 1000, SE_BLOCKED, path );
+		if ( !path.endEvent ) {
+			move.moveDir.z = -1.0f;
+			return true;
+		}
+
+		// trace up to see if we can go over something and go forward
+		idAI::PredictPath( this, aas, org, idVec3( 0.0f, 0.0f, 256.0f ), 1000, 1000, SE_BLOCKED, path );
+
+		idVec3 ceilingPos = path.endPos;
+
+		for( z = org.z; z <= ceilingPos.z + 64.0f; z += 64.0f ) {
+			idVec3 start;
+			if ( z <= ceilingPos.z ) {
+				start.x = org.x;
+				start.y = org.y;
+                start.z = z;
+			} else {
+				start = ceilingPos;
+			}
+			idAI::PredictPath( this, aas, start, move.moveDir * 48.0f, 1000, 1000, SE_BLOCKED, path );
+			if ( !path.endEvent ) {
+				move.moveDir.z = 1.0f;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	return ( path.endEvent == 0 );
+}
+
+/*
+================
+idAI::NewWanderDir
+================
+*/
+bool idAI::NewWanderDir( const idVec3 &dest ) {
+	float	deltax, deltay;
+	float	d[ 3 ];
+	float	tdir, olddir, turnaround;
+
+	move.nextWanderTime = gameLocal.time + ( gameLocal.random.RandomFloat() * 500 + 500 );
+
+	olddir = idMath::AngleNormalize360( ( int )( current_yaw / 45 ) * 45 );
+	turnaround = idMath::AngleNormalize360( olddir - 180 );
+
+	idVec3 org = physicsObj.GetOrigin();
+	deltax = dest.x - org.x;
+	deltay = dest.y - org.y;
+	if ( deltax > 10 ) {
+		d[ 1 ]= 0;
+	} else if ( deltax < -10 ) {
+		d[ 1 ] = 180;
+	} else {
+		d[ 1 ] = DI_NODIR;
+	}
+
+	if ( deltay < -10 ) {
+		d[ 2 ] = 270;
+	} else if ( deltay > 10 ) {
+		d[ 2 ] = 90;
+	} else {
+		d[ 2 ] = DI_NODIR;
+	}
+
+	// try direct route
+	if ( d[ 1 ] != DI_NODIR && d[ 2 ] != DI_NODIR ) {
+		if ( d[ 1 ] == 0 ) {
+			tdir = d[ 2 ] == 90 ? 45 : 315;
+		} else {
+			tdir = d[ 2 ] == 90 ? 135 : 215;
+		}
+
+		if ( tdir != turnaround && StepDirection( tdir ) ) {
+			return true;
+		}
+	}
+
+	// try other directions
+	if ( ( gameLocal.random.RandomInt() & 1 ) || abs( deltay ) > abs( deltax ) ) {
+		tdir = d[ 1 ];
+		d[ 1 ] = d[ 2 ];
+		d[ 2 ] = tdir;
+	}
+
+	if ( d[ 1 ] != DI_NODIR && d[ 1 ] != turnaround && StepDirection( d[1] ) ) {
+		return true;
+	}
+
+	if ( d[ 2 ] != DI_NODIR && d[ 2 ] != turnaround	&& StepDirection( d[ 2 ] ) ) {
+		return true;
+	}
+
+	// there is no direct path to the player, so pick another direction
+	if ( olddir != DI_NODIR && StepDirection( olddir ) ) {
+		return true;
+	}
+
+	 // randomly determine direction of search
+	if ( gameLocal.random.RandomInt() & 1 ) {
+		for( tdir = 0; tdir <= 315; tdir += 45 ) {
+			if ( tdir != turnaround && StepDirection( tdir ) ) {
+                return true;
+			}
+		}
+	} else {
+		for ( tdir = 315; tdir >= 0; tdir -= 45 ) {
+			if ( tdir != turnaround && StepDirection( tdir ) ) {
+				return true;
+			}
+		}
+	}
+
+	if ( turnaround != DI_NODIR && StepDirection( turnaround ) ) {
+		return true;
+	}
+
+	// can't move
+	StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+	return false;
+}
+
+/*
+=====================
+idAI::GetMovePos
+=====================
+*/
+bool idAI::GetMovePos( idVec3 &seekPos ) {
+	int			areaNum;
+	aasPath_t	path;
+	bool		result;
+	idVec3		org;
+
+	org = physicsObj.GetOrigin();
+	seekPos = org;
+
+	switch( move.moveCommand ) {
+	case MOVE_NONE :
+		seekPos = move.moveDest;
+		return false;
+		break;
+
+	case MOVE_FACE_ENEMY :
+	case MOVE_FACE_ENTITY :
+		seekPos = move.moveDest;
+		return false;
+		break;
+
+	case MOVE_TO_POSITION_DIRECT :
+		seekPos = move.moveDest;
+		if ( ReachedPos( move.moveDest, move.moveCommand ) ) {
+			StopMove( MOVE_STATUS_DONE );
+		}
+		return false;
+		break;
+	
+	case MOVE_SLIDE_TO_POSITION :
+		seekPos = org;
+		return false;
+		break;
+	}
+
+	if ( move.moveCommand == MOVE_TO_ENTITY ) {
+		MoveToEntity( move.goalEntity.GetEntity() );
+	}
+
+	move.moveStatus = MOVE_STATUS_MOVING;
+	result = false;
+	if ( gameLocal.time > move.blockTime ) {
+		if ( move.moveCommand == MOVE_WANDER ) {
+			move.moveDest = org + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 256.0f;
+		} else {
+			if ( ReachedPos( move.moveDest, move.moveCommand ) ) {
+				StopMove( MOVE_STATUS_DONE );
+				seekPos	= org;
+				return false;
+			}
+		}
+
+		if ( aas && move.toAreaNum ) {
+			areaNum	= PointReachableAreaNum( org );
+			if ( PathToGoal( path, areaNum, org, move.toAreaNum, move.moveDest ) ) {
+				seekPos = path.moveGoal;
+				result = true;
+				move.nextWanderTime = 0;
+			} else {
+				AI_DEST_UNREACHABLE = true;
+			}
+		}
+	}
+
+	if ( !result ) {
+		// wander around
+		if ( ( gameLocal.time > move.nextWanderTime ) || !StepDirection( move.wanderYaw ) ) {
+			result = NewWanderDir( move.moveDest );
+			if ( !result ) {
+				StopMove( MOVE_STATUS_DEST_UNREACHABLE );
+				AI_DEST_UNREACHABLE = true;
+				seekPos	= org;
+				return false;
+			}
+		} else {
+			result = true;
+		}
+
+		seekPos = org + move.moveDir * 2048.0f;
+		if ( ai_debugMove.GetBool() ) {
+			gameRenderWorld->DebugLine( colorYellow, org, seekPos, gameLocal.msec, true );
+		}
+	} else {
+		AI_DEST_UNREACHABLE = false;
+	}
+
+	if ( result && ( ai_debugMove.GetBool() ) ) {
+		gameRenderWorld->DebugLine( colorCyan, physicsObj.GetOrigin(), seekPos );
+	}
+
+	return result;
+}
+
+/*
+=====================
+idAI::EntityCanSeePos
+=====================
+*/
+bool idAI::EntityCanSeePos( idActor *actor, const idVec3 &actorOrigin, const idVec3 &pos ) {
+	idVec3 eye, point;
+	trace_t results;
+	pvsHandle_t handle;
+
+	handle = gameLocal.pvs.SetupCurrentPVS( actor->GetPVSAreas(), actor->GetNumPVSAreas() );
+
+	if ( !gameLocal.pvs.InCurrentPVS( handle, GetPVSAreas(), GetNumPVSAreas() ) ) {
+		gameLocal.pvs.FreeCurrentPVS( handle );
+		return false;
+	}
+
+	gameLocal.pvs.FreeCurrentPVS( handle );
+
+	eye = actorOrigin + actor->EyeOffset();
+
+	point = pos;
+	point[2] += 1.0f;
+
+	physicsObj.DisableClip();
+
+	gameLocal.clip.TracePoint( results, eye, point, MASK_SOLID, actor );
+	if ( results.fraction >= 1.0f || ( gameLocal.GetTraceEntity( results ) == this ) ) {
+		physicsObj.EnableClip();
+		return true;
+	}
+
+	const idBounds &bounds = physicsObj.GetBounds();
+	point[2] += bounds[1][2] - bounds[0][2];
+
+	gameLocal.clip.TracePoint( results, eye, point, MASK_SOLID, actor );
+	physicsObj.EnableClip();
+	if ( results.fraction >= 1.0f || ( gameLocal.GetTraceEntity( results ) == this ) ) {
+		return true;
+	}
+	return false;
+}
+
+/*
+=====================
+idAI::BlockedFailSafe
+=====================
+*/
+void idAI::BlockedFailSafe( void ) {
+	if ( !ai_blockedFailSafe.GetBool() || blockedRadius < 0.0f ) {
 		return;
 	}
-	
-	value = !!(flagOverrides & flagOverrideValue);
-
-	switch ( flag ) {
-		case AIFLAGOVERRIDE_DISABLEPAIN:	disablePain = value;			break;
-		case AIFLAGOVERRIDE_DAMAGE:			fl.takedamage = value;			break;
-		case AIFLAGOVERRIDE_NOTURN:			move.fl.noTurn = value;		break;
-		case AIFLAGOVERRIDE_NOGRAVITY:		move.fl.noGravity = value;	break;
+	if ( !physicsObj.OnGround() || enemy.GetEntity() == NULL ||
+			( physicsObj.GetOrigin() - move.lastMoveOrigin ).LengthSqr() > Square( blockedRadius ) ) {
+		move.lastMoveOrigin = physicsObj.GetOrigin();
+		move.lastMoveTime = gameLocal.time;
 	}
-}	
+	if ( move.lastMoveTime < gameLocal.time - blockedMoveTime ) {
+		if ( lastAttackTime < gameLocal.time - blockedAttackTime ) {
+			AI_BLOCKED = true;
+			move.lastMoveTime = gameLocal.time;
+		}
+	}
+}
+
+/***********************************************************************
+
+	turning
+
+***********************************************************************/
+
+/*
+=====================
+idAI::Turn
+=====================
+*/
+void idAI::Turn( void ) {
+	float diff;
+	float diff2;
+	float turnAmount;
+	animFlags_t animflags;
+
+	if ( !turnRate ) {
+		return;
+	}
+
+	// check if the animator has marker this anim as non-turning
+	if ( !legsAnim.Disabled() && !legsAnim.AnimDone( 0 ) ) {
+		animflags = legsAnim.GetAnimFlags();
+	} else {
+		animflags = torsoAnim.GetAnimFlags();
+	}
+	if ( animflags.ai_no_turn ) {
+		return;
+	}
+
+	if ( anim_turn_angles && animflags.anim_turn ) {
+		idMat3 rotateAxis;
+
+		// set the blend between no turn and full turn
+		float frac = anim_turn_amount / anim_turn_angles;
+		animator.CurrentAnim( ANIMCHANNEL_LEGS )->SetSyncedAnimWeight( 0, 1.0f - frac );
+		animator.CurrentAnim( ANIMCHANNEL_LEGS )->SetSyncedAnimWeight( 1, frac );
+		animator.CurrentAnim( ANIMCHANNEL_TORSO )->SetSyncedAnimWeight( 0, 1.0f - frac );
+		animator.CurrentAnim( ANIMCHANNEL_TORSO )->SetSyncedAnimWeight( 1, frac );
+
+		// get the total rotation from the start of the anim
+		animator.GetDeltaRotation( 0, gameLocal.time, rotateAxis );
+		current_yaw = idMath::AngleNormalize180( anim_turn_yaw + rotateAxis[ 0 ].ToYaw() );
+	} else {
+		diff = idMath::AngleNormalize180( ideal_yaw - current_yaw );
+		turnVel += AI_TURN_SCALE * diff * MS2SEC( gameLocal.msec );
+		if ( turnVel > turnRate ) {
+			turnVel = turnRate;
+		} else if ( turnVel < -turnRate ) {
+			turnVel = -turnRate;
+		}
+		turnAmount = turnVel * MS2SEC( gameLocal.msec );
+		if ( ( diff >= 0.0f ) && ( turnAmount >= diff ) ) {
+			turnVel = diff / MS2SEC( gameLocal.msec );
+			turnAmount = diff;
+		} else if ( ( diff <= 0.0f ) && ( turnAmount <= diff ) ) {
+			turnVel = diff / MS2SEC( gameLocal.msec );
+			turnAmount = diff;
+		}
+		current_yaw += turnAmount;
+		current_yaw = idMath::AngleNormalize180( current_yaw );
+		diff2 = idMath::AngleNormalize180( ideal_yaw - current_yaw );
+		if ( idMath::Fabs( diff2 ) < 0.1f ) {
+			current_yaw = ideal_yaw;
+		}
+	}
+
+	//HUMANHEAD: aob - added vehicle check
+	if( !InVehicle() ) {
+		viewAxis = idAngles( 0, current_yaw, 0 ).ToMat3();
+	}
+	// HUMANHEAD END aob
+
+	if ( ai_debugMove.GetBool() ) {
+		const idVec3 &org = physicsObj.GetOrigin();
+		gameRenderWorld->DebugLine( colorRed, org, org + idAngles( 0, ideal_yaw, 0 ).ToForward() * 64, gameLocal.msec );
+		gameRenderWorld->DebugLine( colorGreen, org, org + idAngles( 0, current_yaw, 0 ).ToForward() * 48, gameLocal.msec );
+		gameRenderWorld->DebugLine( colorYellow, org, org + idAngles( 0, current_yaw + turnVel, 0 ).ToForward() * 32, gameLocal.msec );
+	}
+}
+
+/*
+=====================
+idAI::FacingIdeal
+=====================
+*/
+bool idAI::FacingIdeal( void ) {
+	float diff;
+
+	if ( !turnRate ) {
+		return true;
+	}
+
+	diff = idMath::AngleNormalize180( current_yaw - ideal_yaw );
+	if ( idMath::Fabs( diff ) < 0.01f ) {
+		// force it to be exact
+		current_yaw = ideal_yaw;
+		return true;
+	}
+
+	return false;
+}
+
+/*
+=====================
+idAI::TurnToward
+=====================
+*/
+bool idAI::TurnToward( float yaw ) {
+	ideal_yaw = idMath::AngleNormalize180( yaw );
+	bool result = FacingIdeal();
+	return result;
+}
+
+/*
+=====================
+idAI::TurnToward
+=====================
+*/
+bool idAI::TurnToward( const idVec3 &pos ) {
+	idVec3 dir;
+	idVec3 local_dir;
+	float lengthSqr;
+
+	dir = pos - physicsObj.GetOrigin();
+#ifdef HUMANHEAD	//jsh wallwalk
+	physicsObj.GetAxis().ProjectVector( dir, local_dir );
+#else
+	physicsObj.GetGravityAxis().ProjectVector( dir, local_dir );
+#endif
+	local_dir.z = 0.0f;
+	lengthSqr = local_dir.LengthSqr();
+	if ( lengthSqr > Square( 2.0f ) || ( lengthSqr > Square( 0.1f ) && enemy.GetEntity() == NULL ) ) {
+		ideal_yaw = idMath::AngleNormalize180( local_dir.ToYaw() );
+	}
+
+	bool result = FacingIdeal();
+	return result;
+}
+
+/***********************************************************************
+
+	Movement
+
+***********************************************************************/
+
+/*
+================
+idAI::ApplyImpulse
+================
+*/
+void idAI::ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse ) {
+	// FIXME: Jim take a look at this and see if this is a reasonable thing to do
+	// instead of a spawnArg flag.. Sabaoth is the only slide monster ( and should be the only one for D3 )
+	// and we don't want him taking physics impulses as it can knock him off the path
+	if ( move.moveType != MOVETYPE_STATIC && move.moveType != MOVETYPE_SLIDE ) {
+		idActor::ApplyImpulse( ent, id, point, impulse );
+	}
+}
+
+/*
+=====================
+idAI::GetMoveDelta
+=====================
+*/
+void idAI::GetMoveDelta( const idMat3 &oldaxis, const idMat3 &axis, idVec3 &delta ) {
+	idVec3 oldModelOrigin;
+	idVec3 modelOrigin;
+
+	animator.GetDelta( gameLocal.time - gameLocal.msec, gameLocal.time, delta );
+	delta = axis * delta;
+
+	if ( modelOffset != vec3_zero ) {
+		// the pivot of the monster's model is around its origin, and not around the bounding
+		// box's origin, so we have to compensate for this when the model is offset so that
+		// the monster still appears to rotate around it's origin.
+		oldModelOrigin = modelOffset * oldaxis;
+		modelOrigin = modelOffset * axis;
+		delta += oldModelOrigin - modelOrigin;
+	}
+
+	delta *= physicsObj.GetGravityAxis();
+}
+
+/*
+=====================
+idAI::CheckObstacleAvoidance
+=====================
+*/
+void idAI::CheckObstacleAvoidance( const idVec3 &goalPos, idVec3 &newPos ) {
+	idEntity		*obstacle;
+	obstaclePath_t	path;
+	idVec3			dir;
+	float			dist;
+	bool			foundPath;
+
+	if ( ignore_obstacles ) {
+		newPos = goalPos;
+		move.obstacle = NULL;
+		return;
+	}
+
+	const idVec3 &origin = physicsObj.GetOrigin();
+
+	obstacle = NULL;
+	AI_OBSTACLE_IN_PATH = false;
+	foundPath = FindPathAroundObstacles( &physicsObj, aas, ( move.bEnemyBlocks ? NULL : enemy.GetEntity() ), origin, goalPos, path ); // HUMANHEAD mdl:  Added bEnemyBlocks check
+	if ( ai_showObstacleAvoidance.GetBool() ) {
+		gameRenderWorld->DebugLine( colorBlue, goalPos + idVec3( 1.0f, 1.0f, 0.0f ), goalPos + idVec3( 1.0f, 1.0f, 64.0f ), gameLocal.msec );
+		gameRenderWorld->DebugLine( foundPath ? colorYellow : colorRed, path.seekPos, path.seekPos + idVec3( 0.0f, 0.0f, 64.0f ), gameLocal.msec );
+	}
+
+	if ( !foundPath ) {
+		// couldn't get around obstacles
+		if ( path.firstObstacle ) {
+			AI_OBSTACLE_IN_PATH = true;
+			if ( physicsObj.GetAbsBounds().Expand( 2.0f ).IntersectsBounds( path.firstObstacle->GetPhysics()->GetAbsBounds() ) ) {
+				obstacle = path.firstObstacle;
+			}
+		} else if ( path.startPosObstacle ) {
+			AI_OBSTACLE_IN_PATH = true;
+			if ( physicsObj.GetAbsBounds().Expand( 2.0f ).IntersectsBounds( path.startPosObstacle->GetPhysics()->GetAbsBounds() ) ) {
+				obstacle = path.startPosObstacle;
+			}
+		} else {
+			// Blocked by wall
+			move.moveStatus = MOVE_STATUS_BLOCKED_BY_WALL;
+		}
+#if 0
+	} else if ( path.startPosObstacle ) {
+		// check if we're past where the our origin was pushed out of the obstacle
+		dir = goalPos - origin;
+		dir.Normalize();
+		dist = ( path.seekPos - origin ) * dir;
+		if ( dist < 1.0f ) {
+			AI_OBSTACLE_IN_PATH = true;
+			obstacle = path.startPosObstacle;
+		}
+#endif
+	} else if ( path.seekPosObstacle ) {
+		// if the AI is very close to the path.seekPos already and path.seekPosObstacle != NULL
+		// then we want to push the path.seekPosObstacle entity out of the way
+		AI_OBSTACLE_IN_PATH = true;
+
+		// check if we're past where the goalPos was pushed out of the obstacle
+		dir = goalPos - origin;
+		dir.Normalize();
+		dist = ( path.seekPos - origin ) * dir;
+		if ( dist < 1.0f ) {
+			obstacle = path.seekPosObstacle;
+		}
+	}
+
+	// if we had an obstacle, set our move status based on the type, and kick it out of the way if it's a moveable
+	if ( obstacle ) {
+		if ( obstacle->IsType( idActor::Type ) ) {
+			// monsters aren't kickable
+			if ( obstacle == enemy.GetEntity() ) {
+				move.moveStatus = MOVE_STATUS_BLOCKED_BY_ENEMY;
+			} else {
+				move.moveStatus = MOVE_STATUS_BLOCKED_BY_MONSTER;
+			}
+		} else {
+			// try kicking the object out of the way
+			move.moveStatus = MOVE_STATUS_BLOCKED_BY_OBJECT;
+		}
+		newPos = obstacle->GetPhysics()->GetOrigin();
+		//newPos = path.seekPos;
+		move.obstacle = obstacle;
+	} else {
+		newPos = path.seekPos;
+		move.obstacle = NULL;
+	}
+}
+
+/*
+=====================
+idAI::DeadMove
+=====================
+*/
+void idAI::DeadMove( void ) {
+	idVec3				delta;
+	monsterMoveResult_t	moveResult;
+
+	ApplyBasePush();
+
+	idVec3 org = physicsObj.GetOrigin();
+
+	GetMoveDelta( viewAxis, viewAxis, delta );
+	physicsObj.SetDelta( delta );
+
+	RunPhysics();
+
+	moveResult = physicsObj.GetMoveResult();
+	AI_ONGROUND = physicsObj.OnGround();
+}
+
+/*
+=====================
+idAI::AnimMove
+=====================
+*/
+void idAI::AnimMove( void ) {
+	idVec3				goalPos;
+	idVec3				delta;
+	idVec3				goalDelta;
+	float				goalDist;
+	monsterMoveResult_t	moveResult;
+	idVec3				newDest;
+
+	idVec3 oldorigin = physicsObj.GetOrigin();
+#ifdef HUMANHEAD //jsh wallwalk
+	idMat3 oldaxis = GetGravViewAxis();
+#else
+	idMat3 oldaxis = viewAxis;
+#endif
+
+	AI_BLOCKED = false;
+
+	if ( move.moveCommand < NUM_NONMOVING_COMMANDS ){ 
+		move.lastMoveOrigin.Zero();
+		move.lastMoveTime = gameLocal.time;
+	}
+
+	move.obstacle = NULL;
+	if ( ( move.moveCommand == MOVE_FACE_ENEMY ) && enemy.GetEntity() ) {
+		TurnToward( lastVisibleEnemyPos );
+		goalPos = oldorigin;
+	} else if ( ( move.moveCommand == MOVE_FACE_ENTITY ) && move.goalEntity.GetEntity() ) {
+		TurnToward( move.goalEntity.GetEntity()->GetPhysics()->GetOrigin() );
+		goalPos = oldorigin;
+	} else if ( GetMovePos( goalPos ) ) {
+		if ( move.moveCommand != MOVE_WANDER ) {
+			CheckObstacleAvoidance( goalPos, newDest );
+			TurnToward( newDest );
+		} else {
+			TurnToward( goalPos );
+		}
+	}
+		
+	Turn();	
+
+	if ( move.moveCommand == MOVE_SLIDE_TO_POSITION ) {
+		if ( gameLocal.time < move.startTime + move.duration ) {
+			goalPos = move.moveDest - move.moveDir * MS2SEC( move.startTime + move.duration - gameLocal.time );
+			delta = goalPos - oldorigin;
+			delta.z = 0.0f;
+		} else {
+			delta = move.moveDest - oldorigin;
+			delta.z = 0.0f;
+			StopMove( MOVE_STATUS_DONE );
+		}
+	} else if ( allowMove ) {
+#ifdef HUMANHEAD //jsh wallwalk
+		GetMoveDelta( oldaxis, GetGravViewAxis(), delta );
+#else
+		GetMoveDelta( oldaxis, viewAxis, delta );
+#endif
+	} else {
+		delta.Zero();
+	}
+
+	if ( move.moveCommand == MOVE_TO_POSITION ) {
+		goalDelta = move.moveDest - oldorigin;
+		goalDist = goalDelta.LengthFast();
+		if ( goalDist < delta.LengthFast() ) {
+			delta = goalDelta;
+		}
+	}
+	
+#ifdef HUMANHEAD //shrink functionality
+	float scale = renderEntity.shaderParms[SHADERPARM_ANY_DEFORM_PARM1];
+	if ( scale > 0.0f && scale < 2.0f ) {
+		delta *= scale;
+	}
+#endif
+	physicsObj.SetDelta( delta );
+	physicsObj.ForceDeltaMove( disableGravity );
+
+	RunPhysics();
+
+	if ( ai_debugMove.GetBool() ) {
+		// HUMANHEAD JRM - so we can see if grav is on or off
+		if(disableGravity) {
+			gameRenderWorld->DebugLine( colorRed, oldorigin, physicsObj.GetOrigin(), 5000 );
+		} else {
+			gameRenderWorld->DebugLine( colorCyan, oldorigin, physicsObj.GetOrigin(), 5000 );
+		}
+	}
+
+	moveResult = physicsObj.GetMoveResult();
+	if ( !af_push_moveables && attack.Length() && TestMelee() ) {
+		DirectDamage( attack, enemy.GetEntity() );
+	} else {
+		idEntity *blockEnt = physicsObj.GetSlideMoveEntity();
+		if ( blockEnt && blockEnt->IsType( idMoveable::Type ) && blockEnt->GetPhysics()->IsPushable() ) {
+			if ( move.moveCommand != MOVE_NONE ) {	//HUMANHEAD jsh only kick obstacles if moving
+				KickObstacles( viewAxis[ 0 ], kickForce, blockEnt );
+			}
+		}
+	}
+
+	BlockedFailSafe();
+
+	AI_ONGROUND = physicsObj.OnGround();
+
+	idVec3 org = physicsObj.GetOrigin();
+	if ( oldorigin != org ) {
+		TouchTriggers();
+	}
+
+	if ( ai_debugMove.GetBool() ) {
+		gameRenderWorld->DebugBounds( colorMagenta, physicsObj.GetBounds(), org, gameLocal.msec );
+		gameRenderWorld->DebugBounds( colorMagenta, physicsObj.GetBounds(), move.moveDest, gameLocal.msec );
+		gameRenderWorld->DebugLine( colorYellow, org + EyeOffset(), org + EyeOffset() + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 16.0f, gameLocal.msec, true );
+		DrawRoute();
+	}
+}
+
+/*
+=====================
+Seek
+=====================
+*/
+idVec3 Seek( idVec3 &vel, const idVec3 &org, const idVec3 &goal, float prediction ) {
+	idVec3 predictedPos;
+	idVec3 goalDelta;
+	idVec3 seekVel;
+
+	// predict our position
+	predictedPos = org + vel * prediction;
+	goalDelta = goal - predictedPos;
+	seekVel = goalDelta * MS2SEC( gameLocal.msec );
+
+	return seekVel;
+}
+
+/*
+=====================
+idAI::SlideMove
+=====================
+*/
+void idAI::SlideMove( void ) {
+	idVec3				goalPos;
+	idVec3				delta;
+	idVec3				goalDelta;
+	float				goalDist;
+	monsterMoveResult_t	moveResult;
+	idVec3				newDest;
+
+	idVec3 oldorigin = physicsObj.GetOrigin();
+	idMat3 oldaxis = viewAxis;
+
+	AI_BLOCKED = false;
+
+	if ( move.moveCommand < NUM_NONMOVING_COMMANDS ){ 
+		move.lastMoveOrigin.Zero();
+		move.lastMoveTime = gameLocal.time;
+	}
+
+	move.obstacle = NULL;
+	if ( ( move.moveCommand == MOVE_FACE_ENEMY ) && enemy.GetEntity() ) {
+		TurnToward( lastVisibleEnemyPos );
+		goalPos = move.moveDest;
+	} else if ( ( move.moveCommand == MOVE_FACE_ENTITY ) && move.goalEntity.GetEntity() ) {
+		TurnToward( move.goalEntity.GetEntity()->GetPhysics()->GetOrigin() );
+		goalPos = move.moveDest;
+	} else if ( GetMovePos( goalPos ) ) {
+		CheckObstacleAvoidance( goalPos, newDest );
+		TurnToward( newDest );
+		goalPos = newDest;
+	}
+
+	if ( move.moveCommand == MOVE_SLIDE_TO_POSITION ) {
+		if ( gameLocal.time < move.startTime + move.duration ) {
+			goalPos = move.moveDest - move.moveDir * MS2SEC( move.startTime + move.duration - gameLocal.time );
+		} else {
+			goalPos = move.moveDest;
+			StopMove( MOVE_STATUS_DONE );
+		}
+	}
+
+	if ( move.moveCommand == MOVE_TO_POSITION ) {
+		goalDelta = move.moveDest - oldorigin;
+		goalDist = goalDelta.LengthFast();
+		if ( goalDist < delta.LengthFast() ) {
+			delta = goalDelta;
+		}
+	}
+
+	idVec3 vel = physicsObj.GetLinearVelocity();
+	float z = vel.z;
+	idVec3  predictedPos = oldorigin + vel * AI_SEEK_PREDICTION;
+
+	// seek the goal position
+	goalDelta = goalPos - predictedPos;
+	vel -= vel * AI_FLY_DAMPENING * MS2SEC( gameLocal.msec );
+	vel += goalDelta * MS2SEC( gameLocal.msec );
+
+	// cap our speed
+	vel.Truncate( fly_speed );
+	vel.z = z;
+	physicsObj.SetLinearVelocity( vel );
+	physicsObj.UseVelocityMove( true );
+	RunPhysics();
+
+	if ( ( move.moveCommand == MOVE_FACE_ENEMY ) && enemy.GetEntity() ) {
+		TurnToward( lastVisibleEnemyPos );
+	} else if ( ( move.moveCommand == MOVE_FACE_ENTITY ) && move.goalEntity.GetEntity() ) {
+		TurnToward( move.goalEntity.GetEntity()->GetPhysics()->GetOrigin() );
+	} else if ( move.moveCommand != MOVE_NONE ) {
+		if ( vel.ToVec2().LengthSqr() > 0.1f ) {
+			TurnToward( vel.ToYaw() );
+		}
+	}
+	Turn();
+
+	if ( ai_debugMove.GetBool() ) {
+		gameRenderWorld->DebugLine( colorCyan, oldorigin, physicsObj.GetOrigin(), 5000 );
+	}
+
+	moveResult = physicsObj.GetMoveResult();
+	if ( !af_push_moveables && attack.Length() && TestMelee() ) {
+		DirectDamage( attack, enemy.GetEntity() );
+	} else {
+		idEntity *blockEnt = physicsObj.GetSlideMoveEntity();
+		if ( blockEnt && blockEnt->IsType( idMoveable::Type ) && blockEnt->GetPhysics()->IsPushable() ) {
+			KickObstacles( viewAxis[ 0 ], kickForce, blockEnt );
+		}
+	}
+
+	BlockedFailSafe();
+
+	AI_ONGROUND = physicsObj.OnGround();
+
+	idVec3 org = physicsObj.GetOrigin();
+	if ( oldorigin != org ) {
+		TouchTriggers();
+	}
+
+	if ( ai_debugMove.GetBool() ) {
+		gameRenderWorld->DebugBounds( colorMagenta, physicsObj.GetBounds(), org, gameLocal.msec );
+		gameRenderWorld->DebugBounds( colorMagenta, physicsObj.GetBounds(), move.moveDest, gameLocal.msec );
+		gameRenderWorld->DebugLine( colorYellow, org + EyeOffset(), org + EyeOffset() + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 16.0f, gameLocal.msec, true );
+		DrawRoute();
+	}
+}
+
+/*
+=====================
+idAI::AdjustFlyingAngles
+=====================
+*/
+void idAI::AdjustFlyingAngles( void ) {
+	idVec3	vel;
+	float 	speed;
+	float 	roll;
+	float 	pitch;
+
+	vel = physicsObj.GetLinearVelocity();
+
+	speed = vel.Length();
+	if ( speed < 5.0f ) {
+		roll = 0.0f;
+		pitch = 0.0f;
+	} else {
+		roll = vel * viewAxis[ 1 ] * -fly_roll_scale / fly_speed;
+		if ( roll > fly_roll_max ) {
+			roll = fly_roll_max;
+		} else if ( roll < -fly_roll_max ) {
+			roll = -fly_roll_max;
+		}
+
+		pitch = vel * viewAxis[ 2 ] * -fly_pitch_scale / fly_speed;
+		if ( pitch > fly_pitch_max ) {
+			pitch = fly_pitch_max;
+		} else if ( pitch < -fly_pitch_max ) {
+			pitch = -fly_pitch_max;
+		}
+	}
+
+	fly_roll = fly_roll * 0.95f + roll * 0.05f;
+	fly_pitch = fly_pitch * 0.95f + pitch * 0.05f;
+
+	if ( flyTiltJoint != INVALID_JOINT ) {
+		animator.SetJointAxis( flyTiltJoint, JOINTMOD_WORLD, idAngles( fly_pitch, 0.0f, fly_roll ).ToMat3() );
+	} else {
+		viewAxis = idAngles( fly_pitch, current_yaw, fly_roll ).ToMat3();
+	}
+}
+
+/*
+=====================
+idAI::AddFlyBob
+=====================
+*/
+void idAI::AddFlyBob( idVec3 &vel ) {
+	idVec3	fly_bob_add;
+	float	t;
+
+	if ( fly_bob_strength ) {
+		t = MS2SEC( gameLocal.time + entityNumber * 497 );
+		fly_bob_add = ( viewAxis[ 1 ] * idMath::Sin16( t * fly_bob_horz ) + viewAxis[ 2 ] * idMath::Sin16( t * fly_bob_vert ) ) * fly_bob_strength;
+		vel += fly_bob_add * MS2SEC( gameLocal.msec );
+		if ( ai_debugMove.GetBool() ) {
+			const idVec3 &origin = physicsObj.GetOrigin();
+			gameRenderWorld->DebugArrow( colorOrange, origin, origin + fly_bob_add, 0 );
+		}
+	}
+}
+
+/*
+=====================
+idAI::AdjustFlyHeight
+=====================
+*/
+void idAI::AdjustFlyHeight( idVec3 &vel, const idVec3 &goalPos ) {
+	const idVec3	&origin = physicsObj.GetOrigin();
+	predictedPath_t path;
+	idVec3			end;
+	idVec3			dest;
+	trace_t			trace;
+	idActor			*enemyEnt;
+	bool			goLower;
+
+	// make sure we're not flying too high to get through doors
+	goLower = false;
+	if ( origin.z > goalPos.z ) {
+		dest = goalPos;
+		dest.z = origin.z + 128.0f;
+		idAI::PredictPath( this, aas, goalPos, dest - origin, 1000, 1000, SE_BLOCKED, path );
+		if ( path.endPos.z < origin.z ) {
+			idVec3 addVel = Seek( vel, origin, path.endPos, AI_SEEK_PREDICTION );
+			vel.z += addVel.z;
+			goLower = true;
+		}
+        
+		if ( ai_debugMove.GetBool() ) {
+			gameRenderWorld->DebugBounds( goLower ? colorRed : colorGreen, physicsObj.GetBounds(), path.endPos, gameLocal.msec );
+		}
+	}
+
+	if ( !goLower ) {
+		// make sure we don't fly too low
+		end = origin;
+
+		enemyEnt = enemy.GetEntity();
+		if ( enemyEnt ) {
+			end.z = lastVisibleEnemyPos.z + lastVisibleEnemyEyeOffset.z + fly_offset;
+		} else {
+			// just use the default eye height for the player
+			end.z = goalPos.z + DEFAULT_FLY_OFFSET + fly_offset;
+		}
+
+#if HUMANHEAD // jsh do a shorter trace if player is farther than CM_MAX_TRACE_DIST away
+		if ( (end - origin).LengthSqr() < CM_MAX_TRACE_DIST * CM_MAX_TRACE_DIST ) {
+			gameLocal.clip.Translation( trace, origin, end, physicsObj.GetClipModel(), mat3_identity, MASK_MONSTERSOLID, this );
+			vel += Seek( vel, origin, trace.endpos, AI_SEEK_PREDICTION );
+		} else {
+			idVec3 short_end = origin + ( end - origin ).ToNormal() * 4000;
+			gameLocal.clip.Translation( trace, origin, short_end, physicsObj.GetClipModel(), mat3_identity, MASK_MONSTERSOLID, this );
+			vel += Seek( vel, origin, end, AI_SEEK_PREDICTION );
+		}
+#else
+		gameLocal.clip.Translation( trace, origin, end, physicsObj.GetClipModel(), mat3_identity, MASK_MONSTERSOLID, this );
+		vel += Seek( vel, origin, trace.endpos, AI_SEEK_PREDICTION );
+#endif
+	}
+}
+
+/*
+=====================
+idAI::FlySeekGoal
+=====================
+*/
+void idAI::FlySeekGoal( idVec3 &vel, idVec3 &goalPos ) {
+	idVec3 seekVel;
+	
+	// seek the goal position
+	seekVel = Seek( vel, physicsObj.GetOrigin(), goalPos, AI_SEEK_PREDICTION );
+	seekVel *= fly_seek_scale;
+	vel += seekVel;
+}
+
+/*
+=====================
+idAI::AdjustFlySpeed
+=====================
+*/
+void idAI::AdjustFlySpeed( idVec3 &vel ) {
+	float speed;
+
+	// apply dampening
+	vel -= vel * AI_FLY_DAMPENING * MS2SEC( gameLocal.msec );
+
+	// gradually speed up/slow down to desired speed
+	speed = vel.Normalize();
+	speed += ( move.speed - speed ) * MS2SEC( gameLocal.msec );
+	if ( speed < 0.0f ) {
+		speed = 0.0f;
+	} else if ( move.speed && ( speed > move.speed ) ) {
+		speed = move.speed;
+	}
+
+	vel *= speed;
+}
+
+/*
+=====================
+idAI::FlyTurn
+=====================
+*/
+void idAI::FlyTurn( void ) {
+	if ( move.moveCommand == MOVE_FACE_ENEMY ) {
+		TurnToward( lastVisibleEnemyPos );
+	} else if ( ( move.moveCommand == MOVE_FACE_ENTITY ) && move.goalEntity.GetEntity() ) {
+		TurnToward( move.goalEntity.GetEntity()->GetPhysics()->GetOrigin() );
+	} else if ( move.speed > 0.0f ) {
+		const idVec3 &vel = physicsObj.GetLinearVelocity();
+		if ( vel.ToVec2().LengthSqr() > 0.1f ) {
+			TurnToward( vel.ToYaw() );
+		}
+	}
+	Turn();
+}
+
+/*
+=====================
+idAI::FlyMove
+=====================
+*/
+void idAI::FlyMove( void ) {
+	idVec3	goalPos;
+	idVec3	oldorigin;
+	idVec3	newDest;
+
+	AI_BLOCKED = false;
+	if ( ( move.moveCommand != MOVE_NONE ) && ReachedPos( move.moveDest, move.moveCommand ) ) {
+		StopMove( MOVE_STATUS_DONE );
+	}
+
+	if ( ai_debugMove.GetBool() ) {
+		gameLocal.Printf( "%d: %s: %s, vel = %.2f, sp = %.2f, maxsp = %.2f\n", gameLocal.time, name.c_str(), moveCommandString[ move.moveCommand ], physicsObj.GetLinearVelocity().Length(), move.speed, fly_speed );
+	}
+
+	if ( move.moveCommand != MOVE_TO_POSITION_DIRECT ) {
+		idVec3 vel = physicsObj.GetLinearVelocity();
+
+		if ( GetMovePos( goalPos ) ) {
+			CheckObstacleAvoidance( goalPos, newDest );
+			goalPos = newDest;
+		}
+
+		if ( move.speed	) {
+			FlySeekGoal( vel, goalPos );
+		}
+
+		// add in bobbing
+		AddFlyBob( vel );
+
+		if ( enemy.GetEntity() && ( move.moveCommand != MOVE_TO_POSITION ) ) {
+			AdjustFlyHeight( vel, goalPos );
+		}
+
+		AdjustFlySpeed( vel );
+
+		physicsObj.SetLinearVelocity( vel );
+	}
+
+	// turn	
+	FlyTurn();
+
+	// run the physics for this frame
+	oldorigin = physicsObj.GetOrigin();
+	physicsObj.UseFlyMove( true );
+	physicsObj.UseVelocityMove( false );
+	physicsObj.SetDelta( vec3_zero );
+	physicsObj.ForceDeltaMove( disableGravity );
+	RunPhysics();
+
+	monsterMoveResult_t	moveResult = physicsObj.GetMoveResult();
+	if ( !af_push_moveables && attack.Length() && TestMelee() ) {
+		DirectDamage( attack, enemy.GetEntity() );
+	} else {
+		idEntity *blockEnt = physicsObj.GetSlideMoveEntity();
+		if ( blockEnt && blockEnt->IsType( idMoveable::Type ) && blockEnt->GetPhysics()->IsPushable() ) {
+			KickObstacles( viewAxis[ 0 ], kickForce, blockEnt );
+		} else if ( moveResult == MM_BLOCKED ) {
+			move.blockTime = gameLocal.time + 500;
+			AI_BLOCKED = true;
+		}
+	}
+
+	idVec3 org = physicsObj.GetOrigin();
+	if ( oldorigin != org ) {
+		TouchTriggers();
+	}
+
+	if ( ai_debugMove.GetBool() ) {
+		gameRenderWorld->DebugLine( colorCyan, oldorigin, physicsObj.GetOrigin(), 4000 );
+		gameRenderWorld->DebugBounds( colorOrange, physicsObj.GetBounds(), org, gameLocal.msec );
+		gameRenderWorld->DebugBounds( colorMagenta, physicsObj.GetBounds(), move.moveDest, gameLocal.msec );
+		gameRenderWorld->DebugLine( colorRed, org, org + physicsObj.GetLinearVelocity(), gameLocal.msec, true );
+		gameRenderWorld->DebugLine( colorBlue, org, goalPos, gameLocal.msec, true );
+		gameRenderWorld->DebugLine( colorYellow, org + EyeOffset(), org + EyeOffset() + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 16.0f, gameLocal.msec, true );
+		DrawRoute();
+	}
+}
+
+/*
+=====================
+idAI::StaticMove
+=====================
+*/
+void idAI::StaticMove( void ) {
+	idActor	*enemyEnt = enemy.GetEntity();
+
+	if ( AI_DEAD ) {
+		return;
+	}
+
+	if ( ( move.moveCommand == MOVE_FACE_ENEMY ) && enemyEnt ) {
+		TurnToward( lastVisibleEnemyPos );
+	} else if ( ( move.moveCommand == MOVE_FACE_ENTITY ) && move.goalEntity.GetEntity() ) {
+		TurnToward( move.goalEntity.GetEntity()->GetPhysics()->GetOrigin() );
+	} else if ( move.moveCommand != MOVE_NONE ) {
+		TurnToward( move.moveDest );
+	}
+	Turn();
+
+	physicsObj.ForceDeltaMove( true ); // disable gravity
+	RunPhysics();
+
+	AI_ONGROUND = false;
+
+	if ( !af_push_moveables && attack.Length() && TestMelee() ) {
+		DirectDamage( attack, enemyEnt );
+	}
+
+	if ( ai_debugMove.GetBool() ) {
+		const idVec3 &org = physicsObj.GetOrigin();
+		gameRenderWorld->DebugBounds( colorMagenta, physicsObj.GetBounds(), org, gameLocal.msec );
+		gameRenderWorld->DebugLine( colorBlue, org, move.moveDest, gameLocal.msec, true );
+		gameRenderWorld->DebugLine( colorYellow, org + EyeOffset(), org + EyeOffset() + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 16.0f, gameLocal.msec, true );
+	}
+}
 
 /***********************************************************************
 
@@ -1472,21 +3379,22 @@ idAI::ReactionTo
 */
 int idAI::ReactionTo( const idEntity *ent ) {
 
+	// HUMANHEAD cjr
+	if ( ent->health <= 0 ) {
+		return ATTACK_IGNORE;
+	}
+
 	if ( ent->fl.hidden ) {
 		// ignore hidden entities
 		return ATTACK_IGNORE;
 	}
 
-	if ( !ent->IsType( idActor::GetClassType() ) ) {
-		return ATTACK_IGNORE;
-	}
-
-	if( combat.fl.ignoreEnemies ){
+	if ( !ent->IsType( idActor::Type ) ) {
 		return ATTACK_IGNORE;
 	}
 
 	const idActor *actor = static_cast<const idActor *>( ent );
-	if ( actor->IsType( idPlayer::GetClassType() ) && static_cast<const idPlayer *>(actor)->noclip ) {
+	if ( actor->IsType( idPlayer::Type ) && static_cast<const idPlayer *>(actor)->noclip ) {
 		// ignore players in noclip mode
 		return ATTACK_IGNORE;
 	}
@@ -1495,14 +3403,12 @@ int idAI::ReactionTo( const idEntity *ent ) {
 	if ( actor->team != team ) {
 		if ( actor->fl.notarget ) {
 			// don't attack on sight when attacker is notargeted
-			return ATTACK_ON_DAMAGE; /* | ATTACK_ON_ACTIVATE ; */
+			return ATTACK_ON_DAMAGE | ATTACK_ON_ACTIVATE;
 		}
-		return ATTACK_ON_SIGHT | ATTACK_ON_DAMAGE; /* | ATTACK_ON_ACTIVATE; */
+		return ATTACK_ON_SIGHT | ATTACK_ON_DAMAGE | ATTACK_ON_ACTIVATE;
 	}
 
-	//FIXME: temporarily disabled monsters of same rank fighting because it's happening too much.
-	// monsters will fight when attacked by lower or equal ranked monsters.  rank 0 never fights back.
-	//if ( rank && ( actor->rank <= rank ) ) {
+	// monsters will fight when attacked by lower ranked monsters.  rank 0 never fights back.
 	if ( rank && ( actor->rank < rank ) ) {
 		return ATTACK_ON_DAMAGE;
 	}
@@ -1511,22 +3417,6 @@ int idAI::ReactionTo( const idEntity *ent ) {
 	return ATTACK_IGNORE;
 }
 
-/*
-=====================
-idAI::AdjustHealthByDamage
-=====================
-*/
-void idAI::AdjustHealthByDamage	( int damage ) {
-	if ( aifl.undying ) {
-		return;
-	}	
-	idActor::AdjustHealthByDamage ( damage );
-
-	if ( g_perfTest_aiUndying.GetBool() && health <= 0 ) {
-		//so we still take pain!
-		health = 1;
-	}
-}
 
 /*
 =====================
@@ -1534,74 +3424,104 @@ idAI::Pain
 =====================
 */
 bool idAI::Pain( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location ) {
-	aifl.pain   = idActor::Pain( inflictor, attacker, damage, dir, location );
-	aifl.damage = true;
+	idActor	*actor;
+	// HUMANHEAD JRM - they are ignoring pain from ourselves but yet still playing the pain sounds - skip pain anim/sounds!
+	if(attacker == this) {		
+		return false;
+	}
+	// HUMANHEAD END
+
+	AI_PAIN = idActor::Pain( inflictor, attacker, damage, dir, location );
+	AI_DAMAGE = true;
 
 	// force a blink
 	blink_time = 0;
 
-	// No special handling if friendly fire
-	// jshepard: friendly fire will cause pain. Players will only be able to pain buddy marines
-	// via splash damage.
-
-/*
-	if ( attacker && attacker->IsType ( idActor::GetClassType ( ) ) ) {
-		if ( static_cast<idActor*>( attacker )->team == team ) {
-			return aifl.pain;
-		}
-	}
-*/
-
 	// ignore damage from self
 	if ( attacker != this ) {
-		// React to taking pain
-		ReactToPain ( attacker, damage );
+		if ( inflictor ) {
+			AI_SPECIAL_DAMAGE = inflictor->spawnArgs.GetInt( "special_damage" );
+		} else {
+			AI_SPECIAL_DAMAGE = 0;
+		}
 
-		pain.takenThisFrame += damage;
-		pain.lastTakenTime = gameLocal.time;
-		combat.tacticalPainTaken += damage;
-
-		// If taken too much pain where we then skip the current destination
-		if ( combat.tacticalPainThreshold && combat.tacticalPainTaken > combat.tacticalPainThreshold ) {
-			if (team==AITEAM_STROGG && 
-				(combat.tacticalMaskAvailable&AITACTICAL_COVER_BITS) &&
-				IsType(rvAITactical::GetClassType()) && 
-				ai_allowTacticalRush.GetBool() && 
-				spawnArgs.GetBool("rushOnPain", "1")) {
-
-				// clear any tether
-				tether = NULL;
-
-				// change ranged distances
-				combat.attackRange[0] = 0.0f;
-				combat.attackRange[1] = 100.0f;	// make them get really close
-
-				// remove cover behavior
-				combat.tacticalMaskAvailable &= ~AITACTICAL_COVER_BITS;
-
-				// add ranged behavior
-				combat.tacticalMaskAvailable |=  AITACTICAL_RANGED_BITS;
+		if ( enemy.GetEntity() != attacker && attacker->IsType( idActor::Type ) ) {
+			actor = ( idActor * )attacker;
+			if ( ReactionTo( actor ) & ATTACK_ON_DAMAGE ) {
+				gameLocal.AlertAI( actor );
+				SetEnemy( actor );
 			}
-			ForceTacticalUpdate ( );
-			return true;
 		}
-
-		// If looping pain and a new paintype comes in we can stop the loop
-		if ( pain.loopEndTime && pain.loopType.Icmp ( painType ) ) {
-			pain.loopEndTime = 0;
-			pain.loopType = painType;
-		}
-
-		ExecScriptFunction( funcs.damage );
 	}
 
-	// If we were hit by our enemy and our enemy isnt visible then 
-	// force the enemy visiblity to be updated as if we saw him momentarily
-	if ( enemy.ent == attacker && !enemy.fl.visible ) {
-		UpdateEnemyPosition ( true );
-	}	
+	return ( AI_PAIN != 0 );
+}
 
-	return aifl.pain;
+
+/*
+=====================
+idAI::SpawnParticles
+=====================
+*/
+void idAI::SpawnParticles( const char *keyName ) {
+	const idKeyValue *kv = spawnArgs.MatchPrefix( keyName, NULL );
+	while ( kv ) {
+		particleEmitter_t pe;
+
+		idStr particleName = kv->GetValue();
+
+		if ( particleName.Length() ) {
+
+			idStr jointName = kv->GetValue();
+			int dash = jointName.Find('-');
+			if ( dash > 0 ) {
+				particleName = particleName.Left( dash );
+				jointName = jointName.Right( jointName.Length() - dash - 1 );
+			}
+
+			SpawnParticlesOnJoint( pe, particleName, jointName );
+			particles.Append( pe );
+		}
+
+		kv = spawnArgs.MatchPrefix( keyName, kv );
+	}
+}
+
+/*
+=====================
+idAI::SpawnParticlesOnJoint
+=====================
+*/
+const idDeclParticle *idAI::SpawnParticlesOnJoint( particleEmitter_t &pe, const char *particleName, const char *jointName ) {
+	idVec3 origin;
+	idMat3 axis;
+
+	if ( *particleName == '\0' ) {
+		memset( &pe, 0, sizeof( pe ) );
+		return pe.particle;
+	}
+
+	pe.joint = animator.GetJointHandle( jointName );
+	if ( pe.joint == INVALID_JOINT ) {
+		gameLocal.Warning( "Unknown particleJoint '%s' on '%s'", jointName, name.c_str() );
+		pe.time = 0;
+		pe.particle = NULL;
+	} else {
+		animator.GetJointTransform( pe.joint, gameLocal.time, origin, axis );
+		origin = renderEntity.origin + origin * renderEntity.axis;
+
+		BecomeActive( TH_UPDATEPARTICLES );
+		if ( !gameLocal.time ) {
+			// particles with time of 0 don't show, so set the time differently on the first frame
+			pe.time = 1;
+		} else {
+			pe.time = gameLocal.time;
+		}
+		pe.particle = static_cast<const idDeclParticle *>( declManager->FindType( DECL_PARTICLE, particleName ) );
+		gameLocal.smokeParticles->EmitSmoke( pe.particle, pe.time, gameLocal.random.CRandomFloat(), origin, axis );
+	}
+
+	return pe.particle;
 }
 
 /*
@@ -1610,47 +3530,39 @@ idAI::Killed
 =====================
 */
 void idAI::Killed( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location ) {
-	idAngles			ang;
-	const char*			modelDeath;
-	const idKeyValue*	kv;
-	
+	idAngles ang;
+	const char *modelDeath;
+
+	// make sure the monster is activated
+	EndAttack();
+
 	if ( g_debugDamage.GetBool() ) {
 		gameLocal.Printf( "Damage: joint: '%s', zone '%s'\n", animator.GetJointName( ( jointHandle_t )location ), 
 			GetDamageGroup( location ) );
 	}
 
-	if ( aifl.dead ) {
-		aifl.pain = true;
-		aifl.damage = true;
+	if ( inflictor ) {
+		AI_SPECIAL_DAMAGE = inflictor->spawnArgs.GetInt( "special_damage" );
+	} else {
+		AI_SPECIAL_DAMAGE = 0;
+	}
+
+	if ( AI_DEAD ) {
+		AI_PAIN = true;
+		AI_DAMAGE = true;
 		return;
 	}
 
-	aifl.dead = true;
-
-	// turn off my flashlight, if I had one
-	ProcessEvent( &AI_Flashlight, false );
-
-	// Detach from any spawners
-	if( GetSpawner() ) {
-		GetSpawner()->Detach( this );
-		SetSpawner( NULL );
+	// stop all voice sounds
+	StopSound( SND_CHANNEL_VOICE, false );
+	if ( head.GetEntity() ) {
+		head.GetEntity()->StopSound( SND_CHANNEL_VOICE, false );
+		head.GetEntity()->GetAnimator()->ClearAllAnims( gameLocal.time, 100 );
 	}
 
-	// Hide surfaces on death
-	for ( kv = spawnArgs.MatchPrefix ( "deathhidesurface", NULL );
-		  kv;
-		  kv = spawnArgs.MatchPrefix ( "deathhidesurface", kv ) ) {
-		HideSurface ( kv->GetValue() );
-	}
-
-	// stop all voice sounds 
-	StopSpeaking( true );
-
-	SetMoveType ( MOVETYPE_DEAD );
-
-	move.fl.noGravity = false;
-	move.fl.allowPushMovables = false;
-	aifl.scripted = false;
+	disableGravity = false;
+	move.moveType = MOVETYPE_DEAD;
+	af_push_moveables = false;
 
 	physicsObj.UseFlyMove( false );
 	physicsObj.ForceDeltaMove( false );
@@ -1658,100 +3570,66 @@ void idAI::Killed( idEntity *inflictor, idEntity *attacker, int damage, const id
 	// end our looping ambient sound
 	StopSound( SND_CHANNEL_AMBIENT, false );
 
-	if ( attacker && attacker->IsType( idActor::GetClassType() ) ) {
-		gameLocal.AlertAI( ( idActor * )attacker );
-
-		aiManager.AnnounceKill ( this, attacker, inflictor );
-		aiManager.AnnounceDeath ( this, attacker );
-   	}
-
-	if ( attacker && attacker->IsType( idActor::GetClassType() ) ) {
+	if ( attacker && attacker->IsType( idActor::Type ) ) {
 		gameLocal.AlertAI( ( idActor * )attacker );
 	}
 
 	// activate targets
-	ActivateTargets( this );
+	ActivateTargets( attacker );
 
 	RemoveAttachments();
 	RemoveProjectile();
 	StopMove( MOVE_STATUS_DONE );
 
-	OnDeath();
-	CheckDeathObjectives();
-
 	ClearEnemy();
+	AI_DEAD	= true;
 
 	// make monster nonsolid
-	physicsObj.SetContents( 0 );
-	physicsObj.GetClipModel()->Unlink();
+	if ( !spawnArgs.GetBool( "no_ragdoll_on_death", "0" ) ) { // HUMANHEAD mdl:  Added no_ragdoll_on_death
+		physicsObj.SetContents( 0 );
+		physicsObj.GetClipModel()->Unlink();
+	} // HUMANHEAD END
 
 	Unbind();
-	if ( g_perfTest_aiNoRagdoll.GetBool() ) {
-		if ( spawnArgs.MatchPrefix( "lipsync_death" ) ) {
-			Speak( "lipsync_death", true );
-		} else {
-			StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
-		}
+
+	if ( !spawnArgs.GetBool( "no_ragdoll_on_death", "0" ) && StartRagdoll() ) { // HUMANHEAD mdl:  Added no_ragdoll_on_death
+		StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
+	// HUMANHEAD JRM - some monsters are removed, but always need to play sound
+	} else if(spawnArgs.GetBool("death_sound_always","0")) { 
+		StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
+	}
+	
+	if ( spawnArgs.GetString( "model_death", "", &modelDeath ) ) {
+		// lost soul is only case that does not use a ragdoll and has a model_death so get the death sound in here
+		StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
+		renderEntity.shaderParms[ SHADERPARM_TIMEOFFSET ] = -MS2SEC( gameLocal.time );
+		SetModel( modelDeath );
 		physicsObj.SetLinearVelocity( vec3_zero );
 		physicsObj.PutToRest();
 		physicsObj.DisableImpact();
-
-	} else if( fl.quickBurn ){
-		if ( spawnArgs.MatchPrefix( "lipsync_death" ) ) {
-			Speak( "lipsync_death", true );
-		} else {
-			StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
-		}
-
-		physicsObj.SetLinearVelocity( vec3_zero );
-		physicsObj.PutToRest();
-		physicsObj.DisableImpact();
-
-	} else {
-		if ( StartRagdoll() ) {
-			if ( spawnArgs.MatchPrefix( "lipsync_death" ) ) {
-				Speak( "lipsync_death", true );
-			} else {
-				StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
-			}
-		}
-
-		if ( spawnArgs.GetString( "model_death", "", &modelDeath ) ) {
-			// lost soul is only case that does not use a ragdoll and has a model_death so get the death sound in here
-			if ( spawnArgs.MatchPrefix( "lipsync_death" ) ) {
-				Speak( "lipsync_death", true );
-			} else {
-				StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
-			}
-			renderEntity.shaderParms[ SHADERPARM_TIMEOFFSET ] = -MS2SEC( gameLocal.time );
-			SetModel( modelDeath );
-			physicsObj.SetLinearVelocity( vec3_zero );
-			physicsObj.PutToRest();
-			physicsObj.DisableImpact();
-		}
 	}
 
-	SetState ( "State_Killed" );
+	restartParticles = false;
 
-	kv = spawnArgs.MatchPrefix( "def_drops", NULL );
-	while( kv ) {
-		idDict args;
-		idEntity *tEnt;
-		if( kv->GetValue() != "" ){
-			args.Set( "classname", kv->GetValue() );
-			args.Set( "origin", physicsObj.GetAbsBounds().GetCenter().ToString() );
-			// Let items know that they are of the dropped variety
-			args.Set( "dropped", "1" );
-			if (gameLocal.SpawnEntityDef( args, &tEnt )) {
-				if ( tEnt && tEnt->GetPhysics()) { //tEnt *should* be valid, but hey...
-					// magic/arbitrary number to give it some spin.  Some constants used to ensure guns rarely fall standing up
-					tEnt->GetPhysics()->SetAngularVelocity( idVec3( (gameLocal.random.RandomFloat() * 10.0f) + 20.0f,
-																	(gameLocal.random.RandomFloat() * 10.0f) + 20.0f,
-																	(gameLocal.random.RandomFloat() * 10.0f) + 20.0f));
-				}
-			}
-		}
-		kv = spawnArgs.MatchPrefix( "def_drops", kv );
+	state = GetScriptFunction( "state_Killed" );
+	SetState( state );
+	SetWaitState( "" );
+
+	// HUMANHEAD nla - Commented out as we are doing this in hhAI
+	// const idKeyValue *kv = spawnArgs.MatchPrefix( "def_drops", NULL );
+	// while( kv ) {
+	// 	idDict args;
+	// 
+	//	args.Set( "classname", kv->GetValue() );
+	//	args.Set( "origin", physicsObj.GetOrigin().ToString() );
+	//	gameLocal.SpawnEntityDef( args );
+	//	kv = spawnArgs.MatchPrefix( "def_drops", kv );
+	// }
+	// HUMANHEAD END
+
+	// HUMANHEAD pdm: removed soulcube missile check
+	if ( attacker && attacker->IsType( idPlayer::Type ) ) {
+		static_cast< idPlayer* >( attacker )->AddAIKill();
 	}
 }
 
@@ -1763,20 +3641,90 @@ void idAI::Killed( idEntity *inflictor, idEntity *attacker, int damage, const id
 
 /*
 =====================
+idAI::PlayCinematic
+=====================
+*/
+void idAI::PlayCinematic( void ) {
+	const char *animname;
+
+	if ( current_cinematic >= num_cinematics ) {
+		if ( g_debugCinematic.GetBool() ) {
+			gameLocal.Printf( "%d: '%s' stop\n", gameLocal.framenum, GetName() );
+		}
+		if ( !spawnArgs.GetBool( "cinematic_no_hide" ) ) {
+			Hide();
+		}
+		current_cinematic = 0;
+		ActivateTargets( gameLocal.GetLocalPlayer() );
+		fl.neverDormant = false;
+		return;
+	}
+
+	Show();
+	current_cinematic++;
+
+	allowJointMod = false;
+	allowEyeFocus = false;
+
+	spawnArgs.GetString( va( "anim%d", current_cinematic ), NULL, &animname );
+	if ( !animname ) {
+		gameLocal.Warning( "missing 'anim%d' key on %s", current_cinematic, name.c_str() );
+		return;
+	}
+
+	if ( g_debugCinematic.GetBool() ) {
+		gameLocal.Printf( "%d: '%s' start '%s'\n", gameLocal.framenum, GetName(), animname );
+	}
+
+	headAnim.animBlendFrames = 0;
+	headAnim.lastAnimBlendFrames = 0;
+	headAnim.BecomeIdle();
+
+	legsAnim.animBlendFrames = 0;
+	legsAnim.lastAnimBlendFrames = 0;
+	legsAnim.BecomeIdle();
+
+	torsoAnim.animBlendFrames = 0;
+	torsoAnim.lastAnimBlendFrames = 0;
+	ProcessEvent( &AI_PlayAnim, ANIMCHANNEL_TORSO, animname );
+
+	// make sure our model gets updated
+	animator.ForceUpdate();
+
+	// update the anim bounds
+	UpdateAnimation();
+	UpdateVisuals();
+	Present();
+
+	if ( head.GetEntity() ) {
+		// since the body anim was updated, we need to run physics to update the position of the head
+		RunPhysics();
+
+		// make sure our model gets updated
+		head.GetEntity()->GetAnimator()->ForceUpdate();
+
+		// update the anim bounds
+		head.GetEntity()->UpdateAnimation();
+		head.GetEntity()->UpdateVisuals();
+		head.GetEntity()->Present();
+	}
+
+	fl.neverDormant = true;
+}
+
+/*
+=====================
 idAI::Activate
 
 Notifies the script that a monster has been activated by a trigger or flashlight
 =====================
 */
 void idAI::Activate( idEntity *activator ) {
+#ifndef HUMANHEAD
 	idPlayer *player;
+#endif
 
-	// Set our tether?
-	if ( activator && activator->IsType ( rvAITether::GetClassType ( ) ) ) {
-		SetTether ( static_cast<rvAITether*>(activator) );
-	}
-
-	if ( aifl.dead ) {
+	if ( AI_DEAD ) {
 		// ignore it when they're dead
 		return;
 	}
@@ -1784,23 +3732,68 @@ void idAI::Activate( idEntity *activator ) {
 	// make sure he's not dormant
 	dormantStart = 0;
 
-	aifl.activated = true;
-	if ( !activator || !activator->IsType( idPlayer::GetClassType() ) ) {
-		player = gameLocal.GetLocalPlayer();
+	if ( num_cinematics ) {
+		PlayCinematic();
 	} else {
-		player = static_cast<idPlayer *>( activator );
-	}
+		AI_ACTIVATED = true;
+#ifdef HUMANHEAD
+	    // HUMANHEAD PDM: Allow activation by any actor, not just players
+	    if ( activator && activator->IsType( idActor::Type ) ) {
+		    idActor *actor = static_cast<idActor *>( activator );
+		    //HUMANHEAD: jrm - check if we don't have an enemy
+		    if ( !enemy.IsValid() && ReactionTo( actor ) & ATTACK_ON_ACTIVATE ) {
+			    SetEnemy( actor );
+			    SetEnemyPosition();
+		    }
+	    }
+#else
+		if ( !activator || !activator->IsType( idPlayer::Type ) ) {
+			player = gameLocal.GetLocalPlayer();
+		} else {
+			player = static_cast<idPlayer *>( activator );
+		}
 
-	if ( ReactionTo( player ) & ATTACK_ON_ACTIVATE ) {
-		SetEnemy( player );
+		if ( ReactionTo( player ) & ATTACK_ON_ACTIVATE ) {
+			SetEnemy( player );
+		}
+#endif
+
+		// update the script in cinematics so that entities don't start anims or show themselves a frame late.
+		if ( cinematic ) {
+            UpdateAIScript();
+
+			// make sure our model gets updated
+			animator.ForceUpdate();
+
+			// update the anim bounds
+			UpdateAnimation();
+			UpdateVisuals();
+			Present();
+
+			if ( head.GetEntity() ) {
+				// since the body anim was updated, we need to run physics to update the position of the head
+				RunPhysics();
+
+				// make sure our model gets updated
+				head.GetEntity()->GetAnimator()->ForceUpdate();
+
+				// update the anim bounds
+				head.GetEntity()->UpdateAnimation();
+				head.GetEntity()->UpdateVisuals();
+				head.GetEntity()->Present();
+			}
+		}
 	}
-	
-	// If being activated by a spawner we need to attach to it
-	if ( activator && activator->IsType ( rvSpawner::GetClassType() ) ) {
-		rvSpawner* spawn = static_cast<rvSpawner*>( activator );
-		spawn->Attach ( this );
-		SetSpawner ( spawn );
-	}
+}
+
+/*
+=====================
+idAI::EnemyDead
+=====================
+*/
+void idAI::EnemyDead( void ) {
+	ClearEnemy();
+	AI_ENEMY_DEAD = true;
 }
 
 /*
@@ -1809,94 +3802,25 @@ idAI::TalkTo
 =====================
 */
 void idAI::TalkTo( idActor *actor ) {
-
-	// jshepard: the dead do not speak.
-	if ( aifl.dead )
-		return;
-
-	ExecScriptFunction( funcs.onclick );
-
-	// Cant talk when already talking
-	if ( aifl.action || IsSpeaking ( ) || !aiManager.CheckTeamTimer ( team, AITEAMTIMER_ACTION_TALK ) ) {
+	if ( talk_state != TALK_OK ) {
 		return;
 	}
 
-
-	switch ( GetTalkState ( ) ) {
-		case TALK_OK:
-			if ( talkMessage >= TALKMSG_LOOP ) {
-				//MCG: requested change: stop responding after one loop
-				return;
-			}
-			// at least one second between talking to people 
-			aiManager.SetTeamTimer ( team, AITEAMTIMER_ACTION_TALK, 2000 );
-		
-			talkTarget = actor;
-
-			// Move to the next talk message
-			talkMessage = (talkMessage_t)((int)talkMessage + 1);
-			
-			// Loop until we find a valid talk message
-			while ( 1 ) {
-				idStr postfix;
-				if ( talkMessage >= TALKMSG_LOOP ) {
-					postfix = aiTalkMessageString[TALKMSG_LOOP];
-					postfix += va("%d", (int)(talkMessage - TALKMSG_LOOP+1) );
-				} else {
-					postfix = aiTalkMessageString[talkMessage];
-				}
-				// Try the lipsync for the specific passive prefix first
-				if ( Speak ( va("lipsync_%stalk_%s", passive.prefix.c_str(), postfix.c_str() ) ) ) {
-					break;
-				}
-				// Try the generic lipsync for the current talk message
-				if ( Speak ( va("lipsync_talk_%s", postfix.c_str() ) ) ) {
-					break;
-				}
-				// If the first loop failed then there is no other options
-				if ( talkMessage == TALKMSG_LOOP ) {
-					return;
-				} else if ( talkMessage >= TALKMSG_LOOP ) {
-					talkMessage = TALKMSG_LOOP;
-				} else {
-					talkMessage = (talkMessage_t)((int)talkMessage + 1);
-				}
-			}
-			
-			// Start talking anim if we have one
-			if ( IsSpeaking ( ) ) {
-				passive.talkTime = speakTime;
-			}
-			
-			break;
-		
-		case TALK_FOLLOW:
-			if ( actor == leader ) {
-				leader = NULL;
-				Speak ( "lipsync_stopfollow", true );
-			} else {
-				leader = actor;
-				Speak ( "lipsync_follow", true );
-			}
-			break;
-			
-		case TALK_BUSY:
-			if ( talkBusyCount > 3 )
-			{//only say a max of 4 lines
-				return;
-			}
-			talkBusyCount++;
-			//try to say this variant - if we can't, stop forever
-			if ( !Speak ( va("lipsync_busy_%d",talkBusyCount) ) )
-			{//nevermore
-				talkBusyCount = 999;
-			}
-			break;
-
-		case TALK_WAIT:
-			//do nothing
-			break;
+	talkTarget = actor;
+	if ( actor ) {
+		AI_TALK = true;
+	} else {
+		AI_TALK = false;
 	}
+}
+
+/*
+=====================
+idAI::GetEnemy
+=====================
+*/
+idActor	*idAI::GetEnemy( void ) const {
+	return enemy.GetEntity();
 }
 
 /*
@@ -1905,16 +3829,13 @@ idAI::GetTalkState
 =====================
 */
 talkState_t idAI::GetTalkState( void ) const {
-	if ( ( talkState != TALK_NEVER ) && aifl.dead ) {
+	if ( ( talk_state != TALK_NEVER ) && AI_DEAD ) {
 		return TALK_DEAD;
 	}
 	if ( IsHidden() ) {
 		return TALK_NEVER;
 	}
-	if ( (talkState == TALK_OK || talkState == TALK_FOLLOW) && aifl.scripted ) {
-		return TALK_BUSY;
-	}
-	return talkState;
+	return talk_state;
 }
 
 /*
@@ -1923,7 +3844,7 @@ idAI::TouchedByFlashlight
 =====================
 */
 void idAI::TouchedByFlashlight( idActor *flashlight_owner ) {
-	if ( RespondToFlashlight() ) {
+	if ( wakeOnFlashlight ) {
 		Activate( flashlight_owner );
 	}
 }
@@ -1933,33 +3854,142 @@ void idAI::TouchedByFlashlight( idActor *flashlight_owner ) {
 idAI::ClearEnemy
 =====================
 */
-void idAI::ClearEnemy( bool dead ) {
-	// Dont bother if we dont have an enemy
-	if ( !enemy.ent ) {
-		return;
-	}
-
+void idAI::ClearEnemy( void ) {
 	if ( move.moveCommand == MOVE_TO_ENEMY ) {
 		StopMove( MOVE_STATUS_DEST_NOT_FOUND );
-	} else if ( !aifl.scripted
-		&& move.moveCommand == MOVE_TO_COVER
-		&& !move.fl.done
-		&& aasSensor->Reserved()
-		&& !IsBehindCover() ) {
-		//clear cover and stop move
-		aasSensor->Reserve( NULL );
-		combat.coverValidTime = 0;
-		OnCoverInvalidated();
-		ForceTacticalUpdate();
-		StopMove( MOVE_STATUS_DONE );
 	}
 
 	enemyNode.Remove();
-	enemy.ent			= NULL;
-	enemy.fl.dead		= dead;	
-	combat.fl.seenEnemyDirectly = false;
-	
-	UpdateHelper ( );
+	enemy				= NULL;
+	AI_ENEMY_IN_FOV		= false;
+	AI_ENEMY_VISIBLE	= false;
+	AI_ENEMY_DEAD		= true;
+
+	SetChatSound();
+}
+
+/*
+=====================
+idAI::EnemyPositionValid
+=====================
+*/
+bool idAI::EnemyPositionValid( void ) const {
+	trace_t	tr;
+	idVec3	muzzle;
+	idMat3	axis;
+
+	if ( !enemy.GetEntity() ) {
+		return false;
+	}
+
+	if ( AI_ENEMY_VISIBLE ) {
+		return true;
+	}
+
+	gameLocal.clip.TracePoint( tr, GetEyePosition(), lastVisibleEnemyPos + lastVisibleEnemyEyeOffset, MASK_OPAQUE, this );
+	if ( tr.fraction < 1.0f ) {
+		// can't see the area yet, so don't know if he's there or not
+		return true;
+	}
+
+	return false;
+}
+
+/*
+=====================
+idAI::SetEnemyPosition
+=====================
+*/
+void idAI::SetEnemyPosition( void ) {
+	idActor		*enemyEnt = enemy.GetEntity();
+	int			enemyAreaNum;
+	int			areaNum;
+	int			lastVisibleReachableEnemyAreaNum;
+	aasPath_t	path;
+	idVec3		pos;
+	bool		onGround;
+
+	if ( !enemyEnt ) {
+		return;
+	}
+
+	lastVisibleReachableEnemyPos = lastReachableEnemyPos;
+	lastVisibleEnemyEyeOffset = enemyEnt->EyeOffset();
+	lastVisibleEnemyPos = enemyEnt->GetPhysics()->GetOrigin();
+	if ( move.moveType == MOVETYPE_FLY ) {
+		pos = lastVisibleEnemyPos;
+		onGround = true;
+	} else {
+		onGround = enemyEnt->GetFloorPos( 64.0f, pos );
+		if ( enemyEnt->OnLadder() ) {
+			onGround = false;
+		}
+	}
+
+	if ( !onGround ) {
+		if ( move.moveCommand == MOVE_TO_ENEMY ) {
+			AI_DEST_UNREACHABLE = true;
+		}
+		return;
+	}
+
+	// when we don't have an AAS, we can't tell if an enemy is reachable or not,
+	// so just assume that he is.
+	if ( !aas ) {
+		lastVisibleReachableEnemyPos = lastVisibleEnemyPos;
+		if ( move.moveCommand == MOVE_TO_ENEMY ) {
+			AI_DEST_UNREACHABLE = false;
+		}
+		enemyAreaNum = 0;
+		areaNum = 0;
+	} else {
+		lastVisibleReachableEnemyAreaNum = move.toAreaNum;
+		enemyAreaNum = PointReachableAreaNum( lastVisibleEnemyPos, 1.0f );
+		if ( !enemyAreaNum ) {
+			enemyAreaNum = PointReachableAreaNum( lastReachableEnemyPos, 1.0f );
+			pos = lastReachableEnemyPos;
+		}
+		if ( !enemyAreaNum ) {
+			AI_ENEMY_REACHABLE = false;
+			if ( move.moveCommand == MOVE_TO_ENEMY ) {
+				AI_DEST_UNREACHABLE = true;
+			}
+			areaNum = 0;
+		} else {
+			const idVec3 &org = physicsObj.GetOrigin();
+			areaNum = PointReachableAreaNum( org );
+			if ( PathToGoal( path, areaNum, org, enemyAreaNum, pos ) ) {
+				lastVisibleReachableEnemyPos = pos;
+				lastVisibleReachableEnemyAreaNum = enemyAreaNum;
+				if ( move.moveCommand == MOVE_TO_ENEMY ) {
+					AI_DEST_UNREACHABLE = false;
+				}
+				AI_ENEMY_REACHABLE = true;
+			} else if ( move.moveCommand == MOVE_TO_ENEMY ) {
+				AI_ENEMY_REACHABLE = false;
+				AI_DEST_UNREACHABLE = true;
+			}
+		}
+	}
+
+	if ( move.moveCommand == MOVE_TO_ENEMY ) {
+		if ( !aas ) {
+			// keep the move destination up to date for wandering
+			move.moveDest = lastVisibleReachableEnemyPos;
+		} else if ( enemyAreaNum ) {
+			move.toAreaNum = lastVisibleReachableEnemyAreaNum;
+			move.moveDest = lastVisibleReachableEnemyPos;
+		}
+
+		if ( move.moveType == MOVETYPE_FLY ) {
+			predictedPath_t path;
+			idVec3 end = move.moveDest;
+			end.z += enemyEnt->EyeOffset().z + fly_offset;
+			idAI::PredictPath( this, aas, move.moveDest, end - move.moveDest, 1000, 1000, SE_BLOCKED, path );
+			move.moveDest = path.endPos;
+			move.toAreaNum = PointReachableAreaNum( move.moveDest, 1.0f );
+		}
+	}
 }
 
 /*
@@ -1967,197 +3997,72 @@ void idAI::ClearEnemy( bool dead ) {
 idAI::UpdateEnemyPosition
 =====================
 */
-void idAI::UpdateEnemyPosition ( bool forceUpdate ) {
-	if( !enemy.ent || (!enemy.fl.visible && !forceUpdate) ) {
-		return;
-	}
-
-	idActor*  enemyActor = dynamic_cast<idActor*>(enemy.ent.GetEntity());
-	idEntity* enemyEnt   = static_cast<idEntity*>(enemy.ent.GetEntity());
-
-	enemy.lastVisibleFromEyePosition = GetEyePosition ( );
-
-	// Update the enemy origin if it isnt locked
-	if ( !enemy.fl.lockOrigin ) {
-		enemy.lastKnownPosition	= enemyEnt->GetPhysics()->GetOrigin();
-
-		if ( enemyActor ) {				
-			enemy.lastVisibleEyePosition	= enemyActor->GetEyePosition();
-			enemy.lastVisibleChestPosition	= enemyActor->GetChestPosition();
-		} else {
-			enemy.lastVisibleEyePosition	= enemy.ent->GetPhysics()->GetOrigin ( );
-			enemy.lastVisibleChestPosition	= enemy.ent->GetPhysics()->GetOrigin ( );
-		}		
-	}	
-}
-
-/*
-=====================
-idAI::UpdateEnemy
-=====================
-*/
-void idAI::UpdateEnemy ( void ) {
+void idAI::UpdateEnemyPosition( void ) {
+	idActor *enemyEnt = enemy.GetEntity();
+	int				enemyAreaNum;
+	int				areaNum;
+	aasPath_t		path;
 	predictedPath_t predictedPath;
-	
-	// If we lost our enemy then clear it out to be sure
-	if( !enemy.ent ) {
+	idVec3			enemyPos;
+	bool			onGround;
+
+	if ( !enemyEnt ) {
 		return;
 	}
 
-	// Rest to not being in fov
-	enemy.fl.inFov = false;
+	const idVec3 &org = physicsObj.GetOrigin();
 
-	// Bail out if we arent queued to do a complex think
-	if ( aifl.simpleThink ) {
-		// Keep the fov flag up to date
-		if ( IsEnemyVisible ( ) ) { 
-			enemy.fl.inFov = CheckFOV( enemy.lastKnownPosition );
+	if ( move.moveType == MOVETYPE_FLY ) {
+		enemyPos = enemyEnt->GetPhysics()->GetOrigin();
+		onGround = true;
+	} else {
+		onGround = enemyEnt->GetFloorPos( 64.0f, enemyPos );
+		if ( enemyEnt->OnLadder() ) {
+			onGround = false;
 		}
-	} else { 		
-		bool oldVisible;
-	
-		// Cache current enemy visiblity so we can see if it changes
-		oldVisible = IsEnemyVisible ( );
-	
-		// See if enemy still visible
-		UpdateEnemyVisibility  ( );
+	}
 
-		// If our enemy isnt visible but is within aware range then we know where he is
-		if ( !IsEnemyVisible ( ) && DistanceTo ( enemy.ent ) < combat.awareRange ) {
-			UpdateEnemyPosition( true );
+	if ( onGround ) {
+		// when we don't have an AAS, we can't tell if an enemy is reachable or not,
+		// so just assume that he is.
+		if ( !aas ) {
+			enemyAreaNum = 0;
+			lastReachableEnemyPos = enemyPos;
 		} else {
-/*		
-			// check if we heard any sounds in the last frame
-			if ( enemyEnt == gameLocal.GetAlertActor() ) {
-				float dist = ( enemyEnt->GetPhysics()->GetOrigin() - physicsObj.GetOrigin() ).LengthSqr();
-				if ( dist < Square( combat.earRange ) ) {
-					SetEnemyPosition();
+			enemyAreaNum = PointReachableAreaNum( enemyPos, 1.0f );
+			if ( enemyAreaNum ) {
+				areaNum = PointReachableAreaNum( org );
+				if ( PathToGoal( path, areaNum, org, enemyAreaNum, enemyPos ) ) {
+					lastReachableEnemyPos = enemyPos;
 				}
 			}
-*/
+		}
+	}
+
+	AI_ENEMY_IN_FOV		= false;
+	AI_ENEMY_VISIBLE	= false;
+
+	if ( CanSee( enemyEnt, false ) ) {
+		AI_ENEMY_VISIBLE = true;
+		if ( CheckFOV( enemyEnt->GetPhysics()->GetOrigin() ) ) {
+			AI_ENEMY_IN_FOV = true;
 		}
 
-		// Update fov
-		enemy.fl.inFov = CheckFOV( enemy.lastKnownPosition );
-
-		// Set enemy.visibleTime to the time when the visibility flag changed
-		if ( oldVisible != IsEnemyVisible ( ) ) {
-			// Just caught sight of the enemy after loosing him, delay the attack actions a bit
-			if ( !oldVisible && combat.attackSightDelay ) {
-				float delay;
-				if ( enemy.lastVisibleChangeTime ) {
-					// The longer the enemy has not been visible, the more we should delay
-					delay = idMath::ClampFloat ( 0.0f, 1.0f, (gameLocal.time - enemy.lastVisibleChangeTime) / AI_SIGHTDELAYSCALE );
-				} else {
-					// The enemy has never been visible so delay the full amount
-					delay = 1.0f;
-				}
-				// Add to the ranged attack timer providing its not already running a timer
-				if ( actionTimerRangedAttack.IsDone ( actionTime) ) {
-					actionTimerRangedAttack.Clear ( actionTime );
-					actionTimerRangedAttack.Add ( combat.attackSightDelay * delay, 0.5f );
-				}
-				// Add to the special attack timer providing its not already running a timer
-				if ( actionTimerSpecialAttack.IsDone ( actionTime ) ) {
-					actionTimerSpecialAttack.Clear ( actionTime );		
-					actionTimerSpecialAttack.Add ( combat.attackSightDelay * delay, 0.5f );
-				}
+		SetEnemyPosition();
+	} else {
+		// check if we heard any sounds in the last frame
+		if ( enemyEnt == gameLocal.GetAlertEntity() ) {
+			float dist = ( enemyEnt->GetPhysics()->GetOrigin() - org ).LengthSqr();
+			if ( dist < Square( AI_HEARING_RANGE ) ) {
+				SetEnemyPosition();
 			}
-
-			enemy.lastVisibleChangeTime = gameLocal.time;
-		}
-		
-		// Handler for visibility change
-		if ( oldVisible != IsEnemyVisible ( ) ) {
-			OnEnemyVisiblityChange ( oldVisible );
 		}
 	}
 
-	// Adjust smoothed linear and pushed velocities for enemies
-	if ( enemy.fl.visible ) {
-		enemy.smoothedLinearVelocity += ((enemy.ent->GetPhysics()->GetLinearVelocity ( ) - enemy.ent->GetPhysics()->GetPushedLinearVelocity ( ) - enemy.smoothedLinearVelocity) * enemy.smoothVelocityRate );
- 		enemy.smoothedPushedVelocity += ((enemy.ent->GetPhysics()->GetPushedLinearVelocity ( ) - enemy.smoothedPushedVelocity) * enemy.smoothVelocityRate );
- 	} else {
-		enemy.smoothedLinearVelocity -= (enemy.smoothedLinearVelocity * enemy.smoothVelocityRate );
- 		enemy.smoothedPushedVelocity -= (enemy.smoothedPushedVelocity * enemy.smoothVelocityRate );
-	} 	
-	
-	// Update enemy range
-	enemy.range	  = DistanceTo ( enemy.lastKnownPosition );
-	enemy.range2d = DistanceTo2d ( enemy.lastKnownPosition );
-
-	// Calulcate the aggression scale
-	// Skill level 0: (1.0)
-	// Skill level 1: (1.0 - 1.25)
-	// Skill level 2: (1.0 - 1.5)
-	// Skill level 3: (1.0 - 1.75)
-	if ( combat.aggressiveRange > 0.0f ) {
-		combat.aggressiveScale = (g_skill.GetFloat() / MAX_SKILL_LEVELS);
-		combat.aggressiveScale *= 1.0f - idMath::ClampFloat ( 0.0f, 1.0f, enemy.range / combat.aggressiveRange );
-		combat.aggressiveScale += 1.0f;
+	if ( ai_debugMove.GetBool() ) {
+		gameRenderWorld->DebugBounds( colorLtGrey, enemyEnt->GetPhysics()->GetBounds(), lastReachableEnemyPos, gameLocal.msec );
+		gameRenderWorld->DebugBounds( colorWhite, enemyEnt->GetPhysics()->GetBounds(), lastVisibleReachableEnemyPos, gameLocal.msec );
 	}
-}
-
-/*
-=====================
-idAI::LastKnownPosition
-=====================
-*/
-const idVec3& idAI::LastKnownPosition ( const idEntity *ent ) {
-	return	(ent==enemy.ent)?(enemy.lastKnownPosition):(ent->GetPhysics()->GetOrigin());
-}
-
-/*
-=====================
-idAI::UpdateEnemyVisibility
-
-Update whether or not the AI can see its enemy or not and determine how.
-=====================
-*/
-void idAI::UpdateEnemyVisibility ( void ) {
-	enemy.fl.visible = false;
-
-	// No enemy so nothing to see
-	if ( !enemy.ent ) {
-		return;
-	}
-
-	// Update enemy visibility flag
-	enemy.fl.visible = CanSeeFrom ( GetEyePosition ( ), enemy.ent, false );
-
-	// IF the enemy isnt visible and not forcing an update we can just early out
-	if ( !enemy.fl.visible ) {
-		return;
-	}
-	
-	// If we are seeing our enemy for the first time after changing enemies, call him out
-	if ( enemy.lastVisibleTime < enemy.changeTime ) {
-		AnnounceNewEnemy( );
-	}
-	
-	combat.fl.seenEnemyDirectly = true;
-	enemy.lastVisibleTime		= gameLocal.time;
-	
-	// Update our known locations of the enemy since we just saw him
-	UpdateEnemyPosition ( );
-}
-
-/*
-=====================
-idAI::SetSpawner
-=====================
-*/
-void idAI::SetSpawner ( rvSpawner* _spawner ) {
-	spawner = _spawner;
-}
-
-/*
-=====================
-idAI::SetSpawner
-=====================
-*/
-rvSpawner* idAI::GetSpawner ( void ) {
-	return spawner;
 }
 
 /*
@@ -2165,52 +4070,87 @@ rvSpawner* idAI::GetSpawner ( void ) {
 idAI::SetEnemy
 =====================
 */
-bool idAI::SetEnemy( idEntity *newEnemy ) {
-	idEntity*	oldEnemy;
+void idAI::SetEnemy( idActor *newEnemy ) {
+	int enemyAreaNum;
 
-	// Look for obvious early out
-	if ( enemy.ent == newEnemy ) {
-		return true; 
+	if ( AI_DEAD ) {
+		ClearEnemy();
+		return;
 	}
 
-	// Cant set enemy if dead
-	if ( aifl.dead ) {
-		ClearEnemy ( false );
-		return false;
-	}
-
-	// Cant set enemy if the enemy is dead or has no target set
-	if ( newEnemy ) {
-		if ( newEnemy->health <= 0 || newEnemy->fl.notarget ) {
-			return false;
-		}
-	}
-
-	oldEnemy  			= enemy.ent;
-	enemy.fl.dead		= false;
-	enemy.fl.lockOrigin	= false;
-
+	AI_ENEMY_DEAD = false;
 	if ( !newEnemy ) {
-		ClearEnemy ( false );
-	} else {
-		// Set our current enemy
-		enemy.ent = newEnemy;
+		ClearEnemy();
+	} else if ( enemy.GetEntity() != newEnemy ) {
+		enemy = newEnemy;
+		enemyNode.AddToEnd( newEnemy->enemyList );
+		if ( newEnemy->health <= 0 ) {
+			EnemyDead();
+			return;
+		}
+		// let the monster know where the enemy is
+		newEnemy->GetAASLocation( aas, lastReachableEnemyPos, enemyAreaNum );
+		SetEnemyPosition();
+		SetChatSound();
 
-		// If the enemy is an actor then add to the actors enemy list
-		if( newEnemy->IsType( idActor::GetClassType() ) ){
-			idActor* enemyActor = static_cast<idActor*>( newEnemy );
-			enemyNode.AddToEnd( enemyActor->enemyList );
+		lastReachableEnemyPos = lastVisibleEnemyPos;
+		lastVisibleReachableEnemyPos = lastReachableEnemyPos;
+		enemyAreaNum = PointReachableAreaNum( lastReachableEnemyPos, 1.0f );
+		if ( aas && enemyAreaNum ) {
+			aas->PushPointIntoAreaNum( enemyAreaNum, lastReachableEnemyPos );
+			lastVisibleReachableEnemyPos = lastReachableEnemyPos;
 		}
 	}
-	
-	// Allow custom handling of enemy change
-	if ( enemy.ent != oldEnemy ) {
-		OnEnemyChange ( oldEnemy );
-	}
-	
-	return true;
 }
 
+/*
+============
+idAI::FirstVisiblePointOnPath
+============
+*/
+idVec3 idAI::FirstVisiblePointOnPath( const idVec3 origin, const idVec3 &target, int travelFlags ) const {
+	int i, areaNum, targetAreaNum, curAreaNum, travelTime;
+	idVec3 curOrigin;
+	idReachability *reach;
+
+	if ( !aas ) {
+		return origin;
+	}
+
+	areaNum = PointReachableAreaNum( origin );
+	targetAreaNum = PointReachableAreaNum( target );
+
+	if ( !areaNum || !targetAreaNum ) {
+		return origin;
+	}
+
+	if ( ( areaNum == targetAreaNum ) || PointVisible( origin ) ) {
+		return origin;
+	}
+
+	curAreaNum = areaNum;
+	curOrigin = origin;
+
+	for( i = 0; i < 10; i++ ) {
+
+		if ( !aas->RouteToGoalArea( curAreaNum, curOrigin, targetAreaNum, travelFlags, travelTime, &reach ) ) {
+			break;
+		}
+
+		if ( !reach ) {
+			return target;
+		}
+
+		curAreaNum = reach->toAreaNum;
+		curOrigin = reach->end;
+
+		if ( PointVisible( curOrigin ) ) {
+			return curOrigin;
+		}
+	}
+
+	return origin;
+}
 
 /*
 ===================
@@ -2219,14 +4159,14 @@ idAI::CalculateAttackOffsets
 calculate joint positions on attack frames so we can do proper "can hit" tests
 ===================
 */
-void idAI::CalculateAttackOffsets ( void ) {
-	const idDeclModelDef*	modelDef;
+void idAI::CalculateAttackOffsets( void ) {
+	const idDeclModelDef	*modelDef;
 	int						num;
 	int						i;
 	int						frame;
-	const frameCommand_t*	command;
+	const frameCommand_t	*command;
 	idMat3					axis;
-	const idAnim*			anim;
+	const idAnim			*anim;
 	jointHandle_t			joint;
 
 	modelDef = animator.ModelDef();
@@ -2240,29 +4180,24 @@ void idAI::CalculateAttackOffsets ( void ) {
 
 	// anim number 0 is reserved for non-existant anims.  to avoid off by one issues, just allocate an extra spot for
 	// launch offsets so that anim number can be used without subtracting 1.
-	attackAnimInfo.SetGranularity( 1 );
-	attackAnimInfo.SetNum( num + 1 );
-	attackAnimInfo[ 0 ].attackOffset.Zero();
-	attackAnimInfo[ 0 ].eyeOffset.Zero();
+	missileLaunchOffset.SetGranularity( 1 );
+	missileLaunchOffset.SetNum( num + 1 );
+	missileLaunchOffset[ 0 ].Zero();
 
 	for( i = 1; i <= num; i++ ) {
-		attackAnimInfo[ i ].attackOffset.Zero();
-		attackAnimInfo[ i ].eyeOffset.Zero();
+		missileLaunchOffset[ i ].Zero();
 		anim = modelDef->GetAnim( i );
-		if ( !anim ) {
-			continue;
-		}
-		
-		frame = anim->FindFrameForFrameCommand( FC_AI_ATTACK, &command );
-		if ( frame >= 0 ) {
-			joint = animator.GetJointHandle( command->joint->c_str() );
-			if ( joint == INVALID_JOINT ) {
-				gameLocal.Error( "Invalid joint '%s' on 'ai_attack' frame command on frame %d of model '%s'", command->joint->c_str(), frame, modelDef->GetName() );
-			}
-			GetJointTransformForAnim( joint, i, FRAME2MS( frame ), attackAnimInfo[ i ].attackOffset, axis );
-			
-			if ( chestOffsetJoint!= INVALID_JOINT ) {
-				GetJointTransformForAnim( chestOffsetJoint, i, FRAME2MS( frame ), attackAnimInfo[ i ].eyeOffset, axis );
+		if ( anim ) {
+			frame = anim->FindFrameForFrameCommand( FC_LAUNCHMISSILE, &command );
+			if ( frame >= 0 ) {
+				// HUMANHEAD nla - We have extra data in our frame commands, so need to strip that out/get to the joint name
+				const char *jointName = GetJointForFrameCommand( command->string->c_str() );
+				joint = animator.GetJointHandle( jointName );
+				// HUMANHEAD END
+				if ( joint == INVALID_JOINT ) {
+					gameLocal.Error( "Invalid joint '%s' on 'launch_missile' frame command on frame %d of model '%s'", command->string->c_str(), frame, modelDef->GetName() );
+				}
+				GetJointTransformForAnim( joint, i, FRAME2MS( frame ), missileLaunchOffset[ i ], axis );
 			}
 		}
 	}
@@ -2278,59 +4213,17 @@ idAI::CreateProjectileClipModel
 void idAI::CreateProjectileClipModel( void ) const {
 	if ( projectileClipModel == NULL ) {
 		idBounds projectileBounds( vec3_origin );
-		projectileBounds.ExpandSelf( 2.0f ); // projectileRadius );
+		projectileBounds.ExpandSelf( projectileRadius );
 		projectileClipModel	= new idClipModel( idTraceModel( projectileBounds ) );
-	}
-}
-
-/*
-=====================
-idAI::GetPredictedAimDirOffset
-=====================
-*/
-void idAI::GetPredictedAimDirOffset ( const idVec3& source, const idVec3& target, float projectileSpeed, const idVec3& targetVelocity, idVec3& offset ) const {
-	float  a;
-	float  b;
-	float  c;
-	float  d;
-	float  t;
-	idVec3 r;
-	
-	// Make sure there is something to predict
-	if ( targetVelocity.LengthSqr ( ) == 0.0f ) {
-		offset.Zero ( );
-		return;
-	}
-	
-	// Solve for (t):  magnitude(targetVelocity * t + target - source) = projectileSpeed * t	
-	
-	r = (target-source);
-	a = (targetVelocity * targetVelocity) - Square(projectileSpeed);
-	b = (targetVelocity * 2.0f) * r;
-	c = r*r;
-	d = b*b - 4*a*c; 
-	t = 0.0f;
-	
-	if ( d >= 0.0f ) {
-		float  t1;
-		float  t2;
-		float  denom;
-		d     = idMath::Sqrt(d);
-		denom = 1.0f / (2.0f * a);
-		t1    = (-b + d) * denom;
-		t2    = (-b - d) * denom;
-		if ( t1 < 0.0f && t2 < 0.0f ) {
-			t = 0.0f;
-		} else if ( t1 < 0.0f ) {
-			t = t2;
-		} else if ( t2 < 0.0f ) {
-			t = t1;
-		} else {
-			t = Min(t1,t2);
+		//HUMANHEAD mdc - added to support multiple projectiles
+		if( projectileDefaultDefIndex >= 0 ) {	//propagate back to our projectileInfos
+			int projIndex = FindProjectileInfo( projectileDef );
+			if( projIndex >= 0 ) {
+				projectileInfos[ projIndex ].projectileClipModel = projectileClipModel;
+			}
 		}
+		//HUMANHEAD END
 	}
-
-	offset = targetVelocity * t;
 }
 
 /*
@@ -2338,86 +4231,65 @@ void idAI::GetPredictedAimDirOffset ( const idVec3& source, const idVec3& target
 idAI::GetAimDir
 =====================
 */
-bool idAI::GetAimDir( 
-	const idVec3&	firePos, 
-	const idEntity*	target, 
-	const idDict*	projectileDef, 
-	idEntity*		ignore, 
-	idVec3&			aimDir, 
-	float			aimOffset,
-	float			predict
-	) const 
-{
-	idVec3		targetPos1;
-	idVec3		targetPos2;
-	idVec3		targetLinearVel;
-	idVec3		targetPushedVel;
-	idVec3		delta;
-	float		max_height;
-	bool		result;
-	idEntity*	targetEnt = const_cast<idEntity*>(target);
+bool idAI::GetAimDir( const idVec3 &firePos, idEntity *aimAtEnt, const idEntity *ignore, idVec3 &aimDir ) const {
+	idVec3	targetPos1;
+	idVec3	targetPos2;
+	idVec3	delta;
+	float	max_height;
+	bool	result;
 
 	// if no aimAtEnt or projectile set
-	if ( !targetEnt ) {
+	if ( !aimAtEnt || !projectileDef ) {
 		aimDir = viewAxis[ 0 ] * physicsObj.GetGravityAxis();
 		return false;
 	}
 
-	float	projectileSpeed   = idProjectile::GetVelocity ( projectileDef ).LengthFast ( );
-	idVec3	projectileGravity = idProjectile::GetGravity ( projectileDef );
-
 	if ( projectileClipModel == NULL ) {
 		CreateProjectileClipModel();
 	}
-
-	if ( targetEnt == enemy.ent ) {
-		targetPos2 = enemy.lastVisibleEyePosition;
-		targetPos1 = enemy.lastVisibleChestPosition;
-		targetPushedVel = enemy.smoothedPushedVelocity;
-		targetLinearVel = enemy.smoothedLinearVelocity;
-	} else if ( targetEnt->IsType( idActor::GetClassType() ) ) {
-		targetPos2  = static_cast<idActor*>(targetEnt)->GetEyePosition ( );
-		targetPos1  = static_cast<idActor*>(targetEnt)->GetChestPosition ( );
-		targetPushedVel = target->GetPhysics()->GetPushedLinearVelocity ( );
-		targetLinearVel = (target->GetPhysics()->GetLinearVelocity ( ) - targetPushedVel);
-	} else {
-		targetPos1 = targetEnt->GetPhysics()->GetAbsBounds().GetCenter();
-		targetPos2 = targetPos1;
-		targetPushedVel.Zero ( );
-		targetLinearVel.Zero ( );
-	}
 	
-	// Target prediction
-	if ( projectileSpeed == 0.0f ) {
-		// Hitscan prediction actually causes the hitscan to miss unless it is predicted.
-		delta = (targetLinearVel * (-1.0f + predict));
+	if ( aimAtEnt == enemy.GetEntity() ) {
+		static_cast<idActor *>( aimAtEnt )->GetAIAimTargets( lastVisibleEnemyPos, targetPos1, targetPos2 );		
+	} else if ( aimAtEnt->IsType( idActor::Type ) ) {
+		static_cast<idActor *>( aimAtEnt )->GetAIAimTargets( aimAtEnt->GetPhysics()->GetOrigin(), targetPos1, targetPos2 );		
 	} else {
-		// Projectile prediction must figure out how far to lead the shot to hit the target
-		GetPredictedAimDirOffset ( firePos, targetPos1, projectileSpeed, (targetLinearVel*predict)+targetPushedVel, delta );
+		targetPos1 = aimAtEnt->GetPhysics()->GetAbsBounds().GetCenter();
+		targetPos2 = targetPos1;	
 	}
-	targetPos1 += delta;
-	targetPos2 += delta;
-
-	result = false;
 	
 	// try aiming for chest
-	delta = targetPos1 - firePos;
-	max_height = (delta.NormalizeFast ( ) + aimOffset) * projectile_height_to_distance_ratio;	
-	if ( max_height > 0.0f ) {
-		result = PredictTrajectory( firePos, targetPos1 + delta * aimOffset, projectileSpeed, projectileGravity, projectileClipModel, MASK_SHOT_RENDERMODEL, max_height, ignore, targetEnt, ai_debugTrajectory.GetBool() ? 1000 : 0, aimDir );
-		if ( result || !targetEnt->IsType( idActor::GetClassType() ) ) {
-			return result;
-		}
+	delta = firePos - targetPos1;
+	max_height = delta.LengthFast() * projectile_height_to_distance_ratio;
+	result = PredictTrajectory( firePos, targetPos1, projectileSpeed, projectileGravity, projectileClipModel, MASK_SHOT_RENDERMODEL, max_height, ignore, aimAtEnt, ai_debugTrajectory.GetBool() ? 1000 : 0, aimDir );
+	if ( result || !aimAtEnt->IsType( idActor::Type ) ) {
+		return result;
 	}
 
 	// try aiming for head
-	delta = targetPos2 - firePos;
-	max_height = (delta.NormalizeFast ( ) + aimOffset) * projectile_height_to_distance_ratio;
-	if ( max_height > 0.0f ) {
-		result = PredictTrajectory( firePos, targetPos2 + delta * aimOffset, projectileSpeed, projectileGravity, projectileClipModel, MASK_SHOT_RENDERMODEL, max_height, ignore, targetEnt, ai_debugTrajectory.GetBool() ? 1000 : 0, aimDir );
-	}
+	delta = firePos - targetPos2;
+	max_height = delta.LengthFast() * projectile_height_to_distance_ratio;
+	result = PredictTrajectory( firePos, targetPos2, projectileSpeed, projectileGravity, projectileClipModel, MASK_SHOT_RENDERMODEL, max_height, ignore, aimAtEnt, ai_debugTrajectory.GetBool() ? 1000 : 0, aimDir );
 
 	return result;
+}
+
+/*
+=====================
+idAI::BeginAttack
+=====================
+*/
+void idAI::BeginAttack( const char *name ) {
+	attack = name;
+	lastAttackTime = gameLocal.time;
+}
+
+/*
+=====================
+idAI::EndAttack
+=====================
+*/
+void idAI::EndAttack( void ) {
+	attack = "";
 }
 
 /*
@@ -2425,22 +4297,22 @@ bool idAI::GetAimDir(
 idAI::CreateProjectile
 =====================
 */
-idProjectile *idAI::CreateProjectile ( const idDict* projectileDict, const idVec3 &pos, const idVec3 &dir ) {
-	idEntity*	ent;
-	const char*	clsname;
+idProjectile *idAI::CreateProjectile( const idVec3 &pos, const idVec3 &dir ) {
+	idEntity *ent;
+	const char *clsname;
 
 	if ( !projectile.GetEntity() ) {
-		gameLocal.SpawnEntityDef( *projectileDict, &ent, false );
+		gameLocal.SpawnEntityDef( *projectileDef, &ent, false );
 		if ( !ent ) {
-			clsname = projectileDict->GetString( "classname" );
+			clsname = projectileDef->GetString( "classname" );
 			gameLocal.Error( "Could not spawn entityDef '%s'", clsname );
 		}
 		
-		if ( !ent->IsType( idProjectile::GetClassType() ) ) {
+		if ( !ent->IsType( idProjectile::Type ) ) {
 			clsname = ent->GetClassname();
 			gameLocal.Error( "'%s' is not an idProjectile", clsname );
 		}
-		projectile = (idProjectile*)ent;
+		projectile = ( idProjectile * )ent;
 	}
 
 	projectile.GetEntity()->Create( this, pos, dir );
@@ -2462,209 +4334,161 @@ void idAI::RemoveProjectile( void ) {
 
 /*
 =====================
-idAI::Attack
+idAI::LaunchProjectile
 =====================
 */
-bool idAI::Attack ( const char* attackName, jointHandle_t joint, idEntity* target, const idVec3& pushVelocity ) {
-	// Get the attack dictionary
-	const idDict* attackDict;
-	attackDict = gameLocal.FindEntityDefDict ( spawnArgs.GetString ( va("def_attack_%s", attackName ) ), false );
-	if ( !attackDict ) {
-		gameLocal.Error ( "could not find attack entityDef 'def_attack_%s (%s)' on AI entity %s", attackName, spawnArgs.GetString ( va("def_attack_%s", attackName ) ), GetName ( ) );
-	}
-
-	// Melee Attack?
-	if ( spawnArgs.GetBool ( va("attack_%s_melee", attackName ), "0" ) ) {
-		return AttackMelee ( attackName, attackDict );
-	}
-
-	// Ranged attack (hitscan or projectile)?
-	return ( AttackRanged ( attackName, attackDict, joint, target, pushVelocity ) != NULL );
-}
-
-/*
-=====================
-idAI::AttackRanged
-=====================
-*/
-idProjectile* idAI::AttackRanged ( 
-	const char*		attackName, 
-	const idDict*	attackDict, 
-	jointHandle_t	joint, 
-	idEntity*		target, 
-	const idVec3&	pushVelocity 
-	)	 
-{
+idProjectile *idAI::LaunchProjectile( const char *jointname, idEntity *target, bool clampToAttackCone, const idDict* desiredProjectileDef ) {	//HUMANHEAD mdc - added desiredProjectileDef for supporting multiple projs.
+	idVec3				muzzle;
+	idVec3				dir;
+	idVec3				start;
+	trace_t				tr;
+	idBounds			projBounds;
+	float				distance;
+	const idClipModel	*projClip;
 	float				attack_accuracy;
 	float				attack_cone;
-	float				attack_spread;
-	int					attack_count;
-	bool				attack_hitscan;
-	float				attack_predict;
-	float				attack_pullback;
-	int					i;
-	idVec3				muzzleOrigin;
-	idMat3				muzzleAxis;
-	idVec3				dir;
+	float				projectile_spread;
+	float				diff;
+	float				angle;
+	float				spin;
 	idAngles			ang;
+	int					num_projectiles;
+	int					i;
 	idMat3				axis;
-	idProjectile*		lastProjectile;
-	
-	lastProjectile		= NULL;
-	
-	// Generic attack properties
-	attack_accuracy		= spawnArgs.GetFloat ( va("attack_%s_accuracy", attackName ), "7" );
-	attack_cone			= spawnArgs.GetFloat ( va("attack_%s_cone", attackName ), "75" );
-	attack_spread		= DEG2RAD ( spawnArgs.GetFloat ( va("attack_%s_spread", attackName ), "0" ) );
-	attack_count		= spawnArgs.GetInt ( va("attack_%s_count", attackName ), "1" );
-	attack_hitscan		= spawnArgs.GetBool ( va("attack_%s_hitscan", attackName ), "0" );
-	attack_predict		= spawnArgs.GetFloat ( va("attack_%s_predict", attackName ), "0" );
-	attack_pullback		= spawnArgs.GetFloat ( va("attack_%s_pullback", attackName ), "0" );
+	idVec3				tmp;
+	idProjectile		*lastProjectile;
 
-	// Get the muzzle origin and axis from the given launch joint
-	GetMuzzle( joint, muzzleOrigin, muzzleAxis );
-	if ( attack_pullback )
-	{
-		muzzleOrigin -= muzzleAxis[0]*attack_pullback;
-	}
-
-	// set aiming direction
-	bool calcAim = true;
-	if ( GetEnemy() && GetEnemy() == target && GetEnemy() == gameLocal.GetLocalPlayer() && spawnArgs.GetBool( va("attack_%s_missFirstShot",attackName) ) ) {
-		//purposely miss
-		if ( gameLocal.random.RandomFloat() < 0.5f ) {
-			//actually, hit anyway...
-		} else {
-			idVec3 targetPos = enemy.lastVisibleEyePosition;
-			idVec3 eFacing;
-			idVec3 left, up;
-			
-			up.Set( 0, 0, 1 );
-			left = viewAxis[0].Cross(up);
-
-			if ( GetEnemy()->IsType( idActor::GetClassType() ) )
-			{
-				eFacing = ((idActor*)GetEnemy())->viewAxis[0];
-			}
-			else
-			{
-				eFacing = GetEnemy()->GetPhysics()->GetAxis()[0];
-			}
-			if ( left*eFacing > 0 )
-			{
-				targetPos += left * ((gameLocal.random.RandomFloat()*8.0f) + 8.0f);
-			}
-			else
-			{
-				targetPos -= left * ((gameLocal.random.RandomFloat()*8.0f) + 8.0f);
-			}
-			dir = targetPos-muzzleOrigin;
-			dir.Normalize();
-			attack_accuracy = 0;
-
-			calcAim = false;
-			//don't miss next time
-			spawnArgs.SetBool( va("attack_%s_missFirstShot",attackName), false );
+	//HUMANHEAD mdc - added to support multiple projectiles
+	if( desiredProjectileDef ) {	//try to set our projectile to the desiredProjectile
+		int projIndex = FindProjectileInfo( desiredProjectileDef );
+		if( projIndex >= 0 ) {
+			SetCurrentProjectile( projIndex );
 		}
 	}
-	if ( calcAim ) {
-		if ( target && !spawnArgs.GetBool ( va("attack_%s_lockToJoint",attackName), "0" ) ) {
-			GetAimDir( muzzleOrigin, target, attackDict, this, dir, 
-					spawnArgs.GetFloat ( va("attack_%s_aimoffset", attackName )),
-					attack_predict );
-		} else {
-			dir = muzzleAxis[0];
-			if ( spawnArgs.GetBool ( va("attack_%s_lockToJoint",attackName), "0" ) )
-			{
-				if ( spawnArgs.GetBool( va("attack_%s_traceToNextJoint", attackName ), "0" ) )
-				{
-					jointHandle_t endJoint = animator.GetFirstChild( joint );
-					if ( endJoint != INVALID_JOINT && endJoint != joint )
-					{
-						idVec3 endJointPos;
-						idMat3 blah;
-						GetJointWorldTransform( endJoint, gameLocal.GetTime(), endJointPos, blah );
-						dir = endJointPos-muzzleOrigin;
-						//ARGHH: need to be able to set range!!!
-						//const_cast<idDict*>(attackDict)->SetFloat( "range", dir.Normalize() );//NOTE: yes, I intentionally normalize here as well as use the result for length...
-						dir.Normalize();
-					}
-				}
-			}
-		}
+	//HUMANHEAD END
+
+
+	if ( !projectileDef ) {
+		gameLocal.Warning( "%s (%s) doesn't have a projectile specified", name.c_str(), GetEntityDefName() );
+		return NULL;
 	}
-	
-	// random accuracy
+
+	attack_accuracy = spawnArgs.GetFloat( "attack_accuracy", "7" );
+	attack_cone = spawnArgs.GetFloat( "attack_cone", "70" );
+	projectile_spread = spawnArgs.GetFloat( "projectile_spread", "0" );
+	num_projectiles = spawnArgs.GetInt( "num_projectiles", "1" );
+
+	GetMuzzle( jointname, muzzle, axis );
+
+	if ( !projectile.GetEntity() ) {
+		CreateProjectile( muzzle, axis[ 0 ] );
+	}
+
+	lastProjectile = projectile.GetEntity();
+
+	if ( target != NULL ) {
+		tmp = target->GetPhysics()->GetAbsBounds().GetCenter() - muzzle;
+		tmp.Normalize();
+		axis = tmp.ToMat3();
+	} else {
+		axis = viewAxis;
+	}
+
+	// rotate it because the cone points up by default
+	tmp = axis[2];
+	axis[2] = axis[0];
+	axis[0] = -tmp;
+
+	// make sure the projectile starts inside the monster bounding box
+	const idBounds &ownerBounds = physicsObj.GetAbsBounds();
+	projClip = lastProjectile->GetPhysics()->GetClipModel();
+	projBounds = projClip->GetBounds().Rotate( axis );
+
+	// check if the owner bounds is bigger than the projectile bounds
+	if ( ( ( ownerBounds[1][0] - ownerBounds[0][0] ) > ( projBounds[1][0] - projBounds[0][0] ) ) &&
+		( ( ownerBounds[1][1] - ownerBounds[0][1] ) > ( projBounds[1][1] - projBounds[0][1] ) ) &&
+		( ( ownerBounds[1][2] - ownerBounds[0][2] ) > ( projBounds[1][2] - projBounds[0][2] ) ) ) {
+		if ( (ownerBounds - projBounds).RayIntersection( muzzle, viewAxis[ 0 ], distance ) ) {
+			start = muzzle + distance * viewAxis[ 0 ];
+		} else {
+			start = ownerBounds.GetCenter();
+		}
+	} else {
+		// projectile bounds bigger than the owner bounds, so just start it from the center
+		start = ownerBounds.GetCenter();
+	}
+
+	gameLocal.clip.Translation( tr, start, muzzle, projClip, axis, MASK_SHOT_RENDERMODEL, this );
+	muzzle = tr.endpos;
+
+	// set aiming direction	
+	GetAimDir( muzzle, target, this, dir );
 	ang = dir.ToAngles();
-	ang.pitch += gameLocal.random.CRandomFloat ( ) * attack_accuracy;
-	ang.yaw   += gameLocal.random.CRandomFloat ( ) * attack_accuracy;
 
-	// Lock attacks to a cone?
-	if ( attack_cone ) {
-		float diff;
+	// adjust his aim so it's not perfect.  uses sine based movement so the tracers appear less random in their spread.
+	float t = MS2SEC( gameLocal.time + entityNumber * 497 );
+	ang.pitch += idMath::Sin16( t * 5.1 ) * attack_accuracy;
+	ang.yaw	+= idMath::Sin16( t * 6.7 ) * attack_accuracy;
+
+	if ( clampToAttackCone ) {
 		// clamp the attack direction to be within monster's attack cone so he doesn't do
 		// things like throw the missile backwards if you're behind him
-		diff = idMath::AngleDelta( ang.yaw, move.current_yaw );
+		diff = idMath::AngleDelta( ang.yaw, current_yaw );
 		if ( diff > attack_cone ) {
-			ang.yaw = move.current_yaw + attack_cone;
+			ang.yaw = current_yaw + attack_cone;
 		} else if ( diff < -attack_cone ) {
-			ang.yaw = move.current_yaw - attack_cone;
+			ang.yaw = current_yaw - attack_cone;
 		}
 	}
 
-	ang.Normalize360 ( );
 	axis = ang.ToMat3();
 
-	for( i = 0; i < attack_count; i++ ) {
-		float angle;
-		float spin;
-		
+	float spreadRad = DEG2RAD( projectile_spread );
+	for( i = 0; i < num_projectiles; i++ ) {
 		// spread the projectiles out
-		angle = idMath::Sin( attack_spread * gameLocal.random.RandomFloat() );
+		angle = idMath::Sin( spreadRad * gameLocal.random.RandomFloat() );
 		spin = (float)DEG2RAD( 360.0f ) * gameLocal.random.RandomFloat();
 		dir = axis[ 0 ] + axis[ 2 ] * ( angle * idMath::Sin( spin ) ) - axis[ 1 ] * ( angle * idMath::Cos( spin ) );
 		dir.Normalize();
 
-		if ( attack_hitscan ) {
-			gameLocal.HitScan( *attackDict, muzzleOrigin, dir, muzzleOrigin, this, false, combat.aggressiveScale );		
-		} else {
-			// launch the projectile
-			if ( !projectile.GetEntity() ) {
-				CreateProjectile( attackDict, muzzleOrigin, dir );
-			}
-			lastProjectile = projectile.GetEntity();
-			lastProjectile->Launch( muzzleOrigin, dir, pushVelocity, 0.0f, combat.aggressiveScale );
-		
-			// Let the script manage projectiles if need be
-			ExecScriptFunction ( funcs.launch_projectile, lastProjectile );
-		
-			projectile = NULL;
+		// launch the projectile
+		if ( !projectile.GetEntity() ) {
+			CreateProjectile( muzzle, dir );
 		}
+		lastProjectile = projectile.GetEntity();
+		lastProjectile->Launch( muzzle, dir, vec3_origin );
+		projectile = NULL;
 	}
+
+	TriggerWeaponEffects( muzzle, axis );
 
 	lastAttackTime = gameLocal.time;
 
-	// If shooting at another ai entity then kick off an attack reaction
-	if ( enemy.ent && enemy.ent->IsType ( idAI::GetClassType() ) ) {
-		static_cast<idAI*>(enemy.ent.GetEntity())->ReactToShotAt ( this, muzzleOrigin, axis[0] );
-	}
+//HUMANHEAD mdc - added to support multiple projectiles
+	projectile = NULL;
+	SetCurrentProjectile( projectileDefaultDefIndex );	//set back to our default projectile to be on the safe side
+//HUMANHEAD END
 
 	return lastProjectile;
 }
 
-/*s
+/*
 ================
 idAI::DamageFeedback
 
-callback function for when another entity recieved damage from this entity
+callback function for when another entity received damage from this entity.  damage can be adjusted and returned to the caller.
+
+FIXME: This gets called when we call idPlayer::CalcDamagePoints from idAI::AttackMelee, which then checks for a saving throw,
+possibly forcing a miss.  This is harmless behavior ATM, but is not intuitive.
 ================
 */
 void idAI::DamageFeedback( idEntity *victim, idEntity *inflictor, int &damage ) {
-	if ( ( victim == this ) && inflictor->IsType( idProjectile::GetClassType() ) ) {
+	if ( ( victim == this ) && inflictor->IsType( idProjectile::Type ) ) {
 		// monsters only get half damage from their own projectiles
 		damage = ( damage + 1 ) / 2;  // round up so we don't do 0 damage
-	} else if ( victim == enemy.ent ) {
-		aifl.hitEnemy = true;
+
+	} else if ( victim == enemy.GetEntity() ) {
+		AI_HIT_ENEMY = true;
 	}
 }
 
@@ -2709,9 +4533,10 @@ void idAI::DirectDamage( const char *meleeDefName, idEntity *ent ) {
 	idVec3	globalKickDir;
 	globalKickDir = ( viewAxis * physicsObj.GetGravityAxis() ) * kickDir;
 
-//	ent->Damage( this, this, globalKickDir, meleeDefName, 1.0f, INVALID_JOINT );
-	float	damageScale = spawnArgs.GetFloat( "damageScale", "1" );
-	ent->Damage( this, this, globalKickDir, meleeDefName, damageScale, NULL );
+	ent->Damage( this, this, globalKickDir, meleeDefName, 1.0f, INVALID_JOINT );
+
+	// end the attack if we're a multiframe attack
+	EndAttack();
 }
 
 /*
@@ -2720,10 +4545,10 @@ idAI::TestMelee
 =====================
 */
 bool idAI::TestMelee( void ) const {
-	trace_t		trace;
-	idEntity*	enemyEnt = enemy.ent;
+	trace_t trace;
+	idActor *enemyEnt = enemy.GetEntity();
 
-	if ( !enemyEnt || !combat.meleeRange ) {
+	if ( !enemyEnt || !melee_range ) {
 		return false;
 	}
 
@@ -2733,11 +4558,11 @@ bool idAI::TestMelee( void ) const {
 	idBounds bounds;
 
 	// expand the bounds out by our melee range
-	bounds[0][0] = -combat.meleeRange;
-	bounds[0][1] = -combat.meleeRange;
+	bounds[0][0] = -melee_range;
+	bounds[0][1] = -melee_range;
 	bounds[0][2] = myBounds[0][2] - 4.0f;
-	bounds[1][0] = combat.meleeRange;
-	bounds[1][1] = combat.meleeRange;
+	bounds[1][0] = melee_range;
+	bounds[1][1] = melee_range;
 	bounds[1][2] = myBounds[1][2] + 4.0f;
 	bounds.TranslateSelf( org );
 
@@ -2745,7 +4570,7 @@ bool idAI::TestMelee( void ) const {
 	idBounds enemyBounds = enemyEnt->GetPhysics()->GetBounds();
 	enemyBounds.TranslateSelf( enemyOrg );
 
-	if ( DebugFilter(ai_debugMove) ) {	//YELLOW = Test Melee Bounds
+	if ( ai_debugMove.GetBool() ) {
 		gameRenderWorld->DebugBounds( colorYellow, bounds, vec3_zero, gameLocal.msec );
 	}
 
@@ -2756,7 +4581,7 @@ bool idAI::TestMelee( void ) const {
 	idVec3 start = GetEyePosition();
 	idVec3 end = enemyEnt->GetEyePosition();
 
-	gameLocal.TracePoint( this, trace, start, end, MASK_SHOT_BOUNDINGBOX, this );
+	gameLocal.clip.TracePoint( trace, start, end, MASK_SHOT_BOUNDINGBOX, this );
 	if ( ( trace.fraction == 1.0f ) || ( gameLocal.GetTraceEntity( trace ) == enemyEnt ) ) {
 		return true;
 	}
@@ -2770,19 +4595,25 @@ idAI::AttackMelee
 
 jointname allows the endpoint to be exactly specified in the model,
 as for the commando tentacle.  If not specified, it will be set to
-the facing direction + combat.meleeRange.
+the facing direction + melee_range.
 
 kickDir is specified in the monster's coordinate system, and gives the direction
 that the view kick and knockback should go
 =====================
 */
-bool idAI::AttackMelee ( const char *attackName, const idDict* meleeDict ) {
-	idEntity*				enemyEnt = enemy.ent;
-	const char*				p;
-	const idSoundShader*	shader;
+bool idAI::AttackMelee( const char *meleeDefName ) {
+	const idDict *meleeDef;
+	idActor *enemyEnt = enemy.GetEntity();
+	const char *p;
+	const idSoundShader *shader;
+
+	meleeDef = gameLocal.FindEntityDefDict( meleeDefName, false );
+	if ( !meleeDef ) {
+		gameLocal.Error( "Unknown melee '%s'", meleeDefName );
+	}
 
 	if ( !enemyEnt ) {
-		p = meleeDict->GetString( "snd_miss" );
+		p = meleeDef->GetString( "snd_miss" );
 		if ( p && *p ) {
 			shader = declManager->FindSound( p );
 			StartSoundShader( shader, SND_CHANNEL_DAMAGE, 0, false, NULL );
@@ -2793,10 +4624,11 @@ bool idAI::AttackMelee ( const char *attackName, const idDict* meleeDict ) {
 	// check for the "saving throw" automatic melee miss on lethal blow
 	// stupid place for this.
 	bool forceMiss = false;
-	if ( enemyEnt->IsType( idPlayer::GetClassType() ) && g_skill.GetInteger() < 2 ) {
+/*	HUMANHEAD pdm: skill not used
+	if ( enemyEnt->IsType( idPlayer::Type ) && g_skill.GetInteger() < 2 ) {
 		int	damage, armor;
 		idPlayer *player = static_cast<idPlayer*>( enemyEnt );
-		player->CalcDamagePoints( this, this, meleeDict, 1.0f, INVALID_JOINT, &damage, &armor );
+		player->CalcDamagePoints( this, this, meleeDef, 1.0f, INVALID_JOINT, &damage, &armor );
 
 		if ( enemyEnt->health <= damage ) {
 			int	t = gameLocal.time - player->lastSavingThrowTime;
@@ -2805,15 +4637,17 @@ bool idAI::AttackMelee ( const char *attackName, const idDict* meleeDict ) {
 				t = 0;
 			}
 			if ( t < 1000 ) {
+				gameLocal.Printf( "Saving throw.\n" );
 				forceMiss = true;
 			}
 		}
 	}
+*/
 
 	// make sure the trace can actually hit the enemy
-	if ( forceMiss || !TestMelee( ) ) {
+	if ( forceMiss || !TestMelee() ) {
 		// missed
-		p = meleeDict->GetString( "snd_miss" );
+		p = meleeDef->GetString( "snd_miss" );
 		if ( p && *p ) {
 			shader = declManager->FindSound( p );
 			StartSoundShader( shader, SND_CHANNEL_DAMAGE, 0, false, NULL );
@@ -2824,55 +4658,19 @@ bool idAI::AttackMelee ( const char *attackName, const idDict* meleeDict ) {
 	//
 	// do the damage
 	//
-	p = meleeDict->GetString( "snd_hit" );
+	p = meleeDef->GetString( "snd_hit" );
 	if ( p && *p ) {
 		shader = declManager->FindSound( p );
 		StartSoundShader( shader, SND_CHANNEL_DAMAGE, 0, false, NULL );
 	}
 
 	idVec3	kickDir;
-	meleeDict->GetVector( "kickDir", "0 0 0", kickDir );
+	meleeDef->GetVector( "kickDir", "0 0 0", kickDir );
 
 	idVec3	globalKickDir;
 	globalKickDir = ( viewAxis * physicsObj.GetGravityAxis() ) * kickDir;
 
-	// This allows some AI to be soft against melee-- most marines are selfMeleeDamageScale of 3, which means they take 3X from melee attacks!
-	float damageScale = spawnArgs.GetFloat( "damageScale", "1" ) * enemyEnt->spawnArgs.GetFloat ( "selfMeleeDamageScale", "1" );
-
-	//if attacker is a melee superhero, damageScale is way increased
-	idAI* enemyAI = static_cast<idAI*>(enemyEnt);
-	if( aifl.meleeSuperhero)	{
-		if( damageScale >=1 )	{
-			damageScale *= 6;
-		} else	{
-			damageScale = 6;
-		}
-	}
-	
-	//if the defender is a melee superhero, damageScale is way decreased
-	if( enemyAI->aifl.meleeSuperhero)	{
-		damageScale = 0.5f;
-	}
-
-	int   location    = INVALID_JOINT;
-	if ( enemyEnt->IsType ( idAI::Type ) ) {
-		location = static_cast<idAI*>(enemyEnt)->chestOffsetJoint;
-	}
-	enemyEnt->Damage( this, this, globalKickDir, meleeDict->GetString ( "classname" ), damageScale, location );
-
-	if ( meleeDict->GetString( "fx_impact", NULL ) ) {
-		if ( enemyEnt == gameLocal.GetLocalPlayer() ) {
-			idPlayer *ePlayer = static_cast<idPlayer*>(enemyEnt);
-			if ( ePlayer ) {
-				idVec3 dir = ePlayer->firstPersonViewOrigin-GetEyePosition();
-				dir.Normalize();
-				idVec3 org = ePlayer->firstPersonViewOrigin + (dir * -((gameLocal.random.RandomFloat()*8.0f)+8.0f) );
-				idAngles ang = ePlayer->firstPersonViewAxis.ToAngles() * -1;
-				idMat3 axis = ang.ToMat3();
-				gameLocal.PlayEffect( *meleeDict, "fx_impact", org, viewAxis );
-			}
-		}
-	}
+	enemyEnt->Damage( this, this, globalKickDir, meleeDefName, 1.0f, INVALID_JOINT );
 
 	lastAttackTime = gameLocal.time;
 
@@ -2896,7 +4694,7 @@ void idAI::PushWithAF( void ) {
 	af.ChangePose( this, gameLocal.time );
 	int num = af.EntitiesTouchingAF( touchList );
 	for( i = 0; i < num; i++ ) {
-		if ( touchList[ i ].touchedEnt->IsType( idProjectile::GetClassType() ) ) {
+		if ( touchList[ i ].touchedEnt->IsType( idProjectile::Type ) ) {
 			// skip projectiles
 			continue;
 		}
@@ -2912,7 +4710,11 @@ void idAI::PushWithAF( void ) {
 			pushed_ents[num_pushed++] = ent;
 			vel = ent->GetPhysics()->GetAbsBounds().GetCenter() - touchList[ i ].touchedByBody->GetWorldOrigin();
 			vel.Normalize();
-			ent->GetPhysics()->SetLinearVelocity( 100.0f * vel, touchList[ i ].touchedClipModel->GetId() );
+			if ( attack.Length() && ent->IsType( idActor::Type ) ) {
+				ent->Damage( this, this, vel, attack, 1.0f, INVALID_JOINT );
+			} else {
+				ent->GetPhysics()->SetLinearVelocity( 100.0f * vel, touchList[ i ].touchedClipModel->GetId() );
+			}
 		}
 	}
 }
@@ -2928,31 +4730,61 @@ void idAI::PushWithAF( void ) {
 idAI::GetMuzzle
 ================
 */
-void idAI::GetMuzzle( jointHandle_t joint, idVec3 &muzzle, idMat3 &axis ) {
-	if ( joint == INVALID_JOINT ) {
+void idAI::GetMuzzle( const char *jointname, idVec3 &muzzle, idMat3 &axis ) {
+	jointHandle_t joint;
+
+	if ( !jointname || !jointname[ 0 ] ) {
 		muzzle = physicsObj.GetOrigin() + viewAxis[ 0 ] * physicsObj.GetGravityAxis() * 14;
 		muzzle -= physicsObj.GetGravityNormal() * physicsObj.GetBounds()[ 1 ].z * 0.5f;
 	} else {
+		joint = animator.GetJointHandle( jointname );
+		if ( joint == INVALID_JOINT ) {
+			gameLocal.Error( "Unknown joint '%s' on %s", jointname, GetEntityDefName() );
+		}
 		GetJointWorldTransform( joint, gameLocal.time, muzzle, axis );
-		//MCG
-		//pull the muzzle back inside the bounds if possible
-		//FIXME: this is nasty, we should just be able to check for starting in solid and register that as a hit!  But...
-		/*
-		float scale = 0.0f;
-		if ( physicsObj.GetBounds().RayIntersection( muzzle, -axis[0], scale ) )
-		{
-			if ( scale != 0.0f )
-			{//not already inside
-				muzzle += scale * -axis[0];
-			}
+	}
+}
+
+/*
+================
+idAI::TriggerWeaponEffects
+================
+*/
+void idAI::TriggerWeaponEffects( const idVec3 &muzzle, const idMat3 &axis ) {
+	idVec3 org;
+
+	if ( !g_muzzleFlash.GetBool() ) {
+		return;
+	}
+
+	// muzzle flash
+	// offset the shader parms so muzzle flashes show up
+	renderEntity.shaderParms[SHADERPARM_TIMEOFFSET] = -MS2SEC( gameLocal.time );
+	renderEntity.shaderParms[ SHADERPARM_DIVERSITY ] = gameLocal.random.CRandomFloat();
+
+	worldMuzzleFlash.origin = muzzle - axis*worldMuzzleFlash.lightCenter;
+	worldMuzzleFlash.axis = axis;
+	worldMuzzleFlash.shaderParms[SHADERPARM_TIMEOFFSET] = -MS2SEC( gameLocal.time );
+	if ( worldMuzzleFlashHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( worldMuzzleFlashHandle, &worldMuzzleFlash );
+	} else {
+		worldMuzzleFlashHandle = gameRenderWorld->AddLightDef( &worldMuzzleFlash );
+	}
+	muzzleFlashEnd = gameLocal.time + flashTime;
+	UpdateVisuals();
+}
+
+/*
+================
+idAI::UpdateMuzzleFlash
+================
+*/
+void idAI::UpdateMuzzleFlash( void ) {
+	if ( worldMuzzleFlashHandle != -1 ) { 
+		if ( gameLocal.time >= muzzleFlashEnd ) {
+			gameRenderWorld->FreeLightDef( worldMuzzleFlashHandle );
+			worldMuzzleFlashHandle = -1;
 		}
-		else
-		{//just pull it back a little anyway?
-			idVec3 xyOfs = muzzle-physicsObj.GetOrigin();
-			xyOfs.z = 0;
-			muzzle += xyOfs.Length() * -axis[0];
-		}
-		*/
 	}
 }
 
@@ -2967,10 +4799,10 @@ void idAI::Hide( void ) {
 	physicsObj.SetContents( 0 );
 	physicsObj.GetClipModel()->Unlink();
 	StopSound( SND_CHANNEL_AMBIENT, false );
+	SetChatSound();
 
-	enemy.fl.inFov		= false;
-	enemy.fl.visible	= false;
-
+	AI_ENEMY_IN_FOV		= false;
+	AI_ENEMY_VISIBLE	= false;
 	StopMove( MOVE_STATUS_DONE );
 }
 
@@ -2988,11 +4820,42 @@ void idAI::Show( void ) {
 	} else {
 		physicsObj.SetContents( CONTENTS_BODY );
 	}
-
-	physicsObj.GetClipModel()->Link();
-
+	physicsObj.GetClipModel()->Link( gameLocal.clip );
 	fl.takedamage = !spawnArgs.GetBool( "noDamage" );
+	SetChatSound();
 	StartSound( "snd_ambient", SND_CHANNEL_AMBIENT, 0, false, NULL );
+}
+
+/*
+=====================
+idAI::SetChatSound
+=====================
+*/
+void idAI::SetChatSound( void ) {
+	const char *snd;
+
+	if ( IsHidden() ) {
+		snd = NULL;
+	} else if ( enemy.GetEntity() ) {
+		snd = spawnArgs.GetString( "snd_chatter_combat", NULL );
+		chat_min = SEC2MS( spawnArgs.GetFloat( "chatter_combat_min", "5" ) );
+		chat_max = SEC2MS( spawnArgs.GetFloat( "chatter_combat_max", "10" ) );
+	} else if ( !spawnArgs.GetBool( "no_idle_chatter" ) ) {
+		snd = spawnArgs.GetString( "snd_chatter", NULL );
+		chat_min = SEC2MS( spawnArgs.GetFloat( "chatter_min", "5" ) );
+		chat_max = SEC2MS( spawnArgs.GetFloat( "chatter_max", "10" ) );
+	} else {
+		snd = NULL;
+	}
+
+	if ( snd && *snd ) {
+		chat_snd = declManager->FindSound( snd );
+
+		// set the next chat time
+		chat_time = gameLocal.time + chat_min + gameLocal.random.RandomFloat() * ( chat_max - chat_min );
+	} else {
+		chat_snd = NULL;
+	}
 }
 
 /*
@@ -3003,7 +4866,7 @@ Used for playing chatter sounds on monsters.
 ================
 */
 bool idAI::CanPlayChatterSounds( void ) const {
-	if ( aifl.dead ) {
+	if ( AI_DEAD ) {
 		return false;
 	}
 
@@ -3011,7 +4874,7 @@ bool idAI::CanPlayChatterSounds( void ) const {
 		return false;
 	}
 
-	if ( enemy.ent ) {
+	if ( enemy.GetEntity() ) {
 		return true;
 	}
 
@@ -3024,104 +4887,76 @@ bool idAI::CanPlayChatterSounds( void ) const {
 
 /*
 =====================
-idAI::UpdateChatter
+idAI::PlayChatter
 =====================
 */
-void idAI::UpdateChatter ( void ) {	
-	int			chatterRate;
-	const char* chatter;
-
-	// No chatter?
-	if ( !chatterRateIdle && !chatterRateCombat ) {
-		return;
-	}
-
+void idAI::PlayChatter( void ) {
 	// check if it's time to play a chat sound
-	if ( IsHidden() || !aifl.awake || aifl.dead || ( chatterTime > gameLocal.time ) ) {
-		return;
-	}
-	
-	// Skip first chatter
-	if ( enemy.ent ) {
-		chatter		= "lipsync_chatter_combat";
-		chatterRate = chatterRateCombat;
-	} else {
-		chatter		= "lipsync_chatter_idle";
-		chatterRate = chatterRateIdle;
-	}
-
-	// Can chatter ?
-	if ( !chatterRate ) {
+	if ( AI_DEAD || !chat_snd || ( chat_time > gameLocal.time ) ) {
 		return;
 	}
 
-	// Start chattering, but not if he's already speaking.  And he might already be speaking because he was scripted to do so.
-	if ( chatterTime > 0 && !IsSpeaking() ) {
-		Speak ( chatter, true );
-	}
+	StartSoundShader( chat_snd, SND_CHANNEL_VOICE, 0, false, NULL );
 
 	// set the next chat time
-	chatterTime = gameLocal.time + chatterRate + (gameLocal.random.RandomFloat() * chatterRate * 0.5f) - (chatterRate * 0.25f);
+	chat_time = gameLocal.time + chat_min + gameLocal.random.RandomFloat() * ( chat_max - chat_min );
 }
 
 /*
 =====================
-idAI::HeardSound
+idAI::UpdateParticles
 =====================
 */
-idEntity *idAI::HeardSound( int ignore_team ){
-	// check if we heard any sounds in the last frame
-	idActor	*actor = gameLocal.GetAlertActor();
-	if ( actor && ( !ignore_team || ( ReactionTo( actor ) & ATTACK_ON_SIGHT ) ) && gameLocal.InPlayerPVS( this ) ) 	{
-		idVec3 pos = actor->GetPhysics()->GetOrigin();
-		idVec3 org = physicsObj.GetOrigin();
-		float dist = ( pos - org ).LengthSqr();
-		
-		if ( dist < Square( combat.earRange ) ) {
-			//really close?
-			if ( dist < Square( combat.earRange/4.0f ) ) {		
-				return actor;
-			//possible LOS
-			} else if ( dist < Square( combat.visRange * 2.0f ) && CanSee( actor, false ) ) {
-				return actor;
-			} else if ( combat.fl.aware ) {
-				//FIXME: or, maybe find cover/hide/ambush spot and wait to ambush them?
-			//don't have an enemy and not tethered to a position
-			} else if ( !GetEnemy() && !tether ) {
-				//go into search mode
-				WanderAround();
-				move.fl.noRun = false;
-				move.fl.idealRunning = true;
-				//undid this: was causing them to not be able to do fine nav.
-				//move.fl.noWalk = true;
+void idAI::UpdateParticles( void ) {
+	if ( ( thinkFlags & TH_UPDATEPARTICLES) && !IsHidden() ) {
+		idVec3 realVector;
+		idMat3 realAxis;
+
+		int particlesAlive = 0;
+		for ( int i = 0; i < particles.Num(); i++ ) {
+			if ( particles[i].particle && particles[i].time ) {
+				particlesAlive++;
+				if (af.IsActive()) {
+					realAxis = mat3_identity;
+					realVector = GetPhysics()->GetOrigin();
+				} else {
+					animator.GetJointTransform( particles[i].joint, gameLocal.time, realVector, realAxis );
+					realAxis *= renderEntity.axis;
+					realVector = physicsObj.GetOrigin() + ( realVector + modelOffset ) * ( viewAxis * physicsObj.GetGravityAxis() );
+				}
+
+				if ( !gameLocal.smokeParticles->EmitSmoke( particles[i].particle, particles[i].time, gameLocal.random.CRandomFloat(), realVector, realAxis )) {
+					if ( restartParticles ) {
+						particles[i].time = gameLocal.time;
+					} else {
+						particles[i].time = 0;
+						particlesAlive--;
+					}
+				}
 			}
 		}
+		if ( particlesAlive == 0 ) {
+			BecomeInactive( TH_UPDATEPARTICLES );
+		}
 	}
-
-	return NULL;
 }
 
 /*
-============
-idAI::SetLeader
-============
+=====================
+idAI::TriggerParticles
+=====================
 */
-void idAI::SetLeader ( idEntity *newLeader ) {
-	idEntity* oldLeader = leader;
-	
-	if( !newLeader ){
-		leader = NULL;
-	} else if ( !newLeader->IsType( idActor::GetClassType() ) ) {
-		gameLocal.Error( "'%s' is not an idActor (player or ai controlled character)", newLeader->name.c_str() );
-	} else {
-		leader = static_cast<idActor *>( newLeader );	
-	}
-	
-	if ( oldLeader != leader ) {
-		OnLeaderChange ( oldLeader );
+void idAI::TriggerParticles( const char *jointName ) {
+	jointHandle_t jointNum;
+
+	jointNum = animator.GetJointHandle( jointName );
+	for ( int i = 0; i < particles.Num(); i++ ) {
+		if ( particles[i].joint == jointNum ) {
+			particles[i].time = gameLocal.time;
+			BecomeActive( TH_UPDATEPARTICLES );
+		}
 	}
 }
-
 
 
 /***********************************************************************
@@ -3136,36 +4971,57 @@ idAI::UpdateAnimationControllers
 ================
 */
 bool idAI::UpdateAnimationControllers( void ) {
+	idVec3		local;
+	idVec3		focusPos;
 	idVec3		left;
 	idVec3 		dir;
 	idVec3 		orientationJointPos;
 	idVec3 		localDir;
 	idAngles 	newLookAng;
+	idAngles	diff;
 	idMat3		mat;
 	idMat3		axis;
 	idMat3		orientationJointAxis;
+	idAFAttachment	*headEnt = head.GetEntity();
+	idVec3		eyepos;
 	idVec3		pos;
 	int			i;
 	idAngles	jointAng;
 	float		orientationJointYaw;
-	float		currentHeadFocusRate = ( combat.fl.aware ? headFocusRate : headFocusRate * 0.5f );
 
-	MEM_SCOPED_TAG(tag,MA_ANIM);
-
-	if ( aifl.dead ) {
+	if ( AI_DEAD ) {
 		return idActor::UpdateAnimationControllers();
 	}
 
 	if ( orientationJoint == INVALID_JOINT ) {
 		orientationJointAxis = viewAxis;
 		orientationJointPos = physicsObj.GetOrigin();
-		orientationJointYaw = move.current_yaw;
+		orientationJointYaw = current_yaw;
 	} else {
 		GetJointWorldTransform( orientationJoint, gameLocal.time, orientationJointPos, orientationJointAxis );
 		orientationJointYaw = orientationJointAxis[ 2 ].ToYaw();
 		orientationJointAxis = idAngles( 0.0f, orientationJointYaw, 0.0f ).ToMat3();
 	}
-	
+
+	if ( focusJoint != INVALID_JOINT ) {
+		if ( headEnt ) {
+			headEnt->GetJointWorldTransform( focusJoint, gameLocal.time, eyepos, axis );
+		} else {
+			// JRMMERGE_GRAVAXIS - What about GetGravAxis() are we still using/needing that?
+			GetJointWorldTransform( focusJoint, gameLocal.time, eyepos, axis );
+		}
+		eyeOffset.z = eyepos.z - physicsObj.GetOrigin().z;
+		if ( ai_debugMove.GetBool() ) {
+			gameRenderWorld->DebugLine( colorRed, eyepos, eyepos + orientationJointAxis[ 0 ] * 32.0f, gameLocal.msec );
+		}
+	} else {
+		eyepos = GetEyePosition();
+	}
+
+	if ( headEnt ) {
+		CopyJointsFromBodyToHead();
+	}
+
 	// Update the IK after we've gotten all the joint positions we need, but before we set any joint positions.
 	// Getting the joint positions causes the joints to be updated.  The IK gets joint positions itself (which
 	// are already up to date because of getting the joints in this function) and then sets their positions, which
@@ -3175,1977 +5031,424 @@ bool idAI::UpdateAnimationControllers( void ) {
 	// in order to see how many times an entity transforms the joints per frame.
 	idActor::UpdateAnimationControllers();
 
-	// Update the focus position
-	UpdateFocus( orientationJointAxis );
-
-	//MCG NOTE: don't know why Dube added this extra check for the torsoAnim (5/09/05), but it was causing popping, so I took it out... :/
-	//bool canLook = ( !torsoAnim.AnimDone(0) || !torsoAnim.GetAnimator()->CurrentAnim(ANIMCHANNEL_TORSO)->IsDone(gameLocal.GetTime()) || torsoAnim.Disabled() ) && !torsoAnim.GetAnimFlags().ai_no_look && !aifl.disableLook;
-	//bool canLook = (!torsoAnim.GetAnimFlags().ai_no_look && !aifl.disableLook);
-	
-	bool canLook = (!animator.GetAnimFlags(animator.CurrentAnim(ANIMCHANNEL_TORSO)->AnimNum()).ai_no_look && !aifl.disableLook);
-	if ( !canLook ) {
-		//actually, do the looking, but bring it back forward...
-		currentFocusPos = GetEyePosition() + orientationJointAxis[ 0 ] * 64.0f;
+	idEntity *focusEnt = focusEntity.GetEntity();
+	if ( !allowJointMod || !allowEyeFocus || ( gameLocal.time >= focusTime ) ) {
+	    focusPos = GetEyePosition() + orientationJointAxis[ 0 ] * 512.0f;
+	} else if ( focusEnt == NULL ) {
+		// keep looking at last position until focusTime is up
+		focusPos = currentFocusPos;
+	} else if ( focusEnt == enemy.GetEntity() ) {
+		focusPos = lastVisibleEnemyPos + lastVisibleEnemyEyeOffset - eyeVerticalOffset * enemy.GetEntity()->GetPhysics()->GetGravityNormal();
+	} else if ( focusEnt->IsType( idActor::Type ) ) {
+		focusPos = static_cast<idActor *>( focusEnt )->GetEyePosition() - eyeVerticalOffset * focusEnt->GetPhysics()->GetGravityNormal();
+	} else {
+		focusPos = focusEnt->GetPhysics()->GetOrigin();
 	}
 
-	// Determine the new look yaw
-	dir = currentFocusPos - orientationJointPos;
-	newLookAng.yaw = dir.ToYaw( );
+	currentFocusPos = currentFocusPos + ( focusPos - currentFocusPos ) * eyeFocusRate;
 
-	// Determine the new look pitch
-	dir = currentFocusPos - GetEyePosition();
+	// determine yaw from origin instead of from focus joint since joint may be offset, which can cause us to bounce between two angles
+	dir = focusPos - orientationJointPos;
+	newLookAng.yaw = idMath::AngleNormalize180( dir.ToYaw() - orientationJointYaw );
+	newLookAng.roll = 0.0f;
+	newLookAng.pitch = 0.0f;
+
+#if 0
+	gameRenderWorld->DebugLine( colorRed, orientationJointPos, focusPos, gameLocal.msec );
+	gameRenderWorld->DebugLine( colorYellow, orientationJointPos, orientationJointPos + orientationJointAxis[ 0 ] * 32.0f, gameLocal.msec );
+	gameRenderWorld->DebugLine( colorGreen, orientationJointPos, orientationJointPos + newLookAng.ToForward() * 48.0f, gameLocal.msec );
+#endif
+
+//JRMMERGE_GRAVAXIS: This changed to much to merge, see if you can get your monsters on planets changes back in here.  I'll leave both versions
+#if OLD_CODE
+	GetGravViewAxis().ProjectVector( dir, localDir ); // HUMANHEAD JRM: VIEWAXIS_TO_GETGRAVVIEWAXIS
+	lookAng.yaw		= idMath::AngleNormalize180( localDir.ToYaw() );
+	lookAng.pitch	= -idMath::AngleNormalize180( localDir.ToPitch() );
+	lookAng.roll	= 0.0f;
+#else
+	// determine pitch from joint position
+	dir = focusPos - eyepos;
 	dir.NormalizeFast();
 	orientationJointAxis.ProjectVector( dir, localDir );
 	newLookAng.pitch = -idMath::AngleNormalize180( localDir.ToPitch() );
 	newLookAng.roll	= 0.0f;
+#endif
+
+	diff = newLookAng - lookAng;
 	
-	if ( !canLook ) {
-		//actually, do the looking, but bring it back forward...
-		newLookAng.yaw = orientationJointAxis[0].ToYaw();
-		newLookAng.pitch = 0;
-	}
-	// Add the angle change using the head focus rate and convert the look angles to
-	// local angles so they can be properly clamped.
-	float f = lookAng.yaw;
-	if ( lookMin.yaw <= -360.0f && lookMax.yaw >= 360.0f )
-	{
-		lookAng.yaw    = f - orientationJointYaw;
-		float diff;
-		diff = ( idMath::AngleNormalize360(newLookAng.yaw) - idMath::AngleNormalize360(f) );
-		diff = idMath::AngleNormalize180( diff );
-		lookAng.yaw    += diff * currentHeadFocusRate;
-		//lookAng.yaw   += ( newLookAng.yaw - f ) * currentHeadFocusRate;
-	}
-	else
-	{
-		lookAng.yaw    = idMath::AngleNormalize180 ( f - orientationJointYaw );
-		lookAng.yaw   += (idMath::AngleNormalize180 ( newLookAng.yaw - f ) * currentHeadFocusRate);
-	}
-	lookAng.pitch += ( idMath::AngleNormalize180( newLookAng.pitch - lookAng.pitch ) * currentHeadFocusRate );
-
-	// Clamp the look angles
-	lookAng.Clamp( lookMin, lookMax );
-
-	// Calcuate the eye angles
-	f = eyeAng.yaw;
-	eyeAng.yaw    = idMath::AngleNormalize180( f - orientationJointYaw );
-	eyeAng.yaw   += (idMath::AngleNormalize180( newLookAng.yaw - f ) * eyeFocusRate);	
-	eyeAng.pitch += (idMath::AngleNormalize180( newLookAng.pitch - eyeAng.pitch ) * eyeFocusRate);
-
-	// Clamp eye angles relative to the look angles
-	jointAng = eyeAng - lookAng;
-	jointAng.Normalize180( );	
-	jointAng.Clamp( eyeMin, eyeMax );
-	eyeAng = lookAng + jointAng;
-	eyeAng.Normalize180( );	
-
-	if ( canLook ) {
-		// Apply the look angles to the look joints
-		if ( animator.GetAnimFlags( animator.CurrentAnim( ANIMCHANNEL_TORSO )->AnimNum()).ai_look_head_only ) {
-			if ( neckJoint != INVALID_JOINT || headJoint != INVALID_JOINT ) {
-				float jScale = 1.0f;
-				if ( neckJoint != INVALID_JOINT && headJoint != INVALID_JOINT ) {
-					jScale = 0.5f;
-				}
-				jointAng.pitch	= lookAng.pitch * jScale;
-				jointAng.yaw	= lookAng.yaw * jScale;
-				if ( neckJoint != INVALID_JOINT ) {
-					animator.SetJointAxis( neckJoint, JOINTMOD_WORLD, jointAng.ToMat3() );
-				}
-				if ( headJoint != INVALID_JOINT ) {
-					animator.SetJointAxis( headJoint, JOINTMOD_WORLD, jointAng.ToMat3() );
-				}
-			}
-			//what if we have a previous joint mod on the rest of the lookJoints 
-			//from an anim that *wasn't* ai_look_head_only...?
-			//just clear them?  Or move them towards 0?
-			//FIXME: move them towards zero...
-			if ( newLookAng.Compare( lookAng ) ) {
-				//snap back now!
-				for( i = 0; i < lookJoints.Num(); i++ ) {
-					if ( lookJoints[i] != neckJoint
-						&& lookJoints[i] != headJoint ) {
-						//snap back now!
-						animator.ClearJoint ( lookJoints[i] );
-					}
-				}
-			} else {
-				//blend back
-				//yes, this is framerate dependant and inefficient and wrong, but... eliminates pops
-				jointAng.roll = 0.0f;
-				jointMod_t *curJointMod;
-				idAngles curJointAngleMod;
-				for( i = 0; i < lookJoints.Num(); i++ ) {
-					if ( lookJoints[i] != neckJoint
-						&& lookJoints[i] != headJoint ) {
-						//blend back
-						curJointMod = animator.FindExistingJointMod( lookJoints[ i ], NULL );
-						if ( curJointMod )
-						{
-							curJointAngleMod = curJointMod->mat.ToAngles();
-							curJointAngleMod *= 0.75f;
-							if ( fabs(curJointAngleMod.pitch) < 1.0f 
-								&& fabs(curJointAngleMod.yaw) < 1.0f
-								&& fabs(curJointAngleMod.roll) < 1.0f )
-							{
-								//snap back now!
-								animator.ClearJoint ( lookJoints[i] );
-							}
-							else
-							{
-								animator.SetJointAxis( lookJoints[ i ], JOINTMOD_WORLD, curJointAngleMod.ToMat3() );
-							}
-						}
-					}
-				}
-			}
+	if ( eyeAng != diff ) {
+		eyeAng = diff;
+		eyeAng.Clamp( eyeMin, eyeMax );
+		idAngles angDelta = diff - eyeAng;
+		if ( !angDelta.Compare( ang_zero, 0.1f ) ) {
+			alignHeadTime = gameLocal.time;
 		} else {
-			jointAng.roll = 0.0f;
-			for( i = 0; i < lookJoints.Num(); i++ ) {
-				jointAng.pitch	= lookAng.pitch * lookJointAngles[ i ].pitch;
-				jointAng.yaw	= lookAng.yaw * lookJointAngles[ i ].yaw;
-				animator.SetJointAxis( lookJoints[ i ], JOINTMOD_WORLD, jointAng.ToMat3() );
-			}
+			alignHeadTime = gameLocal.time + ( 0.5f + 0.5f * gameLocal.random.RandomFloat() ) * focusAlignTime;
 		}
-	} else {
-		//if ( animator.GetAnimFlags(animator.CurrentAnim(ANIMCHANNEL_TORSO)->AnimNum()).ai_no_look || aifl.disableLook ) {
-		if ( newLookAng.Compare( lookAng ) ) {
-			//snap back now!
-			for( i = 0; i < lookJoints.Num(); i++ ) {
-				animator.ClearJoint ( lookJoints[i] );
-			}
-		} else {
-			//PCJ back to neutral
-			jointAng.roll = 0.0f;
-			for( i = 0; i < lookJoints.Num(); i++ ) {
-				jointAng.pitch	= lookAng.pitch * lookJointAngles[ i ].pitch;
-				jointAng.yaw	= lookAng.yaw * lookJointAngles[ i ].yaw;
-				animator.SetJointAxis( lookJoints[ i ], JOINTMOD_WORLD, jointAng.ToMat3() );
-			}
-		}
-	}	
+	}
 
-	// Convert the look angles back to world angles.  This is done to prevent dramatic orietation changes
-	// from changing the look direction abruptly (unless of course the minimums are not met)
-	lookAng.yaw = idMath::AngleNormalize180( lookAng.yaw + orientationJointYaw );
-	eyeAng.yaw = idMath::AngleNormalize180( eyeAng.yaw + orientationJointYaw );
-	
-	if ( move.moveType == MOVETYPE_FLY || move.fl.flyTurning ) {
+	if ( idMath::Fabs( newLookAng.yaw ) < 0.1f ) {
+		alignHeadTime = gameLocal.time;
+	}
+
+	if ( ( gameLocal.time >= alignHeadTime ) || ( gameLocal.time < forceAlignHeadTime ) ) {
+		alignHeadTime = gameLocal.time + ( 0.5f + 0.5f * gameLocal.random.RandomFloat() ) * focusAlignTime;
+		destLookAng = newLookAng;
+		destLookAng.Clamp( lookMin, lookMax );
+	}
+
+	diff = destLookAng - lookAng;
+	if ( ( lookMin.pitch == -180.0f ) && ( lookMax.pitch == 180.0f ) ) {
+		if ( ( diff.pitch > 180.0f ) || ( diff.pitch <= -180.0f ) ) {
+			diff.pitch = 360.0f - diff.pitch;
+		}
+	}
+	if ( ( lookMin.yaw == -180.0f ) && ( lookMax.yaw == 180.0f ) ) {
+		if ( diff.yaw > 180.0f ) {
+			diff.yaw -= 360.0f;
+		} else if ( diff.yaw <= -180.0f ) {
+			diff.yaw += 360.0f;
+		}
+	}
+	lookAng = lookAng + diff * headFocusRate;
+	lookAng.Normalize180();
+
+	jointAng.roll = 0.0f;
+	for( i = 0; i < lookJoints.Num(); i++ ) {
+		jointAng.pitch	= lookAng.pitch * lookJointAngles[ i ].pitch;
+		jointAng.yaw	= lookAng.yaw * lookJointAngles[ i ].yaw;
+		animator.SetJointAxis( lookJoints[ i ], JOINTMOD_WORLD, jointAng.ToMat3() );
+	}
+
+
+	if ( move.moveType == MOVETYPE_FLY ) {
 		// lean into turns
 		AdjustFlyingAngles();
 	}
+	
+	if ( headEnt ) {
+		idAnimator *headAnimator = headEnt->GetAnimator();
 
-	// Orient the eyes towards their target
-	if ( leftEyeJoint != INVALID_JOINT && rightEyeJoint != INVALID_JOINT ) {
-		if ( head ) {
-			idAnimator *headAnimator = head->GetAnimator();
+		// HUMANHEAD pdm: Added support for look joints in head entities
+		for( i = 0; i < headLookJoints.Num(); i++ ) {
+			jointAng.pitch	= lookAng.pitch * headLookJointAngles[ i ].pitch;
+			jointAng.yaw	= lookAng.yaw * headLookJointAngles[ i ].yaw;
+			headAnimator->SetJointAxis( headLookJoints[ i ], JOINTMOD_WORLD, jointAng.ToMat3() );
+		}
+		// HUMANHEAD END
 
-			if ( focusType != AIFOCUS_NONE && allowEyeFocus && canLook ) {
-				//tweak these since it's looking at the wrong spot and not calculating from each eye and I don't have time to bother rewriting all of this properly
-				eyeAng.yaw -= 0.5f;
-				eyeAng.pitch += 3.25f;
-				idMat3 eyeAxis = ( eyeAng ).ToMat3() * head->GetPhysics()->GetAxis().Transpose ( );  
-
-				headAnimator->SetJointAxis ( leftEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyeAxis );	
-
-				eyeAng.yaw += 3.0f;
-				eyeAxis = ( eyeAng ).ToMat3() * head->GetPhysics()->GetAxis().Transpose ( );  
-
-				headAnimator->SetJointAxis ( rightEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyeAxis );
-
-				if ( ai_debugEyeFocus.GetBool() ) {
-					idVec3 eyeOrigin;
-					idMat3 axis;
-					
-					head->GetJointWorldTransform ( rightEyeJoint, gameLocal.time, eyeOrigin, axis );
-					gameRenderWorld->DebugArrow ( colorGreen, eyeOrigin, ( eyeOrigin + (32.0f*axis[0])), 1, 0 );
-
-					head->GetJointWorldTransform ( leftEyeJoint,  gameLocal.time, eyeOrigin,  axis );
-					gameRenderWorld->DebugArrow ( colorGreen, eyeOrigin, ( eyeOrigin + (32.0f*axis[0])), 1, 0 );
-				}
-			} else {
-				headAnimator->ClearJoint( leftEyeJoint );
-				headAnimator->ClearJoint( rightEyeJoint );
-			}
+		if ( allowEyeFocus ) {
+			idMat3 eyeAxis = ( lookAng + eyeAng ).ToMat3(); idMat3 headTranspose = headEnt->GetPhysics()->GetAxis().Transpose();
+			axis =  eyeAxis * orientationJointAxis;
+			left = axis[ 1 ] * eyeHorizontalOffset;
+			eyepos -= headEnt->GetPhysics()->GetOrigin();
+			headAnimator->SetJointPos( leftEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyepos + ( axis[ 0 ] * 64.0f + left ) * headTranspose );
+			headAnimator->SetJointPos( rightEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyepos + ( axis[ 0 ] * 64.0f - left ) * headTranspose );
 		} else {
-			if ( allowEyeFocus && focusType != AIFOCUS_NONE && !torsoAnim.GetAnimFlags().ai_no_look && !aifl.disableLook ) {
-				idMat3 eyeAxis = ( eyeAng ).ToMat3() * GetPhysics()->GetAxis().Transpose ( );  
-				animator.SetJointAxis ( rightEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyeAxis );
-				animator.SetJointAxis ( leftEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyeAxis );			
-			} else {
-				animator.ClearJoint( leftEyeJoint );
-				animator.ClearJoint( rightEyeJoint );
-			}
+			headAnimator->ClearJoint( leftEyeJoint );
+			headAnimator->ClearJoint( rightEyeJoint );
 		}
-	}
-	
-	return true;
-}
-
-void idAI::OnTouch( idEntity *other, trace_t *trace ) {
-	// if we dont have an enemy or had one for at least a second that is a potential enemy the set the enemy	
-	if ( other->IsType( idActor::GetClassType() )
-		&& !other->fl.notarget 
-		&& ( ReactionTo( other )&ATTACK_ON_SIGHT)
-		&& (!enemy.ent || gameLocal.time - enemy.changeTime > 1000 ) ) {
-		SetEnemy( other );
-	}
-
-	if ( !enemy.ent && !other->fl.notarget && ( ReactionTo( other ) & ATTACK_ON_ACTIVATE ) ) {
-		Activate( other );
-	}
-	pusher = other;
-	aifl.pushed = true;
-	
-	// If pushed by the player update tactical
-	if ( pusher && pusher->IsType ( idPlayer::GetClassType() ) && (combat.tacticalMaskAvailable & AITACTICAL_MOVE_PLAYERPUSH_BIT) ) {
-		ForceTacticalUpdate ( );
-	}		
-}
-
-idProjectile* idAI::AttackProjectile ( const idDict* projectileDict, const idVec3 &org, const idAngles &ang ) {
-	idVec3				start;
-	trace_t				tr;
-	idBounds			projBounds;
-	const idClipModel*	projClip;
-	idMat3				axis;
-	float				distance;
-	idProjectile*		result;
-
-	if ( !projectileDict ) {
-		gameLocal.Warning( "%s (%s) doesn't have a projectile specified", name.c_str(), GetEntityDefName() );
-		return NULL;
-	}
-
-	axis = ang.ToMat3();
-	if ( !projectile.GetEntity() ) {
-		CreateProjectile( projectileDict, org, axis[ 0 ] );
-	}
-
-	// make sure the projectile starts inside the monster bounding box
-	const idBounds &ownerBounds = physicsObj.GetAbsBounds();
-	projClip = projectile.GetEntity()->GetPhysics()->GetClipModel();
-	projBounds = projClip->GetBounds().Rotate( projClip->GetAxis() );
-
-	// check if the owner bounds is bigger than the projectile bounds
-	if ( ( ( ownerBounds[1][0] - ownerBounds[0][0] ) > ( projBounds[1][0] - projBounds[0][0] ) ) &&
-		( ( ownerBounds[1][1] - ownerBounds[0][1] ) > ( projBounds[1][1] - projBounds[0][1] ) ) &&
-		( ( ownerBounds[1][2] - ownerBounds[0][2] ) > ( projBounds[1][2] - projBounds[0][2] ) ) ) {
-		if ( (ownerBounds - projBounds).RayIntersection( org, viewAxis[ 0 ], distance ) ) {
-			start = org + distance * viewAxis[ 0 ];
+	} else {
+		if ( allowEyeFocus ) {
+			idMat3 eyeAxis = ( lookAng + eyeAng ).ToMat3();
+			axis =  eyeAxis * orientationJointAxis;
+			left = axis[ 1 ] * eyeHorizontalOffset;
+			eyepos += axis[ 0 ] * 64.0f - physicsObj.GetOrigin();
+			animator.SetJointPos( leftEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyepos + left );
+			animator.SetJointPos( rightEyeJoint, JOINTMOD_WORLD_OVERRIDE, eyepos - left );
 		} else {
-			start = ownerBounds.GetCenter();
-		}
-	} else {
-		// projectile bounds bigger than the owner bounds, so just start it from the center
-		start = ownerBounds.GetCenter();
-	}
-
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	gameLocal.Translation( this, tr, start, org, projClip, projClip->GetAxis(), MASK_SHOT_RENDERMODEL, this );
-// RAVEN END
-
-	// launch the projectile
- 	projectile.GetEntity()->Launch( tr.endpos, axis[ 0 ], vec3_origin );
- 	result = projectile;
-	projectile = NULL;
-
-	lastAttackTime = gameLocal.time;
-	
-	return result;
-}
-
-void idAI::RadiusDamageFromJoint( const char *jointname, const char *damageDefName ) {
-	jointHandle_t joint;
-	idVec3 org;
-	idMat3 axis;
-
-	if ( !jointname || !jointname[ 0 ] ) {
-		org = physicsObj.GetOrigin();
-	} else {
-		joint = animator.GetJointHandle( jointname );
-		if ( joint == INVALID_JOINT ) {
-			gameLocal.Error( "Unknown joint '%s' on %s", jointname, GetEntityDefName() );
-		}
-		GetJointWorldTransform( joint, gameLocal.time, org, axis );
-	}
-
-	gameLocal.RadiusDamage( org, this, this, this, this, damageDefName );
-}
-
-/*
-=====================
-idAI::CanBecomeSolid
-
-returns true if the AI entity could become solid at its current position
-=====================
-*/
-bool idAI::CanBecomeSolid ( void ) {
-	int				i;
-	int				num;
-	idEntity *		hit;
-	idClipModel*	cm;
-	idClipModel*	clipModels[ MAX_GENTITIES ];
-
-	// Determine what we are currently touching
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	num = gameLocal.ClipModelsTouchingBounds( this, physicsObj.GetAbsBounds(), MASK_MONSTERSOLID, clipModels, MAX_GENTITIES );
-// RAVEN END
-	for ( i = 0; i < num; i++ ) {
-		cm = clipModels[ i ];
-
-		// don't check render entities
-		if ( cm->IsRenderModel() ) {
-			continue;
-		}
-
-		hit = cm->GetEntity();
-		if ( ( hit == this ) || !hit->fl.takedamage ) {
-			continue;
-		}
-
-		if ( physicsObj.ClipContents( cm ) ) {
-			return false;
+			animator.ClearJoint( leftEyeJoint );
+			animator.ClearJoint( rightEyeJoint );
 		}
 	}
 
 	return true;
 }
 
+/***********************************************************************
+
+idCombatNode
+
+***********************************************************************/
+
+const idEventDef EV_CombatNode_MarkUsed( "markUsed" );
+
+CLASS_DECLARATION( idEntity, idCombatNode )
+	EVENT( EV_CombatNode_MarkUsed,				idCombatNode::Event_MarkUsed )
+	EVENT( EV_Activate,							idCombatNode::Event_Activate )
+END_CLASS
+
 /*
 =====================
-idAI::BecomeSolid
+idCombatNode::idCombatNode
 =====================
 */
-void idAI::BecomeSolid( void ) {
-	physicsObj.EnableClip();
-	if ( spawnArgs.GetBool( "big_monster" ) ) {
-		physicsObj.SetContents( 0 );
-	} else if ( use_combat_bbox ) {
-		physicsObj.SetContents( CONTENTS_BODY|CONTENTS_SOLID );
-	} else {
-		physicsObj.SetContents( CONTENTS_BODY );
-	}
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	physicsObj.GetClipModel()->Link();
-// RAVEN END
-	fl.takedamage = !spawnArgs.GetBool( "noDamage" );
+idCombatNode::idCombatNode( void ) {
+	min_dist = 0.0f;
+	max_dist = 0.0f;
+	cone_dist = 0.0f;
+	min_height = 0.0f;
+	max_height = 0.0f;
+	cone_left.Zero();
+	cone_right.Zero();
+	offset.Zero();
+	disabled = false;
 }
 
 /*
 =====================
-idAI::BecomeNonSolid
+idCombatNode::Save
 =====================
 */
-void idAI::BecomeNonSolid( void ) {
-	fl.takedamage = false;
-	physicsObj.SetContents( 0 );
-	physicsObj.GetClipModel()->Unlink();
+void idCombatNode::Save( idSaveGame *savefile ) const {
+	savefile->WriteFloat( min_dist );
+	savefile->WriteFloat( max_dist );
+	savefile->WriteFloat( cone_dist );
+	savefile->WriteFloat( min_height );
+	savefile->WriteFloat( max_height );
+	savefile->WriteVec3( cone_left );
+	savefile->WriteVec3( cone_right );
+	savefile->WriteVec3( offset );
+	savefile->WriteBool( disabled );
 }
 
-const char *idAI::ChooseAnim( int channel, const char *animname ) {
-	int anim;
+/*
+=====================
+idCombatNode::Restore
+=====================
+*/
+void idCombatNode::Restore( idRestoreGame *savefile ) {
+	savefile->ReadFloat( min_dist );
+	savefile->ReadFloat( max_dist );
+	savefile->ReadFloat( cone_dist );
+	savefile->ReadFloat( min_height );
+	savefile->ReadFloat( max_height );
+	savefile->ReadVec3( cone_left );
+	savefile->ReadVec3( cone_right );
+	savefile->ReadVec3( offset );
+	savefile->ReadBool( disabled );
+}
 
-	anim = GetAnim( channel, animname );
-	if ( anim ) {
-		if ( channel == ANIMCHANNEL_HEAD ) {
-			if ( head.GetEntity() ) {
-				return head.GetEntity()->GetAnimator()->AnimFullName( anim );
-			}
+/*
+=====================
+idCombatNode::Spawn
+=====================
+*/
+void idCombatNode::Spawn( void ) {
+	float fov;
+	float yaw;
+	float height;
+
+	min_dist = spawnArgs.GetFloat( "min" );
+	max_dist = spawnArgs.GetFloat( "max" );
+	height = spawnArgs.GetFloat( "height" );
+	fov = spawnArgs.GetFloat( "fov", "60" );
+	offset = spawnArgs.GetVector( "offset" );
+
+	const idVec3 &org = GetPhysics()->GetOrigin() + offset;
+	min_height = org.z - height * 0.5f;
+	max_height = min_height + height;
+
+	const idMat3 &axis = GetPhysics()->GetAxis();
+	yaw = axis[ 0 ].ToYaw();
+
+	idAngles leftang( 0.0f, yaw + fov * 0.5f - 90.0f, 0.0f );
+	cone_left = leftang.ToForward();
+
+	idAngles rightang( 0.0f, yaw - fov * 0.5f + 90.0f, 0.0f );
+	cone_right = rightang.ToForward();
+
+	disabled = spawnArgs.GetBool( "start_off" );
+}
+
+/*
+=====================
+idCombatNode::IsDisabled
+=====================
+*/
+bool idCombatNode::IsDisabled( void ) const {
+	return disabled;
+}
+
+/*
+=====================
+idCombatNode::DrawDebugInfo
+=====================
+*/
+void idCombatNode::DrawDebugInfo( void ) {
+	idEntity		*ent;
+	idCombatNode	*node;
+	idPlayer		*player = gameLocal.GetLocalPlayer();
+	idVec4			color;
+	idBounds		bounds( idVec3( -16, -16, 0 ), idVec3( 16, 16, 0 ) );
+	
+	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+		if ( !ent->IsType( idCombatNode::Type ) ) {
+			continue;
+		}
+
+		node = static_cast<idCombatNode *>( ent );
+		if ( node->disabled ) {
+			color = colorMdGrey;
+		} else if ( player && node->EntityInView( player, player->GetPhysics()->GetOrigin() ) ) {
+			color = colorYellow;
 		} else {
-			return animator.AnimFullName( anim );
-		}
-	}
-
-	return "";
-}
-
-/*
-============
-idAI::ExecScriptFunction
-============
-*/
-void idAI::ExecScriptFunction ( rvScriptFuncUtility& func, idEntity* parm ) {
-	if( parm ) {
-		func.InsertEntity( parm, 0 );
-	} else {
-		func.InsertEntity( this, 0 );
-	}
-
-	func.CallFunc( &spawnArgs );
-
-	if( parm ) {
-		func.RemoveIndex( 0 );
-	}
-}
-
-/*
-============
-idAI::Prethink
-============
-*/
-void idAI::Prethink ( void ) {
-	// Update our helper if we are moving
-	if ( move.fl.moving ) {
-		UpdateHelper ( );
-	}
-	
-	if ( leader ) {
-		idEntity* groundEnt	= leader->GetGroundEntity ( );
-		if ( !(tether && !aifl.tetherMover) && groundEnt ) {
-			if ( groundEnt->IsType ( idMover::GetClassType ( ) ) ) {			
-				idEntity* ent;
-				idEntity* next;
-				for( ent = groundEnt->GetNextTeamEntity(); ent != NULL; ent = next ) {
-					next = ent->GetNextTeamEntity();
-					if ( ent->GetBindMaster() == groundEnt && ent->IsType ( rvAITether::GetClassType ( ) ) ) {
-						SetTether ( static_cast<rvAITether*>(ent) );
-						aifl.tetherMover = true;
-						break;
-					}
-				}
-			} else {
-				SetTether ( NULL );
-			}
-		}					
-	} else if ( tether && aifl.tetherMover ) {
-		SetTether ( NULL );
-	}
-}
-
-/*
-============
-idAI::Postthink
-============
-*/
-void idAI::Postthink( void ){
-	if ( !aifl.simpleThink ) {
-		pain.takenThisFrame = 0;
-	}
-
-	// Draw debug tactical information 
-	DrawTactical ( );
-				
-	if( vehicleController.IsDriving() ){	// Generate some sort of command?
-		usercmd_t				usercmd;
-
-		// Note!  usercmd angles stuff is in deltas, not in absolute values.
-
-		memset( &usercmd, 0, sizeof( usercmd ) );
-
-		idVec3 toEnemy;
-
-		if( enemy.ent ){
-			toEnemy = enemy.ent->GetPhysics()->GetOrigin();
-			toEnemy -= GetPhysics()->GetOrigin();
-			toEnemy.Normalize();
-			
-			idAngles enemyAng;
-
-			enemyAng = toEnemy.ToAngles();
-
-			usercmd.angles[PITCH] = ANGLE2SHORT( enemyAng.pitch );
-			usercmd.angles[YAW] = ANGLE2SHORT( enemyAng.yaw );
-
-			usercmd.buttons = BUTTON_ATTACK;
-
-			vehicleController.SetInput ( usercmd, enemyAng );
-		}
-	}
-	
-	// Keep our threat value up to date
-	UpdateThreat ( );
-}
-
-/*
-============
-idAI::
-============
-*/
-
-void idAI::OnDeath( void ){
-	if( vehicleController.IsDriving() ){
-		usercmd_t				usercmd;
-
-		memset( &usercmd, 0, sizeof( usercmd ) );
-		usercmd.buttons = BUTTON_ATTACK;
-		usercmd.upmove = 300.0f; // This will cause the character to eject.
-
-		vehicleController.SetInput( usercmd, idAngles( 0, 0, 0 ) );
-
-		// Fixme!  Is this safe to do immediately?
-		vehicleController.Eject();
-	}
-
-	aiManager.RemoveTeammate ( this );
-
-	ExecScriptFunction( funcs.death );
-
-/* DONT DROP ANYTHING FOR NOW
-	float rVal = gameLocal.random.RandomInt( 100 );
-
-	if( spawnArgs.GetFloat( "no_drops" ) >= 1.0 ){
-		spawnArgs.Set( "def_dropsItem1", "" );
-	}else{
-		// Fixme!  Better guys should drop better stuffs!  Make drops related to guy type?  Do something cooler here?
-		if( rVal < 25 ){	// Half of guys drop nothing?
-			spawnArgs.Set( "def_dropsItem1", "" );
-		}else if( rVal < 50 ){
-			spawnArgs.Set( "def_dropsItem1", "item_health_small" );
-		}
-	}
-*/
-}
-
-/*
-============
-idAI::OnWakeUp
-============
-*/
-void idAI::OnWakeUp ( void ) {
-}
-
-/*
-============
-idAI::OnUpdatePlayback
-============
-*/
-void idAI::OnUpdatePlayback ( const rvDeclPlaybackData& pbd ) {
-	return;
-}
-
-/*
-============
-idAI::OnLeaderChange
-============
-*/
-void idAI::OnLeaderChange ( idEntity* oldLeader ) {
-	ForceTacticalUpdate ( );
-}
-
-/*
-============
-idAI::OnEnemyChange
-============
-*/
-void idAI::OnEnemyChange ( idEntity* oldEnemy ) {
-	// Make sure we update our tactical state immediately
-	ForceTacticalUpdate ( );
-
-	// see if we should announce the enemy
-	if ( enemy.ent ) {
-		combat.fl.aware = true;
-		combat.investigateTime = 0;
-
-		enemy.changeTime = gameLocal.time;
-
-		enemy.lastKnownPosition = enemy.ent->GetPhysics()->GetOrigin ( );
-		
-		UpdateEnemyVisibility ( );
-		UpdateEnemyPosition ( true );
-		UpdateEnemy ( );		
-	} else {
-		enemy.range		 = 0;
-		enemy.range2d 	 = 0;
-		enemy.changeTime = 0;
-		enemy.smoothedLinearVelocity.Zero ( );
-		enemy.smoothedPushedVelocity.Zero ( );
-	}	
-	
-	enemy.fl.visible = false;
-}
-
-/*
-============
-idAI::OnTacticalChange
-============
-*/
-void idAI::OnTacticalChange ( aiTactical_t oldTactical ) {
-	// if acutally moving to a new tactial location announce it
-	if ( move.fl.moving ) {
-		AnnounceTactical( combat.tacticalCurrent );
-	}
-}
-
-/*
-============
-idAI::OnFriendlyFire
-============
-*/
-void idAI::OnFriendlyFire ( idActor* attacker ) {
-	AnnounceFriendlyFire( static_cast<idActor*>(attacker) );
-}	
-
-/*
-============
-idAI::OnStartMoving
-============
-*/
-void idAI::OnStartMoving ( void ) {
-	aifl.simpleThink = false;
-	combat.fl.crouchViewClear = false;
-}
-
-/*
-============
-idAI::OnStopMoving
-============
-*/
-void idAI::OnStopMoving ( aiMoveCommand_t oldMoveCommand ) {
-}
-
-/*
-============
-idAI::OnStartAction
-============
-*/
-void idAI::OnStartAction ( void ) {
-}
-
-/*
-============
-idAI::OnStopAction
-============
-*/
-void idAI::OnStopAction	( void ) {
-}
-
-/*
-============
-idAI::OnEnemyVisiblityChange
-============
-*/
-void idAI::OnEnemyVisiblityChange ( bool oldVisible ) {
-}
-
-/*
-============
-idAI::OnSetKey
-============
-*/
-void idAI::OnSetKey	( const char* key, const char* value ) {
-	if ( !idStr::Icmp ( key, "noCombatChatter" ) ) {
-		combat.fl.noChatter = spawnArgs.GetBool ( key );
-	} else if ( !idStr::Icmp ( key, "allowPlayerPush" ) ) {
-		combat.tacticalMaskAvailable &= ~(AITACTICAL_MOVE_PLAYERPUSH_BIT);		
-		if ( spawnArgs.GetBool ( key ) ) {
-			combat.tacticalMaskAvailable |= AITACTICAL_MOVE_PLAYERPUSH_BIT;
-		}
-	} else if ( !idStr::Icmp ( key, "noLook" ) ) {
-		aifl.disableLook = spawnArgs.GetBool ( key );
-	} else if ( !idStr::Icmp ( key, "killer_guard" ) ) {
-		aifl.killerGuard = spawnArgs.GetBool ( key );
-	}
-}
-
-/*
-============
-idAI::OnCoverInvalidated
-============
-*/
-void idAI::OnCoverInvalidated ( void ) {
-	// Force a tactical update now
-	ForceTacticalUpdate ( );
-}
-
-/*
-============
-idAI::OnCoverNotFacingEnemy
-============
-*/
-void idAI::OnCoverNotFacingEnemy ( void ) {
-	// Clear attack timers so we can shoot right now
-	actionTimerRangedAttack.Clear ( actionTime );
-	actionRangedAttack.timer.Clear( actionTime );
-}
-
-/*
-============
-idAI::SkipCurrentDestination
-
-Is the AI's current destination ok enough to stay at?
-============
-*/
-bool idAI::SkipCurrentDestination ( void ) const {
-	// can only skip current destination when we are stopped
-	if ( move.fl.moving ) {
-		return false;
-	}
-/*
-	// If we are currently behind cover and that cover is no longer valid we should skip it
-	if ( IsBehindCover ( ) && !IsCoverValid ( ) ) {
-		return true;
-	}
-*/
-	return false;
-}
-
-/*
-============
-idAI::SkipImpulse
-============
-*/
-bool idAI::SkipImpulse( idEntity *ent, int id ){
-	bool skip = idActor::SkipImpulse( ent, id );
-
-	if( af.IsActive ( ) ) {
-		return false;
-	}
-	if( !fl.takedamage ){
-		return true;
-	}
-	if( move.moveCommand == MOVE_RV_PLAYBACK ){
-		return true;
-	}	
-	
-	return skip;
-}
-
-/*
-============
-idAI::CanHitEnemy
-============
-*/
-bool idAI::CanHitEnemy ( void ) {
-	trace_t	tr;
-	idEntity *hit;
-
-	idEntity *enemyEnt = enemy.ent;
-	if ( !IsEnemyVisible ( ) || !enemyEnt ) {
-		return false;
-	}
-
-	// don't check twice per frame
-	if ( gameLocal.time == lastHitCheckTime ) {
-		return lastHitCheckResult;
-	}
-
-	lastHitCheckTime = gameLocal.time;
-
-	idVec3 toPos = enemyEnt->GetEyePosition();
-	idVec3 eye = GetEyePosition();
-	idVec3 dir;
-
-	// expand the ray out as far as possible so we can detect anything behind the enemy
-	dir = toPos - eye;
-	dir.Normalize();
-	toPos = eye + dir * MAX_WORLD_SIZE;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	if ( g_perfTest_aiNoVisTrace.GetBool() ) {
-		lastHitCheckResult = true;
-		return lastHitCheckResult;
-	}
-
-	gameLocal.TracePoint( this, tr, eye, toPos, MASK_SHOT_BOUNDINGBOX, this );
-	hit = gameLocal.GetTraceEntity( tr );
-// RAVEN END
-	if ( tr.fraction >= 1.0f || ( hit == enemyEnt ) ) {
-		lastHitCheckResult = true;
-	} else if ( ( tr.fraction < 1.0f ) && ( hit->IsType( idAI::Type ) ) && 
-		( static_cast<idAI *>( hit )->team != team ) ) {
-		lastHitCheckResult = true;
-	} else {
-		lastHitCheckResult = false;
-	}
-
-	return lastHitCheckResult;
-}
-
-/*
-============
-idAI::CanHitEnemyFromJoint
-============
-*/
-
-bool idAI::CanHitEnemyFromJoint( const char *jointname ){
-	trace_t	tr;
-	idVec3	muzzle;
-	idMat3	axis;
-
-	idEntity *enemyEnt = enemy.ent;
-	if ( !IsEnemyVisible ( ) || !enemyEnt ) {
-		return false;
-	}
-
-	// don't check twice per frame
-	if ( gameLocal.time == lastHitCheckTime ) {
-		return lastHitCheckResult;
-	}
-
-	if ( g_perfTest_aiNoVisTrace.GetBool() ) {
-		lastHitCheckResult = true;
-		return true;
-	}
-
-	lastHitCheckTime = gameLocal.time;
-
-	idVec3 toPos = enemyEnt->GetEyePosition();
-	jointHandle_t joint = animator.GetJointHandle( jointname );
-	if ( joint == INVALID_JOINT ) {
-		gameLocal.Error( "Unknown joint '%s' on %s", jointname, GetEntityDefName() );
-	}
-	animator.GetJointTransform( joint, gameLocal.time, muzzle, axis );
-	muzzle = physicsObj.GetOrigin() + ( muzzle + modelOffset ) * viewAxis * physicsObj.GetGravityAxis();
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	gameLocal.TracePoint( this, tr, muzzle, toPos, MASK_SHOT_BOUNDINGBOX, this );
-// RAVEN END
-	if ( tr.fraction >= 1.0f || ( gameLocal.GetTraceEntity( tr ) == enemyEnt ) ) {
-		lastHitCheckResult = true;
-	} else {
-		lastHitCheckResult = false;
-	}
-
-	return lastHitCheckResult;
-}
-
-/*
-============
-idAI::
-============
-
-float HeightForTrajectory( const idVec3 &start, float zVel, float gravity );
-
-int idAI::TestTrajectory( const idVec3 &firePos, const idVec3 &target, const char *projectileName ){
-	idVec3	projVelocity;
-	idVec3	projGravity;
-	float	testTime;
-	float	zVel, height, pitch, s, c;
-	idVec3	dir;
-	float	newVel;
-	float	delta_x;
-	float	delta_z;
-
-	projectileDef	= gameLocal.FindEntityDefDict ( projectileName );	
-	projVelocity	= idProjectile::GetVelocity( projectileDef );
-	projGravity		= idProjectile::GetGravity( projectileDef ).z * GetPhysics()->GetGravity();
-	pitch			= DEG2RAD( gameLocal.random.RandomFloat() * 50 + 20 );	// Random pitch range between 20 and 70.  Should this be customizeable?
-
-	idMath::SinCos( pitch, s, c );
-
-	delta_x			= idMath::Sqrt( ( target.x - firePos.x ) * ( target.x - firePos.x ) + ( target.y - firePos.y ) * ( target.y - firePos.y ) );
-	delta_z			= target.z - firePos.z;
-	newVel			= ( delta_x / idMath::Cos( pitch ) ) * idMath::Sqrt( projGravity.z / ( 2.0f * ( delta_x * idMath::Tan( pitch ) - delta_z ) ) );
-	testTime		= delta_x / ( newVel * c );
-	zVel			= newVel * s;
-
-	float a = idMath::ASin ( delta_x * GetPhysics()->GetGravity().Length() / (projVelocity.x * projVelocity.x) );
-	a = a / 2;
-
-	float r = (projVelocity.x * projVelocity.x) * idMath::Sin ( 2 * a ) / GetPhysics()->GetGravity().Length();
-	if ( r < delta_x - (delta_x * 0.1) ) {
-		mVar.valid_lobbed_shot = 0;
-		return 0;
-	} else {
-		mVar.lobDir = target - firePos;
-		mVar.lobDir.z = 0;
-		mVar.lobDir.z = idMath::Tan ( a ) * mVar.lobDir.LengthFast();
-		mVar.lobDir.Normalize ( );
-		mVar.valid_lobbed_shot = gameLocal.time;
-		mVar.lob_vel_scale = 1.0f; // newVel / projVelocity.Length();
-		return 1;
-	}
-
-	projGravity[2] *= -1.0f;
-
-	dir				= target - firePos;
-	dir.z			= 0;
-	dir.Normalize();
-	delta_x			= idMath::Sqrt( 1 - ( c * c ) );
-	dir.x			*= delta_x;
-	dir.y			*= delta_x;
-	dir.z			= c;
-
-	height = HeightForTrajectory( firePos, zVel, projGravity[2] ) - firePos.z;
-	if ( height > MAX_WORLD_SIZE ) {
-		// goes higher than we want to allow
-		mVar.valid_lobbed_shot = 0;
-		return 0;
-	}
-
-	if ( idAI::TestTrajectory ( firePos, target, zVel, projGravity[2], testTime, height * 2, NULL, 
-								MASK_SHOT_RENDERMODEL, this, enemy.GetEntity(), ai_debugTrajectory.GetBool() ? 4000 : 0 ) ) {
-
-		if ( ai_debugTrajectory.GetBool() ) {
-			float t = testTime / 100.0f;
-			idVec3 velocity = dir * newVel;
-			idVec3 lastPos, pos;
-			lastPos = firePos;
-			pos = firePos;
-			for ( int j = 1; j < 100; j++ ) {
-				pos += velocity * t;
-				velocity += projGravity * t;
-				gameRenderWorld->DebugLine( colorCyan, lastPos, pos, ai_debugTrajectory.GetBool() ? 4000 : 0 );
-				lastPos = pos;
-			}
+			color = colorRed;
 		}
 
-		mVar.lobDir = dir;
-		mVar.valid_lobbed_shot = gameLocal.time;
-		mVar.lob_vel_scale = newVel / projVelocity.Length();
-	}else{
-		mVar.valid_lobbed_shot = 0;
-	}
+		idVec3 leftDir( -node->cone_left.y, node->cone_left.x, 0.0f );
+		idVec3 rightDir( node->cone_right.y, -node->cone_right.x, 0.0f );
+		idVec3 org = node->GetPhysics()->GetOrigin() + node->offset;
 
-	return ( (int)mVar.valid_lobbed_shot != 0 );
+		bounds[ 1 ].z = node->max_height;
 
-}
-*/
+		leftDir.NormalizeFast();
+		rightDir.NormalizeFast();
 
-/*
-============
-idAI::
-============
-*/
+		const idMat3 &axis = node->GetPhysics()->GetAxis();
+		float cone_dot = node->cone_right * axis[ 1 ];
+		if ( idMath::Fabs( cone_dot ) > 0.1 ) {
+			float cone_dist = node->max_dist / cone_dot;
+			idVec3 pos1 = org + leftDir * node->min_dist;
+			idVec3 pos2 = org + leftDir * cone_dist;
+			idVec3 pos3 = org + rightDir * node->min_dist;
+			idVec3 pos4 = org + rightDir * cone_dist;
 
-float idAI::GetTurnDelta( void ){
-	float amount;
-
-	if ( move.turnRate ) {
-		amount = idMath::AngleNormalize180( move.ideal_yaw - move.current_yaw );
-		return amount;
-	} else {
-		return 0.0f;
-	}
-}
-
-/*
-============
-idAI::GetIdleAnimName
-============
-*/
-const char* idAI::GetIdleAnimName ( void ) {
-	const char* animName = NULL;
-	
-	// Start idle animation
-	if ( enemy.ent ) {
-		animName = "idle_alert";
-	}
-	
-	if ( animName && HasAnim ( ANIMCHANNEL_ALL, animName ) ) {
-		return animName;
-	}
-	
-	return "idle";
-}
-
-/*
-===============================================================================
-
-	idAI - Enemy Finding
-
-===============================================================================
-*/
-
-/*
-============
-idAI::FindEnemy
-============
-*/
-idEntity *idAI::FindEnemy ( bool inFov, bool forceNearest, float maxDistSqr ){
-	idActor*	actor;
-	idActor*	bestEnemy;
-	idActor*	bestEnemyBackup;
-	float		bestThreat;
-	float		bestThreatBackup;
-	float		distSqr;
-	float		enemyRangeSqr;
-	float		awareRangeSqr;
-	idVec3		origin;
-	idVec3		delta;
-	pvsHandle_t pvs;
-	
-	// Setup our local variables used in the search
-	pvs				 = gameLocal.pvs.SetupCurrentPVS( GetPVSAreas(), GetNumPVSAreas() );
-	bestThreat		 = 0.0f;
-	bestThreatBackup = 0.0f;
-	bestEnemy		 = NULL;
-	bestEnemyBackup	 = NULL;
-	awareRangeSqr	 = Square ( combat.awareRange );
-	enemyRangeSqr	 = enemy.ent ? Square ( enemy.range ) : Square ( combat.attackRange[1] );
-	origin			 = GetEyePosition ( );
-
-	// Iterate through the enemy team
-	for( actor = aiManager.GetEnemyTeam ( (aiTeam_t)team ); actor; actor = actor->teamNode.Next() ) {
-		// Skip hidden enemies and enemies that cant be targeted
-		if( actor->fl.notarget || actor->fl.isDormant || ( actor->IsHidden ( ) && !actor->IsInVehicle() ) ) {
-			continue;
-		}
-
-		// Calculate the distance between ourselves and our potential enemy
-		delta   = physicsObj.GetOrigin() - actor->GetPhysics()->GetOrigin();
-		distSqr = delta.LengthSqr();
-
-		// Calculate the adjusted threat for this actor		
-		float threat = CalculateEnemyThreat ( actor );
-
-		// Save the highest threat enemy as a backup in case we cannot find one we can see
-		if ( threat > bestThreatBackup ) {
-			bestThreatBackup = threat;
-			bestEnemyBackup  = actor;
-		}
-
-		// If we have already found a more threatening enemy then attack that
-		if ( threat < bestThreat ) {
-			continue;
-		}
-		
-		// If this enemy isnt in the same pvps then use them as a backup
-		if ( !gameLocal.pvs.InCurrentPVS( pvs, actor->GetPVSAreas(), actor->GetNumPVSAreas() ) ) {
-			continue;
-		}
-
-		// this is pretty specific to Quake 4, but we don't want the player to be around an enemy too long who can't see him. We need to randomly spike the
-		// awareRange on creatures to simulate them looking behind them, or noticing someone standing around for too long.
-		// Modders take note, this will prevent most "sneaking up on bad guys" action because they will likely spike their aware ranges out
-		// during the sneaking.
-		if( gameLocal.random.RandomFloat() < 0.005f )	{
-			awareRangeSqr *= 15;
-		}
-
-		// fov doesn't matter if they're within awareRange, we "sense" them if we're alert... (or should LOS not even matter at this point?)
-		if ( distSqr < awareRangeSqr || CanSeeFrom ( origin, actor, (inFov && !(combat.fl.aware&&distSqr<awareRangeSqr)) ) ) {
-			bestThreat = threat;
-			bestEnemy  = actor;
-		}
-	}
-
-	// If force nearest is set we will give them an enemy reguardless of distance or sight
-	if( forceNearest ){
-		if( bestEnemy == NULL ){
-			bestEnemy = bestEnemyBackup;
-		}
-	}
-
-	gameLocal.pvs.FreeCurrentPVS( pvs );
-		
-	return bestEnemy;
-}
-
-/*
-============
-idAI::CheckForEnemy
-
-Look for a suitable enemy
-============
-*/
-bool idAI::CheckForEnemy ( bool useFov, bool force ) {
-	idEntity *newEnemy;
-
-	if ( combat.fl.ignoreEnemies ) {
-		return false;
-	}
-
-	// If we already have an enemy and arent being forced to find a new on then just return now
-	if ( enemy.ent && !force ) {
-		return true;
-	}
-
-	// Save last time we checked for a new enemy
-	enemy.checkTime = gameLocal.time;
-
-	// Dont use fov check when behind cover because you are up against a wall
-	newEnemy = FindEnemy ( !IsBehindCover ( ), 0, 0.0f );
- 	
- 	// Havent found an enemy yet, see if we heard something that can be our enemy
-	if ( !newEnemy ) {
-		newEnemy = HeardSound( true );
-	}
-
-	// If we still havent found an enemy, see if a teammate can give us one	
-	if ( !newEnemy ) {
-		return CheckForTeammateEnemy ( );
-	}
-
-	SetEnemy( newEnemy );
-	return true;
-}
-
-/*
-============
-idAI::CheckForTeammateEnemy
-============
-*/
-bool idAI::CheckForTeammateEnemy( void ) {
-	idActor*	teammate;
-	idEntity*	teammateEnemy;
-
-	// Not looking for a new enemy.
-	if ( combat.fl.ignoreEnemies ) {
-		return false;
-	}
-	
-	// Find an enemy from a nearby ally
-	teammateEnemy = aiManager.NearestTeammateEnemy ( this, 1000.0f, false, false, &teammate );
-	if ( !teammateEnemy || teammateEnemy == enemy.ent ) {
-		return false;
-	}
-	
-	assert ( teammate );
-	
-	// Attempt to set the new enemy
-	if ( !SetEnemy ( teammateEnemy ) ) {
-		return false;
-	}
-	
-	// If the ally is another AI entity we can use their enemy visibility information
-	if ( teammate->IsType ( idAI::Type ) ) {
-		idAI* teammateAI = static_cast<idAI*>(teammate);
-		enemy.smoothedLinearVelocity		= teammateAI->enemy.smoothedLinearVelocity;
-		enemy.smoothedPushedVelocity		= teammateAI->enemy.smoothedPushedVelocity;
-		enemy.lastKnownPosition				= teammateAI->enemy.lastKnownPosition;
-		enemy.lastVisibleEyePosition		= teammateAI->enemy.lastVisibleEyePosition;
-		enemy.lastVisibleFromEyePosition	= teammateAI->enemy.lastVisibleEyePosition;
-		enemy.lastVisibleChestPosition		= teammateAI->enemy.lastVisibleChestPosition;
-		enemy.lastVisibleTime				= 0;
-	}
-	
-	return true;
-}
-
-/*
-============
-idAI::CheckForCloserEnemy
-============
-*/
-bool idAI::CheckForCloserEnemy ( void ) {
-	idEntity*	newEnemy = NULL;
-	float		maxDistSqr;
-
-	// Not looking for a new enemy.
-	if ( combat.fl.ignoreEnemies ) {
-		return false;
-	}
-
-	// See if we happen to have heard someone this frame that we can use 
-	newEnemy = HeardSound( true );
-	if ( newEnemy && newEnemy != enemy.ent && newEnemy->IsType( idActor::GetClassType() ) ) {
-		//heard someone else!
-		float newDist = DistanceTo ( newEnemy->GetPhysics()->GetOrigin() );
-		
-		// Are they closer than the enemy we are fighting?
-		if ( newDist < enemy.range ) {
-			//new enemy is closer than current one, take them!
-			SetEnemy( newEnemy );
-			return true;
-		}
-	}
-
-	if ( GetEnemy() && enemy.range ) {
-		maxDistSqr = Min( Square ( enemy.range ), Square ( combat.awareRange ) );
-	} else {
-		maxDistSqr = Square ( combat.awareRange );
-	}
-
-	newEnemy = FindEnemy( false, 0, maxDistSqr );
-
-	if ( !newEnemy ) {
-		return false;
-	}
-
-	SetEnemy( newEnemy );
-	return true;
-}
-
-/*
-============
-idAI::CheckForReplaceEnemy
-
-TODO: Call CalculateThreat ( ent ) and compare to current entity
-============
-*/
-bool idAI::CheckForReplaceEnemy ( idEntity* replacement ) {
-	bool replace;
-
-	// If our replacement is a driver a vehicle and they are hidden we will 
-	// want to shoot back at their vehicle not them.
-	idActor* actor;
-	actor = dynamic_cast<idActor*>(replacement);
-	if ( actor && actor->IsInVehicle ( ) && actor->IsHidden ( ) ) {
-		replacement = actor->GetVehicleController ( ).GetVehicle ( );
-	}
-
-	// Invalid replacement?
-	if ( !replacement) {
-		return false;
-	}
-
-	// Not looking for a new enemy.
-	if ( combat.fl.ignoreEnemies ) {
-		return false;
-	}
-
-	if ( replacement == enemy.ent ) {
-		return false;
-	}
-	 
-	// Dont want to set our enemy to a friendly target
-	if ( replacement->IsType( idActor::GetClassType() ) && (static_cast<idActor*>(replacement))->team == team ) {
-		return false;
-	}
-	
-	// Not having an enemy will set it immediately
-	if ( !enemy.ent ) {
-		SetEnemy ( replacement );
-		return true;
-	}
-
-	// Dont change enemies too often when being hit
-	if ( gameLocal.time - enemy.changeTime < 1000 ) {
-		return false;
-	}
-
-	replace = false;
-
-	// If new enemy is more threatening then replace it reguardless if we can see it
-	if ( CalculateEnemyThreat ( replacement ) > CalculateEnemyThreat ( enemy.ent ) ) {
-		replace = true;
-	// Replace our enemy if we havent seen ours in a bit
-	} else if ( !IsEnemyRecentlyVisible ( 0.25f ) ) {
-		replace = true;
-	}
-	
-	// Replace enemy?
-	if ( replace ) {
-		SetEnemy ( replacement );
-	}
-	
-	return replace;
-}
-
-/*
-============
-idAI::UpdateThreat
-============
-*/
-void idAI::UpdateThreat ( void ) {
-	// Start threat at base threat level
-	combat.threatCurrent = combat.threatBase;
-	
-	// Adjust threat using current tactical state
-	switch ( combat.tacticalCurrent ) {
-		case AITACTICAL_HIDE:	combat.threatCurrent *= 0.5f;	break;
-		case AITACTICAL_MELEE:	combat.threatCurrent *= 2.0f;	break;
-	}		
-	
-	// Signifigantly reduced threat when in undying mode
-	if ( aifl.undying ) {
-		combat.threatCurrent *= 0.25f;
-	}
-}
-
-/*
-============
-idAI::CalculateEnemyThreat
-============
-*/
-float idAI::CalculateEnemyThreat ( idEntity* enemyEnt ) {
-	// Calculate the adjusted threat for this actor		
-	float threat = 1.0f;
-	if ( enemyEnt->IsType ( idAI::GetClassType ( ) ) ) {
-		idAI* enemyAI = static_cast<idAI*>(enemyEnt);
-		threat = enemyAI->combat.threatCurrent;
-		
-		// Increase threat for enemies that are targetting us
-		if ( enemyAI->enemy.ent == this && enemyAI->combat.tacticalCurrent == AITACTICAL_MELEE ) {
-			threat *= 2.0f;
-		}
-	} else if ( enemyEnt->IsType ( idPlayer::GetClassType ( ) ) ) {
-		threat = 2.0f; 
-	} else {
-		threat = 1.0f;
-	}				
-
-	float enemyRangeSqr;
-	float distSqr;	
-	
-	enemyRangeSqr = (enemy.ent) ? Square ( enemy.range ) : Square ( combat.attackRange[1] );
-	distSqr		  = (physicsObj.GetOrigin ( ) - enemyEnt->GetPhysics()->GetOrigin ( )).LengthSqr ( );
-	
-	if ( distSqr > 0 ) {
-		return threat * (enemyRangeSqr / distSqr);
-	}
-	
-	return threat;
-}
-
-/*
-============
-idAI::CheckBlink
-============
-*/
-void idAI::CheckBlink ( void ) {
-//	if ( IsSpeaking ( ) ) {
-//		return;
-//	}
-	idActor::CheckBlink ( );
-}
-
-/*
-============
-idAI::Speak
-============
-*/
-bool idAI::Speak( const char *lipsync, bool random ){
-	assert( idStr::Icmpn( lipsync, "lipsync_", 7 ) == 0 );
-	
-	if ( random ) {
-		// If there is no lipsync then skip it
-		if ( spawnArgs.MatchPrefix ( lipsync ) ) {
-			lipsync = spawnArgs.RandomPrefix ( lipsync, gameLocal.random );
-		} else { 
-			lipsync = NULL;
-		}
-	} else {
-		lipsync = spawnArgs.GetString ( lipsync );
-	}
-	
-	if ( !lipsync || !*lipsync ) {
-		return false;
-	}
-	
-	if ( head ) {
-		speakTime = head->StartLipSyncing( lipsync );
-	} else {
-		speakTime = 0;		
-		StartSoundShader (declManager->FindSound ( lipsync ), SND_CHANNEL_VOICE, SSF_IS_VO, false, &speakTime );
-	}
-
-	speakTime += gameLocal.time;
-	return true;	
-}
-
-/*
-============
-idAI::StopSpeaking
-============
-*/
-void idAI::StopSpeaking( bool stopAnims ){
-	speakTime = 0;
-	StopSound( SND_CHANNEL_VOICE, false );
-	if ( head.GetEntity() ) {
-		head.GetEntity()->StopSound( SND_CHANNEL_VOICE, false );
-		if ( stopAnims ) {
-			head.GetEntity()->GetAnimator()->ClearAllAnims( gameLocal.time, 100 );
+			gameRenderWorld->DebugLine( color, node->GetPhysics()->GetOrigin(), ( pos1 + pos3 ) * 0.5f, gameLocal.msec );
+			gameRenderWorld->DebugLine( color, pos1, pos2, gameLocal.msec );
+			gameRenderWorld->DebugLine( color, pos1, pos3, gameLocal.msec );
+			gameRenderWorld->DebugLine( color, pos3, pos4, gameLocal.msec );
+			gameRenderWorld->DebugLine( color, pos2, pos4, gameLocal.msec );
+			gameRenderWorld->DebugBounds( color, bounds, org, gameLocal.msec );
 		}
 	}
 }
-
-/*
-============
-idAI::CanHitEnemyFromAnim
-============
-*/
-bool idAI::CanHitEnemyFromAnim( int animNum, idVec3 offset ) {
-	idVec3		dir;
-	idVec3		local_dir;
-	idVec3		fromPos;
-	idMat3		axis;
-	idVec3		start;
-	trace_t		tr;
-	idEntity*	enemyEnt;
-
-	// Need an enemy.
-	if ( !enemy.ent ) {
-		return false;
-	}
-
-	// Enemy actor pointer
-	enemyEnt = static_cast<idEntity*>(enemy.ent.GetEntity());
-
-	// just do a ray test if close enough
-	if ( enemyEnt->GetPhysics()->GetAbsBounds().IntersectsBounds( physicsObj.GetAbsBounds().Expand( 16.0f ) ) ) {
-		return CanHitEnemy();
-	}
-
-	// calculate the world transform of the launch position
-  	idVec3 org = physicsObj.GetOrigin()+offset;
-	idVec3 from;
-  	dir = enemy.lastVisibleChestPosition - org;
-  	physicsObj.GetGravityAxis().ProjectVector( dir, local_dir );
-  	local_dir.z = 0.0f;
-  	local_dir.ToVec2().Normalize();
-  	axis = local_dir.ToMat3();
-  	from = org + attackAnimInfo[ animNum ].attackOffset * axis;
-
-/*
-	if( DebugFilter(ai_debugTactical) ) {
-		gameRenderWorld->DebugLine ( colorYellow, org + attackAnimInfo[ animNum ].eyeOffset * viewAxis, from, 5000 );
-		gameRenderWorld->DebugLine ( colorOrange, from, enemy.lastVisibleEyePosition, 5000 );
-	}
-*/
-
-	// If the point we are shooting from is within our bounds then we are good to go, otherwise make sure its not in a wall
-	const idBounds &ownerBounds = physicsObj.GetAbsBounds();
-	if ( !ownerBounds.ContainsPoint ( from ) ) {
-		trace_t tr;
-		if ( !g_perfTest_aiNoVisTrace.GetBool() ) {
-			gameLocal.TracePoint( this, tr, org + attackAnimInfo[ animNum ].eyeOffset * axis, from, MASK_SHOT_BOUNDINGBOX, this );
-			if ( tr.fraction < 1.0f ) {
-				return false;
-			}
-		}
-	}		
-
-	return CanSeeFrom ( from, enemy.lastVisibleEyePosition, true );
-}
-
-/*
-================
-idAI::ScriptedBegin
-================
-*/
-bool idAI::ScriptedBegin ( bool endWithIdle, bool allowDormant ) {
-	if ( aifl.dead ) {
-		return false;
-	}
-	
-	// Wakeup if not awake already
-	WakeUp ( );
-		
-	aifl.scriptedEndWithIdle = endWithIdle;
-	aifl.scripted			 = true;
-//	combat.fl.aware			 = false;
-	combat.tacticalCurrent	 = AITACTICAL_NONE;
-
-	// Make sure the entity never goes dormant during a scripted event or
-	// the event may never end.
-	aifl.scriptedNeverDormant = !allowDormant;
-	dormantStart = 0;
-
-/*		
-	// actors will ignore enemies during scripted events
-	ClearEnemy ( );
-*/
-	
-	// Cancel any current movement
-	StopMove ( MOVE_STATUS_DONE );
-	
-	move.fl.allowAnimMove = true;
-	
-	return true;
-}
-
-/*
-================
-idAI::ScriptedEnd
-================
-*/
-void idAI::ScriptedEnd ( void ) {
-	dormantStart = 0;
-	aifl.scripted = false;
-}
-
-/*
-================
-idAI::ScriptedStop
-================
-*/
-void idAI::ScriptedStop ( void ) {
-	if ( !aifl.scripted ) {
-		return;
-	}
-	aifl.scriptedEndWithIdle = true;
-	aifl.scripted			 = false;
-	StopMove( MOVE_STATUS_DONE );
-}
-
-/*
-================
-idAI::ScriptedMove
-================
-*/
-void idAI::ScriptedMove ( idEntity* destEnt, float minDist, bool endWithIdle ) {
-	if ( !ScriptedBegin ( endWithIdle ) ) {
-		return;
-	}
-
-	//disable all temporary blocked reachabilities due to teammate obstacle avoidance
-	aiManager.UnMarkAllReachBlocked();
-	//attempt the move - NOTE: this *can* fail if there's no route or AAS obstacles are in the way!
-	MoveToEntity ( destEnt, minDist );
-	//re-enable all temporary blocked reachabilities due to teammate obstacle avoidance
-	aiManager.ReMarkAllReachBlocked();
-
-	// Move the torso to the idle state if its not already there
-	SetAnimState( ANIMCHANNEL_TORSO, "Torso_Idle", 4 ); 
-
-	// Move the legs into the idle state so he will start moving
-	SetAnimState( ANIMCHANNEL_LEGS, "Legs_Idle", 4 ); 
-
-	// Set up state loop for moving
-	SetState ( "State_ScriptedMove" );
-	PostState ( "State_ScriptedStop" );
-}
-
-/*
-================
-idAI::ScriptedFace
-================
-*/
-void idAI::ScriptedFace ( idEntity* faceEnt, bool endWithIdle ) {
-	if ( !ScriptedBegin ( endWithIdle ) ) {
-		return;
-	}
-
-	// Force idle while facing
-	SetAnimState ( ANIMCHANNEL_LEGS, "Legs_Idle", 4 ); 
-	SetAnimState ( ANIMCHANNEL_TORSO, "Torso_Idle", 4 ); 
-
-	// Start facing the entity
-	FaceEntity ( faceEnt );
-
-	SetState ( "State_ScriptedFace" );
-	PostState ( "State_ScriptedStop" );
-}
-
-/*
-================
-idAI::ScriptedAnim
-
-Plays an the given animation in an un-interruptable state.  If looping will continue indefinately until
-another operation which will stop a scripted sequence is called. When done can optionally return the character
-back to their normal processing if endWithIdle is set to true.
-================
-*/
-void idAI::ScriptedAnim ( const char* animname, int blendFrames, bool loop, bool endWithIdle ) {
-	// Start the scripted sequence
-	if ( !ScriptedBegin ( endWithIdle, true ) ) {
-		return;
-	}
-	
-	TurnToward ( move.current_yaw );
-
-	if ( loop ) {
-		// Loop the given animation
-		PlayCycle ( ANIMCHANNEL_TORSO, animname, blendFrames );		
-	} else {
-		// Play the given animation
-		PlayAnim ( ANIMCHANNEL_TORSO, animname, blendFrames );
-	}
-	
-	SetAnimState ( ANIMCHANNEL_LEGS, "Wait_Frame" );
-	SetAnimState ( ANIMCHANNEL_TORSO, "Torso_ScriptedAnim" );
-
-	DisableAnimState ( ANIMCHANNEL_LEGS );
-
-	SetState ( "Wait_ScriptedDone" );
-	PostState ( "State_ScriptedStop" );
-}
-
-
-/*
-============
-idAI::ScriptedPlaybackAim
-============
-*/
-void idAI::ScriptedPlaybackAim ( const char* playback, int flags, int numFrames ) {
-	// Start the scripted sequence
-	if ( !ScriptedBegin ( false ) ) {
-		return;
-	}
-
-	mLookPlayback.Start( spawnArgs.GetString ( playback ), this, flags, numFrames );
-
-	// Wait till its done and mark it finished
-	SetState ( "State_ScriptedPlaybackAim" );
-	PostState ( "State_ScriptedStop" );
-}		
-
-/*
-============
-idAI::ScriptedAction
-============
-*/
-void idAI::ScriptedAction ( idEntity* actionEnt, bool endWithIdle ) {
-	const char* actionName;
-	
-	if ( !actionEnt ) {
-		return;
-	}
-	
-	// Get the action name
-	actionName = actionEnt->spawnArgs.GetString ( "action" );
-	if ( !*actionName ) {
-		gameLocal.Error ( "missing action keyword on scripted action entity '%s' for ai '%s'",
-						  actionEnt->GetName(),
-						  GetName() );
-		return;
-	}
-
-	// Start the scripted sequence
-	if ( !ScriptedBegin ( endWithIdle ) ) {
-		return;
-	}
-
-	scriptedActionEnt = actionEnt;
-	
-	SetState ( "State_ScriptedStop" );
-	PerformAction ( va("TorsoAction_%s", actionName ), 4, true );
-}
-
-/*
-============
-idAI::FootStep
-============
-*/
-void idAI::FootStep ( void ) {
-	idActor::FootStep ( );
-	
-	ExecScriptFunction( funcs.footstep );	
-}
-
-/*
-============
-idAI::SetScript
-============
-*/
-void idAI::SetScript( const char* scriptName, const char* funcName ) {
-	if ( !funcName || !funcName[0] ) {
-		return;
-	} 
-
-	// Set the associated script
-	if ( !idStr::Icmp ( scriptName, "first_sight" ) ) {
-		funcs.first_sight.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "sight" ) ) {
-		funcs.sight.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "pain" ) ) {
-		funcs.pain.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "damage" ) ) {
-		funcs.damage.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "death" ) ) {
-		funcs.death.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "attack" ) ) {
-		funcs.attack.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "init" ) ) {
-		funcs.init.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "onclick" ) ) {
-		funcs.onclick.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "launch_projectile" ) ) {
-		funcs.launch_projectile.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "footstep" ) ) {
-		funcs.footstep.Init( funcName );
-	} else if ( !idStr::Icmp ( scriptName, "postHeal" ) ) {
-		// hax: this is a medic only script and I don't want to store it on every AI type..
-		//	I also don't want it generating the warning below in this case.
-	} else if ( !idStr::Icmp ( scriptName, "postWeaponDestroyed" ) ) {
-		// hax: this is a Gladiator/Light Tank only script and I don't want to store it on every AI type..
-		//	I also don't want it generating the warning below in this case.
-	} else {
-		gameLocal.Warning ( "unknown script '%s' specified on entity '%s'", scriptName, name.c_str() );
-	}
-}
-
-/*
-===============================================================================
-
-	idAI - Reactions
-
-===============================================================================
-*/
-
-/*
-============
-idAI::ReactToShotAt
-============
-*/
-void idAI::ReactToShotAt ( idEntity* attacker, const idVec3 &origOrigin, const idVec3 &origDir ) {
-	if ( g_perfTest_aiNoDodge.GetBool() ) {
-		return;
-	}
-
-	idVec3 foo;
-	idVec3 diff;
-	diff = GetPhysics()->GetOrigin() - origOrigin;
-	diff = origOrigin + diff.ProjectOntoVector ( origDir ) * origDir;
-	diff = diff - GetPhysics()->GetOrigin();
-	diff.NormalizeFast ( );
-	diff.z = 0;
-			
-	idAngles angles = diff.ToAngles ( );
-	float angleDelta = idMath::AngleDelta ( angles[YAW], move.current_yaw );
-
-	combat.shotAtTime	= gameLocal.time;
-	combat.shotAtAngle  = angleDelta;
-			
-	// Someone is attacking us so give them a chance to be our new enemy
-	CheckForReplaceEnemy ( attacker );
-}
-
-/*
-============
-idAI::ReactToPain
-============
-*/
-void idAI::ReactToPain ( idEntity* attacker, int damage ) {
-	CheckForReplaceEnemy ( attacker );
-}
-	
-/*
-===============================================================================
-
-	idAI - Helpers
-
-===============================================================================
-*/
-
-/*
-============
-idAI::UpdateHelper
-============
-*/
-void idAI::UpdateHelper ( void ) {
-	rvAIHelper* oldhelper;
-			
-	// Link ourselves to the closest helper
-	oldhelper     = helperCurrent;
-	helperCurrent = aiManager.FindClosestHelper ( physicsObj.GetOrigin() );
-	
-	// Ideal stays the same as current as long as it was the same when we started
-	if ( oldhelper == helperIdeal ) {
-		helperIdeal = helperCurrent;
-	}
-}
-
-/*
-============
-idAI::GetActiveHelper
-
-When we have an enemy our current helper becomes the active helper, when we dont have an 
-enemy we instead use our ideal.
-============
-*/
-rvAIHelper* idAI::GetActiveHelper ( void ) {
-	return GetEnemy ( ) ? helperCurrent : helperIdeal;
-}
-
-/*
-===============================================================================
-
-	idAI - Tethers
-
-===============================================================================
-*/
-
-/*
-============
-idAI::SetTether
-============
-*/
-void idAI::SetTether ( rvAITether* newTether ) {
-	aifl.tetherMover = false;
-	
-	// Clear our current tether?
-	if ( !newTether ) {
-		if ( tether ) {
-			tether = NULL;
-			ForceTacticalUpdate ( );
-		}
-	} else if ( newTether->IsType ( rvAITetherClear::GetClassType ( ) ) ) {
-		SetTether ( NULL );
-	} else {
-		if ( newTether && !newTether->ValidateAAS ( this ) ) {
-			// If you have aas error out to make them fix it
-			if ( aas ) {
-				gameLocal.Error ( "tether entity '%s' does no link into the aas for ai '%s'. (try moving it closer to the floor where the aas is)",
-								   newTether->GetName(), GetName ()  );
-			// If we dont have aas, just warn								   
-			} else {
-				gameLocal.Warning ( "tether entity '%s' does no link into the aas for ai '%s'. (there is no aas available)",
-								   newTether->GetName(), GetName ()  );
-			}				
-			SetTether ( NULL );
-		} else if ( newTether != tether ) {
-			tether = newTether;
-			ForceTacticalUpdate ( );
-		}
-	}
-}
-
-/*
-============
-idAI::GetTether
-============
-*/
-rvAITether* idAI::GetTether ( void ) {
-	return tether;
-}
-
-/*
-============
-idAI::IsTethered
-============
-*/
-bool idAI::IsTethered ( void ) const {
-	// Need a tether entity to be tethered
-	if ( !tether ) {
-		return false;
-	}
-	// If we have an enemy and that enemy is within our tether then break it if we can
-	if ( enemy.ent && enemy.ent->IsType ( idAI::GetClassType() ) && tether->CanBreak ( ) ) {
-		if ( tether->ValidateDestination ( static_cast<idAI*>(enemy.ent.GetEntity()), enemy.lastKnownPosition ) ) {
-			return false;
-		}
-	}
-	return true;
-}
-
-/*
-============
-idAI::IsWithinTether
-============
-*/
-bool idAI::IsWithinTether ( void ) const {
-	if ( !IsTethered ( ) ) {
-		return false;
-	}
-	if ( !tether->ValidateDestination ( (idAI*)this, physicsObj.GetOrigin ( ) ) ) {
-		return false;
-	}
-	return true;
-}
-
-/*
-===============================================================================
-
-	idAI - NonCombat
-
-===============================================================================
-*/
 
 /*
 =====================
-idAI::SetTalkState
+idCombatNode::EntityInView
 =====================
 */
-void idAI::SetTalkState ( talkState_t state ) {
-	// Make sure state is valid
-	if ( ( state < 0 ) || ( state >= NUM_TALK_STATES ) ) {
-		gameLocal.Error( "Invalid talk state (%d)", (int)state ); 
-	}
-	
-	// Same state we are already in?
-	if ( talkState == state ) {
-		return;
-	}
-	
-	// Set new talk state
-	talkState = state;
-
-}
-
-/*
-============
-idAI::SetPassivePrefix
-============
-*/
-void idAI::SetPassivePrefix ( const char* prefix ) {
-	passive.prefix = prefix;
-	if ( passive.prefix.Length() ) {
-		passive.prefix += "_";
-	}
-
-	// Force an idle change
-	passive.idleAnimChangeTime = 0;	
-	passive.fidgetTime		   = 0;
-	passive.talkTime		   = 0;
-	
-	// Get animation prefixs
-	passive.fl.multipleIdles = GetPassiveAnimPrefix ( "idle",		passive.animIdlePrefix );	
-							   GetPassiveAnimPrefix ( "fidget",		passive.animFidgetPrefix );
-							   GetPassiveAnimPrefix ( "talk",		passive.animTalkPrefix );
-}
-
-/*
-============
-idAI::GetPassiveAnimPrefix
-============
-*/
-bool idAI::GetPassiveAnimPrefix ( const char* animName, idStr& animPrefix ) {
-	const idKeyValue* key;
-	
-	// First see if we have custom idle animations for the passive prefix
-	key = NULL;
-	if ( passive.prefix.Length ( ) ) {
-		animPrefix = va("anim_%s%s", passive.prefix.c_str(), animName );
-		key		   = spawnArgs.MatchPrefix ( animPrefix );
-	}
-	
-	// If there are no custom idle animations for the prefix then see if there are any custom anims at all
-	if ( !key ) {
-		animPrefix = va("anim_%s", animName );
-		key		   = spawnArgs.MatchPrefix ( animPrefix );
-	}
-	
-	if ( !key ) {
-		animPrefix = "";
+bool idCombatNode::EntityInView( idActor *actor, const idVec3 &pos ) {
+	if ( !actor || ( actor->health <= 0 ) ) {
 		return false;
 	}
+
+	const idBounds &bounds = actor->GetPhysics()->GetBounds();
+	if ( ( pos.z + bounds[ 1 ].z < min_height ) || ( pos.z + bounds[ 0 ].z >= max_height ) ) {
+		return false;
+	}
+
+	const idVec3 &org = GetPhysics()->GetOrigin() + offset;
+	const idMat3 &axis = GetPhysics()->GetAxis();
+	idVec3 dir = pos - org;
+	float  dist = dir * axis[ 0 ];
 	
-	return spawnArgs.MatchPrefix ( animPrefix, key ) ? true : false;
+	if ( ( dist < min_dist ) || ( dist > max_dist ) ) {
+		return false;
+	}
+
+	float left_dot = dir * cone_left;
+	if ( left_dot < 0.0f ) {
+		return false;
+	}
+
+	float right_dot = dir * cone_right;
+	if ( right_dot < 0.0f ) {
+		return false;
+	}
+
+	return true;
+}
+
+/*
+=====================
+idCombatNode::Event_Activate
+=====================
+*/
+void idCombatNode::Event_Activate( idEntity *activator ) {
+	disabled = !disabled;
+}
+
+/*
+=====================
+idCombatNode::Event_MarkUsed
+=====================
+*/
+void idCombatNode::Event_MarkUsed( void ) {
+	if ( spawnArgs.GetBool( "use_once" ) ) {
+		disabled = true;
+	}
+}
+
+
+/*
+==============
+idAI::ClientImpacts
+//HUMANHEAD nla
+==============
+*/
+void idAI::ClientImpacts( void ) {
+	int			entCounter, touchEnt;
+	trace_t		trace;
+	idEntity	*other;
+
+
+	memset(&trace, 0, sizeof(trace));
+
+	for (entCounter = 0; entCounter < physicsObj.GetNumTouchEnts();
+		 entCounter++) {
+		touchEnt = physicsObj.GetTouchEnt(entCounter);
+
+		other = gameLocal.entities[ touchEnt ];
+		assert(other);
+
+		//! Should we signal?, and if so, check if hasSignal?
+		// other->Signal(SIG_TOUCH);
+
+		if (other->RespondsTo( EV_Touch ) ) {
+			other->ProcessEvent( &EV_Touch, this, &trace);
+		}
+	}	//. entCounter loop
+
+
+}		//. idAI::ClientImpacts(void)
+
+
+//HUMANHEAD mdc - added to support multiple projectiles
+/*
+===================
+idAI::SetCurrentProjectile
+===================
+*/
+void idAI::SetCurrentProjectile( int infoIndex ) {
+	if( projectileDefaultDefIndex < 0 ) {	//we aren't using infos, so don't do anything
+		return;
+	}
+	HH_ASSERT( infoIndex >= 0 && infoIndex < projectileInfos.Num() );
+
+	projectileInfo_t* projInfo = &(projectileInfos[ infoIndex ]);
+	if( projInfo ) {
+		projectileDef = projInfo->projectileDef;
+		projectileRadius = projInfo->projectileRadius;
+		projectileVelocity = projInfo->projectileVelocity;
+		projectileGravity = projInfo->projectileGravity;
+		projectileSpeed = projInfo->projectileSpeed;
+		projectileClipModel = projInfo->projectileClipModel;
+	}
 }
 
 /*
 ===================
-idAI::IsMeleeNeeded
+idAI::FindProjectileInfo
 ===================
 */
-bool idAI::IsMeleeNeeded( void )	{
-
-	if( enemy.ent && enemy.ent->IsType ( idAI::Type ))	{
-		
-		idAI* enemyAI = static_cast<idAI*>(enemy.ent.GetEntity());
-
-		//if our enemy is closing in on us and demands melee, we'll meet him.
-		if ( enemyAI->combat.tacticalCurrent == AITACTICAL_MELEE && enemy.range < combat.meleeRange ) {
-			return true;
-		}
-	
-		//other checks...
-	}
-	
-	return false;
-}
-
-/*
-===================
-idAI::IsCrouching
-===================
-*/
-bool idAI::IsCrouching( void ) const {
-	return move.fl.crouching;
-}
-
-bool idAI::CheckDeathCausesMissionFailure( void )
-{
-	if ( spawnArgs.GetString( "objectivetitle_failed", NULL ) )
-	{
-		return true;
-	}
-	if ( targets.Num() )
-	{
-		//go through my targets and see if any are of class rvObjectiveFailed
-		idEntity* targEnt;
-		for( int i = 0; i < targets.Num(); i++ ) {
-			targEnt = targets[ i ].GetEntity();
-			if ( !targEnt )
-			{
-				continue;
-			}
-			if ( !targEnt->IsType( rvObjectiveFailed::GetClassType() ) ) {
-				continue;
-			}
-			if ( !spawnArgs.GetString( "inv_objective", NULL ) ) {
-				continue;
-			}
-			//yep!
-			return true;
+int	idAI::FindProjectileInfo( const idDict* findDef ) const {
+	for( int i = 0; i < projectileInfos.Num(); i++ ) {
+		if( projectileInfos[ i ].projectileDef == findDef ) {
+			return i;
 		}
 	}
-	return false;
+	return -1;
 }
+//HUMANHEAD END

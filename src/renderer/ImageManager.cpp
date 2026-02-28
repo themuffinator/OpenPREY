@@ -52,6 +52,58 @@ static void R_NormalizeInternalImageName( idStr& name ) {
 	}
 }
 
+static void OpenPrey_RemapLegacyImageName( idStr& name ) {
+	struct legacyImageRemap_t {
+		const char *legacyName;
+		const char *replacementName;
+	};
+
+	static const legacyImageRemap_t remaps[] = {
+		{ "_menushot", "_currentRender" },
+		{ "gfx/guis/loadscreens/generic", "guis/assets/loading/loading" },
+		{ "gfx/splashscreen", "guis/assets/loading/loading" },
+		{ "gfx/guis/white", "guis/assets/white" },
+		{ "gfx/guis/guicursor_arrow", "guis/assets/guicursor_arrow" },
+		{ "gfx/guis/guicursor_hand", "guis/assets/guicursor_hand" },
+		{ "gfx/guis/scrollbarh", "guis/assets/scrollbarv" },
+		{ "gfx/guis/scrollbarv", "guis/assets/scrollbarv" },
+		{ "gfx/guis/scrollbar_thumb", "guis/assets/scrollbar_thumb" },
+		{ "gfx/guis/scrollbar_right", "guis/assets/scrollbarv_cap" },
+		{ "gfx/guis/scrollbar_left", "guis/assets/scrollbarv_cap" },
+		{ "gfx/guis/scrollbar_up", "guis/assets/scrollbarv_cap" },
+		{ "gfx/guis/scrollbar_down", "guis/assets/scrollbarv_cap" }
+	};
+
+	for ( int i = 0; i < (int)( sizeof( remaps ) / sizeof( remaps[ 0 ] ) ); i++ ) {
+		if ( idStr::Icmp( name.c_str(), remaps[ i ].legacyName ) == 0 ) {
+			name = remaps[ i ].replacementName;
+			return;
+		}
+	}
+
+	const char *legacyLoadscreenPrefix = "gfx/guis/loadscreens/";
+	const int legacyLoadscreenPrefixLen = static_cast<int>( strlen( legacyLoadscreenPrefix ) );
+	if ( idStr::Icmpn( name.c_str(), legacyLoadscreenPrefix, legacyLoadscreenPrefixLen ) == 0 ) {
+		idStr mapName = name.c_str() + legacyLoadscreenPrefixLen;
+		if ( mapName.Length() ) {
+			if ( mapName.Icmp( "generic" ) == 0 ) {
+				name = "guis/assets/loading/loading";
+			} else {
+				name = "guis/assets/loading/";
+				name += mapName;
+			}
+		}
+	}
+}
+
+static void OpenPrey_NormalizeAndRemapImageName( idStr& name ) {
+	// strip any .tga file extensions from anywhere in the name, including image program parameters
+	name.Replace( ".tga", "" );
+	name.BackSlashesToSlashes();
+	R_NormalizeInternalImageName( name );
+	OpenPrey_RemapLegacyImageName( name );
+}
+
 /*
 ===============
 R_ReloadImages_f
@@ -326,17 +378,16 @@ idImage	*idImageManager::GetImageWithParameters( const char *_name, textureFilte
 		declManager->MediaPrint( "DEFAULTED\n" );
 		return globalImages->defaultImage;
 	}
-	if ( idStr::Icmpn( _name, "fonts", 5 ) == 0 || idStr::Icmpn( _name, "newfonts", 8 ) == 0 ) {
+
+	idStr name = _name;
+	OpenPrey_NormalizeAndRemapImageName( name );
+	if ( idStr::Icmpn( name.c_str(), "fonts", 5 ) == 0 || idStr::Icmpn( name.c_str(), "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
-	if ( idStr::Icmpn( _name, "lights", 6 ) == 0 ) {
+	if ( idStr::Icmpn( name.c_str(), "lights", 6 ) == 0 ) {
 		usage = TD_LIGHT;
 	}
-	// strip any .tga file extensions from anywhere in the _name, including image program parameters
-	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+
 	int hash = name.FileNameHash();
 	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
 		idImage	* image = images[i];
@@ -377,18 +428,15 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 		declManager->MediaPrint( "DEFAULTED\n" );
 		return globalImages->defaultImage;
 	}
-	if ( idStr::Icmpn( _name, "fonts", 5 ) == 0 || idStr::Icmpn( _name, "newfonts", 8 ) == 0 ) {
+
+	idStr name = _name;
+	OpenPrey_NormalizeAndRemapImageName( name );
+	if ( idStr::Icmpn( name.c_str(), "fonts", 5 ) == 0 || idStr::Icmpn( name.c_str(), "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
-	if ( idStr::Icmpn( _name, "lights", 6 ) == 0 ) {
+	if ( idStr::Icmpn( name.c_str(), "lights", 6 ) == 0 ) {
 		usage = TD_LIGHT;
 	}
-
-	// strip any .tga file extensions from anywhere in the _name, including image program parameters
-	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
 
 	//
 	// see if the image is already loaded, unless we
@@ -527,11 +575,8 @@ idImage *idImageManager::GetImage( const char *_name ) const {
 		return globalImages->defaultImage;
 	}
 
-	// strip any .tga file extensions from anywhere in the _name, including image program parameters
 	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	OpenPrey_NormalizeAndRemapImageName( name );
 
 	//
 	// look in loaded images

@@ -32,6 +32,51 @@ If you have questions concerning this license or the applicable additional terms
 
 extern idCVar s_maxSamples;
 
+static bool ParseSoundClassToken( idToken &token, int &soundClass ) {
+	if ( token.type == TT_NUMBER ) {
+		soundClass = token.GetIntValue();
+		return true;
+	}
+	if ( !token.Icmp( "SC_NORMAL" ) ) {
+		soundClass = SOUNDCLASS_NORMAL;
+		return true;
+	}
+	if ( !token.Icmp( "SC_VOICEDUCKER" ) ) {
+		soundClass = SOUNDCLASS_VOICEDUCKER;
+		return true;
+	}
+	if ( !token.Icmp( "SC_SPIRIT" ) || !token.Icmp( "SC_SPIRITWALK" ) ) {
+		soundClass = SOUNDCLASS_SPIRITWALK;
+		return true;
+	}
+	if ( !token.Icmp( "SC_VOICE" ) ) {
+		soundClass = SOUNDCLASS_VOICE;
+		return true;
+	}
+	if ( !token.Icmp( "SC_MUSIC" ) ) {
+		soundClass = SOUNDCLASS_MUSIC;
+		return true;
+	}
+	return false;
+}
+
+static bool ParseSubtitleDirective( idLexer& src ) {
+	idToken subtitleDelay;
+	idToken subtitleString;
+
+	if( !src.ExpectAnyToken( &subtitleDelay ) ) {
+		src.Warning( "Missing subtitle delay value" );
+		return false;
+	}
+
+	if( !src.ExpectAnyToken( &subtitleString ) ) {
+		src.Warning( "Missing subtitle string token" );
+		return false;
+	}
+
+	return true;
+}
+
 //typedef enum
 //{
 //	SPEAKER_LEFT = 0,
@@ -174,13 +219,17 @@ bool idSoundShader::ParseShader( idLexer& src )
 {
 	idToken		token;
 
-	// Quake 4 shaders author these distances in world units; keep stock defaults.
+	// Distances are authored in meters; keep Doom 3 / Prey defaults.
 	parms.minDistance = 40.0f;
 	parms.maxDistance = 400.0f;
 	parms.volume = 1;
 	parms.shakes = 0;
 	parms.soundShaderFlags = 0;
 	parms.soundClass = 0;
+	parms.subIndex = 0;
+	parms.profanityIndex = 0;
+	parms.profanityDelay = 0.0f;
+	parms.profanityDuration = 0.0f;
 	parms.frequencyShift = 1.0f;
 	parms.wetLevel = 0.0f;
 	parms.dryLevel = 1.0f;
@@ -295,10 +344,18 @@ bool idSoundShader::ParseShader( idLexer& src )
 			}
 			parms.dryLevel = src.ParseFloat();
 		}
+		else if( token.IcmpPrefix( "noreverb" ) == 0 )
+		{
+			// Prey and Doom 3 shaders use this as metadata; defaults already disable reverb.
+			parms.wetLevel = 0.0f;
+			parms.dryLevel = 1.0f;
+		}
 		// volume
 		else if( !token.Icmp( "volume" ) )
 		{
-			parms.volume = src.ParseFloat();
+			// Prey/Quake4 shader 'volume' is authored in dB.
+			const float db = src.ParseFloat();
+			parms.volume = idMath::dBToScale( db );
 		}
 		// leadinVolume is used to allow light breaking leadin sounds to be much louder than the broken loop
 		else if( !token.Icmp( "leadinVolume" ) )
@@ -338,7 +395,15 @@ bool idSoundShader::ParseShader( idLexer& src )
 		// soundClass
 		else if( !token.Icmp( "soundClass" ) )
 		{
-			parms.soundClass = src.ParseInt();
+			if( !src.ReadToken( &token ) )
+			{
+				return false;
+			}
+			if( !ParseSoundClassToken( token, parms.soundClass ) )
+			{
+				src.Warning( "Unknown soundClass value '%s'", token.c_str() );
+				parms.soundClass = SOUNDCLASS_NORMAL;
+			}
 			if( parms.soundClass < 0 || parms.soundClass >= SOUND_MAX_CLASSES )
 			{
 				src.Warning( "SoundClass out of range" );
@@ -384,7 +449,7 @@ bool idSoundShader::ParseShader( idLexer& src )
 			parms.soundShaderFlags |= SSF_LOOPING;
 		}
 		// no occlusion
-		else if( !token.Icmp( "no_occlusion" ) )
+		else if( !token.Icmp( "no_occlusion" ) || !token.Icmp( "noPortalFlow" ) )
 		{
 			parms.soundShaderFlags |= SSF_NO_OCCLUSION;
 		}
@@ -414,13 +479,37 @@ bool idSoundShader::ParseShader( idLexer& src )
 			parms.soundShaderFlags |= SSF_UNCLAMPED;
 		}
 		// omnidirectional
-		else if( !token.Icmp( "omnidirectional" ) )
+		else if( !token.Icmp( "omnidirectional" ) || !token.Icmp( "omniwhenclose" ) )
 		{
 			parms.soundShaderFlags |= SSF_OMNIDIRECTIONAL;
 		}
 		else if( !token.Icmp( "onDemand" ) )
 		{
 			// no longer loading sounds on demand
+		}
+		else if( !token.Icmp( "if" ) )
+		{
+			// Legacy conditional syntax appears in a few shipped shaders; runtime selection isn't supported here.
+			src.SkipRestOfLine();
+		}
+		// Prey dialogue metadata (not sound sample paths)
+		else if( !token.Icmp( "bleep" ) )
+		{
+			// Prey profanity censorship metadata.
+			parms.profanityIndex = src.ParseInt();
+			parms.profanityDelay = src.ParseFloat();
+			parms.profanityDuration = src.ParseFloat();
+		}
+		else if( !token.Icmp( "jawflap" ) )
+		{
+			parms.soundShaderFlags |= SSF_VOICEAMPLITUDE;
+		}
+		else if( token.IcmpPrefix( "subtitle" ) == 0 )
+		{
+			if( !ParseSubtitleDirective( src ) )
+			{
+				return false;
+			}
 		}
 		// the wave files
 		else if( !token.Icmp( "leadin" ) )

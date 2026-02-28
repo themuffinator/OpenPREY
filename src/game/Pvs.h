@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_PVS_H__
 #define __GAME_PVS_H__
@@ -18,14 +20,13 @@ typedef struct pvsHandle_s {
 	unsigned int		h;			// handle for current pvs
 } pvsHandle_t;
 
+
 typedef struct pvsCurrent_s {
 	pvsHandle_t			handle;		// current pvs handle
 	byte *				pvs;		// current pvs bit string
 } pvsCurrent_t;
 
-// must be a power of 2
-// base was 8, MP now stores client PVS from frame to frame ( MAX_CLIENTS )
-#define MAX_CURRENT_PVS		64
+#define MAX_CURRENT_PVS		8		// must be a power of 2
 
 typedef enum {
 	PVS_NORMAL				= 0,	// PVS through portals taking portal states into account
@@ -73,7 +74,6 @@ private:
 	bool *				connectedAreas;
 	int *				areaQueue;
 	byte *				areaPVS;
-
 						// current PVS for a specific source possibly taking portal states (open/closed) into account
 	mutable pvsCurrent_t currentPVS[MAX_CURRENT_PVS];
 						// used to create PVS
@@ -89,6 +89,12 @@ private:
 	void				CreatePVSData( void );
 	void				DestroyPVSData( void );
 	void				CopyPortalPVSToMightSee( void ) const;
+	//HUMANHEAD rww
+						//check if two portals should be seen from each other because of gameportal linking
+	bool				MightSeeLinkedGamePortal(const struct pvsPortal_s *p1, const struct pvsPortal_s *p2) const;
+						//go through all of our portals and modify the mightSees based on gameportal linking
+	void				MightSeeGamePortals(void) const; 
+	//HUMANHEAD END
 	void				FloodFrontPortalPVS_r( struct pvsPortal_s *portal, int areaNum ) const;
 	void				FrontPortalPVS( void ) const;
 	struct pvsStack_s *	FloodPassagePVS_r( struct pvsPortal_s *source, const struct pvsPortal_s *portal, struct pvsStack_s *prevStack ) const;

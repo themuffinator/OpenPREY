@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __PHYSICS_H__
 #define __PHYSICS_H__
@@ -69,13 +71,6 @@ public:	// common physics interface
 								// get/set the mass of a specific clip model or the whole physics object
 	virtual void				SetMass( float mass, int id = -1 ) = 0;
 	virtual float				GetMass( int id = -1 ) const = 0;
-
-// RAVEN BEGIN
-// bdube: added center mass	
-								// get the center of mass origin
-	virtual idVec3				GetCenterMass ( int id = -1 ) const = 0;
-// RAVEN END
-
 								// get/set the contents of a specific clip model or the whole physics object
 	virtual void				SetContents( int contents, int id = -1 ) = 0;
 	virtual int					GetContents( int id = -1 ) const = 0;
@@ -100,10 +95,6 @@ public:	// common physics interface
 	virtual bool				IsAtRest( void ) const = 0;
 	virtual int					GetRestStartTime( void ) const = 0;
 	virtual bool				IsPushable( void ) const = 0;
-// RAVEN BEGIN
-// bdube: water interraction
-	virtual bool				IsInWater ( void ) const = 0;
-// RAVEN END	
 								// save and restore the physics state
 	virtual void				SaveState( void ) = 0;
 	virtual void				RestoreState( void ) = 0;
@@ -147,12 +138,6 @@ public:	// common physics interface
 	virtual bool				HasGroundContacts( void ) const = 0;
 	virtual bool				IsGroundEntity( int entityNum ) const = 0;
 	virtual bool				IsGroundClipModel( int entityNum, int id ) const = 0;
-// RAVEN BEGIN
-// abahr
-	virtual const idVec3		GetContactNormal() const { return vec3_zero; }
-	virtual const idVec3		GetGroundContactNormal() const { return vec3_zero; }
-	virtual idEntity*			GetSelf() const = 0;
-// RAVEN END
 								// set the master entity for objects bound to a master
 	virtual void				SetMaster( idEntity *master, const bool orientated = true ) = 0;
 								// set pushed state
@@ -169,11 +154,9 @@ public:	// common physics interface
 	virtual void				WriteToSnapshot( idBitMsgDelta &msg ) const = 0;
 	virtual void				ReadFromSnapshot( const idBitMsgDelta &msg ) = 0;
 
-// RAVEN BEGIN
-// kfuller: we want to debug draw the bbox
-	virtual void				DebugDraw() {}
-// RAVEN END
-
+	//HUMANHEAD: aob - need declarations so we can call these with GetPhysics()
+	virtual void				ActivateContactEntities( void ) {}
+	//HUMANHEAD END
 };
 
 #endif /* !__PHYSICS_H__ */

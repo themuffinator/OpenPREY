@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -23,23 +25,6 @@ const idEventDef EV_Light_Off( "Off", NULL );
 const idEventDef EV_Light_FadeOut( "fadeOutLight", "f" );
 const idEventDef EV_Light_FadeIn( "fadeInLight", "f" );
 
-// RAVEN BEGIN
-// bdube: added
-const idEventDef EV_Light_SetLightGUI ( "setLightGUI", "s" );
-// jscott: added for modview
-const idEventDef EV_Light_SetCurrentLightLevel( "setCurrentLightLevel", "d" );
-const idEventDef EV_Light_SetMaxLightLevel( "setMaxLightLevel", "d" );
-// kfuller: 8/11/03
-const idEventDef EV_Light_IsOn( "isOn", NULL, 'f' );
-const idEventDef EV_Light_Break( "break", "ef" );
-// kfuller: lights that blink to life
-const idEventDef EV_Light_DoneBlinking( "doneBlinking", NULL );
-// kfuller: lights that blink off
-const idEventDef EV_Light_DoneBlinkingOff( "doneBlinkingOff", NULL );
-// abahr:
-const idEventDef EV_Light_Timer( "<lightTimer>" );
-// RAVEN END
-
 CLASS_DECLARATION( idEntity, idLight )
 	EVENT( EV_Light_SetShader,		idLight::Event_SetShader )
 	EVENT( EV_Light_GetLightParm,	idLight::Event_GetLightParm )
@@ -55,23 +40,6 @@ CLASS_DECLARATION( idEntity, idLight )
 	EVENT( EV_PostSpawn,			idLight::Event_SetSoundHandles )
 	EVENT( EV_Light_FadeOut,		idLight::Event_FadeOut )
 	EVENT( EV_Light_FadeIn,			idLight::Event_FadeIn )
-
-// RAVEN BEGIN
-// bdube: added
-	EVENT( EV_Light_SetLightGUI,				idLight::Event_SetLightGUI )
-	EVENT( EV_Light_SetCurrentLightLevel,		idLight::Event_SetCurrentLightLevel )
-	EVENT( EV_Light_SetMaxLightLevel,			idLight::Event_SetMaxLightLevel )
-// kfuller: 8/11/03
-	EVENT( EV_Light_IsOn,			idLight::Event_IsOn )
-	EVENT( EV_Light_Break,			idLight::Event_Break )
-// kfuller: lights that blink to life
-	EVENT( EV_Light_DoneBlinking,	idLight::Event_DoneBlinking )
-// kfuller: lights that blink off
-	EVENT( EV_Light_DoneBlinkingOff,	idLight::Event_DoneBlinkingOff )
-	EVENT( EV_Earthquake,				idLight::Event_EarthQuake )
-// abahr:
-	EVENT( EV_Light_Timer,				idLight::Event_Timer )
-// RAVEN END
 END_CLASS
 
 
@@ -84,11 +52,10 @@ this is the canonical renderLight parm parsing,
 which should be used by dmap and the editor
 ================
 */
-bool idGameEdit::ParseSpawnArgsToRenderLight( const idDict *args, renderLight_t *renderLight ) {
-	bool		gotTarget, gotUp, gotRight;
+void idGameEdit::ParseSpawnArgsToRenderLight( const idDict *args, renderLight_t *renderLight ) {
+	bool	gotTarget, gotUp, gotRight;
 	const char	*texture;
-	idVec3		color;
-	bool		rv = true;
+	idVec3	color;
 
 	memset( renderLight, 0, sizeof( *renderLight ) );
 
@@ -106,10 +73,9 @@ bool idGameEdit::ParseSpawnArgsToRenderLight( const idDict *args, renderLight_t 
 
 	// we should have all of the target/right/up or none of them
 	if ( ( gotTarget || gotUp || gotRight ) != ( gotTarget && gotUp && gotRight ) ) {
-		gameLocal.Warning( "Light at (%f,%f,%f) has bad target info\n",
+		gameLocal.Printf( "Light at (%f,%f,%f) has bad target info\n",
 			renderLight->origin[0], renderLight->origin[1], renderLight->origin[2] );
-
-		return false;
+		return;
 	}
 
 	if ( !gotTarget ) {
@@ -118,23 +84,12 @@ bool idGameEdit::ParseSpawnArgsToRenderLight( const idDict *args, renderLight_t 
 		// allow an optional relative center of light and shadow offset
 		args->GetVector( "light_center", "0 0 0", renderLight->lightCenter );
 
-// RAVEN BEGIN
-// bdube: default light radius changed to 320
 		// create a point light
-		if (!args->GetVector( "light_radius", "320 320 320", renderLight->lightRadius ) ) {
+		if (!args->GetVector( "light_radius", "300 300 300", renderLight->lightRadius ) ) {
 			float radius;
 
-			args->GetFloat( "light", "320", radius );
-// RAVEN END
+			args->GetFloat( "light", "300", radius );
 			renderLight->lightRadius[0] = renderLight->lightRadius[1] = renderLight->lightRadius[2] = radius;
-		}
-
-		if ( renderLight->lightRadius[0] == 0 ||
-			 renderLight->lightRadius[1] == 0 ||
-			 renderLight->lightRadius[2] == 0 ) {
-			gameLocal.Warning( "PointLight at ( %d, %d, %d ) has at least one radius component of 0!",
-				( int )renderLight->origin[0], ( int )renderLight->origin[1], ( int )renderLight->origin[2] );
-			rv = false;
 		}
 	}
 
@@ -173,25 +128,13 @@ bool idGameEdit::ParseSpawnArgsToRenderLight( const idDict *args, renderLight_t 
 	args->GetFloat( "shaderParm6", "0", renderLight->shaderParms[6] );
 	args->GetFloat( "shaderParm7", "0", renderLight->shaderParms[ SHADERPARM_MODE ] );
 	args->GetBool( "noshadows", "0", renderLight->noShadows );
-
-// RAVEN BEGIN
-// dluetscher: added a min light detail level setting that describes when this light is visible
-	args->GetFloat( "detailLevel", "10", renderLight->detailLevel );
-// RAVEN END
-
-// RAVEN BEGIN
-// ddynerman: dynamic shadows
-	args->GetBool( "noDynamicShadows", "0", renderLight->noDynamicShadows );
-// RAVEN END
 	args->GetBool( "nospecular", "0", renderLight->noSpecular );
+	args->GetBool( "lowSkippable", "0", renderLight->lowSkippable );	//HUMANHEAD bjk
 	args->GetBool( "parallel", "0", renderLight->parallel );
-	args->GetBool( "globalLight", "0", renderLight->globalLight );
 
 	args->GetString( "texture", "lights/squarelight1", &texture );
 	// allow this to be NULL
 	renderLight->shader = declManager->FindMaterial( texture, false );
-
-	return rv;
 }
 
 /*
@@ -224,10 +167,6 @@ idLight::idLight
 */
 idLight::idLight() {
 	memset( &renderLight, 0, sizeof( renderLight ) );
-// RAVEN BEGIN
-// dluetscher: added a default detail level to each render light
-	renderLight.detailLevel = DEFAULT_LIGHT_DETAIL_LEVEL;
-// RAVEN END
 	localLightOrigin	= vec3_zero;
 	localLightAxis		= mat3_identity;
 	lightDefHandle		= -1;
@@ -243,13 +182,6 @@ idLight::idLight() {
 	fadeStart			= 0;
 	fadeEnd				= 0;
 	soundWasPlaying		= false;
-	
-// RAVEN BEGIN
-// bdube: light gui
-	lightGUI			= NULL;
-	random				= 0.0f;
-	wait				= 0.0f;
-// RAVEN END	
 }
 
 /*
@@ -277,7 +209,6 @@ void idLight::Save( idSaveGame *savefile ) const {
 
 	savefile->WriteVec3( localLightOrigin );
 	savefile->WriteMat3( localLightAxis );
-	//qhandle_t		lightDefHandle;	// cnicholson: This wasn't here from id, so I didnt add it either. 
 
 	savefile->WriteString( brokenModel );
 	savefile->WriteInt( levels );
@@ -293,9 +224,6 @@ void idLight::Save( idSaveGame *savefile ) const {
 	savefile->WriteVec4( fadeTo );
 	savefile->WriteInt( fadeStart );
 	savefile->WriteInt( fadeEnd );
-
-	lightGUI.Save( savefile );			// cnicholson: added unsaved var
-
 	savefile->WriteBool( soundWasPlaying );
 }
 
@@ -307,12 +235,6 @@ unarchives object from save game file
 ================
 */
 void idLight::Restore( idRestoreGame *savefile ) {
-// RAVEN BEGIN
-// jscott: constants can be read from the spawnargs
-	wait = spawnArgs.GetFloat( "wait" );
-	random = spawnArgs.GetFloat( "random" );
-// RAVEN END
-
 	bool hadPrelightModel;
 
 	savefile->ReadRenderLight( renderLight );
@@ -347,13 +269,8 @@ void idLight::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec4( fadeTo );
 	savefile->ReadInt( fadeStart );
 	savefile->ReadInt( fadeEnd );
-// RAVEN BEGIN
-// bdube: light gui
-	lightGUI.Restore ( savefile );
-// RAVEN END	
-
 	savefile->ReadBool( soundWasPlaying );
-	
+
 	lightDefHandle = -1;
 
 	SetLightLevel();
@@ -366,27 +283,13 @@ idLight::Spawn
 */
 void idLight::Spawn( void ) {
 	bool start_off;
+	/* HUMANHEAD AOB - not needed
 	bool needBroken;
+	HUMANHEAD END*/
 	const char *demonic_shader;
 
 	// do the parsing the same way dmap and the editor do
-	if ( !gameEdit->ParseSpawnArgsToRenderLight( &spawnArgs, &renderLight ) ) {
-		gameLocal.Warning( "Removing invalid light named: %s", GetName() );
-		PostEventMS( &EV_Remove, 0 );
-		return;
-	}
-
-	static int s_lightSpawnLogCount = 0;
-	if ( s_lightSpawnLogCount < 16 ) {
-		const char *shaderName = renderLight.shader ? renderLight.shader->GetName() : "<null>";
-		common->Printf( "LightSpawn: name='%s' shader='%s' point=%d radius=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f)\n",
-			GetName(),
-			shaderName,
-			renderLight.pointLight ? 1 : 0,
-			renderLight.lightRadius[0], renderLight.lightRadius[1], renderLight.lightRadius[2],
-			renderLight.origin[0], renderLight.origin[1], renderLight.origin[2] );
-		++s_lightSpawnLogCount;
-	}
+	gameEdit->ParseSpawnArgsToRenderLight( &spawnArgs, &renderLight );
 
 	// we need the origin and axis relative to the physics origin/axis
 	localLightOrigin = ( renderLight.origin - GetPhysics()->GetOrigin() ) * GetPhysics()->GetAxis().Transpose();
@@ -452,6 +355,7 @@ void idLight::Spawn( void ) {
 
 		fl.takedamage	= true;
 
+#if !HUMANHEAD // aob - if no broken model is defined don't try and find one
 		// see if we need to create a broken model name
 		needBroken = true;
 		if ( model.Length() && !brokenModel.Length() ) {
@@ -480,37 +384,24 @@ void idLight::Spawn( void ) {
 				brokenModel = "";
 			}
 		}
+#endif
 
 		GetPhysics()->SetContents( spawnArgs.GetBool( "nonsolid" ) ? 0 : CONTENTS_SOLID );
+	
+		// make sure the collision model gets cached
+		idClipModel::CheckModel( brokenModel );
 	}
 
 	PostEventMS( &EV_PostSpawn, 0 );
-	
-// RAVEN BEGIN
-// bdube: light guis	
-	const char* lightGUI;
-	if ( spawnArgs.GetString ( "light_gui", "", &lightGUI ) ) {	
-		PostEventMS( &EV_Light_SetLightGUI, 0, lightGUI );
-	}
-
-// abahr:
-	wait = spawnArgs.GetFloat( "wait" );
-	random = spawnArgs.GetFloat( "random" );
-// AReis: Minor light optimization stuff.
-	spawnArgs.GetBool( "globalLight", "0", renderLight.globalLight );
-// RAVEN END
 
 	UpdateVisuals();
 
-// RAVEN BEGIN
-// ddynerman: ambient lights added clientside
- 	if( renderLight.shader && renderLight.shader->IsAmbientLight() ) {
- 		if ( !gameLocal.ambientLights.Find( static_cast<idEntity*>(this) ) ) {
- 			gameLocal.ambientLights.Append( static_cast<idEntity*>(this) );
- 		}
- 		fl.networkSync = false; // don't transmit ambient lights
- 	}
-// RAVEN END
+	//HUMANHEAD rww - don't want ambient lights in the snapshot
+	if (renderLight.shader && renderLight.shader->IsAmbientLight()) {
+		fl.networkSync = false;
+		fl.clientEntity = true; //even though it isn't in the client entity array, it can be treated as one, in that it will be active and update on the client without snapshot intervention.
+	}
+	//HUMANHEAD END
 }
 
 /*
@@ -618,7 +509,6 @@ void idLight::SetLightParms( float parm0, float parm1, float parm2, float parm3 
 	renderEntity.shaderParms[ SHADERPARM_GREEN ]	= parm1;
 	renderEntity.shaderParms[ SHADERPARM_BLUE ]		= parm2;
 	renderEntity.shaderParms[ SHADERPARM_ALPHA ]	= parm3;
-	baseColor.Set( parm0, parm1, parm2 );
 	PresentLightDefChange();
 	PresentModelDefChange();
 }
@@ -654,26 +544,6 @@ void idLight::On( void ) {
 	currentLevel = levels;
 	// offset the start time of the shader to sync it to the game time
 	renderLight.shaderParms[ SHADERPARM_TIMEOFFSET ] = -MS2SEC( gameLocal.time );
-
-// RAVEN BEGIN
-	idStr	blinkOnSound;
-	if (spawnArgs.GetString("snd_blinkOn", "", blinkOnSound))
-	{
-		refSound.shader = declManager->FindSound(blinkOnSound);
-		int howLongInMS = StartSoundShader( refSound.shader, SND_CHANNEL_ANY, 0, false, NULL );
-		PostEventMS(&EV_Light_DoneBlinking, howLongInMS);
-		soundWasPlaying = false;
-		idStr	blinkOnTexture;
-		if (spawnArgs.GetString( "mtr_blinkOn", "", blinkOnTexture ))
-		{
-			renderLight.shader = declManager->FindMaterial( blinkOnTexture, false );
-			UpdateVisuals();
-			Present();
-		}
-	}
-	else
-// RAVEN END
-
 	if ( ( soundWasPlaying || refSound.waitfortrigger ) && refSound.shader ) {
 		StartSoundShader( refSound.shader, SND_CHANNEL_ANY, 0, false, NULL );
 		soundWasPlaying = false;
@@ -688,35 +558,12 @@ idLight::Off
 ================
 */
 void idLight::Off( void ) {
-// RAVEN BEGIN
-// kfuller: lights can flicker off
-	idStr	blinkOffSound;
-	if (spawnArgs.GetString("snd_blinkOff", "", blinkOffSound))
-	{
-		refSound.shader = declManager->FindSound(blinkOffSound);
-		int howLongInMS = StartSoundShader( refSound.shader, SND_CHANNEL_ANY, 0, false, NULL );//*1000;
-		PostEventMS(&EV_Light_DoneBlinkingOff, howLongInMS);
-		soundWasPlaying = false;
-		idStr	blinkOffTexture;
-		if (spawnArgs.GetString( "mtr_blinkOff", "", blinkOffTexture ))
-		{
-			renderLight.shader = declManager->FindMaterial( blinkOffTexture, false );
-			UpdateVisuals();
-			Present();
-		}
+	currentLevel = 0;
+	// kill any sound it was making
+	if ( refSound.referenceSound && refSound.referenceSound->CurrentlyPlaying() ) {
+		StopSound( SND_CHANNEL_ANY, false );
+		soundWasPlaying = true;
 	}
-	else
-	{
-		currentLevel = 0;
-		// kill any sound it was making
-		idSoundEmitter* emitter = NULL;
-		emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
-		if ( emitter && emitter->CurrentlyPlaying() ) {
-			StopSound( SND_CHANNEL_ANY, false );
-			soundWasPlaying = true;
-		}
-	}
-// RAVEN END
 	SetLightLevel();
 	BecomeActive( TH_UPDATEVISUALS );
 }
@@ -781,15 +628,7 @@ void idLight::BecomeBroken( idEntity *activator ) {
 		SetModel( brokenModel );
 
 		if ( !spawnArgs.GetBool( "nonsolid" ) ) {
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-			RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 			GetPhysics()->SetClipModel( new idClipModel( brokenModel.c_str() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-			RV_POP_HEAP();
-// RAVEN END
 			GetPhysics()->SetContents( CONTENTS_SOLID );
 		}
 	} else if ( spawnArgs.GetBool( "hideModelOnBreak" ) ) {
@@ -799,7 +638,7 @@ void idLight::BecomeBroken( idEntity *activator ) {
 
 	if ( gameLocal.isServer ) {
 
-		ServerSendInstanceEvent( EVENT_BECOMEBROKEN, NULL, true, -1 );
+		ServerSendEvent( EVENT_BECOMEBROKEN, NULL, true, -1 );
 
 		if ( spawnArgs.GetString( "def_damage", "", &damageDefName ) ) {
 			idVec3 origin = renderEntity.origin + renderEntity.bounds.GetCenter() * renderEntity.axis;
@@ -808,7 +647,7 @@ void idLight::BecomeBroken( idEntity *activator ) {
 
 	}
 
-	ActivateTargets( activator );
+		ActivateTargets( activator );
 
 	// offset the start time of the shader to sync it to the game time
 	renderEntity.shaderParms[ SHADERPARM_TIMEOFFSET ] = -MS2SEC( gameLocal.time );
@@ -825,11 +664,7 @@ void idLight::BecomeBroken( idEntity *activator ) {
 		const idSoundShader *alternate = refSound.shader ? refSound.shader->GetAltSound() : declManager->FindSound( parm );
 		if ( alternate ) {
 			// start it with no diversity, so the leadin break sound plays
-			idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
-			if( emitter ) {
-				emitter->UpdateEmitter( refSound.origin, refSound.velocity, refSound.listenerId, &refSound.parms );
-				emitter->StartSound( alternate, SND_CHANNEL_ANY, 0.0, 0 );
-			}
+			refSound.referenceSound->StartSound( alternate, SND_CHANNEL_ANY, 0.0, 0 );
 		}
 	}
 
@@ -847,28 +682,11 @@ idLight::PresentLightDefChange
 ================
 */
 void idLight::PresentLightDefChange( void ) {
-	const bool wasMissingHandle = ( lightDefHandle == -1 );
-
 	// let the renderer apply it to the world
 	if ( ( lightDefHandle != -1 ) ) {
 		gameRenderWorld->UpdateLightDef( lightDefHandle, &renderLight );
 	} else {
 		lightDefHandle = gameRenderWorld->AddLightDef( &renderLight );
-	}
-
-	static int s_lightPresentLogCount = 0;
-	if ( s_lightPresentLogCount < 16 ) {
-		const char *shaderName = renderLight.shader ? renderLight.shader->GetName() : "<null>";
-		common->Printf( "LightPresent: %s name='%s' handle=%d skipUpdates=%d shader='%s' point=%d radius=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f)\n",
-			wasMissingHandle ? "add" : "update",
-			GetName(),
-			lightDefHandle,
-			cvarSystem->GetCVarBool( "r_skipUpdates" ) ? 1 : 0,
-			shaderName,
-			renderLight.pointLight ? 1 : 0,
-			renderLight.lightRadius[0], renderLight.lightRadius[1], renderLight.lightRadius[2],
-			renderLight.origin[0], renderLight.origin[1], renderLight.origin[2] );
-		++s_lightPresentLogCount;
 	}
 }
 
@@ -897,10 +715,6 @@ idLight::Present
 ================
 */
 void idLight::Present( void ) {
-// RAVEN BEGIN
-// jnewquist: Tag scope and callees to track allocations using "new".
-	MEM_SCOPED_TAG( tag, MA_RENDER );
-// RAVEN END
 	// don't present to the renderer if the entity hasn't changed
 	if ( !( thinkFlags & TH_UPDATEVISUALS ) ) {
 		return;
@@ -915,14 +729,12 @@ void idLight::Present( void ) {
 
 	// reference the sound for shader synced effects
 	if ( lightParent ) {
-// RAVEN BEGIN
-		renderLight.referenceSoundHandle = lightParent->GetSoundEmitter();
-		renderEntity.referenceSoundHandle = lightParent->GetSoundEmitter();
+		renderLight.referenceSound = lightParent->GetSoundEmitter();
+		renderEntity.referenceSound = lightParent->GetSoundEmitter();
 	}
 	else {
-		renderLight.referenceSoundHandle = refSound.referenceSoundHandle;
-		renderEntity.referenceSoundHandle = refSound.referenceSoundHandle;
-// RAVEN END
+		renderLight.referenceSound = refSound.referenceSound;
+		renderEntity.referenceSound = refSound.referenceSound;
 	}
 
 	// update the renderLight and renderEntity to render the light and flare
@@ -938,12 +750,6 @@ idLight::Think
 void idLight::Think( void ) {
 	idVec4 color;
 
-	static int s_lightThinkLogCount = 0;
-	if ( s_lightThinkLogCount < 16 ) {
-		common->Printf( "LightThink: name='%s' handle=%d thinkFlags=0x%X\n", GetName(), lightDefHandle, thinkFlags );
-		++s_lightThinkLogCount;
-	}
-
 	if ( thinkFlags & TH_THINK ) {
 		if ( fadeEnd > 0 ) {
 			if ( gameLocal.time < fadeEnd ) {
@@ -955,13 +761,6 @@ void idLight::Think( void ) {
 			}
 			SetColor( color );
 		}
-
-// RAVEN BEGIN
-// bdube: gui controlled lights		
-		if ( lightGUI ) {
-			SetColor ( lightGUI->GetRenderEntity()->gui[0]->GetLightColor ( ) );
-		}
-// RAVEN END
 	}
 
 	RunPhysics();
@@ -1124,16 +923,6 @@ idLight::Event_ToggleOnOff
 ================
 */
 void idLight::Event_ToggleOnOff( idEntity *activator ) {
-// RAVEN BEGIN
-// abahr:
-	if( wait > 0 ) {
-		if( EventIsPosted(&EV_Light_Timer) ) {
-			CancelEvents( &EV_Light_Timer );
-		} else {
-			ProcessEvent( &EV_Light_Timer );
-		}
-	} else {
-// RAVEN END
 	triggercount++;
 	if ( triggercount < count ) {
 		return;
@@ -1160,35 +949,6 @@ void idLight::Event_ToggleOnOff( idEntity *activator ) {
 			SetLightLevel();
 		}
 	}
-// RAVEN BEGIN
-// abahr:
-	}
-// RAVEN END
-}
-
-// RAVEN BEGIN
-// abahr:
-/*
-================
-idSound::Event_Timer
-================
-*/
-void idLight::Event_Timer( void ) {
-// FIXME: think about putting this logic in helper function so we don't have cut and pasted code
-	if ( !currentLevel ) {
-		On();
-	}
-	else {
-		currentLevel--;
-		if ( !currentLevel ) {
-			Off();
-		}
-		else {
-			SetLightLevel();
-		}
-	}
-
-	PostEventSec( &EV_Light_Timer, wait + gameLocal.random.CRandomFloat() * random );
 }
 
 /*
@@ -1202,7 +962,7 @@ void idLight::Event_SetSoundHandles( void ) {
 	int i;
 	idEntity *targetEnt;
 
-	if ( !soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle ) ) {
+	if ( !refSound.referenceSound ) {
 		return;
 	}
 
@@ -1216,19 +976,12 @@ void idLight::Event_SetSoundHandles( void ) {
 			light->FreeSoundEmitter( true );
 
 			// manually set the refSound to this light's refSound
-			light->renderEntity.referenceSoundHandle = renderEntity.referenceSoundHandle;
+			light->renderEntity.referenceSound = renderEntity.referenceSound;
 
 			// update the renderEntity to the renderer
 			light->UpdateVisuals();
 		}
-// RAVEN BEGIN
-// rjohnson: func_static's can now have their color parms affected by lights
-		else if ( targetEnt && targetEnt->IsType( idStaticEntity::GetClassType() ) ) {
-			targetEnt->GetRenderEntity()->referenceShader = renderLight.shader;
-			targetEnt->GetRenderEntity()->referenceSoundHandle = renderEntity.referenceSoundHandle;
-		}
-// RAVEN END
-	}	
+	}
 }
 
 /*
@@ -1375,149 +1128,5 @@ bool idLight::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 			return idEntity::ClientReceiveEvent( event, time, msg );
 		}
 	}
-//unreachable
-//	return false;
+	return false;
 }
-
-// RAVEN BEGIN
-// kfuller: 8/11/03
-void idLight::Event_IsOn()
-{
-	// not entirely sure this is the best way to check for offness
-	if (currentLevel == 0)
-	{
-		idThread::ReturnFloat( false );
-	}
-	else
-	{
-		idThread::ReturnFloat( true );
-	}
-}
-
-void idLight::Event_Break(idEntity *activator, float turnOff)
-{
-	BecomeBroken(activator);
-	if (turnOff)
-	{
-		Off();
-	}
-}
-
-void idLight::Event_DoneBlinking()
-{
-	// switch to a new (possibly non-blinking) shader for the light as well as a new looping sound
-	idStr	blinkedOn;
-	if (spawnArgs.GetString( "mtr_doneBlinking", "", blinkedOn ))
-	{
-		renderLight.shader = declManager->FindMaterial( blinkedOn, false );
-		UpdateVisuals();
-		Present();
-	}
-	idStr	doneBlinkingSound;
-	if (spawnArgs.GetBool("doneBlinkingNoSound"))
-	{
-		StopSound( SCHANNEL_ANY, false );
-	}
-	else if (spawnArgs.GetString("snd_doneBlinking", "", doneBlinkingSound))
-	{
-		StopSound( SCHANNEL_ANY, false );
-		if (doneBlinkingSound.Icmp("none"))
-		{
-			refSound.shader = declManager->FindSound(doneBlinkingSound);
-			StartSoundShader( refSound.shader, SND_CHANNEL_ANY, 0, false, NULL );
-			soundWasPlaying = false;
-		}
-	}
-}
-
-void idLight::Event_DoneBlinkingOff()
-{
-	// switch light and sound off
-	currentLevel = 0;
-	SetLightLevel();
-// RAVEN BEGIN
-	// kill any sound it was making
-	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
-	if ( emitter && emitter->CurrentlyPlaying ( ) ) {
-// RAVEN END
-		StopSound( SCHANNEL_ANY, false );
-		soundWasPlaying = true;
-	}
-}
-
-// kfuller: want fx entities to be able to respond to earthquakes
-void idLight::Event_EarthQuake(float requiresLOS)
-{
-	// does this entity even care about earthquakes?
-	float	quakeChance = 0;
-
-	if (!spawnArgs.GetFloat("quakeChance", "0", quakeChance))
-	{
-		return;
-	}
-	if (rvRandom::flrand(0, 1.0f) > quakeChance)
-	{
-		// failed its activation roll
-		return;
-	}
-
-	if (requiresLOS)
-	{
-		bool inPVS = gameLocal.InPlayerPVS( this );
-
-		// for lights, a line-of-sight check doesn't make as much sense, so if the quake requires an LOS check
-		//we'll actually perform a PVS check
-		if (!inPVS)
-		{
-			return;
-		}
-	}
-	// do something with this light
-	if (spawnArgs.GetBool("quakeBreak"))
-	{
-		spawnArgs.SetBool("quakeBreak", false);
-		BecomeBroken(gameLocal.entities[ENTITYNUM_WORLD]);
-		return;
-	}
-
-	float	offTime = spawnArgs.GetFloat("quakeOffTime", "1.0");
-	
-	Off();
-	PostEventMS(&EV_Light_On, offTime*1000.0f);
-}
-
-/*
-================
-idLight::Event_SetLightGUI
-================
-*/
-void idLight::Event_SetLightGUI ( const char* gui ) {
-	lightGUI = gameLocal.FindEntity( gui );
-	if ( lightGUI && lightGUI->GetRenderEntity() && lightGUI->GetRenderEntity()->gui[0] ) {
-		BecomeActive( TH_THINK );
-	} else {
-		lightGUI = NULL;
-	}
-}
-
-/*
-================
-idLight::Event_SetCurrentLightLevel
-================
-*/
-void idLight::Event_SetCurrentLightLevel( int in ) { 
-	currentLevel = in;
-	SetLightLevel();
-}
-
-/*
-================
-idLight::Event_SetMaxLightLevel
-================
-*/
-void idLight::Event_SetMaxLightLevel( int in ) { 
-	levels = in; 
-	SetLightLevel();
-}
-
-// RAVEN END

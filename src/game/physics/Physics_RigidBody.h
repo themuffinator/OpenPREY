@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __PHYSICS_RIGIDBODY_H__
 #define __PHYSICS_RIGIDBODY_H__
@@ -12,6 +14,11 @@
 
 ===================================================================================
 */
+
+extern const float	RB_VELOCITY_MAX;
+extern const int	RB_VELOCITY_TOTAL_BITS;
+extern const int	RB_VELOCITY_EXPONENT_BITS;
+extern const int	RB_VELOCITY_MANTISSA_BITS;
 
 typedef struct rididBodyIState_s {
 	idVec3					position;					// position of trace model
@@ -61,11 +68,6 @@ public:	// common physics interface
 
 	void					SetMass( float mass, int id = -1 );
 	float					GetMass( int id = -1 ) const;
-
-// RAVEN BEGIN
-// bdube: means of getting center of mass
-	idVec3					GetCenterMass ( int id = -1 ) const;
-// RAVEN END
 
 	void					SetContents( int contents, int id = -1 );
 	int						GetContents( int id = -1 ) const;
@@ -125,13 +127,13 @@ public:	// common physics interface
 	void					WriteToSnapshot( idBitMsgDelta &msg ) const;
 	void					ReadFromSnapshot( const idBitMsgDelta &msg );
 
-protected:
+	//HUMANHEAD: aob
+	const idVec3&			GetCenterOfMass() const { return centerOfMass; }
 
+protected:	// HUMANHEAD
 	// state of the rigid body
 	rigidBodyPState_t		current;
 	rigidBodyPState_t		saved;
-
-private:
 
 	// rigid body properties
 	float					linearFriction;				// translational friction
@@ -157,9 +159,11 @@ private:
 	bool					hasMaster;
 	bool					isOrientated;
 
-private:
+protected:	// HUMANHEAD
 	friend void				RigidBodyDerivatives( const float t, const void *clientData, const float *state, float *derivatives );
+	virtual	// HUMANHEAD: made virtual
 	void					Integrate( const float deltaTime, rigidBodyPState_t &next );
+	virtual	// HUMANHEAD: made virtual
 	bool					CheckForCollisions( const float deltaTime, rigidBodyPState_t &next, trace_t &collision );
 	bool					CollisionImpulse( const trace_t &collision, idVec3 &impulse );
 	void					ContactFriction( float deltaTime );
@@ -167,6 +171,9 @@ private:
 	bool					TestIfAtRest( void ) const;
 	void					Rest( void );
 	void					DebugDraw( void );
+	// HUMANHEAD pdm: testing
+	void					TestForRotation(const char *text);
+	// HUMANHEAD pdm: testing
 };
 
 #endif /* !__PHYSICS_RIGIDBODY_H__ */

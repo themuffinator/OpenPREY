@@ -182,6 +182,7 @@ userCmdString_t	userCmdStrings[] = {
 	{ "_moveRight",		UB_MOVERIGHT },
 
 	{ "_attack",		UB_ATTACK },
+	{ "_attackalt",		UB_BUTTON3 },
 	{ "_speed",			UB_SPEED },
 	{ "_zoom",			UB_ZOOM },
 	{ "_showScores",	UB_SHOWSCORES },

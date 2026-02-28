@@ -180,6 +180,12 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 	if ( sw != NULL && !sw->IsPaused() ) {
 		sw->Pause();
 	}
+	if ( menuSoundWorld != NULL && menuSoundWorld->IsPaused() ) {
+		menuSoundWorld->UnPause();
+	}
+
+	// Menu entry should always be audible unless explicitly muted elsewhere.
+	soundSystem->SetMute( false );
 
 	// start playing the menu sounds
 	SetPlayingSoundWorld( menuSoundWorld );
@@ -191,7 +197,7 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 	if(fileSystem->HasD3XP()) {
 		guiMainMenu->SetStateString("game_list", common->GetLanguageDict()->GetString( "#str_07202" ));
 	} else {
-		guiMainMenu->SetStateString("game_list", common->GetLanguageDict()->GetString( "#str_107212" ));
+		guiMainMenu->SetStateString("game_list", common->GetLanguageDict()->GetString( "#str_07212" ));
 	}
 
 	console->Close();
@@ -229,6 +235,7 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 
 	cmd = guiActive->HandleEvent( &ev, com_frameTime );
 	guiActive->Activate( true, com_frameTime );
+	guiActive->CallStartup();
 }
 
 /*
@@ -433,7 +440,7 @@ void idSessionLocal::SetMainMenuGuiVars( void ) {
 #else
 	guiMainMenu->SetStateString( "nightmare", cvarSystem->GetCVarBool( "g_nightmare" ) ? "1" : "0" );
 #endif
-	guiMainMenu->SetStateString( "browser_levelshot", "gfx/guis/loadscreens/generic" );
+	guiMainMenu->SetStateString( "browser_levelshot", "guis/assets/loading/loading" );
 
 	SetMainMenuSkin();
 	// Mods Menu
@@ -695,7 +702,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 
 		// always let the game know the command is being run
 		if ( game ) {
-			game->HandleMainMenuCommands( cmd, guiActive );
+			(void)game->HandleGuiCommands( cmd );
 		}
 		
 		if ( !idStr::Icmp( cmd, "startGame" ) ) {

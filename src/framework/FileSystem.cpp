@@ -32,8 +32,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "Unzip.h"
 
 #ifdef WIN32
+	#include <windows.h>
 	#include <io.h>	// for _read
 	#include <direct.h> // for _getcwd
+	#include <ctype.h>
 #else
 	#if !__MACH__ && __MWERKS__
 		#include <types.h>
@@ -43,6 +45,7 @@ If you have questions concerning this license or the applicable additional terms
 		#include <sys/stat.h>
 	#endif
 	#include <unistd.h>
+	#include <ctype.h>
 #endif
 
 #if ID_ENABLE_CURL
@@ -66,8 +69,8 @@ usually the executable. It defaults to the current directory, but can be overrid
 with "+set fs_basepath c:\doom" on the command line. The base path cannot be modified
 at all after startup.
 
-The "home path" is the user-writable root path for OpenQ4 data. It can be overridden
-with "+set fs_homepath c:\users\you\saved games\openq4" on the command line.
+The "home path" is the user-writable root path for OpenPrey data. It can be overridden
+with "+set fs_homepath c:\users\you\saved games\OpenPrey" on the command line.
 
 The "save path" is the path to the directory where game files will be saved. It defaults
 to the home path, but can be overridden with a "+set fs_savepath c:\doom" on the
@@ -169,7 +172,7 @@ for instance to base a mod of D3 + D3XP assets, fs_game mymod, fs_game_base d3xp
 
 
 // define to fix special-cases for GetPackStatus so that files that shipped in 
-// the wrong place for OpenQ4 don't break pure servers.
+// the wrong place for OpenPrey don't break pure servers.
 #define DOOM3_PURE_SPECIAL_CASES	
 
 typedef bool (*pureExclusionFunc_t)( const struct pureExclusion_s &excl, int l, const idStr &name );
@@ -259,49 +262,47 @@ typedef struct {
 } officialPk4Info_t;
 
 static officialPk4Info_t officialPk4s[] = {
-	// game binaries
-	{ "game000.pk4",			0xb3abe28c,	true,	false },
-	{ "game100.pk4",			0x74b379d9,	true,	false },
-	{ "game200.pk4",			0xa3c810d9,	true,	false },
-	{ "game300.pk4",			0x68fb90b1,	true,	false },
+	// Retail CD/DVD naming (checksum baseline not yet captured in this branch).
+	{ "pak000.pk4",				0,			false,	true },
+	{ "pak001.pk4",				0,			false,	true },
+	{ "pak002.pk4",				0,			false,	true },
+	{ "pak003.pk4",				0,			false,	true },
+	{ "pak004.pk4",				0,			false,	true },
 
-	// core media baseline for Quake 4
-	{ "pak001.pk4",				0xf2cbc998,	true,	true },
-	{ "pak002.pk4",				0x7f8d80d1,	true,	true },
-	{ "pak003.pk4",				0x1b57b207,	true,	true },
-	{ "pak004.pk4",				0x385aa578,	true,	true },
-	{ "pak005.pk4",				0x60d50a1d,	true,	true },
-	{ "pak006.pk4",				0x9099ed11,	true,	true },
-	{ "pak007.pk4",				0xaf301fff,	true,	true },
-	{ "pak008.pk4",				0x4ac6f6d9,	true,	true },
-	{ "pak009.pk4",				0x36030c7d,	true,	true },
-	{ "pak010.pk4",				0x4b80fbda,	true,	true },
-	{ "pak011.pk4",				0x8acf4cfa,	true,	true },
-	{ "pak012.pk4",				0xbe4120b0,	true,	true },
-	{ "pak013.pk4",				0x6ad67f40,	true,	true },
-	{ "pak014.pk4",				0xee51cd59,	true,	true },
-	{ "pak015.pk4",				0xf5bf4e0c,	true,	true },
-	{ "pak016.pk4",				0x2196f58c,	true,	true },
-	{ "pak017.pk4",				0x91118a35,	true,	true },
-	{ "pak018.pk4",				0x98a14f03,	true,	true },
-	{ "pak019.pk4",				0xbc82ac79,	true,	true },
-	{ "pak020.pk4",				0xce74cda5,	true,	true },
-	{ "pak021.pk4",				0x2ba6e70c,	true,	true },
-	{ "pak022.pk4",				0x4e390eec,	true,	true },
-	{ "pak023.pk4",				0x7c1fd3a5,	true,	true },
-	{ "pak024.pk4",				0x5546d551,	true,	true },
-	{ "pak025.pk4",				0xcaeec1fd,	true,	true },
+	// Consolidated retail-media naming seen in legacy digital distributions.
+	{ "pak_data.pk4",			0xbe295ead,	false,	true },
+	{ "pak_sound.pk4",			0xe0c27ee2,	false,	true },
+	{ "pak_en_v.pk4",			0x952b910e,	false,	true },
+	{ "pak_en_t.pk4",			0x6625f12d,	false,	true },
 
-	// official but optional
-	{ "q4cmp_pak001.pk4",		0xd0813943,	false,	false },
-	{ "zpak_english.pk4",		0x5868f530,	false,	false },
-	{ "zpak_english_01.pk4",	0xd9f04b8b,	false,	false },
-	{ "zpak_english_02.pk4",	0x9dbd91fd,	false,	false },
-	{ "zpak_english_03.pk4",	0x02eb6ad8,	false,	false },
-	{ "zpak_english_04.pk4",	0xd3fefaa1,	false,	false },
-	{ "zpak_english_05.pk4",	0x8596af60,	false,	false },
+	// known official optional/patch media.
+	{ "pak005.pk4",				0,			false,	true },
+	{ "pak006.pk4",				0,			false,	true },
+	{ "pak020.pk4",				0,			false,	true },
+	{ "pak040.pk4",				0,			false,	true },
+	{ "game00.pk4",				0,			false,	false },
+	{ "game01.pk4",				0,			false,	false },
+	{ "game02.pk4",				0,			false,	false },
+	{ "game03.pk4",				0,			false,	false },
 
 	{ NULL,						0,			false,	false }
+};
+
+static const char *requiredClassicPk4s[] = {
+	"pak000.pk4",
+	"pak001.pk4",
+	"pak002.pk4",
+	"pak003.pk4",
+	"pak004.pk4",
+	NULL
+};
+
+static const char *requiredConsolidatedPk4s[] = {
+	"pak_data.pk4",
+	"pak_sound.pk4",
+	"pak_en_v.pk4",
+	"pak_en_t.pk4",
+	NULL
 };
 
 static const officialPk4Info_t *FindOfficialPk4Info( const char *pakName ) {
@@ -353,20 +354,36 @@ static void FS_AddUniquePath( idStrList &paths, const char *path ) {
 }
 
 static bool FS_HasGameFilesAtBasePath( const char *basePath ) {
-	idStr pakPath;
-	idStr gamePath;
+	idStr baseGamePath;
+	idStr packPath;
+	static const char *requiredPackCandidates[] = {
+		// Retail Prey CD/DVD layout.
+		"pak000.pk4",
+		"pak001.pk4",
+		// Consolidated layouts found in some legacy digital/runtime distributions.
+		"pak_data.pk4",
+		"pak_sound.pk4",
+		"pak_en_v.pk4",
+		"pak_en_t.pk4",
+		NULL
+	};
 
 	if ( !basePath || !basePath[ 0 ] ) {
 		return false;
 	}
 
-	pakPath = basePath;
-	pakPath.AppendPath( BASE_GAMEDIR );
-	pakPath.AppendPath( "pak001.pk4" );
-	gamePath = basePath;
-	gamePath.AppendPath( BASE_GAMEDIR );
-	gamePath.AppendPath( "game000.pk4" );
-	return ( FS_FileExists( pakPath.c_str() ) && FS_FileExists( gamePath.c_str() ) );
+	baseGamePath = basePath;
+	baseGamePath.AppendPath( BASE_GAMEDIR );
+
+	for ( int i = 0; requiredPackCandidates[ i ] != NULL; i++ ) {
+		packPath = baseGamePath;
+		packPath.AppendPath( requiredPackCandidates[ i ] );
+		if ( FS_FileExists( packPath.c_str() ) ) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static bool FS_GetCurrentWorkingDirectory( idStr &cwd ) {
@@ -385,212 +402,371 @@ static bool FS_GetCurrentWorkingDirectory( idStr &cwd ) {
 	return true;
 }
 
-static void FS_ExtractQuotedTokens( const char *line, idStrList &tokens ) {
-	const char	*p;
-	const char	*start;
-	char		token[ 2048 ];
-	int			len;
+static void FS_AppendInstallRootCandidate( idStrList &candidates, const char *pathHint ) {
+	idStr normalized;
+	idStr lower;
+	int commaPos;
 
-	tokens.Clear();
-	if ( !line ) {
+	if ( !pathHint || !pathHint[ 0 ] ) {
 		return;
 	}
-	p = line;
-	while ( ( p = strchr( p, '\"' ) ) != NULL ) {
+
+	normalized = pathHint;
+	normalized.StripQuotes();
+	normalized.Replace( "\\\\", "\\" );
+	normalized.BackSlashesToSlashes();
+	normalized.StripTrailing( '/' );
+	if ( !normalized.Length() ) {
+		return;
+	}
+
+	commaPos = normalized.Find( "," );
+	if ( commaPos > 0 ) {
+		idStr maybeExe = normalized.Left( commaPos );
+		idStr maybeExeLower = maybeExe;
+		maybeExeLower.ToLower();
+		if ( maybeExeLower.Length() > 4 && !idStr::Icmp( maybeExeLower.Right( 4 ).c_str(), ".exe" ) ) {
+			normalized = maybeExe;
+		}
+	}
+
+	lower = normalized;
+	lower.ToLower();
+	if ( lower.Length() > 4 && !idStr::Icmp( lower.Right( 4 ).c_str(), ".exe" ) ) {
+		idStr dir;
+		normalized.ExtractFilePath( dir );
+		normalized = dir;
+	}
+
+	normalized.StripTrailing( '/' );
+	if ( !normalized.Length() ) {
+		return;
+	}
+
+	lower = normalized;
+	lower.ToLower();
+	if ( lower.Length() > 5 && !idStr::Icmp( lower.Right( 5 ).c_str(), "/base" ) ) {
+		normalized.CapLength( normalized.Length() - 5 );
+		normalized.StripTrailing( '/' );
+	}
+
+	if ( normalized.Length() ) {
+		FS_AddUniquePath( candidates, normalized.c_str() );
+	}
+}
+
+static void FS_AddKnownInstallCandidatesFromRoot( idStrList &candidates, const char *rootPath ) {
+	idStr candidate;
+	static const char *relativePaths[] = {
+		"Human Head Studios/Prey",
+		"2K Games/Prey",
+		"3D Realms/Prey",
+		"Games/Prey",
+		"Prey",
+		NULL
+	};
+
+	if ( !rootPath || !rootPath[ 0 ] ) {
+		return;
+	}
+
+	for ( int i = 0; relativePaths[ i ] != NULL; i++ ) {
+		candidate = rootPath;
+		candidate.AppendPath( relativePaths[ i ] );
+		FS_AddUniquePath( candidates, candidate.c_str() );
+	}
+}
+
+static bool FS_ExtractExecutableDirectoryFromCommand( const char *commandLine, idStr &directoryOut ) {
+	const char	*p;
+	const char	*start;
+	const char	*end;
+	char		token[ 4096 ];
+	idStr		lower;
+	int			commaPos;
+	int			len;
+
+	directoryOut.Clear();
+	if ( !commandLine || !commandLine[ 0 ] ) {
+		return false;
+	}
+
+	p = commandLine;
+	while ( *p && isspace( (unsigned char)*p ) ) {
+		p++;
+	}
+	if ( !*p ) {
+		return false;
+	}
+
+	if ( *p == '\"' ) {
 		start = ++p;
 		while ( *p && *p != '\"' ) {
 			p++;
 		}
-		if ( *p != '\"' ) {
+		end = p;
+	} else {
+		start = p;
+		while ( *p && !isspace( (unsigned char)*p ) ) {
+			p++;
+		}
+		end = p;
+	}
+
+	len = (int)( end - start );
+	if ( len <= 0 ) {
+		return false;
+	}
+	if ( len >= (int)sizeof( token ) ) {
+		len = sizeof( token ) - 1;
+	}
+	memcpy( token, start, len );
+	token[ len ] = '\0';
+
+	directoryOut = token;
+	directoryOut.StripQuotes();
+	directoryOut.Replace( "\\\\", "\\" );
+	directoryOut.BackSlashesToSlashes();
+	directoryOut.StripTrailing( '/' );
+	if ( !directoryOut.Length() ) {
+		return false;
+	}
+
+	commaPos = directoryOut.Find( "," );
+	if ( commaPos > 0 ) {
+		idStr maybeExe = directoryOut.Left( commaPos );
+		idStr maybeExeLower = maybeExe;
+		maybeExeLower.ToLower();
+		if ( maybeExeLower.Length() > 4 && !idStr::Icmp( maybeExeLower.Right( 4 ).c_str(), ".exe" ) ) {
+			directoryOut = maybeExe;
+		}
+	}
+
+	lower = directoryOut;
+	lower.ToLower();
+	if ( lower.Length() > 4 && !idStr::Icmp( lower.Right( 4 ).c_str(), ".exe" ) ) {
+		idStr dir;
+		directoryOut.ExtractFilePath( dir );
+		directoryOut = dir;
+	}
+
+	directoryOut.StripTrailing( '/' );
+	return directoryOut.Length() > 0;
+}
+
+#ifdef WIN32
+static bool FS_GetRegistryStringValue( HKEY rootKey, const char *subKey, const char *valueName, idStr &valueOut ) {
+	HKEY	hKey;
+	LONG	status;
+	DWORD	valueType;
+	DWORD	valueSize;
+	char	valueBuf[ 4096 ];
+
+	valueOut.Clear();
+	if ( !subKey || !subKey[ 0 ] ) {
+		return false;
+	}
+
+	status = RegOpenKeyExA( rootKey, subKey, 0, KEY_READ, &hKey );
+	if ( status != ERROR_SUCCESS ) {
+		return false;
+	}
+
+	memset( valueBuf, 0, sizeof( valueBuf ) );
+	valueType = 0;
+	valueSize = sizeof( valueBuf ) - 1;
+	status = RegQueryValueExA( hKey, valueName, NULL, &valueType, (LPBYTE)valueBuf, &valueSize );
+	RegCloseKey( hKey );
+	if ( status != ERROR_SUCCESS ) {
+		return false;
+	}
+	if ( valueType != REG_SZ && valueType != REG_EXPAND_SZ ) {
+		return false;
+	}
+
+	valueBuf[ sizeof( valueBuf ) - 1 ] = '\0';
+	valueOut = valueBuf;
+	valueOut.StripQuotes();
+
+	if ( valueType == REG_EXPAND_SZ ) {
+		char expandedBuf[ 4096 ];
+		DWORD expandedLen = ExpandEnvironmentStringsA( valueOut.c_str(), expandedBuf, sizeof( expandedBuf ) );
+		if ( expandedLen > 0 && expandedLen < sizeof( expandedBuf ) ) {
+			expandedBuf[ sizeof( expandedBuf ) - 1 ] = '\0';
+			valueOut = expandedBuf;
+		}
+	}
+
+	return valueOut.Length() > 0;
+}
+
+static void FS_AppendRegistryValueCandidate( idStrList &candidates, HKEY rootKey, const char *subKey, const char *valueName ) {
+	idStr value;
+	if ( FS_GetRegistryStringValue( rootKey, subKey, valueName, value ) ) {
+		FS_AppendInstallRootCandidate( candidates, value.c_str() );
+	}
+}
+
+static void FS_AppendRegistryUninstallCandidates( idStrList &candidates, HKEY rootKey, const char *uninstallRoot ) {
+	HKEY	uninstallKey;
+	LONG	status;
+	DWORD	index;
+	char	subKeyName[ 512 ];
+	DWORD	subKeyNameSize;
+
+	if ( !uninstallRoot || !uninstallRoot[ 0 ] ) {
+		return;
+	}
+
+	status = RegOpenKeyExA( rootKey, uninstallRoot, 0, KEY_READ, &uninstallKey );
+	if ( status != ERROR_SUCCESS ) {
+		return;
+	}
+
+	index = 0;
+	while ( true ) {
+		idStr subKeyPath;
+		idStr displayName;
+		idStr displayNameLower;
+		idStr installLocation;
+		idStr displayIcon;
+		idStr uninstallString;
+		idStr commandDir;
+
+		subKeyNameSize = sizeof( subKeyName ) - 1;
+		status = RegEnumKeyExA( uninstallKey, index, subKeyName, &subKeyNameSize, NULL, NULL, NULL, NULL );
+		if ( status == ERROR_NO_MORE_ITEMS ) {
 			break;
 		}
-		len = (int)( p - start );
-		if ( len > 0 ) {
-			if ( len >= (int)sizeof( token ) ) {
-				len = sizeof( token ) - 1;
+		index++;
+		if ( status != ERROR_SUCCESS ) {
+			continue;
+		}
+		subKeyName[ subKeyNameSize ] = '\0';
+
+		subKeyPath = uninstallRoot;
+		subKeyPath += "\\";
+		subKeyPath += subKeyName;
+
+		if ( !FS_GetRegistryStringValue( rootKey, subKeyPath.c_str(), "DisplayName", displayName ) ) {
+			continue;
+		}
+
+		displayNameLower = displayName;
+		displayNameLower.ToLower();
+		if ( displayNameLower.Find( "prey" ) < 0 ) {
+			continue;
+		}
+
+		if ( FS_GetRegistryStringValue( rootKey, subKeyPath.c_str(), "InstallLocation", installLocation ) ) {
+			FS_AppendInstallRootCandidate( candidates, installLocation.c_str() );
+		}
+
+		if ( FS_GetRegistryStringValue( rootKey, subKeyPath.c_str(), "DisplayIcon", displayIcon ) ) {
+			FS_AppendInstallRootCandidate( candidates, displayIcon.c_str() );
+		}
+
+		if ( FS_GetRegistryStringValue( rootKey, subKeyPath.c_str(), "UninstallString", uninstallString ) ) {
+			if ( FS_ExtractExecutableDirectoryFromCommand( uninstallString.c_str(), commandDir ) ) {
+				FS_AppendInstallRootCandidate( candidates, commandDir.c_str() );
 			}
-			memcpy( token, start, len );
-			token[ len ] = '\0';
-			tokens.Append( token );
 		}
-		p++;
 	}
+
+	RegCloseKey( uninstallKey );
 }
 
-static void FS_AppendSteamLibrariesFromVdf( const char *steamRoot, idStrList &libraryRoots ) {
-	idStr		vdfPath;
-	FILE		*f;
-	char		line[ 4096 ];
-	idStrList	quoted;
-	idStr		key;
-	idStr		value;
+static void FS_BuildRegistryInstallCandidates( idStrList &candidates ) {
+	static HKEY rootKeys[] = {
+		HKEY_CURRENT_USER,
+		HKEY_LOCAL_MACHINE
+	};
+	static const char *installKeys[] = {
+		"SOFTWARE\\Human Head Studios\\Prey",
+		"SOFTWARE\\2K Games\\Prey",
+		"SOFTWARE\\3D Realms\\Prey",
+		"SOFTWARE\\WOW6432Node\\Human Head Studios\\Prey",
+		"SOFTWARE\\WOW6432Node\\2K Games\\Prey",
+		"SOFTWARE\\WOW6432Node\\3D Realms\\Prey",
+		NULL
+	};
+	static const char *installValueNames[] = {
+		"InstallPath",
+		"InstallDir",
+		"InstallLocation",
+		"Path",
+		NULL
+	};
+	static const char *appPathKeys[] = {
+		"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\prey.exe",
+		"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\PREY.EXE",
+		"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths\\prey.exe",
+		"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths\\PREY.EXE",
+		NULL
+	};
+	static const char *uninstallRoots[] = {
+		"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+		"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+		NULL
+	};
 
-	if ( !steamRoot || !steamRoot[ 0 ] ) {
-		return;
-	}
+	for ( int rootIndex = 0; rootIndex < (int)( sizeof( rootKeys ) / sizeof( rootKeys[ 0 ] ) ); rootIndex++ ) {
+		HKEY rootKey = rootKeys[ rootIndex ];
 
-	vdfPath = steamRoot;
-	vdfPath.AppendPath( "steamapps" );
-	vdfPath.AppendPath( "libraryfolders.vdf" );
-	f = fopen( vdfPath.c_str(), "rb" );
-	if ( !f ) {
-		return;
-	}
-
-	while ( fgets( line, sizeof( line ), f ) != NULL ) {
-		FS_ExtractQuotedTokens( line, quoted );
-		if ( quoted.Num() < 2 ) {
-			continue;
+		for ( int keyIndex = 0; installKeys[ keyIndex ] != NULL; keyIndex++ ) {
+			for ( int valueIndex = 0; installValueNames[ valueIndex ] != NULL; valueIndex++ ) {
+				FS_AppendRegistryValueCandidate( candidates, rootKey, installKeys[ keyIndex ], installValueNames[ valueIndex ] );
+			}
+			FS_AppendRegistryValueCandidate( candidates, rootKey, installKeys[ keyIndex ], NULL );
 		}
-		key = quoted[ 0 ];
-		value = quoted[ 1 ];
-		value.Replace( "\\\\", "\\" );
-		value.BackSlashesToSlashes();
-		value.StripTrailing( '/' );
 
-		if ( !key.Icmp( "path" ) ) {
-			FS_AddUniquePath( libraryRoots, value.c_str() );
-			continue;
+		for ( int keyIndex = 0; appPathKeys[ keyIndex ] != NULL; keyIndex++ ) {
+			FS_AppendRegistryValueCandidate( candidates, rootKey, appPathKeys[ keyIndex ], NULL );
+			FS_AppendRegistryValueCandidate( candidates, rootKey, appPathKeys[ keyIndex ], "Path" );
 		}
 
-		if ( idStr::IsNumeric( key.c_str() ) &&
-			( value.Find( "/" ) >= 0 || value.Find( "\\" ) >= 0 || value.Find( ":" ) >= 0 ) ) {
-			FS_AddUniquePath( libraryRoots, value.c_str() );
+		for ( int uninstallIndex = 0; uninstallRoots[ uninstallIndex ] != NULL; uninstallIndex++ ) {
+			FS_AppendRegistryUninstallCandidates( candidates, rootKey, uninstallRoots[ uninstallIndex ] );
 		}
 	}
-	fclose( f );
 }
-
-static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {
-	idStrList	steamRoots;
-	idStrList	libraryRoots;
-	idStr		path;
-	const char	*envPath;
-
-	candidates.Clear();
-
-#ifdef WIN32
-	FS_AddUniquePath( steamRoots, "C:/Program Files (x86)/Steam" );
-	FS_AddUniquePath( steamRoots, "C:/Program Files/Steam" );
-
-	envPath = getenv( "ProgramFiles(x86)" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-	}
-	envPath = getenv( "ProgramFiles" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-	}
-	envPath = getenv( "ProgramW6432" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-	}
-	envPath = getenv( "LOCALAPPDATA" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-	}
-#elif defined( __APPLE__ )
-	envPath = getenv( "HOME" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "Library" );
-		path.AppendPath( "Application Support" );
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-	}
-#else
-	envPath = getenv( "HOME" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( ".steam" );
-		path.AppendPath( "steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-
-		path = envPath;
-		path.AppendPath( ".local" );
-		path.AppendPath( "share" );
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-
-		path = envPath;
-		path.AppendPath( ".var" );
-		path.AppendPath( "app" );
-		path.AppendPath( "com.valvesoftware.Steam" );
-		path.AppendPath( ".local" );
-		path.AppendPath( "share" );
-		path.AppendPath( "Steam" );
-		FS_AddUniquePath( steamRoots, path.c_str() );
-	}
 #endif
 
-	for ( int i = 0; i < steamRoots.Num(); i++ ) {
-		libraryRoots.Clear();
-		FS_AddUniquePath( libraryRoots, steamRoots[ i ] );
-		FS_AppendSteamLibrariesFromVdf( steamRoots[ i ], libraryRoots );
-		for ( int j = 0; j < libraryRoots.Num(); j++ ) {
-			path = libraryRoots[ j ];
-			path.AppendPath( "steamapps" );
-			path.AppendPath( "common" );
-			path.AppendPath( "Quake 4" );
-			FS_AddUniquePath( candidates, path.c_str() );
-		}
-	}
-}
-
-static void FS_BuildGogInstallCandidates( idStrList &candidates ) {
-	idStr		path;
-	const char	*envPath;
+static void FS_BuildKnownInstallCandidates( idStrList &candidates ) {
+	const char *envPath;
 
 	candidates.Clear();
 
 #ifdef WIN32
-	FS_AddUniquePath( candidates, "C:/Program Files (x86)/GOG Galaxy/Games/Quake 4" );
-	FS_AddUniquePath( candidates, "C:/Program Files/GOG Galaxy/Games/Quake 4" );
-	FS_AddUniquePath( candidates, "C:/GOG Games/Quake 4" );
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/Human Head Studios/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/Human Head Studios/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/2K Games/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/2K Games/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/Prey" );
+	FS_AddUniquePath( candidates, "C:/Games/Prey" );
 
 	envPath = getenv( "ProgramFiles(x86)" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "GOG Galaxy" );
-		path.AppendPath( "Games" );
-		path.AppendPath( "Quake 4" );
-		FS_AddUniquePath( candidates, path.c_str() );
-	}
+	FS_AddKnownInstallCandidatesFromRoot( candidates, envPath );
+
 	envPath = getenv( "ProgramFiles" );
-	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "GOG Galaxy" );
-		path.AppendPath( "Games" );
-		path.AppendPath( "Quake 4" );
-		FS_AddUniquePath( candidates, path.c_str() );
-	}
+	FS_AddKnownInstallCandidatesFromRoot( candidates, envPath );
+
+	envPath = getenv( "ProgramW6432" );
+	FS_AddKnownInstallCandidatesFromRoot( candidates, envPath );
+
 	envPath = getenv( "SystemDrive" );
 	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "GOG Games" );
-		path.AppendPath( "Quake 4" );
-		FS_AddUniquePath( candidates, path.c_str() );
+		idStr rootDrive = envPath;
+		rootDrive.AppendPath( "Games" );
+		FS_AddKnownInstallCandidatesFromRoot( candidates, rootDrive.c_str() );
 	}
 #else
 	envPath = getenv( "HOME" );
 	if ( envPath && envPath[ 0 ] ) {
-		path = envPath;
-		path.AppendPath( "GOG Games" );
-		path.AppendPath( "Quake 4" );
-		FS_AddUniquePath( candidates, path.c_str() );
-
-		path = envPath;
+		idStr path = envPath;
 		path.AppendPath( "Games" );
-		path.AppendPath( "GOG Games" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 	}
 #endif
@@ -615,12 +791,15 @@ static bool FS_AutoDiscoverBasePath( idStr &basePath ) {
 		return true;
 	}
 
-	FS_BuildSteamInstallCandidates( candidates );
+#ifdef WIN32
+	candidates.Clear();
+	FS_BuildRegistryInstallCandidates( candidates );
 	if ( FS_FindFirstValidInstallPath( candidates, basePath ) ) {
 		return true;
 	}
+#endif
 
-	FS_BuildGogInstallCandidates( candidates );
+	FS_BuildKnownInstallCandidates( candidates );
 	if ( FS_FindFirstValidInstallPath( candidates, basePath ) ) {
 		return true;
 	}
@@ -752,6 +931,7 @@ public:
 	virtual idFile *		OpenFileByMode( const char *relativePath, fsMode_t mode );
 	virtual idFile *		OpenExplicitFileRead( const char *OSPath );
 	virtual idFile *		OpenExplicitFileWrite( const char *OSPath );
+	virtual idFile *		OpenExplicitFileAppend( const char *OSPath );
 	virtual void			CloseFile( idFile *f );
 	virtual void			BackgroundDownload( backgroundDownload_t *bgl );
 	virtual void			ResetReadCount( void ) { readCount = 0; }
@@ -878,7 +1058,7 @@ idCVar	idFileSystemLocal::fs_basepath( "fs_basepath", "", CVAR_SYSTEM | CVAR_INI
 idCVar	idFileSystemLocal::fs_homepath( "fs_homepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_savepath( "fs_savepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_cdpath( "fs_cdpath", "", CVAR_SYSTEM | CVAR_INIT, "" );
-idCVar	idFileSystemLocal::fs_game( "fs_game", OPENQ4_GAMEDIR, CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "mod path" );
+idCVar	idFileSystemLocal::fs_game( "fs_game", OPENPREY_GAMEDIR, CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "mod path" );
 idCVar  idFileSystemLocal::fs_game_base( "fs_game_base", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "alternate mod path, searched after the main fs_game path, before the basedir" );
 #ifdef WIN32
 idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
@@ -886,7 +1066,7 @@ idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "0", CVAR_SY
 idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 #endif
 idCVar	idFileSystemLocal::fs_searchAddons( "fs_searchAddons", "0", CVAR_SYSTEM | CVAR_BOOL, "search all addon pk4s ( disables addon functionality )" );
-idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base pk4 checksums on startup" );
+idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official Prey base pk4 files on startup" );
 
 idFileSystemLocal	fileSystemLocal;
 idFileSystem *		fileSystem = &fileSystemLocal;
@@ -1332,7 +1512,8 @@ const char *idFileSystemLocal::OSPathToRelativePath( const char *OSPath ) {
 	}
 
 	if ( !ignoreWarning ) {
-		common->Warning( "idFileSystem::OSPathToRelativePath failed on %s", OSPath );
+		// Prey assets can carry legacy absolute authoring paths; keep this non-fatal and quiet.
+		common->DPrintf( "idFileSystem::OSPathToRelativePath failed on %s\n", OSPath );
 	}
 	strcpy( relativePath, "" );
 	return relativePath;
@@ -2196,7 +2377,7 @@ idModList *idFileSystemLocal::ListMods( void ) {
 	}
 
 	list->mods.Insert( "" );
-	list->descriptions.Insert( "OpenQ4" );
+	list->descriptions.Insert( "OpenPrey" );
 
 	assert( list->mods.Num() == list->descriptions.Num() );
 
@@ -2647,22 +2828,58 @@ idFileSystemLocal::ValidateRequiredOfficialPaks
 */
 bool idFileSystemLocal::ValidateRequiredOfficialPaks( idStr &errors ) const {
 	const officialPk4Info_t	*info;
+	const char *const		*requiredSet = NULL;
+	const char *const		*setProbe;
 	pack_t					*pack;
+	unsigned int			expectedChecksum;
+	int						classicFoundCount = 0;
+	int						consolidatedFoundCount = 0;
 
 	errors.Clear();
-	for ( int i = 0; officialPk4s[ i ].name != NULL; i++ ) {
-		info = &officialPk4s[ i ];
-		if ( !info->required ) {
-			continue;
+
+	for ( setProbe = requiredClassicPk4s; *setProbe != NULL; setProbe++ ) {
+		if ( FindBaseGamePackByName( *setProbe ) != NULL ) {
+			classicFoundCount++;
 		}
-		pack = FindBaseGamePackByName( info->name );
+	}
+
+	for ( setProbe = requiredConsolidatedPk4s; *setProbe != NULL; setProbe++ ) {
+		if ( FindBaseGamePackByName( *setProbe ) != NULL ) {
+			consolidatedFoundCount++;
+		}
+	}
+
+	if ( classicFoundCount == 0 && consolidatedFoundCount == 0 ) {
+		errors += "no known official Prey base pack layout detected\n";
+		errors += "expected either classic retail packs:\n";
+		for ( setProbe = requiredClassicPk4s; *setProbe != NULL; setProbe++ ) {
+			errors += va( "  - %s\n", *setProbe );
+		}
+		errors += "or consolidated retail packs:\n";
+		for ( setProbe = requiredConsolidatedPk4s; *setProbe != NULL; setProbe++ ) {
+			errors += va( "  - %s\n", *setProbe );
+		}
+		return false;
+	}
+
+	requiredSet = ( consolidatedFoundCount > classicFoundCount ) ? requiredConsolidatedPk4s : requiredClassicPk4s;
+	for ( ; *requiredSet != NULL; requiredSet++ ) {
+		pack = FindBaseGamePackByName( *requiredSet );
+		info = FindOfficialPk4Info( *requiredSet );
+		expectedChecksum = info ? info->checksum : 0;
+
 		if ( !pack ) {
-			errors += va( "missing %s (expected 0x%08x)\n", info->name, info->checksum );
+			if ( expectedChecksum != 0 ) {
+				errors += va( "missing %s (expected 0x%08x)\n", *requiredSet, expectedChecksum );
+			} else {
+				errors += va( "missing %s\n", *requiredSet );
+			}
 			continue;
 		}
-		if ( (unsigned int)pack->checksum != info->checksum ) {
+
+		if ( expectedChecksum != 0 && (unsigned int)pack->checksum != expectedChecksum ) {
 			errors += va( "checksum mismatch for %s (expected 0x%08x, got 0x%08x from %s)\n",
-				info->name, info->checksum, (unsigned int)pack->checksum, pack->pakFilename.c_str() );
+				*requiredSet, expectedChecksum, (unsigned int)pack->checksum, pack->pakFilename.c_str() );
 		}
 	}
 	return ( errors.Length() == 0 );
@@ -2741,8 +2958,8 @@ void idFileSystemLocal::Startup( void ) {
 		idStr validationErrors;
 		if ( !ValidateRequiredOfficialPaks( validationErrors ) ) {
 			common->FatalError(
-				"Required official Quake 4 pk4 files are missing or modified.\n\n%s\n"
-				"Install/verify the original q4base assets and remove overrides from fs_savepath/fs_cdpath.",
+				"Required official Prey base pk4 files are missing or modified.\n\n%s\n"
+				"Install/verify the original Prey assets and remove overrides from fs_savepath/fs_cdpath.",
 				validationErrors.c_str() );
 		}
 	}
@@ -3348,8 +3565,8 @@ void idFileSystemLocal::Init( void ) {
 	// fs_basepath auto-discovery order:
 	// 1) valid user override
 	// 2) current working directory
-	// 3) Steam install paths
-	// 4) GOG install paths
+	// 3) Windows registry install entries (CD-era installs, App Paths, uninstall keys)
+	// 4) known legacy install directories
 	if ( fs_basepath.GetString()[0] ) {
 		if ( !FS_HasGameFilesAtBasePath( fs_basepath.GetString() ) ) {
 			common->Warning( "fs_basepath '%s' has no %s game files, auto-discovery will be attempted", fs_basepath.GetString(), BASE_GAMEDIR );
@@ -3556,7 +3773,7 @@ pureStatus_t idFileSystemLocal::GetPackStatus( pack_t *pak ) {
 		return pak->pureStatus;
 	}
 
-	// Keep the stock Quake 4 base media in the pure list no matter their contents.
+	// Keep the stock Prey base media in the pure list no matter their contents.
 	pak->pakFilename.ExtractFileName( name );
 	officialInfo = FindOfficialPk4Info( name.c_str() );
 	if ( officialInfo && officialInfo->pureBase ) {
@@ -4009,6 +4226,40 @@ idFile *idFileSystemLocal::OpenExplicitFileWrite( const char *OSPath ) {
 
 /*
 ===========
+idFileSystemLocal::OpenExplicitFileAppend
+===========
+*/
+idFile *idFileSystemLocal::OpenExplicitFileAppend( const char *OSPath ) {
+	idFile_Permanent *f;
+
+	if ( !searchPaths ) {
+		common->FatalError( "Filesystem call made without initialization\n" );
+	}
+
+	if ( fs_debug.GetInteger() ) {
+		common->Printf( "idFileSystem::OpenExplicitFileAppend: %s\n", OSPath );
+	}
+
+	common->DPrintf( "appending to: %s\n", OSPath );
+	CreateOSPath( OSPath );
+
+	f = new idFile_Permanent();
+	f->o = OpenOSFile( OSPath, "ab" );
+	if ( !f->o ) {
+		delete f;
+		return NULL;
+	}
+	f->name = OSPath;
+	f->fullPath = OSPath;
+	f->mode = ( 1 << FS_APPEND );
+	f->handleSync = false;
+	f->fileSize = DirectFileLength( f->o );
+
+	return f;
+}
+
+/*
+===========
 idFileSystemLocal::OpenFileAppend
 ===========
 */
@@ -4389,7 +4640,7 @@ void idFileSystemLocal::FindDLL( const char *name, char _dllPath[ MAX_OSPATH ], 
 		// without requiring copies into the executable root.
 		const char *moduleGameDir = fs_game.GetString();
 		if ( !moduleGameDir[0] ) {
-			moduleGameDir = OPENQ4_GAMEDIR;
+			moduleGameDir = OPENPREY_GAMEDIR;
 		}
 		if ( !dllFile && moduleGameDir[0] ) {
 			dllPath = exeDir;
@@ -4397,7 +4648,6 @@ void idFileSystemLocal::FindDLL( const char *name, char _dllPath[ MAX_OSPATH ], 
 			dllPath.AppendPath( dllName );
 			dllFile = OpenExplicitFileRead( dllPath );
 		}
-
 		// Fallback: check the executable directory itself.
 		if ( !dllFile && !preferExeDirFirst ) {
 			dllPath = exeDir;
@@ -4716,25 +4966,41 @@ idFileSystemLocal::FindMapScreenshot
 void idFileSystemLocal::FindMapScreenshot( const char *path, char *buf, int len ) {
 	idFile	*file;
 	idStr	mapname = path;
+	idStr	candidatePath;
 
 	mapname.StripPath();
 	mapname.StripFileExtension();
-	
-	idStr::snPrintf( buf, len, "gfx/guis/loadscreens/%s.tga", mapname.c_str() );
-	if ( ReadFile( buf, NULL, NULL ) == -1 ) {
-		// try to extract from an addon
-		file = OpenFileReadFlags( buf, FSFLAG_SEARCH_ADDONS );
-		if ( file ) {
-			// save it out to an addon splash directory
-			int dlen = file->Length();
-			char *data = new char[ dlen ];
-			file->Read( data, dlen );
-			CloseFile( file );
-			idStr::snPrintf( buf, len, "guis/assets/splash/addon/%s.tga", mapname.c_str() );
-			WriteFile( buf, data, dlen );
-			delete[] data;
-		} else {
-			idStr::Copynz( buf, "gfx/guis/loadscreens/generic.tga", len );
+
+	const char *runtimeCandidates[] = {
+		"guis/assets/loading/%s.tga",
+		"guis/assets/loading/thumbs/%s.tga",
+		"gfx/guis/loadscreens/%s.tga"
+	};
+
+	for ( int i = 0; i < (int)( sizeof( runtimeCandidates ) / sizeof( runtimeCandidates[ 0 ] ) ); i++ ) {
+		idStr::snPrintf( buf, len, runtimeCandidates[ i ], mapname.c_str() );
+		if ( ReadFile( buf, NULL, NULL ) != -1 ) {
+			return;
 		}
+	}
+
+	// Addon map screenshots follow the legacy Quake 4 loadscreens location.
+	candidatePath = va( "gfx/guis/loadscreens/%s.tga", mapname.c_str() );
+	file = OpenFileReadFlags( candidatePath.c_str(), FSFLAG_SEARCH_ADDONS );
+	if ( file ) {
+		// Save the extracted addon splash image to a stable location.
+		int dlen = file->Length();
+		char *data = new char[ dlen ];
+		file->Read( data, dlen );
+		CloseFile( file );
+		idStr::snPrintf( buf, len, "guis/assets/splash/addon/%s.tga", mapname.c_str() );
+		WriteFile( buf, data, dlen );
+		delete[] data;
+		return;
+	}
+
+	idStr::Copynz( buf, "guis/assets/loading/loading.tga", len );
+	if ( ReadFile( buf, NULL, NULL ) == -1 ) {
+		idStr::Copynz( buf, "gfx/guis/loadscreens/generic.tga", len );
 	}
 }

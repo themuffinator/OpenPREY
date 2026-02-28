@@ -1,16 +1,11 @@
-		
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
-// RAVEN BEGIN
-// bdube: added
-#include "Effect.h"
-// nmckenzie:
-//#include "rvAI/AI.h"
-#include "ai/AI.h"
-#include "client/ClientEffect.h"
-// RAVEN END
+
 
 /*
 ===============================================================================
@@ -150,7 +145,7 @@ void idDragEntity::Update( idPlayer *player ) {
 	trace_t trace;
 	idEntity *newEnt;
 	idAngles angles;
-	jointHandle_t newJoint = INVALID_JOINT;
+	jointHandle_t newJoint;
 	idStr newBodyName;
 
 	player->GetViewPos( viewPoint, viewAxis );
@@ -159,10 +154,8 @@ void idDragEntity::Update( idPlayer *player ) {
     if ( !dragEnt.GetEntity() ) {
 
 		if ( player->usercmd.buttons & BUTTON_ATTACK ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			gameLocal.TracePoint( player, trace, viewPoint, viewPoint + viewAxis[0] * MAX_DRAG_TRACE_DISTANCE, (CONTENTS_SOLID|CONTENTS_RENDERMODEL|CONTENTS_BODY), player );
-// RAVEN END
+
+			gameLocal.clip.TracePoint( trace, viewPoint, viewPoint + viewAxis[0] * MAX_DRAG_TRACE_DISTANCE, (CONTENTS_SOLID|CONTENTS_RENDERMODEL|CONTENTS_BODY), player );
 			if ( trace.fraction < 1.0f ) {
 
 				newEnt = gameLocal.entities[ trace.c.entityNum ];
@@ -177,10 +170,7 @@ void idDragEntity::Update( idPlayer *player ) {
 						newEnt = newEnt->GetBindMaster();
 					}
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-					if ( newEnt->IsType( idAFEntity_Base::GetClassType() ) && static_cast<idAFEntity_Base *>(newEnt)->IsActiveAF() ) {
-// RAVEN END
+					if ( newEnt->IsType( idAFEntity_Base::Type ) && static_cast<idAFEntity_Base *>(newEnt)->IsActiveAF() ) {
 						idAFEntity_Base *af = static_cast<idAFEntity_Base *>(newEnt);
 
 						// joint being dragged
@@ -190,10 +180,7 @@ void idDragEntity::Update( idPlayer *player ) {
 						// get the name of the body being dragged
 						newBodyName = af->GetAFPhysics()->GetBody( trace.c.id )->GetName();
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-					} else if ( !newEnt->IsType( idWorldspawn::GetClassType() ) ) {
-// RAVEN END
+					} else if ( !newEnt->IsType( idWorldspawn::Type ) ) {
 
 						if ( trace.c.id < 0 ) {
 							newJoint = CLIPMODEL_ID_TO_JOINT_HANDLE( trace.c.id );
@@ -216,10 +203,7 @@ void idDragEntity::Update( idPlayer *player ) {
 					bodyName = newBodyName;
 
 					if ( !cursor ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-						cursor = ( idCursor3D * )gameLocal.SpawnEntityType( idCursor3D::GetClassType() );
-// RAVEN END
+						cursor = ( idCursor3D * )gameLocal.SpawnEntityType( idCursor3D::Type );
 					}
 
 					idPhysics *phys = dragEnt.GetEntity()->GetPhysics();
@@ -232,12 +216,9 @@ void idDragEntity::Update( idPlayer *player ) {
 					cursor->drag.SetPhysics( phys, id, localEntityPoint );
 					cursor->Show();
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-					if ( phys->IsType( idPhysics_AF::GetClassType() ) ||
-							phys->IsType( idPhysics_RigidBody::GetClassType() ) ||
-								phys->IsType( idPhysics_Monster::GetClassType() ) ) {
-// RAVEN END
+					if ( phys->IsType( idPhysics_AF::Type ) ||
+							phys->IsType( idPhysics_RigidBody::Type ) ||
+								phys->IsType( idPhysics_Monster::Type ) ) {
 						cursor->BecomeActive( TH_THINK );
 					}
 				}
@@ -318,10 +299,7 @@ void idDragEntity::BindSelected( void ) {
 
 	af = static_cast<idAFEntity_Base *>(dragEnt.GetEntity());
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !af || !af->IsType( idAFEntity_Base::GetClassType() ) || !af->IsActiveAF() ) {
-// RAVEN END
+	if ( !af || !af->IsType( idAFEntity_Base::Type ) || !af->IsActiveAF() ) {
 		return;
 	}
 
@@ -373,10 +351,7 @@ void idDragEntity::UnbindSelected( void ) {
 
 	af = static_cast<idAFEntity_Base *>(selected.GetEntity());
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !af || !af->IsType( idAFEntity_Base::GetClassType() ) || !af->IsActiveAF() ) {
-// RAVEN END
+	if ( !af || !af->IsType( idAFEntity_Base::Type ) || !af->IsActiveAF() ) {
 		return;
 	}
 
@@ -415,38 +390,6 @@ idEditEntities::idEditEntities( void ) {
 	nextSelectTime = 0;
 }
 
-// RAVEN BEGIN
-// bdube: made this special to edit entities
-/*
-=============
-idEditEntities::FindTraceEntity
-=============
-*/
-idEntity* idEditEntities::FindTraceEntity( idVec3 start, idVec3 end, const idEntity *skip ) {
-	idEntity *ent;
-	idEntity *bestEnt;
-	float scale;
-	float bestScale;
-	idBounds b;
-
-	bestEnt = NULL;
-	bestScale = 1.0f;
-	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
-		if ( ent != skip && EntityIsSelectable ( ent ) ) {
-			b = ent->GetPhysics()->GetAbsBounds().Expand( 16 );
-			if ( b.RayIntersection( start, end-start, scale ) ) {
-				if ( scale >= 0.0f && scale < bestScale ) {
-					bestEnt = ent;
-					bestScale = scale;
-				}
-			}
-		}
-	}
-
-	return bestEnt;
-}
-// RAVEN END
-
 /*
 =============
 idEditEntities::SelectEntity
@@ -467,32 +410,23 @@ bool idEditEntities::SelectEntity( const idVec3 &origin, const idVec3 &dir, cons
 
 	end = origin + dir * 4096.0f;
 
-// RAVEN BEGIN
-// bdube: more generic
 	ent = NULL;
 	for ( int i = 0; i < selectableEntityClasses.Num(); i++ ) {
-		ent = FindTraceEntity( origin, end, skip );
+		ent = gameLocal.FindTraceEntity( origin, end, *selectableEntityClasses[i].typeInfo, skip );
 		if ( ent ) {
 			break;
 		}
 	}
-	if ( !ent ) {
-		return false;
+	if ( ent ) {
+		ClearSelectedEntities();
+		if ( EntityIsSelectable( ent ) ) {
+			AddSelectedEntity( ent );
+			gameLocal.Printf( "entity #%d: %s '%s'\n", ent->entityNumber, ent->GetClassname(), ent->name.c_str() );
+			ent->ShowEditingDialog();
+			return true;
+		}
 	}
-	
-	ClearSelectedEntities();
-
-	AddSelectedEntity( ent );
-	gameLocal.Printf( "entity #%d: %s '%s'\n", ent->entityNumber, ent->GetClassname(), ent->name.c_str() );
-
-	//if ( gameLocal.editors & EDITOR_ENTVIEW ) {
-	//	common->InitTool ( EDITOR_ENTVIEW, &ent->spawnArgs );
-	//} else {
-	//	ent->ShowEditingDialog();
-	//}
-
-	return true;
-// RAVEN END
+	return false;
 }
 
 /*
@@ -538,17 +472,9 @@ idEditEntities::EntityIsSelectable
 =============
 */
 bool idEditEntities::EntityIsSelectable( idEntity *ent, idVec4 *color, idStr *text ) {
-// RAVEN BEGIN
-// bdube: no matter what dont let the player or its entities be selectable
-	idPlayer* player;
-	if ( 0 != (player = gameLocal.GetLocalPlayer() )) {
-		if ( ent == player || ent == player->GetWeaponViewModel ( ) || ent == player->GetWeaponWorldModel ( ) ) {
-			return false;
-		}
-	}
 	for ( int i = 0; i < selectableEntityClasses.Num(); i++ ) {
-		if ( ent->IsType ( *selectableEntityClasses[i].typeInfo ) ) {		
-// RAVEN END
+		//HUMANHEAD: aob - changed to inheritance check.  Hopefully no breakage.  :)
+		if ( ent->IsType(*selectableEntityClasses[i].typeInfo) ) {
 			if ( text ) {
 				*text = selectableEntityClasses[i].textKey;
 			}
@@ -591,77 +517,43 @@ void idEditEntities::DisplayEntities( void ) {
 
 	switch( g_editEntityMode.GetInteger() ) {
 		case 1:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idLight::GetClassType();
-// RAVEN END
+			sit.typeInfo = &idLight::Type;
 			sit.textKey = "texture";
 			selectableEntityClasses.Append( sit );
 			break;
 		case 2:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idSound::GetClassType();
-// scork: added secondary "name" field as well (Zack request)
-			sit.textKey = "s_shader|name";
+			sit.typeInfo = &idSound::Type;
+			sit.textKey = "s_shader";
 			selectableEntityClasses.Append( sit );
-// scork: Zack (reasonably enough) doesn't want the lights displayed when editing sounds
-//			sit.typeInfo = &idLight::GetClassType();
-//			sit.textKey = "texture";
-//			selectableEntityClasses.Append( sit );
-// RAVEN END
+			sit.typeInfo = &idLight::Type;
+			sit.textKey = "texture";
+			selectableEntityClasses.Append( sit );
 			break;
 		case 3:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idAFEntity_Base::GetClassType();
-// RAVEN END
+			sit.typeInfo = &idAFEntity_Base::Type;
 			sit.textKey = "articulatedFigure";
 			selectableEntityClasses.Append( sit );
 			break;
 		case 4:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idFuncEmitter::GetClassType();
-// RAVEN END
+			sit.typeInfo = &idFuncEmitter::Type;
 			sit.textKey = "model";
 			selectableEntityClasses.Append( sit );
 			break;
 		case 5:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idAI::GetClassType();
-// RAVEN END
+			sit.typeInfo = &idAI::Type;
 			sit.textKey = "name";
 			selectableEntityClasses.Append( sit );
 			break;
 		case 6:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idEntity::GetClassType();
-// RAVEN END
+			sit.typeInfo = &idEntity::Type;
 			sit.textKey = "name";
 			selectableEntityClasses.Append( sit );
 			break;
 		case 7:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &idEntity::GetClassType();
-// RAVEN END
+			sit.typeInfo = &idEntity::Type;
 			sit.textKey = "model";
 			selectableEntityClasses.Append( sit );
 			break;
-// RAVEN BEGIN
-// bdube: added fx entities
-		case 8:
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-			sit.typeInfo = &rvEffect::GetClassType();
-// RAVEN END
-			sit.textKey = "fx";
-			selectableEntityClasses.Append ( sit );
-			break;
-// RAVEN END						
 		default:
 			return;
 	}
@@ -670,19 +562,10 @@ void idEditEntities::DisplayEntities( void ) {
 	idBounds viewTextBounds( gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin() );
 	idMat3 axis = gameLocal.GetLocalPlayer()->viewAngles.ToMat3();
 
-	viewBounds.ExpandSelf( g_editEntityDistance.GetFloat() );
-// RAVEN BEGIN
-// scork: changed from 128 to 256 so we can see speaker ent descriptions before getting right up to them
-// rhummer: Added cvar to adjust the distance for the text too.
-	viewTextBounds.ExpandSelf( g_editEntityTextDistance.GetFloat() );
-// RAVEN END
+	viewBounds.ExpandSelf( 512 );
+	viewTextBounds.ExpandSelf( 128 );
 
 	idStr textKey;
-// RAVEN BEGIN
-// scork: secondary field
-	idStr textKey2;
-	idStr strOutput;
-// RAVEN END
 
 	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
 
@@ -693,62 +576,20 @@ void idEditEntities::DisplayEntities( void ) {
 			continue;
 		}
 
-// RAVEN BEGIN
-// scork: handle optional secondary field
-		textKey2 = "";
-		int iIndex = textKey.Find('|');
-		if (iIndex >= 0)
-		{
-			textKey2 = textKey.Mid ( iIndex+1, textKey.Length()-(iIndex+1) );	// hmmm, they emulate 99% of MS CString but don't have a single-param Mid() func?
-			textKey  = textKey.Left( iIndex );
-		}
-// RAVEN END
-
-
 		bool drawArrows = false;
-// RAVEN BEGIN
-// bdube: added		
-		bool drawDirection = false;
-// RAVEN END
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent->GetType() == &idAFEntity_Base::GetClassType() ) {
-// RAVEN END
+		if ( ent->GetType() == &idAFEntity_Base::Type ) {
 			if ( !static_cast<idAFEntity_Base *>(ent)->IsActiveAF() ) {
 				continue;
 			}
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		} else if ( ent->GetType() == &idSound::GetClassType() ) {
-// RAVEN END
-			if ( ent->fl.selected ) 
-			{
+		} else if ( ent->IsType( hhSound::Type ) ) {	// HUMANHEAD pdm: Changed to proper hhSound check
+			if ( ent->fl.selected ) {
 				drawArrows = true;
-				int iFlag = ent->GetRefSoundShaderFlags();
-				iFlag |= SSF_HILITE;
-				ent->SetRefSoundShaderFlags( iFlag );
 			}
-			else
-			{
-				int iFlag = ent->GetRefSoundShaderFlags();
-				iFlag &= ~SSF_HILITE;
-				ent->SetRefSoundShaderFlags( iFlag );
-			}
-			ent->UpdateSound();
 			const idSoundShader * ss = declManager->FindSound( ent->spawnArgs.GetString( textKey ) );
 			if ( ss->HasDefaultSound() || ss->base->GetState() == DS_DEFAULTED ) {
 				color.Set( 1.0f, 0.0f, 1.0f, 1.0f );
 			}
-// RAVEN BEGIN
-// bdube: added			
-// jnewquist: Use accessor for static class type 
-		} else if ( ent->GetType() == &rvEffect::GetClassType() ) {
-			drawDirection = true;
-			if ( ent->fl.selected ) {
-				drawArrows = true;
-			}
-		} else if ( ent->GetType() == &idFuncEmitter::GetClassType() ) {
-// RAVEN END
+		} else if ( ent->GetType() == &idFuncEmitter::Type ) {
 			if ( ent->fl.selected ) {
 				drawArrows = true;
 			}
@@ -781,29 +622,11 @@ void idEditEntities::DisplayEntities( void ) {
 			gameRenderWorld->DrawText( "z-", end + idVec3( 0, 0, -4 ), 0.15f, colorWhite, axis );
 		}
 
-// RAVEN BEGIN
-// bdube: added
-		if ( drawDirection ) {
-			idVec3 start = ent->GetPhysics()->GetOrigin ( );
-			idVec3 end   = start + ent->GetPhysics()->GetAxis()[0] * 35.0f;
-			gameRenderWorld->DebugArrow ( colorYellow, start, end, 6 );
-		}
-// RAVEN END
-
 		if ( textKey.Length() ) {
-// RAVEN BEGIN
-// scork: handle optional secondary field, plus only call GetString when bounds are within view
+			const char *text = ent->spawnArgs.GetString( textKey );
 			if ( viewTextBounds.ContainsPoint( ent->GetPhysics()->GetOrigin() ) ) {
-				strOutput = ent->spawnArgs.GetString( textKey );
-				if (!textKey2.IsEmpty())
-				{
-					strOutput += " ( ";
-					strOutput += ent->spawnArgs.GetString( textKey2 );
-					strOutput += " )";
-				}
-				gameRenderWorld->DrawText( strOutput.c_str(), ent->GetPhysics()->GetOrigin() + idVec3(0, 0, 12), 0.25, colorWhite, axis, 1 );
+				gameRenderWorld->DrawText( text, ent->GetPhysics()->GetOrigin() + idVec3(0, 0, 12), 0.25, colorWhite, axis, 1 );
 			}
-// RAVEN END
 		}
 	}
 }
@@ -866,12 +689,7 @@ void idGameEdit::ClearEntitySelection() {
 	for( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
 		ent->fl.selected = false;
 	}
-// RAVEN BEGIN
-// bdube: fixed potential crash	
-	if ( gameLocal.editEntities ) {
-		gameLocal.editEntities->ClearSelectedEntities();
-	}
-// RAVEN END
+	gameLocal.editEntities->ClearSelectedEntities();
 }
 
 /*
@@ -880,12 +698,9 @@ idGameEdit::AddSelectedEntity
 ================
 */
 void idGameEdit::AddSelectedEntity( idEntity *ent ) {
-// RAVEN BEGIN
-// mekberg: fixed crash
-	if ( ent && gameLocal.editEntities ) {
+	if ( ent ) {
 		gameLocal.editEntities->AddSelectedEntity( ent );
 	}
-// RAVEN END
 }
 
 /*
@@ -1010,10 +825,7 @@ void idGameEdit::EntityTranslate( idEntity *ent, const idVec3 &org ) {
 idGameEdit::EntityGetSpawnArgs
 ================
 */
-// RAVEN BEGIN
-// scork: const-qualified 'ent' so other things would compile
-const idDict *idGameEdit::EntityGetSpawnArgs( const idEntity *ent ) const {
-// RAVEN END
+const idDict *idGameEdit::EntityGetSpawnArgs( idEntity *ent ) const {
 	if ( ent ) {
 		return &ent->spawnArgs;
 	}
@@ -1093,234 +905,6 @@ void idGameEdit::EntityDelete( idEntity *ent ) {
 	delete ent;
 }
 
-// RAVEN BEGIN
-// bdube: added
-/*
-================
-idGameEdit::EntityGetRenderEntity
-================
-*/
-renderEntity_t* idGameEdit::EntityGetRenderEntity ( idEntity* ent ) {
-	return ent->GetRenderEntity();
-}
-
-/*
-================
-idGameEdit::EntityGetName
-================
-*/
-const char* idGameEdit::EntityGetName ( idEntity* ent ) const {
-	if ( !ent ) {
-		return "";
-	}
-	return ent->GetName();
-}
-
-/*
-================
-idGameEdit::EntityGetClassname
-================
-*/
-const char* idGameEdit::EntityGetClassname ( idEntity* ent ) const {
-	return ent->GetType()->classname;
-}
-
-/*
-================
-idGameEdit::EntityIsDerivedFrom
-================
-*/
-bool idGameEdit::EntityIsDerivedFrom ( idEntity* ent, const char* classname ) const {
-	idTypeInfo* type;
-	type = idClass::GetClass ( classname );
-	if ( !type ) {
-		return false;
-	}
-	
-	return ent->IsType ( *type );
-}
-
-/*
-================
-idGameEdit::EntityIsValid
-================
-*/
-int idGameEdit::EntityToSafeId ( idEntity* ent ) const {
-	if ( !ent ) {
-		return 0;
-	}
-	return ( gameLocal.spawnIds[ent->entityNumber] << GENTITYNUM_BITS ) | ent->entityNumber;
-}
-
-/*
-================
-idGameEdit::EntityFromSafeId
-================
-*/
-idEntity *idGameEdit::EntityFromSafeId( int safeID ) const {
-	int entityNum = safeID & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	if ( ( gameLocal.spawnIds[ entityNum ] == ( safeID >> GENTITYNUM_BITS ) ) ) {
-		return gameLocal.entities[ entityNum ];
-	}
-	return NULL;
-}
-
-/*
-================
-idGameEdit::EntitySetSkin
-================
-*/
-void idGameEdit::EntitySetSkin ( idEntity* ent, const char* temp ) const {
-	ent->SetSkin ( declManager->FindSkin ( temp ) );
-}
-
-/*
-================
-idGameEdit::EntityClearSkin
-================
-*/
-void idGameEdit::EntityClearSkin ( idEntity* ent ) const {
-	ent->ClearSkin ( );
-}
-
-/*
-================
-idGameEdit::EntityClearSkin
-================
-*/
-void idGameEdit::EntityShow ( idEntity* ent ) const {
-	ent->Show ( );
-}
-
-/*
-================
-idGameEdit::EntityClearSkin
-================
-*/
-void idGameEdit::EntityHide ( idEntity* ent ) const {
-	ent->Hide ( );
-}
-
-/*
-================
-idGameEdit::EntityGetBounds
-================
-*/
-void idGameEdit::EntityGetBounds ( idEntity* ent, idBounds &bounds ) const {
-	bounds = ent->GetRenderEntity()->bounds;
-}
-
-/*
-================
-idGameEdit::EntityPlayAnim
-================
-*/
-int idGameEdit::EntityPlayAnim ( idEntity* ent, int animNum, int time, int blendtime ) {
-	if ( !ent->GetAnimator ( ) ) {
-		return 0;
-	}
-	ent->GetAnimator()->PlayAnim ( ANIMCHANNEL_ALL, animNum, time, blendtime );
-	ent->GetAnimator()->ServiceAnims ( time, time );
-	return ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_ALL )->GetEndTime ( );
-}
-
-/*
-================
-idGameEdit::EntitySetFrame
-================
-*/
-void idGameEdit::EntitySetFrame ( idEntity* ent, int animNum, int frame, int time, int blendtime ) {
-	idAnimator* animator;
-		
-	animator = ent->GetAnimator ( );	
-	if ( !animator ) {
-		return;
-	}
-
-	animator->ClearAllAnims ( time, time );
-	
-	// Move to the first frame of the animation
-// RAVEN BEGIN
-	frameBlend_t frameBlend = { 0, frame, frame, 1.0f, 0 };
-	animator->SetFrame ( ANIMCHANNEL_ALL, animNum, frameBlend );
-// RAVEN END
-	animator->ForceUpdate ( );
-}
-
-/*
-================
-idGameEdit::EntityGetDelta
-================
-*/
-void idGameEdit::EntityGetDelta ( idEntity* ent, int fromTime, int toTime, idVec3& delta ) {
-	ent->GetAnimator()->GetDelta ( fromTime, toTime, delta );
-}
-
-/*
-================
-idGameEdit::EntityRemoveOriginOffset
-================
-*/
-void idGameEdit::EntityRemoveOriginOffset ( idEntity* ent, bool remove ) {
-	ent->GetAnimator()->RemoveOriginOffset ( remove );
-}
-
-/*
-================
-idGameEdit::EntityStopAllEffects
-================
-*/
-void idGameEdit::EntityStopAllEffects ( idEntity* ent ) {
-	ent->StopAllEffects ( );
-	ent->StopSound ( SND_CHANNEL_ANY, false );
-}
-
-// RAVEN BEGIN
-// scork: some accessor functions for various utils
-idEntity *idGameEdit::EntityGetNextTeamEntity( idEntity *pEnt ) const {
-	return pEnt->GetNextTeamEntity();
-}
-void idGameEdit::GetPlayerInfo( idVec3 &v3Origin, idMat3 &mat3Axis, int PlayerNum, idAngles *deltaViewAngles ) const
-{
-	game->GetPlayerInfo( v3Origin, mat3Axis, PlayerNum, deltaViewAngles );
-}
-
-void idGameEdit::SetPlayerInfo( idVec3 &v3Origin, idMat3 &mat3Axis, int PlayerNum ) const
-{
-	game->SetPlayerInfo( v3Origin, mat3Axis, PlayerNum );
-}
-void idGameEdit::EntitySetName( idEntity* pEnt, const char *psName )
-{
-	pEnt->SetName( psName );
-}
-// RAVEN END
-
-/*
-================
-idGameEdit::LightSetParms
-================
-*/
-void idGameEdit::LightSetParms ( idEntity* ent, int maxLevel, int currentLevel, float radius ) {	
-	intptr_t	 data;
-	idLight* light;
-	
-	// Switch to a light entity
-	light = dynamic_cast<idLight*>(ent);
-	if ( !light )
-	{
-		return;
-	}
-
-	light->ProcessEvent ( &EV_Light_SetMaxLightLevel, maxLevel );
-	light->ProcessEvent ( &EV_Light_SetCurrentLightLevel, (int)currentLevel );
-
-	(*(float*)&data) = radius;
-	light->ProcessEventArgPtr ( &EV_Light_SetRadius, &data );		
-	
-	light->SetLightLevel();
-}
-// RAVEN END
-
 /*
 ================
 idGameEdit::PlayerIsValid
@@ -1391,59 +975,9 @@ idGameEdit::MapSave
 void idGameEdit::MapSave( const char *path ) const {
 	idMapFile *mapFile = gameLocal.GetLevelMap();
 	if (mapFile) {
-// RAVEN BEGIN
-// rjohnson: added entity export
-		if (mapFile->HasExportEntities()) {
-			mapFile->WriteExport( (path) ? path : mapFile->GetName() );
-		} else {
-			if ( path ) {
-				mapFile->Write( path, ".map");
-			} else {
-				idStr osPath;
-				osPath = mapFile->GetName ( );
-				osPath.DefaultFileExtension ( ".map" );
-				idFile* file = fileSystem->OpenFileRead ( osPath );
-				if ( file ) {
-					osPath = file->GetFullPath ( );
-					fileSystem->CloseFile ( file );
-					mapFile->Write ( osPath, ".map", false );
-				} else {
-					mapFile->Write ( file->GetName(), ".map" );
-				}
-			}				
-		}
-// RAVEN END
+		mapFile->Write( (path) ? path : mapFile->GetName(), ".map");
 	}
 }
-
-// RAVEN BEGIN
-// rjohnson: added entity export
-bool idGameEdit::MapHasExportEntities( void ) const {
-	idMapFile *mapFile = gameLocal.GetLevelMap();
-	if (mapFile) {
-		return mapFile->HasExportEntities();
-	}
-	return false;
-}
-// scork: simple query function for the sound editor
-// cdr: changed to also return the full string name of the map file (still compatable as a bool test)
-const char* idGameEdit::MapLoaded( void ) const {
-
-	const char *psMapName = gameLocal.GetMapName();
-	if (psMapName && psMapName[0]) {
-		return psMapName;
-	}
-	return 0;
-}
-
-// cdr: AASTactical
-idAASFile* idGameEdit::GetAASFile( int i ) {
-	if (gameLocal.GetAAS( i )) {
-		return gameLocal.GetAAS( i )->GetFile();
-	}
-	return 0;
-}
-// RAVEN END
 
 /*
 ================
@@ -1582,379 +1116,3 @@ void idGameEdit::MapEntityTranslate( const char *name, const idVec3 &v ) const {
 		}
 	}
 }
-
-// RAVEN BEGIN
-// bdube: new game edit stuff
-/*
-================
-idGameEdit::PlayerTraceFromEye
-================
-*/
-bool idGameEdit::PlayerTraceFromEye ( trace_t &results, float length, int contentMask ) {
-	idVec3		start;
-	idVec3		end;
-	idAngles	angles;
-		
-	PlayerGetEyePosition( start );
-	PlayerGetEyePosition( end );
-	PlayerGetViewAngles ( angles );
-	
-	end += angles.ToForward() * length;
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	return gameLocal.TracePoint ( gameLocal.GetLocalPlayer(), results, start, end, contentMask, gameLocal.GetLocalPlayer() );
-// RAVEN END
-}
-
-/*
-================
-idGameEdit::EffectRefreshTemplate
-================
-*/
-void idGameEdit::EffectRefreshTemplate ( const idDecl *effect ) const {
-	rvClientEntity* cent;	
-
-	// Restart all effects
-	for ( cent = gameLocal.clientSpawnedEntities.Next(); cent; cent = cent->spawnNode.Next() ) {
-		if ( cent->IsType ( rvClientEffect::GetClassType() ) ) {
-			rvClientEffect* clientEffect;
-			clientEffect = static_cast<rvClientEffect*>( cent );
-			if ( clientEffect->GetEffectIndex ( ) == effect->Index() ) {
-				clientEffect->Restart ( );
-			}
-		}
-	}
-}
-
-/*
-================
-idGameEdit::GetGameTime
-================
-*/
-int idGameEdit::GetGameTime ( int *previous ) const {
-	if ( previous ) {
-		*previous = gameLocal.previousTime;
-	}
-	
-	return gameLocal.time;
-}
-
-/*
-================
-idGameEdit::SetGameTime
-================
-*/
-void idGameEdit::SetGameTime ( int time ) const {
-	gameLocal.time = time;
-	gameLocal.previousTime = time;
-}
-
-/*
-================
-idGameEdit::TracePoint
-================
-*/
-bool idGameEdit::TracePoint ( trace_t &results, const idVec3 &start, const idVec3 &end, int contentMask ) const {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	return gameLocal.TracePoint( gameLocal.GetLocalPlayer(), results, start, end, contentMask, NULL );
-// RAVEN END
-}
-
-/*
-================
-idGameEdit::CacheDictionaryMedia
-================
-*/
-void idGameEdit::CacheDictionaryMedia ( const idDict* dict ) const {
-	gameLocal.CacheDictionaryMedia ( dict );
-}
-
-/*
-================
-idGameEdit::SetCamera
-================
-*/
-void idGameEdit::SetCamera ( idEntity* camera ) const {
-	gameLocal.SetCamera ( dynamic_cast<idCamera*>(camera) );
-}
-
-/*
-================
-idGameEdit::ScriptGetStatementLineNumber
-================
-*/
-int idGameEdit::ScriptGetStatementLineNumber ( idProgram* program, int instructionPointer ) const {
-	return program->GetStatement ( instructionPointer ).linenumber;
-}
-
-/*
-================
-idGameEdit::ScriptGetStatementFileName
-================
-*/
-const char* idGameEdit::ScriptGetStatementFileName ( idProgram* program, int instructionPointer ) const {
-	return program->GetFilename ( program->GetStatement ( instructionPointer ).file );
-}
-
-/*
-================
-idGameEdit::ScriptGetStatementOperator
-================
-*/
-int idGameEdit::ScriptGetStatementOperator ( idProgram* program, int instructionPointer ) const {
-	return program->GetStatement ( instructionPointer ).op;
-}
-
-/*
-================
-idGameEdit::ScriptGetCurrentFunction
-================
-*/
-void* idGameEdit::ScriptGetCurrentFunction ( idInterpreter* interpreter ) const {
-	return (void*)interpreter->GetCurrentFunction ( );
-}
-
-/*
-================
-idGameEdit::ScriptGetCurrentFunctionName
-================
-*/
-const char* idGameEdit::ScriptGetCurrentFunctionName ( idInterpreter* interpreter ) const {
-	if ( interpreter->GetCurrentFunction ( ) ) {
-		return interpreter->GetCurrentFunction ( )->Name();
-	}
-	return "";
-}
-
-/*
-================
-idGameEdit::ScriptGetStatementOperator
-================
-*/
-int idGameEdit::ScriptGetCallstackDepth ( idInterpreter* interpreter ) const {
-	return interpreter->GetCallstackDepth ( );
-}
-
-/*
-================
-idGameEdit::ScriptGetCallstackFunction
-================
-*/
-void* idGameEdit::ScriptGetCallstackFunction ( idInterpreter* interpreter, int depth ) const {
-	return (void*)interpreter->GetCallstack ( )[depth].f;
-}
-
-/*
-================
-idGameEdit::ScriptGetCallstackFunctionName
-================
-*/
-const char* idGameEdit::ScriptGetCallstackFunctionName ( idInterpreter* interpreter, int depth ) const {
-	return interpreter->GetCallstack()[depth].f->Name();
-}
-
-/*
-================
-idGameEdit::ScriptGetCallstackStatement
-================
-*/
-int idGameEdit::ScriptGetCallstackStatement ( idInterpreter* interpreter, int depth ) const {
-	return interpreter->GetCallstack()[depth].s;
-}
-
-/*
-================
-idGameEdit::ScriptIsReturnOperator
-================
-*/
-bool idGameEdit::ScriptIsReturnOperator ( int op ) const {
-	return op == OP_RETURN;
-}
-
-/*
-================
-idGameEdit::ScriptGetRegisterValue
-================
-*/
-const char* idGameEdit::ScriptGetRegisterValue ( idInterpreter* interpreter, const char* varname, int callstackDepth ) const {
-	static char	value[4096];
-	idStr		out;
-	
-	value[0] = '\0';
-	if ( interpreter->GetRegisterValue ( varname, out, callstackDepth ) ) {	
-		idStr::snPrintf ( value, 4095, out.c_str() );	
-	}
-	
-	return value;
-}
-
-/*
-================
-idGameEdit::ScriptGetThread
-================
-*/
-idThread* idGameEdit::ScriptGetThread ( idInterpreter* interpreter ) const {
-	return interpreter->GetThread();
-}
-
-/*
-================
-idGameEdit::ThreadGetCount
-================
-*/
-int idGameEdit::ThreadGetCount ( void ) {
-	return idThread::GetThreads().Num();
-}
-
-/*
-================
-idGameEdit::ThreadGetThread
-================
-*/
-idThread* idGameEdit::ThreadGetThread ( int index ) {
-	return idThread::GetThreads()[index];
-}
-
-/*
-================
-idGameEdit::ThreadGetName
-================
-*/
-const char* idGameEdit::ThreadGetName ( idThread* thread ) {
-	return thread->GetThreadName ( );
-}
-
-/*
-================
-idGameEdit::ThreadGetNumber
-================
-*/
-int idGameEdit::ThreadGetNumber ( idThread* thread ) {
-	return thread->GetThreadNum ( );
-}
-
-/*
-================
-idGameEdit::ThreadGetState
-================
-*/
-const char* idGameEdit::ThreadGetState ( idThread* thread ) {
-	if ( thread->IsDying() ) {
-		return "Dying";
-	} else if ( thread->IsWaiting() ) {
-		return "Waiting";
-	} else if ( thread->IsDoneProcessing() ) {
-		return "Stopped";
-	}
-	
-	return "Running";
-}
-
-/*
-================
-idGameEdit::GetClassDebugInfo
-================
-*/
-void idGameEdit::GetClassDebugInfo ( const idEntity* entity, debugInfoProc_t proc, void* userdata ) {
-	const_cast<idEntity *>( entity )->GetDebugInfo ( proc, userdata  );
-}
-
-/*
-================
-idGameEdit::GetGameEntityRegisterTime
-================
-*/
-int idGameEdit::GetGameEntityRegisterTime ( void ) const {
-	return gameLocal.entityRegisterTime;
-}
-
-/*
-================
-idGameEdit::GetFirstSpawnedEntity
-================
-*/
-idEntity* idGameEdit::GetFirstSpawnedEntity ( void ) const {
-	return gameLocal.spawnedEntities.Next();
-}
-
-/*
-================
-idGameEdit::GetNextSpawnedEntity
-================
-*/
-idEntity* idGameEdit::GetNextSpawnedEntity ( idEntity* from ) const {
-	if ( !from ) {
-		return NULL;
-	}
-	return from->spawnNode.Next();
-}
-
-
-// RAVEN END
-
-// RAVEN BEGIN
-// mekberg: access to animationlib functions for radiant
-void idGameEdit::FlushUnusedAnims ( void ) {
-
-// RAVEN BEGIN
-// jsinger: animationLib changed to a pointer
-	animationLib->FlushUnusedAnims();
-// RAVEN END
-}
-
-/*
-===============================================================================
-
-  rvModviewModel
-
-  Actor model for modview
-
-===============================================================================
-*/
-
-class rvModviewModel : public idActor {
-public:
-	CLASS_PROTOTYPE( rvModviewModel );
-	
-	rvModviewModel ( void );
-		
-private:
-	
-	void					Event_Speak		( const char* lipsync );
-};
-
-CLASS_DECLARATION( idActor, rvModviewModel )
-	EVENT( AI_Speak,				rvModviewModel::Event_Speak )	
-END_CLASS
-
-/*
-=====================
-rvModviewModel::rvModviewModel
-=====================
-*/
-rvModviewModel::rvModviewModel ( void ) {
-}
-
-/*
-=====================
-rvModviewModel::Event_Speak
-=====================
-*/
-void rvModviewModel::Event_Speak ( const char* lipsync ) {
-	assert( idStr::Icmpn( lipsync, "lipsync_", 7 ) == 0 );
-	
-	lipsync = spawnArgs.GetString ( lipsync );
-	if ( !lipsync || !*lipsync ) {
-		return;
-	}
-	
-	if ( head ) {
-		head->StartLipSyncing( lipsync );
-	} else {
-		StartSoundShader (declManager->FindSound ( lipsync ), SND_CHANNEL_VOICE, 0, false, NULL );
-	}
-}	
-
-// RAVEN END
-

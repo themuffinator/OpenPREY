@@ -121,6 +121,9 @@ typedef enum {
 	EXP_REG_PARM9,
 	EXP_REG_PARM10,
 	EXP_REG_PARM11,
+#ifdef HUMANHEAD
+	EXP_REG_PARM12,
+#endif
 
 	EXP_REG_GLOBAL0,
 	EXP_REG_GLOBAL1,
@@ -131,6 +134,8 @@ typedef enum {
 	EXP_REG_GLOBAL6,
 	EXP_REG_GLOBAL7,
 	EXP_REG_VERTEX_RANDOM,
+	EXP_REG_FRAGMENT_PROGRAMS,
+	EXP_REG_GLSL_PROGRAMS,
 
 	EXP_REG_NUM_PREDEFINED
 } expRegister_t;
@@ -185,7 +190,11 @@ typedef enum {
 } stageVertexColor_t;
 
 static const int	MAX_FRAGMENT_IMAGES = 8;
+#ifdef HUMANHEAD
+static const int	MAX_VERTEX_PARMS = 8;
+#else
 static const int	MAX_VERTEX_PARMS = 4;
+#endif
 static const int	MAX_GLSL_SHADER_PARMS = 32;
 static const int	MAX_GLSL_SHADER_NAME = 256;
 static const int	MAX_GLSL_SHADER_PARM_NAME = 32;
@@ -275,7 +284,11 @@ const int MAX_SHADER_STAGES = 256;
 
 const int MAX_TEXGEN_REGISTERS = 4;
 
+#ifdef HUMANHEAD
+const int MAX_ENTITY_SHADER_PARMS = 13;
+#else
 const int MAX_ENTITY_SHADER_PARMS = 12;
+#endif
 
 // material flags
 typedef enum {
@@ -306,6 +319,23 @@ typedef enum {
 	CONTENTS_AAS_SOLID = BIT(13),	// solid for AAS
 	CONTENTS_AAS_OBSTACLE = BIT(14),	// used to compile an obstacle into AAS that can be enabled/disabled
 	CONTENTS_FLASHLIGHT_TRIGGER = BIT(15),	// used for triggers that are activated by the flashlight
+#ifdef HUMANHEAD
+	CONTENTS_FORCEFIELD			= BIT(16),	// forcefield matter, only passable in spirit mode
+	CONTENTS_SPIRITBRIDGE		= BIT(17),	// collidable only by spiritwalk players
+
+	// contents used by utils
+	CONTENTS_AREAPORTAL			= BIT(18),	// portal separating renderer areas
+	CONTENTS_NOCSG				= BIT(19),	// don't cut this brush with CSG operations in the editor
+
+	CONTENTS_BLOCK_RADIUSDAMAGE = BIT(20),	// used by objects like forcefields and chaff
+	CONTENTS_SHOOTABLE			= BIT(21),	// bullets collide with but not player or monsters
+	CONTENTS_DEATHVOLUME		= BIT(22),	// used by death zones for simple contents checks
+	CONTENTS_VEHICLECLIP		= BIT(23),	// used to clip off vehicle movement
+	CONTENTS_OWNER_TO_OWNER		= BIT(24),	// disables owner-to-owner collision rejection
+	CONTENTS_GAME_PORTAL		= BIT(25),	// used for clipping against game portals
+	CONTENTS_SHOOTABLEBYARROW	= BIT(26),	// solid to spirit arrows
+	CONTENTS_HUNTERCLIP			= BIT(27),	// solid to hunters, but not hunters in vehicles
+#else
 // RAVEN BEGIN
 // bdube: new clip that blocks monster visibility
 	CONTENTS_SIGHTCLIP			= BIT(16),	// used for blocking sight for actors and cameras
@@ -329,6 +359,7 @@ typedef enum {
 	CONTENTS_LAVA				= BIT(26),
 	CONTENTS_SLIME				= BIT(27),
 // jmarshall end
+#endif
 
 	CONTENTS_REMOVE_UTIL = ~(CONTENTS_AREAPORTAL | CONTENTS_NOCSG)
 } contentsFlags_t;
@@ -337,6 +368,36 @@ typedef enum {
 const int NUM_SURFACE_BITS = 4;
 const int MAX_SURFACE_TYPES = 1 << NUM_SURFACE_BITS;
 
+#ifdef HUMANHEAD
+typedef enum {
+	SURFTYPE_NONE,					// default type
+	SURFTYPE_METAL,
+	SURFTYPE_STONE,
+	SURFTYPE_FLESH,
+	SURFTYPE_WOOD,
+	SURFTYPE_CARDBOARD,
+	SURFTYPE_LIQUID,
+	SURFTYPE_GLASS,
+	SURFTYPE_TILE,
+	SURFTYPE_WALLWALK,
+	SURFTYPE_ALTMETAL,
+	SURFTYPE_FORCEFIELD,
+	SURFTYPE_PIPE,
+	SURFTYPE_SPIRIT,
+	SURFTYPE_CHAFF,
+	NUM_SURFACE_TYPES,
+
+	// Transitional aliases kept to reduce churn in mixed Q4/Prey code paths.
+	SURFTYPE_PLASTIC = SURFTYPE_TILE,
+	SURFTYPE_RICOCHET = SURFTYPE_ALTMETAL,
+	SURFTYPE_10 = SURFTYPE_FORCEFIELD,
+	SURFTYPE_11 = SURFTYPE_PIPE,
+	SURFTYPE_12 = SURFTYPE_SPIRIT,
+	SURFTYPE_13 = SURFTYPE_CHAFF,
+	SURFTYPE_14 = SURFTYPE_CHAFF,
+	SURFTYPE_15 = SURFTYPE_CHAFF
+} surfTypes_t;
+#else
 typedef enum {
 	SURFTYPE_NONE,					// default type
 	SURFTYPE_METAL,
@@ -355,6 +416,7 @@ typedef enum {
 	SURFTYPE_14,
 	SURFTYPE_15
 } surfTypes_t;
+#endif
 
 // surface flags
 typedef enum {

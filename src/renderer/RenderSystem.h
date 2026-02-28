@@ -311,6 +311,14 @@ public:
 	virtual void			DrawSmallStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material ) = 0;
 	virtual void			DrawBigChar( int x, int y, int ch, const idMaterial *material ) = 0;
 	virtual void			DrawBigStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material ) = 0;
+	virtual void			SetEntireSceneMaterial( idMaterial *material ) { (void)material; }
+	virtual bool			IsScopeView( void ) { return false; }
+	virtual void			SetScopeView( bool view ) { (void)view; }
+	virtual bool			IsShuttleView( void ) { return false; }
+	virtual void			SetShuttleView( bool view ) { (void)view; }
+	virtual bool			SupportsFragmentPrograms( void ) { return true; }
+	virtual int				VideoCardNumber( void ) { return 0; }
+	virtual void			LogViewRender( const struct renderView_s *view ) { (void)view; }
 
 	// dump all 2D drawing so far this frame to the demo file
 	virtual void			WriteDemoPics() = 0;

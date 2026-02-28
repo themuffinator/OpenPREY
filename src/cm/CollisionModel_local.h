@@ -347,6 +347,8 @@ public:
 								idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
 	// test collision detection
 	void			DebugOutput( const idVec3 &origin );
+	const char *	ContentsName( const int contents ) const;
+	void			ModelInfo( int modelIndex );
 
 	// list all loaded models
 	void			ListModels( void );

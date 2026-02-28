@@ -1099,6 +1099,12 @@ void R_RenderView( viewDef_t *parms ) {
 		return;
 	}
 
+	// Subviews (mirrors/remote cameras) must evaluate suppress/allow rules as
+	// viewID 0 so first-person entity suppression does not hide the player model.
+	if ( parms->isSubview ) {
+		parms->renderView.viewID = 0;
+	}
+
 	tr.viewCount++;
 
 	// save view in case we are a subview

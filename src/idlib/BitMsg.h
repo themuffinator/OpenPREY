@@ -53,6 +53,7 @@ public:
 	void			WriteBits( int value, int numBits );	// write the specified number of bits
 	void			WriteChar( int c );
 	void			WriteByte( int c );
+	void			WriteBool( bool b );
 	void			WriteShort( int c );
 	void			WriteUShort( int c );
 	void			WriteLong( int c );
@@ -61,9 +62,12 @@ public:
 	void			WriteAngle8( float f );
 	void			WriteAngle16( float f );
 	void			WriteDir( const idVec3 &dir, int numBits );
+	void			WriteVec3( const idVec3 &v );
 	void			WriteString( const char *s, int maxLength = -1 );
+	void			WriteString( const char *s, int maxLength, bool make7Bit );
 	void			WriteData( const void *data, int length );
 	void			WriteNetadr( const netadr_t adr );
+	void			SetDebugEntType( int entType );
 
 	void			WriteDeltaChar( int oldValue, int newValue );
 	void			WriteDeltaByte( int oldValue, int newValue );
@@ -81,6 +85,7 @@ public:
 	int				ReadBits( int numBits ) const;			// read the specified number of bits
 	int				ReadChar( void ) const;
 	int				ReadByte( void ) const;
+	bool			ReadBool( void ) const;
 	int				ReadShort( void ) const;
 	int				ReadUShort( void ) const;
 	int				ReadLong( void ) const;
@@ -89,6 +94,7 @@ public:
 	float			ReadAngle8( void ) const;
 	float			ReadAngle16( void ) const;
 	idVec3			ReadDir( int numBits ) const;
+	idVec3			ReadVec3( void ) const;
 	int				ReadString( char *buffer, int bufferSize ) const;
 	int				ReadData( void *data, int length ) const;
 	void			ReadNetadr( netadr_t *adr ) const;
@@ -140,6 +146,15 @@ ID_INLINE void idBitMsg::Init( const byte *data, int length ) {
 	writeData = NULL;
 	readData = data;
 	maxSize = length;
+}
+
+ID_INLINE void idBitMsg::WriteString( const char *s, int maxLength, bool make7Bit ) {
+	(void)make7Bit;
+	WriteString( s, maxLength );
+}
+
+ID_INLINE void idBitMsg::SetDebugEntType( int entType ) {
+	(void)entType;
 }
 
 ID_INLINE byte *idBitMsg::GetData( void ) {
@@ -272,6 +287,10 @@ ID_INLINE void idBitMsg::WriteByte( int c ) {
 	WriteBits( c, 8 );
 }
 
+ID_INLINE void idBitMsg::WriteBool( bool b ) {
+	WriteBits( b ? 1 : 0, 1 );
+}
+
 ID_INLINE void idBitMsg::WriteShort( int c ) {
 	WriteBits( c, -16 );
 }
@@ -303,6 +322,12 @@ ID_INLINE void idBitMsg::WriteAngle16( float f ) {
 
 ID_INLINE void idBitMsg::WriteDir( const idVec3 &dir, int numBits ) {
 	WriteBits( DirToBits( dir, numBits ), numBits );
+}
+
+ID_INLINE void idBitMsg::WriteVec3( const idVec3 &v ) {
+	WriteFloat( v.x );
+	WriteFloat( v.y );
+	WriteFloat( v.z );
 }
 
 ID_INLINE void idBitMsg::WriteDeltaChar( int oldValue, int newValue ) {
@@ -348,6 +373,10 @@ ID_INLINE int idBitMsg::ReadByte( void ) const {
 	return (unsigned char)ReadBits( 8 );
 }
 
+ID_INLINE bool idBitMsg::ReadBool( void ) const {
+	return ( ReadBits( 1 ) != 0 );
+}
+
 ID_INLINE int idBitMsg::ReadShort( void ) const {
 	return (short)ReadBits( -16 );
 }
@@ -381,6 +410,14 @@ ID_INLINE float idBitMsg::ReadAngle16( void ) const {
 
 ID_INLINE idVec3 idBitMsg::ReadDir( int numBits ) const {
 	return BitsToDir( ReadBits( numBits ), numBits );
+}
+
+ID_INLINE idVec3 idBitMsg::ReadVec3( void ) const {
+	idVec3 v;
+	v.x = ReadFloat();
+	v.y = ReadFloat();
+	v.z = ReadFloat();
+	return v;
 }
 
 ID_INLINE int idBitMsg::ReadDeltaChar( int oldValue ) const {
@@ -427,6 +464,8 @@ public:
 
 	void			InitWriting( const idBitMsg *base, idBitMsg *newBase, idBitMsg *delta );
 	void			InitReading( const idBitMsg *base, idBitMsg *newBase, const idBitMsg *delta );
+	void			Init( const idBitMsg *base, idBitMsg *newBase, idBitMsg *delta );
+	void			Init( const idBitMsg *base, idBitMsg *newBase, const idBitMsg *delta );
 	bool			HasChanged( void ) const;
 
 	void			WriteBits( int value, int numBits );
@@ -535,6 +574,14 @@ ID_INLINE void idBitMsgDelta::InitReading( const idBitMsg *base, idBitMsg *newBa
 	this->writeDelta = NULL;
 	this->readDelta = delta;
 	this->changed = false;
+}
+
+ID_INLINE void idBitMsgDelta::Init( const idBitMsg *base, idBitMsg *newBase, idBitMsg *delta ) {
+	InitWriting( base, newBase, delta );
+}
+
+ID_INLINE void idBitMsgDelta::Init( const idBitMsg *base, idBitMsg *newBase, const idBitMsg *delta ) {
+	InitReading( base, newBase, delta );
 }
 
 ID_INLINE bool idBitMsgDelta::HasChanged( void ) const {
@@ -813,6 +860,7 @@ public:
 	void			Init( int sequence );
 
 	bool			Add( const byte *data, const int size, bool sequencing );
+	bool			Add( const byte *data, const int size ) { return Add( data, size, false ); }
 	// prepend to a message without the need to a memcopy and readjust
 	bool			AddConcat( const byte *data1, const int size1, const byte *data2, const int size2, bool sequencing );
 	bool			Get( byte *data, int dataSize, int &size, bool sequencing );
@@ -825,6 +873,9 @@ public:
 	void			WriteTo( idBitMsg &msg );
 	void			FlushTo( idBitMsg &msg );
 	void			ReadFrom( const idBitMsg &msg );
+	void			WriteToMsg( idBitMsg &msg ) { WriteTo( msg ); }
+	void			ReadFromMsg( const idBitMsg &msg ) { ReadFrom( msg ); }
+	bool			GetDirect( byte *data, int &size ) { return Get( data, MAX_MSG_QUEUE_SIZE, size, false ); }
 
 	void			Save( idFile *file ) const;
 	void			Restore( idFile *file );

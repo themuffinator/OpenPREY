@@ -222,11 +222,17 @@ Sys_IsGameWindowFocused
 ================
 */
 bool Sys_IsGameWindowFocused(void) {
-	if (!IsWindowVisible(win32.hWnd))
-		return false;
+	if ( win32.activeApp ) {
+		return true;
+	}
 
-	if (GetForegroundWindow() != win32.hWnd)
+	if ( !win32.hWnd || !IsWindowVisible( win32.hWnd ) ) {
 		return false;
+	}
+
+	if ( GetForegroundWindow() != win32.hWnd ) {
+		return false;
+	}
 
 	return true;
 }
@@ -559,14 +565,14 @@ const char* Sys_DefaultSavePath(void) {
 
 	if ( localAppData && localAppData[0] ) {
 		savePath = localAppData;
-		savePath.AppendPath( "OpenQ4" );
+		savePath.AppendPath( "OpenPrey" );
 		return savePath.c_str();
 	}
 
 	if ( userProfile && userProfile[0] ) {
 		savePath = userProfile;
 		savePath.AppendPath( "Saved Games" );
-		savePath.AppendPath( "OpenQ4" );
+		savePath.AppendPath( "OpenPrey" );
 		return savePath.c_str();
 	}
 

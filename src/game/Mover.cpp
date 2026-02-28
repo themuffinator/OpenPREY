@@ -1,20 +1,30 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
-#include "ai/AI_Manager.h"
 
 // a mover will update any gui entities in it's target list with 
 // a key/val pair of "mover" "state" from below.. guis can represent
 // realtime info like this
 // binary only
+#ifdef HUMANHEAD //removed static and added extern to force external linkage
+extern const char *guiBinaryMoverStates[] = {
+	"1",	// pos 1
+	"2",	// pos 2
+	"3",	// moving 1 to 2
+	"4"		// moving 2 to 1
+};
+#else
 static const char *guiBinaryMoverStates[] = {
 	"1",	// pos 1
 	"2",	// pos 2
 	"3",	// moving 1 to 2
 	"4"		// moving 2 to 1
 };
+#endif
 
 
 /*
@@ -30,9 +40,7 @@ const idEventDef EV_TeamBlocked( "<teamblocked>", "ee" );
 const idEventDef EV_PartBlocked( "<partblocked>", "e" );
 const idEventDef EV_ReachedPos( "<reachedpos>", NULL );
 const idEventDef EV_ReachedAng( "<reachedang>", NULL );
-// RAVEN BEGIN
-const idEventDef EV_PostRestoreExt( "<postrestore>", "ddddd" );
-// RAVEN END
+const idEventDef EV_PostRestore( "<postrestore>", "ddddd" );
 const idEventDef EV_StopMoving( "stopMoving", NULL );
 const idEventDef EV_StopRotating( "stopRotating", NULL );
 const idEventDef EV_Speed( "speed", "f" );
@@ -47,6 +55,9 @@ const idEventDef EV_MoveDecelerateTo( "decelTo", "ff" );
 const idEventDef EV_RotateDownTo( "rotateDownTo", "df" );
 const idEventDef EV_RotateUpTo( "rotateUpTo", "df" );
 const idEventDef EV_RotateTo( "rotateTo", "v" );
+//HUMANHEAD: aob
+const idEventDef EV_RotateTo_World( "rotateTo_world", "v" );
+//HUMANHEAD END
 const idEventDef EV_Rotate( "rotate", "v" );
 const idEventDef EV_RotateOnce( "rotateOnce", "v" );
 const idEventDef EV_Bob( "bob", "ffv" );
@@ -55,10 +66,6 @@ const idEventDef EV_Mover_OpenPortal( "openPortal" );
 const idEventDef EV_Mover_ClosePortal( "closePortal" );
 const idEventDef EV_AccelSound( "accelSound", "s" );
 const idEventDef EV_DecelSound( "decelSound", "s" );
-// RAVEN BEGIN
-// cnicholson: added stop sound support
-const idEventDef EV_StoppedSound( "stoppedSound", "s" );
-// RAVEN END
 const idEventDef EV_MoveSound( "moveSound", "s" );
 const idEventDef EV_Mover_InitGuiTargets( "<initguitargets>", NULL );
 const idEventDef EV_EnableSplineAngles( "enableSplineAngles", NULL );
@@ -68,11 +75,6 @@ const idEventDef EV_StartSpline( "startSpline", "e" );
 const idEventDef EV_StopSpline( "stopSpline", NULL );
 const idEventDef EV_IsMoving( "isMoving", NULL, 'd' );
 const idEventDef EV_IsRotating( "isRotating", NULL, 'd' );
-// RAVEN BEGIN
-// abahr:
-const idEventDef EV_GetSplineEntity( "getSplineEntity", NULL, 'E' );
-const idEventDef EV_MoveAlongVector( "moveAlongVector", "v" );
-// RAVEN END
 
 CLASS_DECLARATION( idEntity, idMover )
 	EVENT( EV_FindGuiTargets,		idMover::Event_FindGuiTargets )
@@ -81,9 +83,7 @@ CLASS_DECLARATION( idEntity, idMover )
 	EVENT( EV_PartBlocked,			idMover::Event_PartBlocked )
 	EVENT( EV_ReachedPos,			idMover::Event_UpdateMove )
 	EVENT( EV_ReachedAng,			idMover::Event_UpdateRotation )
-// RAVEN BEGIN
-	EVENT( EV_PostRestoreExt,		idMover::Event_PostRestoreExt )
-// RAVEN END
+	EVENT( EV_PostRestore,			idMover::Event_PostRestore )
 	EVENT( EV_StopMoving,			idMover::Event_StopMoving )
 	EVENT( EV_StopRotating,			idMover::Event_StopRotating )
 	EVENT( EV_Speed,				idMover::Event_SetMoveSpeed )
@@ -98,6 +98,9 @@ CLASS_DECLARATION( idEntity, idMover )
 	EVENT( EV_RotateDownTo,			idMover::Event_RotateDownTo )
 	EVENT( EV_RotateUpTo,			idMover::Event_RotateUpTo )
 	EVENT( EV_RotateTo,				idMover::Event_RotateTo )
+	//HUMANHEAD: aob
+	EVENT( EV_RotateTo_World,		idMover::Event_RotateTo_World )
+	//HUMANHEAD END
 	EVENT( EV_Rotate,				idMover::Event_Rotate )
 	EVENT( EV_RotateOnce,			idMover::Event_RotateOnce )
 	EVENT( EV_Bob,					idMover::Event_Bob )
@@ -106,10 +109,6 @@ CLASS_DECLARATION( idEntity, idMover )
 	EVENT( EV_Mover_ClosePortal,	idMover::Event_ClosePortal )
 	EVENT( EV_AccelSound,			idMover::Event_SetAccelSound )
 	EVENT( EV_DecelSound,			idMover::Event_SetDecelSound )
-// RAVEN BEGIN
-// cnicholson: added stop sound support
-	EVENT( EV_StoppedSound,			idMover::Event_SetStoppedSound )
-// RAVEN END
 	EVENT( EV_MoveSound,			idMover::Event_SetMoveSound )
 	EVENT( EV_Mover_InitGuiTargets,	idMover::Event_InitGuiTargets )
 	EVENT( EV_EnableSplineAngles,	idMover::Event_EnableSplineAngles )
@@ -120,11 +119,6 @@ CLASS_DECLARATION( idEntity, idMover )
 	EVENT( EV_Activate,				idMover::Event_Activate )
 	EVENT( EV_IsMoving,				idMover::Event_IsMoving )
 	EVENT( EV_IsRotating,			idMover::Event_IsRotating )
-// RAVEN BEGIN
-// abahr:
-	EVENT( EV_GetSplineEntity,		idMover::Event_GetSplineEntity )
-	EVENT( EV_MoveAlongVector,		idMover::Event_MoveAlongVector )
-// RAVEN END
 END_CLASS
 
 /*
@@ -147,26 +141,11 @@ idMover::idMover( void ) {
 	acceltime = 0;
 	stopRotation = false;
 	useSplineAngles = true;
-	attenuate = false;
-	useIdleSound = false;
 	lastCommand = MOVER_NONE;
 	damage = 0.0f;
 	areaPortal = 0;
-	maxAttenuation = 0.0f;
-	attenuationScale = 0.0f;
-	lastOrigin.Zero( );
-	lastTime = 0;
-	splineStartTime = 0;
-
 	fl.networkSync = true;
 }
-
-
-idMover::~idMover( void ) {
-	SetPhysics( NULL );
-}
-
-
 
 /*
 ================
@@ -178,9 +157,20 @@ void idMover::Save( idSaveGame *savefile ) const {
 
 	savefile->WriteStaticObject( physicsObj );
 
-	savefile->Write( &move, sizeof( move ) );
-	savefile->Write( &rot, sizeof( rot ) );
-
+	savefile->WriteInt( move.stage );
+	savefile->WriteInt( move.acceleration );
+	savefile->WriteInt( move.movetime );
+	savefile->WriteInt( move.deceleration );
+	savefile->WriteVec3( move.dir );
+	
+	savefile->WriteInt( rot.stage );
+	savefile->WriteInt( rot.acceleration );
+	savefile->WriteInt( rot.movetime );
+	savefile->WriteInt( rot.deceleration );
+	savefile->WriteFloat( rot.rot.pitch );
+	savefile->WriteFloat( rot.rot.yaw );
+	savefile->WriteFloat( rot.rot.roll );
+	
 	savefile->WriteInt( move_thread );
 	savefile->WriteInt( rotate_thread );
 
@@ -208,9 +198,8 @@ void idMover::Save( idSaveGame *savefile ) const {
 		guiTargets[ i ].Save( savefile );
 	}
 
-	if ( splineEnt.GetEntity() ) {
+	if ( splineEnt.GetEntity() && splineEnt.GetEntity()->GetSpline() ) {
 		idCurve_Spline<idVec3> *spline = physicsObj.GetSpline();
-		if (spline) {
 
 		savefile->WriteBool( true );
 		splineEnt.Save( savefile );
@@ -219,25 +208,10 @@ void idMover::Save( idSaveGame *savefile ) const {
 		savefile->WriteInt( physicsObj.GetSplineAcceleration() );
 		savefile->WriteInt( physicsObj.GetSplineDeceleration() );
 		savefile->WriteInt( (int)physicsObj.UsingSplineAngles() );
-		} else {
-			savefile->WriteBool( false );
-		}
 
 	} else {
 		savefile->WriteBool( false );
 	}
-
-// RAVEN BEGIN
-// mekberg: added for attenuation and idle sound
-	savefile->WriteBool( attenuate );
-	savefile->WriteFloat( maxAttenuation );
-	savefile->WriteFloat( attenuationScale );
-	savefile->WriteVec3( lastOrigin );
-	savefile->WriteInt( lastTime );
-	savefile->WriteBool( useIdleSound );
-	splineStateThread.Save( savefile );
-	savefile->WriteInt( splineStartTime );
-// RAVEN END
 }
 
 /*
@@ -252,9 +226,20 @@ void idMover::Restore( idRestoreGame *savefile ) {
 	savefile->ReadStaticObject( physicsObj );
 	RestorePhysics( &physicsObj );
 
-	savefile->Read( &move, sizeof( move ) );
-	savefile->Read( &rot, sizeof( rot ) );
-
+	savefile->ReadInt( (int&)move.stage );
+	savefile->ReadInt( move.acceleration );
+	savefile->ReadInt( move.movetime );
+	savefile->ReadInt( move.deceleration );
+	savefile->ReadVec3( move.dir );
+	
+	savefile->ReadInt( (int&)rot.stage );
+	savefile->ReadInt( rot.acceleration );
+	savefile->ReadInt( rot.movetime );
+	savefile->ReadInt( rot.deceleration );
+	savefile->ReadFloat( rot.rot.pitch );
+	savefile->ReadFloat( rot.rot.yaw );
+	savefile->ReadFloat( rot.rot.roll );
+	
 	savefile->ReadInt( move_thread );
 	savefile->ReadInt( rotate_thread );
 
@@ -301,35 +286,16 @@ void idMover::Restore( idRestoreGame *savefile ) {
 		savefile->ReadInt( decel );
 		savefile->ReadInt( useAngles );
 
-// RAVEN BEGIN
-		PostEventMS( &EV_PostRestoreExt, 0, starttime, totaltime, accel, decel, useAngles );
-// RAVEN END
+		PostEventMS( &EV_PostRestore, 0, starttime, totaltime, accel, decel, useAngles );
 	} 
-
-// RAVEN BEGIN
-// mekberg: added for attenuation and idle sound
-	savefile->ReadBool( attenuate );
-	savefile->ReadFloat( maxAttenuation );
-	savefile->ReadFloat( attenuationScale );
-	savefile->ReadVec3( lastOrigin );
-	savefile->ReadInt( lastTime );
-	savefile->ReadBool( useIdleSound );
-	splineStateThread.Restore( savefile, this );
-	savefile->ReadInt( splineStartTime );
-
-	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_moverCrush", false, false );
-// RAVEN END
 }
 
 /*
 ================
-idMover::Event_PostRestoreExt
+idMover::Event_PostRestore
 ================
 */
-// RAVEN BEGIN
-void idMover::Event_PostRestoreExt( int start, int total, int accel, int decel, bool useSplineAng ) {
-// RAVEN END
+void idMover::Event_PostRestore( int start, int total, int accel, int decel, int useSplineAng ) {
 	idCurve_Spline<idVec3> *spline;
 
 	idEntity *splineEntity = splineEnt.GetEntity();
@@ -344,7 +310,7 @@ void idMover::Event_PostRestoreExt( int start, int total, int accel, int decel, 
 	spline->MakeUniform( total );
 	spline->ShiftTime( start - spline->GetTime( 0 ) );
 
-	physicsObj.SetSpline( spline, accel, decel, useSplineAng );
+	physicsObj.SetSpline( spline, accel, decel, ( useSplineAng != 0 ) );
 	physicsObj.SetLinearExtrapolation( EXTRAPOLATION_NONE, 0, 0, dest_position, vec3_origin, vec3_origin );
 }
 
@@ -368,30 +334,37 @@ void idMover::Spawn( void ) {
 
 	dest_position = GetPhysics()->GetOrigin();
 	dest_angles = GetPhysics()->GetAxis().ToAngles();
-	
+
+	// HUMANHEAD pdm: added support for noclipmodel
+	idClipModel *clipModel = NULL;
+	int clipMask = 0;
+	bool allowPush = false;
+	if (!spawnArgs.GetBool("noclipmodel")) {
+		clipModel = new idClipModel( GetPhysics()->GetClipModel() );
+		clipMask = MASK_SOLID;
+		allowPush = true;
+	}
+
 	physicsObj.SetSelf( this );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
-	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
+	physicsObj.SetClipModel( clipModel, 1.0f );
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() );
 	physicsObj.SetAxis( GetPhysics()->GetAxis() );
-	physicsObj.SetClipMask( MASK_SOLID );
+	physicsObj.SetClipMask( clipMask );
 	if ( !spawnArgs.GetBool( "solid", "1" ) ) {
 		physicsObj.SetContents( 0 );
 	}
-	if ( !renderEntity.hModel || !spawnArgs.GetBool( "nopush" ) ) {
+	if ( allowPush && (!renderEntity.hModel || !spawnArgs.GetBool( "nopush" )) ) {
 		physicsObj.SetPusher( 0 );
 	}
-
+	// HUMANHEAD END
 	physicsObj.SetLinearExtrapolation( EXTRAPOLATION_NONE, 0, 0, dest_position, vec3_origin, vec3_origin );
 	physicsObj.SetAngularExtrapolation( EXTRAPOLATION_NONE, 0, 0, dest_angles, ang_zero, ang_zero );
 	SetPhysics( &physicsObj );
+
+	//HUMANHEAD: aob
+	move.stage = FINISHED_STAGE;
+	rot.stage = FINISHED_STAGE;
+	//HUMANHEAD END
 
 	// see if we are on an areaportal
 	areaPortal = gameRenderWorld->FindPortal( GetPhysics()->GetAbsBounds() );
@@ -410,130 +383,7 @@ void idMover::Spawn( void ) {
 		fl.takedamage = true;
 	}
 
-// RAVEN BEGIN
-// abahr:
-	if( spawnArgs.GetBool("removeGimbleLock") ) {
-		physicsObj.SetAxisOffset( spawnArgs.GetMatrix("rotation", mat3_identity.ToString()) );
-		physicsObj.SetAxis( mat3_identity );
-		UpdateVisuals();
-	}
-
-// mekberg: attenuation
-	attenuate = spawnArgs.GetBool( "attenuate" );
-	if( attenuate ) {
-		maxAttenuation		= spawnArgs.GetFloat( "maxAttenuation", "3" );
-		attenuationScale	= spawnArgs.GetFloat( "attenuationScale", "100" );
-
-		// Check for bad value/prevent divide by zero
-		if ( attenuationScale == 0.0f || attenuationScale < 0.0f ) {
-			attenuationScale = 100;
-		}
-
-		lastOrigin	= physicsObj.GetOrigin( );
-		lastTime	= gameLocal.time;
-	} else {
-		maxAttenuation = 0.0f;
-		attenuationScale = 1.0f;
-	}
-
-	if ( !idStr::Icmp( spawnArgs.GetString( "snd_idle", "" ), "" ) ) {
-		useIdleSound = false;
-	} else {
-		StartSound( "snd_idle", SND_CHANNEL_BODY, 0, false, NULL );	
-		useIdleSound = true;
-	}	
-
-	splineStateThread.SetName( "SplineStateThread" );
-	splineStateThread.SetOwner( this );
-
-	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_moverCrush", false, false );
-// RAVEN END
 }
-
-// RAVEN BEGIN
-// mekberg: added
-/*
-================
-idMover::Think
-================
-*/
-void idMover::Think( void ) {
-	idVec3	deltaPosition;
-	float	deltaTime;
-	float	speed;
-	float	attenuation;
-
-	if ( physicsObj.GetSpline( ) ) {
-		splineStateThread.Execute( );
-	}
-
-	if ( attenuate ) {
-		deltaPosition	= physicsObj.GetOrigin( ) - lastOrigin;
-		deltaTime		= gameLocal.time - lastTime;
-
-		if ( !deltaTime ) {
-			deltaTime = 1;
-		}
-
-		speed = deltaPosition.Length( ) * ( 1000.0f / float( deltaTime ) );
-
-		if ( speed >= VECTOR_EPSILON ) {		
-			soundShaderParms_t parms = refSound.parms;
-
-			attenuation = 0.8f + 0.2f * ( speed / attenuationScale );
-			parms.frequencyShift = idMath::ClampFloat( 0.0f, maxAttenuation, attenuation );
-
-			idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
-			if( emitter ) {
-				emitter->ModifySound( SND_CHANNEL_BODY, &parms );
-			}
-		}
-
-		lastOrigin	= physicsObj.GetOrigin( );
-		lastTime	= gameLocal.time;
-	}
-
-	idEntity::Think( );
-}
-
-// abahr
-/*
-================
-idMover::GetPhysicsToVisualTransform
-================
-*/
-bool idMover::GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis ) {
-	origin.Zero();
-	axis = physicsObj.GetAxisOffset();
-	return physicsObj.UseAxisOffset();
-}
-
-/*
-================
-idMover::MoveAlongVector
-================
-*/
-void idMover::MoveAlongVector( const idVec3& vec ) {
-	idAngles	ang;
-	idVec3		org;
-
-	physicsObj.GetLocalOrigin( org );
-	physicsObj.GetLocalAngles( ang );
-	dest_position = org + vec * ang.ToMat3();
-
-	BeginMove( idThread::CurrentThread() );
-}
-
-/*
-================
-idMover::Event_MoveAlongVector
-================
-*/
-void idMover::Event_MoveAlongVector( const idVec3& vec ) {
-	MoveAlongVector( vec );
-}
-// RAVEN END
 
 /*
 ================
@@ -769,20 +619,19 @@ void idMover::DoneMoving( void ) {
 	}
 
 	lastCommand	= MOVER_NONE;
-
-// RAVEN BEGIN
-// kfuller: added sig reached
-	Signal(SIG_REACHED);
-// RAVEN END
-
 	idThread::ObjectMoveDone( move_thread, this );
 	move_thread = 0;
 
-// RAVEN BEGIN
-// mekberg: for idle sound
-	if ( !useIdleSound ) {
+// AOBMERGE: check out these channels to see if correct
+#ifdef HUMANHEAD
+	if( rot.stage == FINISHED_STAGE ) {
 		StopSound( SND_CHANNEL_BODY, false );
+		StopSound( SND_CHANNEL_BODY2, false );
+		StartSound( "snd_stop", SND_CHANNEL_ANY, 0, false, NULL );
 	}
+#else
+	StopSound( SND_CHANNEL_BODY, false );
+#endif
 }
 
 /*
@@ -791,39 +640,40 @@ idMover::UpdateMoveSound
 ================
 */
 void idMover::UpdateMoveSound( moveStage_t stage ) {
-// RAVEN BEGIN
-// mekberg: Idle sound plays instead of snd_move. Don't stop idle sounds.
 	switch( stage ) {
 		case ACCELERATION_STAGE: {
-			StartSound( "snd_accel", SND_CHANNEL_BODY2, 0, false, NULL );
-			if ( !useIdleSound ) {
-				StartSound( "snd_move", SND_CHANNEL_BODY, 0, false, NULL );
+#ifdef HUMANHEAD //play snd_move by default if snd_accel isnt set
+			if( !StartSound( "snd_accel", SND_CHANNEL_BODY2, 0, false, NULL ) ) {
+				StartSound( "snd_move", SND_CHANNEL_BODY2, 0, false, NULL );
 			}
+#else
+			StartSound( "snd_accel", SND_CHANNEL_BODY2, 0, false, NULL );
+#endif
+			//HUMANHEAD: aob - changed start move sound to stop move sound as per Mike L. request
+			StopSound( SND_CHANNEL_BODY, false );
+			//HUMANHEAD END
 			break;
 		}
 		case LINEAR_STAGE: {
-			if ( !useIdleSound ) {
-				StartSound( "snd_move", SND_CHANNEL_BODY, 0, false, NULL );
-			}
+			StartSound( "snd_move", SND_CHANNEL_BODY, 0, false, NULL );
 			break;
 		}
 		case DECELERATION_STAGE: {
-			if ( !useIdleSound ) {
-				StopSound( SND_CHANNEL_BODY, false );	
+			StopSound( SND_CHANNEL_BODY, false );
+#ifdef HUMANHEAD //play snd_move by default if snd_decel isnt set
+			if( !StartSound( "snd_decel", SND_CHANNEL_BODY2, 0, false, NULL ) ) {
+				StartSound( "snd_move", SND_CHANNEL_BODY2, 0, false, NULL );
 			}
+#else
 			StartSound( "snd_decel", SND_CHANNEL_BODY2, 0, false, NULL );
+#endif
 			break;
 		}
 		case FINISHED_STAGE: {
-			if ( !useIdleSound ) {
-				StopSound( SND_CHANNEL_BODY, false );
-			}			
-			// cnicholson: added stop sound support
-			StartSound( "snd_stopped", SND_CHANNEL_BODY2, 0, false, NULL );
+			StopSound( SND_CHANNEL_BODY, false );
 			break;
 		}
 	}
-// RAVEN END
 }
 
 /*
@@ -980,16 +830,19 @@ idMover::DoneRotating
 */
 void idMover::DoneRotating( void ) {
 	lastCommand	= MOVER_NONE;
-
-// RAVEN BEGIN
-// kfuller: added reached signal
-	Signal(SIG_REACHED);
-// RAVEN END
-
 	idThread::ObjectMoveDone( rotate_thread, this );
 	rotate_thread = 0;
 
+#ifdef HUMANHEAD
+	//HUMANHEAD: aob
+	if( move.stage == FINISHED_STAGE ) {
+		StopSound( SND_CHANNEL_BODY, false );
+		StopSound( SND_CHANNEL_BODY2, false );
+		StartSound( "snd_stop", SND_CHANNEL_ANY, 0, false, NULL );
+	}
+#else
 	StopSound( SND_CHANNEL_BODY, false );
+#endif
 }
 
 /*
@@ -1000,8 +853,16 @@ idMover::UpdateRotationSound
 void idMover::UpdateRotationSound( moveStage_t stage ) {
 	switch( stage ) {
 		case ACCELERATION_STAGE: {
+#ifdef HUMANHEAD //play snd_move by default if snd_accel isnt set
+			if ( !StartSound( "snd_accel", SND_CHANNEL_BODY2, 0, false, NULL ) ) {
+				StartSound( "snd_move", SND_CHANNEL_BODY2, 0, false, NULL );
+			}
+#else
 			StartSound( "snd_accel", SND_CHANNEL_BODY2, 0, false, NULL );
-			StartSound( "snd_move", SND_CHANNEL_BODY, 0, false, NULL );
+#endif
+			//HUMANHEAD: aob - changed start move sound to stop move sound as per Mike L. request
+			StopSound( SND_CHANNEL_BODY, false );
+			//HUMANHEAD END
 			break;
 		}
 		case LINEAR_STAGE: {
@@ -1010,15 +871,17 @@ void idMover::UpdateRotationSound( moveStage_t stage ) {
 		}
 		case DECELERATION_STAGE: {
 			StopSound( SND_CHANNEL_BODY, false );
+#ifdef HUMANHEAD //play snd_move by default if snd_decel isnt set
+			if( !StartSound( "snd_decel", SND_CHANNEL_BODY2, 0, false, NULL ) ) {
+				StartSound( "snd_move", SND_CHANNEL_BODY2, 0, false, NULL );
+			}
+#else
 			StartSound( "snd_decel", SND_CHANNEL_BODY2, 0, false, NULL );
+#endif
 			break;
 		}
 		case FINISHED_STAGE: {
 			StopSound( SND_CHANNEL_BODY, false );
-// RAVEN BEGIN
-// cnicholson: added stop sound support
-			StartSound( "snd_stopped", SND_CHANNEL_BODY, 0, false, NULL );
-// RAVEN END
 			break;
 		}
 	}
@@ -1174,40 +1037,6 @@ idMover::Event_TeamBlocked
 ===============
 */
 void idMover::Event_TeamBlocked( idEntity *blockedEntity, idEntity *blockingEntity ) {
-	if ( !blockingEntity->fl.takedamage ) {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) ) {
-			//burning out already
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() )
-					|| (blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() )) ) {
-			//moveable
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		}
-	} else {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) && blockingEntity->health <= 0 ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() ) ) {
-			//damagable movable?
-            blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-			return;
-		} else if ( blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() ) ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		}
-	}
 	if ( g_debugMover.GetBool() ) {
 		gameLocal.Printf( "%d: '%s' stopped due to team member '%s' blocked by '%s'\n", gameLocal.time, name.c_str(), blockedEntity->name.c_str(), blockingEntity->name.c_str() );
 	}
@@ -1222,6 +1051,7 @@ void idMover::Event_PartBlocked( idEntity *blockingEntity ) {
 	if ( damage > 0.0f ) {
 		blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", damage, INVALID_JOINT );
 	}
+	blockingEntity->SquishedByDoor(this);	// HUMANHEAD pdm
 	if ( g_debugMover.GetBool() ) {
 		gameLocal.Printf( "%d: '%s' blocked by '%s'\n", gameLocal.time, name.c_str(), blockingEntity->name.c_str() );
 	}
@@ -1289,10 +1119,6 @@ idMover::Event_MoveTo
 void idMover::Event_MoveTo( idEntity *ent ) {
 	if ( !ent ) {
 		gameLocal.Warning( "Entity not found" );
-// RAVEN BEGIN
-// abahr: added return so the NULL ptr doesn't get used
-		return;
-// RAVEN END
 	}
 
 	dest_position = GetLocalCoordinates( ent->GetPhysics()->GetOrigin() );
@@ -1471,7 +1297,24 @@ idMover::Event_RotateTo
 */
 void idMover::Event_RotateTo( idAngles &angles ) {
 	dest_angles = angles;
+
 	BeginRotation( idThread::CurrentThread(), true );
+}
+
+/*
+================
+idMover::Event_RotateTo_World
+
+HUMANHEAD: aob
+================
+*/
+void idMover::Event_RotateTo_World( idAngles &angles ) {
+	idAngles currentAngles( GetAxis()[0].ToAngles() );
+
+	idAngles rotOnceAngles( angles - currentAngles );
+	rotOnceAngles.Normalize180();
+
+	Event_RotateOnce( rotOnceAngles );
 }
 
 /*
@@ -1582,18 +1425,6 @@ void idMover::Event_SetDecelSound( const char *sound ) {
 //	refSound.SetSound( "decel", sound );
 }
 
-// RAVEN BEGIN
-// cnicholson: added stop sound support
-/*
-================
-idMover::Event_SetStoppedSound
-================
-*/
-void idMover::Event_SetStoppedSound( const char *sound ) {
-//	refSound.SetSound( "stopped", sound );
-}
-// RAVEN END
-
 /*
 ================
 idMover::Event_SetMoveSound
@@ -1661,49 +1492,20 @@ void idMover::Event_StartSpline( idEntity *splineEntity ) {
 	lastCommand = MOVER_SPLINE;
 	move_thread = 0;
 
-// RAVEN BEGIN
-// bdube: movement speed
-	// Use movement speed?
-	if ( idMath::Fabs(move_speed) >= VECTOR_EPSILON ) {
-		// Set a fixed time to determine the length from
-		spline->MakeUniform( 1000 );
-		spline->ShiftTime( gameLocal.GetTime() - spline->GetTime( 0 ) );
-
-		// Calculate the move time from the speed
-		move.movetime = SEC2MS( spline->GetLengthForTime(spline->GetTime(spline->GetNumValues() - 1)) / move_speed );
-		move_time = move.movetime;
-
-		spline->SetConstantSpeed( move.movetime );
-		spline->ShiftTime( gameLocal.GetTime() - spline->GetTime( 0 ) );
-	} else {
-		spline->MakeUniform( move_time );
-		spline->ShiftTime( gameLocal.GetTime() - spline->GetTime( 0 ) );
-	}
-// RAVEN END
-
 	if ( acceltime + deceltime > move_time ) {
 		acceltime = move_time / 2;
 		deceltime = move_time - acceltime;
 	}
-
 	move.stage			= FINISHED_STAGE;
 	move.acceleration	= acceltime;
 	move.movetime		= move_time;
 	move.deceleration	= deceltime;
 
+	spline->MakeUniform( move_time );
+	spline->ShiftTime( gameLocal.time - spline->GetTime( 0 ) );
+
 	physicsObj.SetSpline( spline, move.acceleration, move.deceleration, useSplineAngles );
 	physicsObj.SetLinearExtrapolation( EXTRAPOLATION_NONE, 0, 0, dest_position, vec3_origin, vec3_origin );
-
-// RAVEN BEGIN
-// mekberg: let the splines use a state thread instead of linear extrapolation
-	if ( acceltime ) {
-		splineStateThread.SetState( "Accel" );
-	} else {
-		splineStateThread.SetState( "Linear" );
-	}	
-	
-	splineStartTime = gameLocal.time;
-// RAVEN END
 }
 
 /*
@@ -1758,7 +1560,6 @@ idMover::WriteToSnapshot
 ================
 */
 void idMover::WriteToSnapshot( idBitMsgDelta &msg ) const {
-	msg.WriteBits( ( ( thinkFlags & TH_PHYSICS ) != 0 ), 1 );
 	physicsObj.WriteToSnapshot( msg );
 	msg.WriteBits( move.stage, 3 );
 	msg.WriteBits( rot.stage, 3 );
@@ -1774,18 +1575,6 @@ idMover::ReadFromSnapshot
 void idMover::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	moveStage_t oldMoveStage = move.stage;
 	moveStage_t oldRotStage = rot.stage;
-
-	bool proto69 = ( gameLocal.GetCurrentDemoProtocol() == 69 );
-	if ( !proto69 ) {
-		// sync down the TH_PHYSICS flag for movers, now that we skip ClientPredictionThink when thinkFlags == 0 and no longer force TH_PHYSICS on
-		// movers still have prediction issues though, they predict a stop and clear TH_PHYSICS too early
-		bool physics_on = ( msg.ReadBits( 1 ) != 0 );
-		if ( physics_on ) {
-			thinkFlags |= TH_PHYSICS;
-		} else {
-			thinkFlags &= ~TH_PHYSICS;
-		}
-	}
 
 	physicsObj.ReadFromSnapshot( msg );
 	move.stage = (moveStage_t) msg.ReadBits( 3 );
@@ -1811,109 +1600,12 @@ idMover::SetPortalState
 */
 void idMover::SetPortalState( bool open ) {
 	assert( areaPortal );
+#if HUMANHEAD
+	gameLocal.SetPortalState( areaPortal, open ? PS_BLOCK_NONE : PS_BLOCK_VIEW );
+#else
 	gameLocal.SetPortalState( areaPortal, open ? PS_BLOCK_NONE : PS_BLOCK_ALL );
+#endif
 }
-
-// RAVEN BEGIN
-// abahr:
-void idMover::Event_GetSplineEntity() {
-	idThread::ReturnEntity( splineEnt.GetEntity() );
-}
-
-CLASS_STATES_DECLARATION( idMover )
-	STATE( "Accel",				idMover::State_Accel )
-	STATE( "Linear",			idMover::State_Linear )
-	STATE( "Decel",				idMover::State_Decel )
-END_CLASS_STATES
-
-// mekberg: spline states
-/*
-================
-idMover::State_Accel
-================
-*/
-stateResult_t idMover::State_Accel( const stateParms_t& parms ) {
-	enum {
-		STAGE_INIT,
-		STAGE_WAIT,
-	};
-
-	switch( parms.stage ) {
-		case STAGE_INIT:
-			StartSound( "snd_accel", SND_CHANNEL_BODY2, 0, false, NULL );
-			if ( !useIdleSound ) {
-				StartSound( "snd_move", SND_CHANNEL_BODY, 0, false, NULL );
-			}			
-			return SRESULT_STAGE( STAGE_WAIT );
-
-		case STAGE_WAIT:
-			if ( gameLocal.time >= splineStartTime + acceltime ) {
-				splineStateThread.SetState( "Linear" );
-				return SRESULT_DONE;
-			}
-			return SRESULT_WAIT;
-	}
-	return SRESULT_ERROR;
-}
-
-/*
-================
-idMover::State_Linear
-================
-*/
-stateResult_t idMover::State_Linear( const stateParms_t& parms ) {
-	enum {
-		STAGE_INIT,
-		STAGE_WAIT,
-	};
-
-	switch( parms.stage ) {
-		case STAGE_INIT:
-			if ( !useIdleSound ) {
-				StartSound( "snd_move", SND_CHANNEL_BODY, 0, false, NULL );
-			}
-			return SRESULT_STAGE( STAGE_WAIT );			
-
-		case STAGE_WAIT:
-			if ( gameLocal.time >= splineStartTime + move_time - deceltime ) {
-				if ( deceltime ) {
-					splineStateThread.SetState( "Decel" );
-				}
-				return SRESULT_DONE;
-			}
-			return SRESULT_WAIT;
-	}
-	return SRESULT_ERROR;
-}
-
-/*
-================
-idMover::State_Decel
-================
-*/
-stateResult_t idMover::State_Decel( const stateParms_t& parms ) {
-	enum {
-		STAGE_INIT,
-		STAGE_WAIT,
-	};
-
-	switch( parms.stage ) {
-		case STAGE_INIT:
-			if ( !useIdleSound ) {
-				StopSound( SND_CHANNEL_BODY, false );	
-			}
-			StartSound( "snd_decel", SND_CHANNEL_BODY2, 0, false, NULL );
-			return SRESULT_STAGE( STAGE_WAIT );
-
-		case STAGE_WAIT:
-			if ( gameLocal.time >= splineStartTime + move_time ) {
-				return SRESULT_DONE;
-			}
-			return SRESULT_WAIT;
-	}
-	return SRESULT_ERROR;
-}
-// RAVEN END
 
 /*
 ===============================================================================
@@ -1923,17 +1615,12 @@ stateResult_t idMover::State_Decel( const stateParms_t& parms ) {
 ===============================================================================
 */
 
-// RAVEN BEGIN
-// abahr: so we can toggle activated state via script or trigger
-const idEventDef EV_IsActive( "isActive", "", 'd' );
-// RAVEN END
+const idEventDef EV_GetSplineLength( "getSplineLength", NULL, 'f' ); //HUMANHEAD rdr
+const idEventDef EV_GetPositionForLength( "getPositionForLength", "f", 'v' ); //HUMANHEAD rdr
 
 CLASS_DECLARATION( idEntity, idSplinePath )
-// RAVEN BEGIN
-// abahr: so we can toggle activated state via script or trigger
-	EVENT( EV_Activate,			idSplinePath::Event_Toggle )
-	EVENT( EV_IsActive,			idSplinePath::Event_IsActive )
-// RAVEN END
+	EVENT( EV_GetSplineLength,		idSplinePath::Event_GetSplineLength ) //HUMANHEAD rdr
+	EVENT( EV_GetPositionForLength,	idSplinePath::Event_GetPositionForLength ) //HUMANHEAD rdr
 END_CLASS
 
 /*
@@ -1942,20 +1629,29 @@ idSplinePath::idSplinePath
 ================
 */
 idSplinePath::idSplinePath() {
-	sampledTimes	= NULL;
-	numSamples	= 0;
+	splineLength = 0.0f;
 }
 
 /*
-================
-idSplinePath::idSplinePath
-================
+===============
+idSplinePath::Save
+
+HUMANHEAD rdr
+===============
 */
-idSplinePath::~idSplinePath() {
-	if ( sampledTimes ) {
-		delete [] sampledTimes;
-		sampledTimes = NULL;
-	}
+void idSplinePath::Save( idSaveGame *savefile ) const {
+	savefile->WriteFloat( splineLength );
+}
+
+/*
+===============
+idSplinePath::Restore
+
+HUMANHEAD rdr
+===============
+*/
+void idSplinePath::Restore( idRestoreGame *savefile ) {
+	savefile->ReadFloat( splineLength );
 }
 
 /*
@@ -1964,207 +1660,38 @@ idSplinePath::Spawn
 ================
 */
 void idSplinePath::Spawn( void ) {
-// RAVEN BEGIN
-// abahr:
-	SetActive( spawnArgs.GetBool("start_active", "1") );
-	SampleSpline ( );
-// RAVEN END
-}
+	//HUMANHEAD START rdr
 
-// RAVEN BEGIN
-// abahr:
-/*
-================
-idSplinePath::FindTargets
-================
-*/
-void idSplinePath::FindTargets() {
-	idEntity::FindTargets();
+	idCurve_Spline<idVec3>	*spline;
+	spline = this->GetSpline();
 
-	gameLocal.GetTargets( spawnArgs, backwardPathTargets, "target_reverse" );
-
-	// This alows us to seperate forward targets from backward targets
-	for( int ix = backwardPathTargets.Num() - 1; ix >= 0; --ix ) {
-		targets.Remove( backwardPathTargets[ix] );
+	if ( spline ) {
+		float splineEndTime = spline->GetTime( spline->GetNumValues() - 1 );
+		splineLength = spline->GetLengthForTime( splineEndTime );
 	}
+	//HUMANHEAD END rdr
 }
 
-/*
-================
-idSplinePath::SortTargets
-================
-*/
-int rvSortByActiveState( const void* a, const void* b ) {
-	idEntityPtr<idSplinePath>	splineA;
-	idEntityPtr<idSplinePath>	splineB;
-
-	splineA	= *(idEntityPtr<idSplinePath>*)a;
-	splineB = *(idEntityPtr<idSplinePath>*)b;
-
-	return splineB->IsActive() - splineA->IsActive();
+//HUMANHEAD START rdr - returns spline length in units
+void idSplinePath::Event_GetSplineLength() {
+	idThread::ReturnFloat( splineLength );
 }
-int idSplinePath::SortTargets( idList< idEntityPtr<idEntity> >& list ) {
-	int numActive = 0;
-	idSplinePath* target = NULL;
+//HUMANHEAD END rdr
 
-	RemoveNullTargets();
+//HUMANHEAD START rdr - returns world position for the length along the spline
+void idSplinePath::Event_GetPositionForLength( float length ) {
+	idCurve_Spline<idVec3>	*spline;
+	spline = this->GetSpline();
 
-	qsort( list.Ptr(), list.Num(), list.TypeSize(), rvSortByActiveState );
-	for( int ix = list.Num() - 1; ix >= 0; --ix ) {
-		target = static_cast<idSplinePath*>( list[ix].GetEntity() );
-		if( target->IsActive() ) {
-			numActive++;
-		}
-	}
+	float time = 0.f;
+	idVec3 position;
 
-	return numActive;
+	time = spline->GetTimeForLength( length, 0.1f );
+	position = spline->GetCurrentValue( time );
+
+	idThread::ReturnVector( position );
 }
-
-int idSplinePath::SortTargets() {
-	return SortTargets( targets );
-}
-
-int idSplinePath::SortBackwardsTargets() {
-	return SortTargets( backwardPathTargets );
-}
-
-/*
-================
-idSplinePath::RemoveNullTargets
-================
-*/
-void idSplinePath::RemoveNullTargets( idList< idEntityPtr<idEntity> >& list ) {
-	int i;
-
-	for( i = list.Num() - 1; i >= 0; i-- ) {
-		if ( !list[ i ].GetEntity() ) {
-			list.RemoveIndex( i );
-		}
-	}
-}
-
-/*
-================
-idSplinePath::RemoveNullTargets
-================
-*/
-void idSplinePath::ActivateTargets( idEntity *activator, const idList< idEntityPtr<idEntity> >& list ) const {
-	idEntity	*ent;
-	int			i, j;
-	
-	for( i = 0; i < list.Num(); i++ ) {
-		ent = list[ i ].GetEntity();
-		if ( !ent ) {
-			continue;
-		}
-		if ( ent->RespondsTo( EV_Activate ) || ent->HasSignal( SIG_TRIGGER ) ) {
-			ent->Signal( SIG_TRIGGER );
-			ent->ProcessEvent( &EV_Activate, activator );
-		} 		
-		for ( j = 0; j < MAX_RENDERENTITY_GUI; j++ ) {
-			if ( ent->GetRenderEntity()->gui[ j ] ) {
-				ent->GetRenderEntity()->gui[ j ]->Trigger( gameLocal.time );
-			}
-		}
-	}
-}
-
-/*
-================
-idSplinePath::RemoveNullTargets
-================
-*/
-void idSplinePath::RemoveNullTargets( void ) {
-	RemoveNullTargets( targets );
-	RemoveNullTargets( backwardPathTargets );
-}
-
-/*
-==============================
-idSplinePath::ActivateTargets
-
-"activator" should be set to the entity that initiated the firing.
-==============================
-*/
-void idSplinePath::ActivateTargets( idEntity *activator ) const {
-	ActivateTargets( activator, targets );
-	ActivateTargets( activator, backwardPathTargets );
-}
-
-/*
-================
-idSplinePath::Save
-================
-*/
-void idSplinePath::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( active );
-}
-
-/*
-================
-idSplinePath::Restore
-================
-*/
-void idSplinePath::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( active );
-}
-
-/*
-================
-idSplinePath::Event_IsActive
-================
-*/
-void idSplinePath::Event_IsActive() {
-	idThread::ReturnInt( IsActive() );
-}
-
-/*
-================
-idSplinePath::SampleSpline
-================
-*/
-void idSplinePath::SampleSpline ( void ) {
-	int i;
-	float splineLength;
-	idCurve_Spline<idVec3>*	tempSpline = GetSpline ( );
-	splineLength = tempSpline->GetLengthForTime( tempSpline->GetTime(tempSpline->GetNumValues() - 1) );
-
-	if ( splineLength > SPLINE_SAMPLE_RATE ) {
-		numSamples		= int( splineLength / SPLINE_SAMPLE_RATE );
-		sampledTimes	= new float[ numSamples ];
-		float stepSize	= splineLength / ( numSamples - 1 );
-
-		for ( i = 0; i < numSamples; i++ ) {
-			float time = float( i * stepSize );
-			if ( time >= splineLength ) {
-				time = splineLength;
-			}
-			sampledTimes[ i ] = tempSpline->GetTimeForLength ( time, 0.01f );
-		}
-	}
-	SAFE_DELETE_PTR( tempSpline );
-}
-
-/*
-================
-idSplinePath::GetSampledTime
-================
-*/
-float idSplinePath::GetSampledTime ( float distance ) const {
-	if ( sampledTimes && distance  >= 0.0f ) {
-		int lowIndex, highIndex;
-		float lerp = distance / SPLINE_SAMPLE_RATE;
-		int actualLowIndex = int( lerp );
-		lowIndex = idMath::ClampInt ( 0, numSamples - 2, actualLowIndex );
-		highIndex = lowIndex + 1;
-		lerp = lerp - idMath::Floor ( lerp );
-		return ( actualLowIndex != lowIndex ) ? sampledTimes[ highIndex ] : idMath::Lerp( sampledTimes[ lowIndex ], sampledTimes[ highIndex ], lerp );
-	}
-	return -1.0f;
-}
-
-// RAVEN END
-
+//HUMANHEAD END rdr
 
 /*
 ===============================================================================
@@ -2175,15 +1702,14 @@ idElevator
 */
 const idEventDef EV_PostArrival( "postArrival", NULL );
 const idEventDef EV_GotoFloor( "gotoFloor", "d" );
-const idEventDef EV_UpdateFloorInfo ( "updateFloorInfo", NULL );
 
 CLASS_DECLARATION( idMover, idElevator )
 	EVENT( EV_Activate,				idElevator::Event_Activate )
 	EVENT( EV_TeamBlocked,			idElevator::Event_TeamBlocked )
+	EVENT( EV_PartBlocked,			idElevator::Event_PartBlocked )
 	EVENT( EV_PostArrival,			idElevator::Event_PostFloorArrival )
 	EVENT( EV_GotoFloor,			idElevator::Event_GotoFloor )
 	EVENT( EV_Touch,				idElevator::Event_Touch )
-	EVENT( EV_UpdateFloorInfo,		idElevator::Event_UpdateFloorInfo )
 END_CLASS
 
 /*
@@ -2224,7 +1750,6 @@ void idElevator::Save( idSaveGame *savefile ) const {
 	savefile->WriteInt( pendingFloor );
 	savefile->WriteInt( lastFloor );
 	savefile->WriteBool( controlsDisabled );
-//	savefile->WriteBool( waitingForPlayerFollowers );
 	savefile->WriteFloat( returnTime );
 	savefile->WriteInt( returnFloor );
 	savefile->WriteInt( lastTouchTime );
@@ -2255,7 +1780,6 @@ void idElevator::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( pendingFloor );
 	savefile->ReadInt( lastFloor );
 	savefile->ReadBool( controlsDisabled );
-//	savefile->ReadBool( waitingForPlayerFollowers );
 	savefile->ReadFloat( returnTime );
 	savefile->ReadInt( returnFloor );
 	savefile->ReadInt( lastTouchTime );
@@ -2267,6 +1791,9 @@ idElevator::Spawn
 ================
 */
 void idElevator::Spawn( void ) {
+	idStr str;
+	int len1;
+
 	lastFloor = 0;
 	currentFloor = 0;
 	pendingFloor = spawnArgs.GetInt( "floor", "1" );
@@ -2274,27 +1801,6 @@ void idElevator::Spawn( void ) {
 
 	returnTime = spawnArgs.GetFloat( "returnTime" );
 	returnFloor = spawnArgs.GetInt( "returnFloor" );
-
-	UpdateFloorInfo ( );
-
-	lastTouchTime = 0;
-	state = INIT;
-	BecomeActive( TH_THINK | TH_PHYSICS );
-	PostEventMS( &EV_Mover_InitGuiTargets, 0 );
-	controlsDisabled = false;
-//	waitingForPlayerFollowers = false;
-}
-
-/*
-==============
-idElevator::UpdateFloorInfo
-===============
-*/
-void idElevator::UpdateFloorInfo ( void ) {
-	int		len1;
-	idStr	str;
-
-	floorInfo.Clear ( );
 
 	len1 = strlen( "floorPos_" );
 	const idKeyValue *kv = spawnArgs.MatchPrefix( "floorPos_", NULL );
@@ -2307,15 +1813,11 @@ void idElevator::UpdateFloorInfo ( void ) {
 		floorInfo.Append( fi );
 		kv = spawnArgs.MatchPrefix( "floorPos_", kv );
 	}
-}
-
-/*
-==============
-idElevator::Event_UpdateFloorInfo
-===============
-*/
-void idElevator::Event_UpdateFloorInfo ( void ) {
-	UpdateFloorInfo ( );
+	lastTouchTime = 0;
+	state = INIT;
+	BecomeActive( TH_THINK | TH_PHYSICS );
+	PostEventMS( &EV_Mover_InitGuiTargets, 0 );
+	controlsDisabled = false;
 }
 
 /*
@@ -2329,10 +1831,7 @@ void idElevator::Event_Touch( idEntity *other, trace_t *trace ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !other->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+	if ( !other->IsType( idPlayer::Type ) ) {
 		return;
 	}
 
@@ -2375,30 +1874,6 @@ void idElevator::Think( void ) {
 		Event_GotoFloor( pendingFloor );
 		DisableAllDoors();
 		SetGuiStates( ( pendingFloor == 1 ) ? guiBinaryMoverStates[0] : guiBinaryMoverStates[1] );
-
-// RAVEN BEGIN
-// bdube: provide floor information to status guis
-		if ( floorInfo.Num ( ) > 0 ) {
-			int j;
-			// Guis on the elevator are considered status guis
-			for ( j = 0; j < MAX_RENDERENTITY_GUI && renderEntity.gui[j]; j++ ) {
-				InitStatusGui ( renderEntity.gui[j] );
-			}
-			
-			// Initialize all the status guis of the elevator
-			const idKeyValue* kv;
-			for ( kv = spawnArgs.MatchPrefix( "statusGui" ); kv; kv = spawnArgs.MatchPrefix( "statusGui", kv ) ) {
-				idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
-				if ( !ent || !ent->GetRenderEntity() ) {
-					continue;
-				}
-				for ( j = 0; j < MAX_RENDERENTITY_GUI && ent->GetRenderEntity()->gui[j]; j++ ) {
-					InitStatusGui ( ent->GetRenderEntity()->gui[j] );
-				}
-			}
-		}
-// RAVEN END
-
 	} else if ( state == WAITING_ON_DOORS ) {
 		if ( doorent ) {
 			state = doorent->IsOpen() ? WAITING_ON_DOORS : IDLE;
@@ -2436,46 +1911,9 @@ idElevator::Event_TeamBlocked
 ================
 */
 void idElevator::Event_TeamBlocked( idEntity *blockedEntity, idEntity *blockingEntity ) {
-	if ( !blockingEntity->fl.takedamage ) {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) ) {
-			//burning out already
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() )
-					|| (blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() )) ) {
-			//moveable
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		}
-	} else {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) && blockingEntity->health <= 0 ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() ) ) {
-			//damagable movable?
-            blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-			return;
-		} else if ( blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() ) ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		}
-	}
 	if ( blockedEntity == this ) {
 		Event_GotoFloor( lastFloor );
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	} else if ( blockedEntity && blockedEntity->IsType( idDoor::GetClassType() ) ) {
-// RAVEN END
+	} else if ( blockedEntity && blockedEntity->IsType( idDoor::Type ) ) {
 		// open the inner doors if one is blocked
 		idDoor *blocked = static_cast<idDoor *>( blockedEntity );
 		idDoor *door = GetDoor( spawnArgs.GetString( "innerdoor" ) );
@@ -2496,10 +1934,6 @@ idElevator::HandleSingleGuiCommand
 bool idElevator::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 	idToken token;
 
-	if ( controlsDisabled ) {
-		return false;
-	}
-
 	if ( !src->ReadToken( &token ) ) {
 		return false;
 	}
@@ -2510,18 +1944,12 @@ bool idElevator::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 
 	if ( token.Icmp( "changefloor" ) == 0 ) {
 		if ( src->ReadToken( &token ) ) {
-// RAVEN BEGIN
-// bdube: up and down floor commands
-			int newFloor;
-			if (!token.Cmp("up")) {
-				newFloor = currentFloor + 1;
-			} else if (!token.Cmp("down")) {
-				newFloor = currentFloor - 1;
-			} else {
-				newFloor = atoi( token );
+			// HUMANHEAD pdm: Eat unused commands so it doesn't warn about them
+			if ( controlsDisabled ) {
+				return true;
 			}
-// RAVEN END
-			
+
+			int newFloor = atoi( token );
 			if ( newFloor == currentFloor ) {
 				// open currentFloor and interior doors
 				OpenInnerDoor();
@@ -2598,42 +2026,6 @@ void idElevator::Event_GotoFloor( int floor ) {
 				return;
 			}
 		}
-		/*
-		if ( !gameLocal.isMultiplayer ) {
-			//FIXME: make sure player is my activator?
-			idPlayer* player = gameLocal.GetLocalPlayer();
-			if ( player ) {
-				if ( !player->GetGroundEntity() ) {
-					//player in air
-					PostEventSec( &EV_GotoFloor, 0.5f, floor );
-					return;
-				}
-				if ( player->GetGroundElevator() == this ) {
-					idActor* actor = NULL;
-					// Iterate through all teammates
-					for( actor = aiManager.GetAllyTeam ( (aiTeam_t)player->team ); actor; actor = actor->teamNode.Next() ) {
-						if ( !actor->IsHidden() && actor->health > 0 && actor->IsType( idAI::GetClassType() ) ) {
-							if ( ((idAI*)(actor))->leader == player && !((idAI*)(actor))->move.fl.disabled && !((idAI*)(actor))->aifl.scripted ) {
-								if ( actor->GetGroundElevator( this ) != this ) {
-									waitingForPlayerFollowers = true;
-									//follower of player is not standing on me, don't move!
-									PostEventSec( &EV_GotoFloor, 0.5f, floor );
-									return;
-								}
-							}
-						}
-					}
-				} else if ( waitingForPlayerFollowers ) {
-					//player got off, cancel
-					waitingForPlayerFollowers = false;
-					SetGuiStates( ( currentFloor == 1 ) ? guiBinaryMoverStates[0] : guiBinaryMoverStates[1] );
-					UpdateStatusGuis ( );
-					return;
-				}
-			}
-		}
-		waitingForPlayerFollowers = false;
-		*/
 		DisableAllDoors();
 		CloseAllDoors();
 		state = WAITING_ON_DOORS;
@@ -2650,16 +2042,22 @@ void idElevator::BeginMove( idThread *thread ) {
 	controlsDisabled = true;
 	CloseAllDoors();
 	DisableAllDoors();
+	const idKeyValue *kv = spawnArgs.MatchPrefix( "statusGui" );
+	while( kv ) {
+		idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
+		if ( ent ) {
+			for ( int j = 0; j < MAX_RENDERENTITY_GUI; j++ ) {
+				if ( ent->GetRenderEntity() && ent->GetRenderEntity()->gui[ j ] ) {
+					ent->GetRenderEntity()->gui[ j ]->SetStateString( "floor", "" );
+					ent->GetRenderEntity()->gui[ j ]->StateChanged( gameLocal.time, true );
+				}
+			}
+			ent->UpdateVisuals();
+		}
+		kv = spawnArgs.MatchPrefix( "statusGui", kv );
+	}
 	SetGuiStates( ( pendingFloor == 1 ) ? guiBinaryMoverStates[3] : guiBinaryMoverStates[2] );
-
-// RAVEN BEGIN
-// bdube: replaced with function
-	SetAASAreaState ( true );
-
 	idMover::BeginMove( thread );
-
-	UpdateStatusGuis ( );	
-// RAVEN END
 }
 
 /*
@@ -2675,17 +2073,11 @@ idDoor *idElevator::GetDoor( const char *name ) {
 	doorEnt = NULL;
 	if ( name && *name ) {
 		ent = gameLocal.FindEntity( name );
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( ent && ent->IsType( idDoor::GetClassType() ) ) {
-// RAVEN END
+		if ( ent && ent->IsType( idDoor::Type ) ) {
 			doorEnt = static_cast<idDoor*>( ent );
 			master = doorEnt->GetMoveMaster();
 			if ( master != doorEnt ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-				if ( master->IsType( idDoor::GetClassType() ) ) {
-// RAVEN END
+				if ( master->IsType( idDoor::Type ) ) {
 					doorEnt = static_cast<idDoor*>( master );
 				} else {
 					doorEnt = NULL;
@@ -2720,36 +2112,25 @@ idElevator::DoneMoving
 void idElevator::DoneMoving( void ) {
 	idMover::DoneMoving();
 	EnableProperDoors();
-// RAVEN BEGIN
-// bdube: factored into a function
-	UpdateStatusGuis ( );
-// RAVEN END	
+	const idKeyValue *kv = spawnArgs.MatchPrefix( "statusGui" );
+	while( kv ) {
+		idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
+		if ( ent ) {
+			for ( int j = 0; j < MAX_RENDERENTITY_GUI; j++ ) {
+				if ( ent->GetRenderEntity() && ent->GetRenderEntity()->gui[ j ] ) {
+					ent->GetRenderEntity()->gui[ j ]->SetStateString( "floor", va( "%i", currentFloor ) );
+					ent->GetRenderEntity()->gui[ j ]->StateChanged( gameLocal.time, true );
+				}
+			}
+			ent->UpdateVisuals();
+		}
+		kv = spawnArgs.MatchPrefix( "statusGui", kv );
+	}
 	if ( spawnArgs.GetInt( "pauseOnFloor", "-1" ) == currentFloor ) {
 		PostEventSec( &EV_PostArrival, spawnArgs.GetFloat( "pauseTime" ) );
 	} else {
 		Event_PostFloorArrival();
 	}
-
-// RAVEN BEGIN
-// kfuller: we want an elevator to fire its targets when it reaches a floor
-	SetAASAreaState( false );
-
-	// Floor targets
-	if ( lastFloor != 0 ) {
-		const char* floorTarget = spawnArgs.GetString ( va("floorTarget_%d", currentFloor ) );
-		if ( floorTarget && *floorTarget ) {
-			idEntity* ent = gameLocal.FindEntity ( floorTarget );
-			if ( ent ) {
-				ent->ProcessEvent ( &EV_Activate, this );
-			}
-		}
-	}
-
-	if (spawnArgs.GetInt("fireTargetsAtFloor") == currentFloor) {
-		ActivateTargets(gameLocal.entities[ENTITYNUM_WORLD]);
-		spawnArgs.SetInt("fireTargetsAtFloor", -1);
-	}
-// RAVEN END
 }
 
 /*
@@ -2809,110 +2190,19 @@ void idElevator::EnableProperDoors( void ) {
 	}
 }
 
-// RAVEN BEGIN
-// bdube: more advanced status gui control
-
 /*
 ================
-idElevator::SetAASAreaState
+idElevator::Event_PartBlocked
+	HUMANHEAD pdm
 ================
 */
-void idElevator::SetAASAreaState ( bool enable ) {
-	idEntity* ents[16];
-	int		  numEnts;
-	numEnts = gameLocal.EntitiesTouchingBounds ( this, physicsObj.GetAbsBounds(), CONTENTS_AAS_OBSTACLE, ents, 16 );
-	for ( numEnts--; numEnts >= 0; numEnts -- ) {
-		idFuncAASObstacle* obstacle = dynamic_cast<idFuncAASObstacle*>(ents[numEnts]);
-		if ( obstacle ) {
-			obstacle->SetState ( enable );
-		}
+void idElevator::Event_PartBlocked( idEntity *blockingEntity ) {
+	if ( damage > 0.0f ) {
+		blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", damage, INVALID_JOINT );
 	}
+	blockingEntity->SquishedByDoor(this);
 }
 
-/*
-================
-idElevator::InitStatusGui
-================
-*/
-void idElevator::InitStatusGui ( idUserInterface* gui ) {
-	int floor;
-	int topFloor;
-	int bottomFloor;
-	
-	topFloor = -1;
-	bottomFloor = 9999;
-	for ( floor = 0; floor < floorInfo.Num(); floor ++ ) {
-		topFloor = Max( floorInfo[floor].floor, topFloor );
-		bottomFloor = Min( floorInfo[floor].floor, bottomFloor );
-	}
-
-	gui->SetStateInt ( "topFloor", topFloor );
-	gui->SetStateInt ( "bottomFloor", bottomFloor );
-
-	for ( floor = 0; floor < floorInfo.Num(); floor ++ ) {
-		idStr keySrc;
-		idStr keyDest;
-		gui->SetStateInt ( va("floorNumber_%d", floor ), floorInfo[floor].floor );
-		keySrc = va("floorName_%d", floorInfo[floor].floor );
-		keyDest = va("floorName_%d", floor );
-		gui->SetStateString ( keyDest, spawnArgs.GetString ( keySrc, va("%d", floorInfo[floor].floor ) ) );
-	}
-
-	gui->HandleNamedEvent ( "updateFloor" );
-}
-
-/*
-================
-idElevator::UpdateStatusGui
-================
-*/
-void idElevator::UpdateStatusGui ( idUserInterface* gui ) {
-	idStr floorName;
-	floorName = va("floorName_%d", currentFloor );
-	gui->SetStateInt ( "floor", (physicsObj.GetLinearExtrapolationType() == EXTRAPOLATION_NONE) ? currentFloor : lastFloor );
-	gui->SetStateInt ( "floorNext", currentFloor );
-	gui->SetStateString( "floorName", spawnArgs.GetString ( floorName, va("%d", currentFloor ) ) );
-	gui->StateChanged( gameLocal.time, true );
-
-	// mekberg: trigger all status guis if we moved the elevator from another gui.
-	if ( lastFloor && !( physicsObj.GetLinearExtrapolationType() == EXTRAPOLATION_NONE ) ) {
-		gui->HandleNamedEvent( "triggerGui" );
-	}
-
-	gui->HandleNamedEvent ( "updateFloor" );
-}
-
-/*
-================
-idElevator::UpdateStatusGuis
-================
-*/
-void idElevator::UpdateStatusGuis ( void ) {
-	int j;
-	
-	// Treat the guis on the elevator as status guis
-	for ( j = 0; j < MAX_RENDERENTITY_GUI; j++ ) {
-		if ( renderEntity.gui[ j ] ) {
-			UpdateStatusGui ( renderEntity.gui[ j ] );
-		}
-	}
-
-	// All entities linked as status guis should get updated
-	const idKeyValue *kv = spawnArgs.MatchPrefix( "statusGui" );
-	while( kv ) {
-		idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
-		if ( ent ) {
-			for ( j = 0; j < MAX_RENDERENTITY_GUI; j++ ) {
-				if ( ent->GetRenderEntity() && ent->GetRenderEntity()->gui[ j ] ) {
-					UpdateStatusGui ( ent->GetRenderEntity()->gui[j] );
-				}
-			}
-			ent->UpdateVisuals();
-		}
-		kv = spawnArgs.MatchPrefix( "statusGui", kv );
-	}
-}
-// RAVEN END
 
 /*
 ===============================================================================
@@ -2969,7 +2259,6 @@ idMover_Binary::idMover_Binary() {
 	stateStartTime = 0;
 	team.Clear();
 	enabled = false;
-	deferedOpen = false;
 	move_thread = 0;
 	updateStatus = 0;
 	areaPortal = 0;
@@ -3001,8 +2290,6 @@ idMover_Binary::~idMover_Binary() {
 			}
 		}
 	}
-	
-	SetPhysics( NULL );
 }
 
 /*
@@ -3038,7 +2325,6 @@ void idMover_Binary::Save( idSaveGame *savefile ) const {
 	savefile->WriteInt( stateStartTime );
 	savefile->WriteString( team );
 	savefile->WriteBool( enabled );
-	savefile->WriteBool( deferedOpen );
 
 	savefile->WriteInt( move_thread );
 	savefile->WriteInt( updateStatus );
@@ -3097,7 +2383,6 @@ void idMover_Binary::Restore( idRestoreGame *savefile ) {
 
 	savefile->ReadString( team );
 	savefile->ReadBool( enabled );
-	savefile->ReadBool( deferedOpen );
 
 	savefile->ReadInt( move_thread );
 	savefile->ReadInt( updateStatus );
@@ -3180,15 +2465,7 @@ void idMover_Binary::Spawn( void ) {
 	}
 
 	physicsObj.SetSelf( this );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() );
 	physicsObj.SetAxis( GetPhysics()->GetAxis() );
 	physicsObj.SetClipMask( MASK_SOLID );
@@ -3268,14 +2545,28 @@ void idMover_Binary::UpdateMoverSound( moverState_t state ) {
 	if ( moveMaster == this ) {
 		switch( state ) {
 			case MOVER_POS1:
+				//HUMANHEAD: aob - changed channel to a specific one so the old
+				//sound is stopped when a we update
+				StartSound( "snd_closed", SND_CHANNEL_BODY, 0, false, NULL );
+				//HUMANHEAD END
 				break;
 			case MOVER_POS2:
+				//HUMANHEAD: aob - changed channel to a specific one so the old
+				//sound is stopped when a we update
+				StartSound( "snd_opened", SND_CHANNEL_BODY, 0, false, NULL );
+				//HUMANHEAD END
 				break;
 			case MOVER_1TO2:
-				StartSound( "snd_open", SND_CHANNEL_ANY, 0, false, NULL );
+				//HUMANHEAD: aob - changed channel to a specific one so the old
+				//sound is stopped when a we update
+				StartSound( "snd_open", SND_CHANNEL_BODY, 0, false, NULL );
+				//HUMANHEAD END
 				break;
 			case MOVER_2TO1:
-				StartSound( "snd_close", SND_CHANNEL_ANY, 0, false, NULL );
+				//HUMANHEAD: aob - changed channel to a specific one so the old
+				//sound is stopped when a we update
+				StartSound( "snd_close", SND_CHANNEL_BODY, 0, false, NULL );
+				//HUMANHEAD END
 				break;
 		}
 	}
@@ -3292,7 +2583,8 @@ void idMover_Binary::SetMoverState( moverState_t newstate, int time ) {
 	moverState = newstate;
 	move_thread = 0;
 
-	UpdateMoverSound( newstate );
+	if ( gameLocal.time > 0 ) // HUMANHEAD mdl:  Don't update sound at spawn time
+		UpdateMoverSound( newstate );
 
 	stateStartTime = time;
 	switch( moverState ) {
@@ -3339,7 +2631,7 @@ in the same amount of time
 */
 void idMover_Binary::MatchActivateTeam( moverState_t newstate, int time ) {
 	idMover_Binary *slave;
-	deferedOpen = false;
+
 	for ( slave = this; slave != NULL; slave = slave->activateChain ) {
 		slave->SetMoverState( newstate, time );
 	}
@@ -3401,7 +2693,9 @@ void idMover_Binary::Event_Enable( void ) {
 	idMover_Binary *slave;
 
 	for ( slave = moveMaster; slave != NULL; slave = slave->activateChain ) {
-		slave->Enable( false );
+		//HUMANHEAD: aob - changed from false to true
+		slave->Enable( true );
+		//HUMANHEAD END
 	}
 }
 
@@ -3477,28 +2771,27 @@ void idMover_Binary::Event_Reached_BinaryMover( void ) {
 		idThread::ObjectMoveDone( move_thread, this );
 		move_thread = 0;
 
+/*	HUMANHEAD aob - removed
 		if ( moveMaster == this ) {
 			StartSound( "snd_opened", SND_CHANNEL_ANY, 0, false, NULL );
 		}
+	HUMANHEAD END */
 
 		SetMoverState( MOVER_POS2, gameLocal.time );
 
 		SetGuiStates( guiBinaryMoverStates[MOVER_POS2] );
 
-// RAVEN BEGIN
-// jdischler: this wasn't actually doing anything, anyway
-//		UpdateBuddies( 1 );
-// RAVEN END
+		UpdateBuddies( 1 );
 
 		if ( enabled && wait >= 0 && !spawnArgs.GetBool( "toggle" ) ) {
 			// return to pos1 after a delay
 			PostEventSec( &EV_Mover_ReturnToPos1, wait );
 		}
-
+		
 		// fire targets
 		ActivateTargets( moveMaster->GetActivator() );
-		
-		SetBlocked ( false );
+
+		SetBlocked(false);
 	} else if ( moverState == MOVER_2TO1 ) {
 		// reached pos1
 		idThread::ObjectMoveDone( move_thread, this );
@@ -3508,17 +2801,10 @@ void idMover_Binary::Event_Reached_BinaryMover( void ) {
 
 		SetGuiStates( guiBinaryMoverStates[MOVER_POS1] );
 
-// RAVEN BEGIN
-// jdischler: this wasn't actually doing anything, anyway
-//		UpdateBuddies( 0 );
-// RAVEN END
+		UpdateBuddies( 0 );
 
 		// close areaportals
 		if ( moveMaster == this ) {
-// RAVEN BEGIN
-// kfuller: added "snd_closed"
-			StartSound( "snd_closed", SND_CHANNEL_ANY, 0, false, NULL );
-// RAVEN END
 			ProcessEvent( &EV_Mover_ClosePortal );
 		}
 
@@ -3526,7 +2812,7 @@ void idMover_Binary::Event_Reached_BinaryMover( void ) {
 			PostEventSec( &EV_Activate, wait, this );
 		}
 
-		SetBlocked ( false );
+		SetBlocked(false);
 	} else {
 		gameLocal.Error( "Event_Reached_BinaryMover: bad moverState" );
 	}
@@ -3561,7 +2847,6 @@ void idMover_Binary::GotoPosition1( void ) {
 		if ( !spawnArgs.GetBool( "toggle" ) ) {
 			ProcessEvent( &EV_Mover_ReturnToPos1 );
 		}
-
 		return;
 	}
 
@@ -3632,24 +2917,20 @@ void idMover_Binary::GotoPosition2( void ) {
 idMover_Binary::UpdateBuddies
 ================
 */
-void idMover_Binary::UpdateBuddies( int val ) 
-{
-// RAVEN BEGIN
-// jdischler: was using update status but that was never getting set anyway.
-// Additionally, shaderparm_mode was never getting set on the mover itself, which creates
-// extra work for the designers.
-	int c = buddies.Num();
-	for ( int i = 0; i < c; i++ ) {
-		idEntity *buddy = gameLocal.FindEntity( buddies[i] );
-		if ( buddy ) {
-			buddy->SetShaderParm( SHADERPARM_MODE, val );
-			buddy->UpdateVisuals();
+void idMover_Binary::UpdateBuddies( int val ) {
+/*	HUMANHEAD pdm: undocumented, unused
+	int i, c;
+
+	if ( updateStatus == 2 ) {
+		c = buddies.Num();
+		for ( i = 0; i < c; i++ ) {
+			idEntity *buddy = gameLocal.FindEntity( buddies[i] );
+			if ( buddy ) {
+				buddy->SetShaderParm( SHADERPARM_MODE, val );
+			}
 		}
 	}
-	// Update the mover itself, too.
-	SetShaderParm( SHADERPARM_MODE, val );
-	UpdateVisuals();
-// RAVEN END
+*/
 }
 
 /*
@@ -3689,31 +2970,14 @@ void idMover_Binary::Use_BinaryMover( idEntity *activator ) {
 
 	activatedBy = activator;
 
-	if ( moverState == MOVER_POS1 && !deferedOpen) {
+	if ( moverState == MOVER_POS1 ) {
+		// FIXME: start moving USERCMD_MSEC later, because if this was player
+		// triggered, gameLocal.time hasn't been advanced yet
+		MatchActivateTeam( MOVER_1TO2, gameLocal.time + USERCMD_MSEC );
 
-		float openWait = spawnArgs.GetFloat( "openWait", "0" );
-		deferedOpen = true;
-		PostEventMS( &EV_Mover_MatchTeam, SEC2MS(openWait), MOVER_1TO2, SEC2MS(openWait) + gameLocal.time );
-
-		// TODO: might want to delay these as well if openWait is present?
 		SetGuiStates( guiBinaryMoverStates[MOVER_1TO2] );
 		// open areaportal
 		ProcessEvent( &EV_Mover_OpenPortal );
-
-		// any things we should trigger when the door is first asked to open?
-		//	NOTE: with openWait, it's possible (and desirable as per aweldon's request)
-		//		that this will be called before the door actually opens.  This is specifically
-		//		used by the rotate/lock doors...the triggering below starts another entity rotating
-		//		and onWait is used to offset the actual open so the rotating piece has time to work...
-		const idKeyValue *kv = spawnArgs.MatchPrefix( "triggerOnOpen" );
-		while( kv ) {
-			idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
-			if ( ent ) {
-				ent->PostEventMS( &EV_Activate, 0, moveMaster->GetActivator() );
-			}
-			kv = spawnArgs.MatchPrefix( "triggerOnOpen", kv );
-		}
-
 		return;
 	}
 
@@ -3972,7 +3236,11 @@ idMover_Binary::SetPortalState
 */
 void idMover_Binary::SetPortalState( bool open ) {
 	assert( areaPortal );
+#if HUMANHEAD
+	gameLocal.SetPortalState( areaPortal, open ? PS_BLOCK_NONE : PS_BLOCK_VIEW );
+#else
 	gameLocal.SetPortalState( areaPortal, open ? PS_BLOCK_NONE : PS_BLOCK_ALL );
+#endif
 }
 
 /*
@@ -4012,10 +3280,6 @@ CLASS_DECLARATION( idMover_Binary, idDoor )
 	EVENT( EV_SpectatorTouch,			idDoor::Event_SpectatorTouch )
 	EVENT( EV_Mover_OpenPortal,			idDoor::Event_OpenPortal )
 	EVENT( EV_Mover_ClosePortal,		idDoor::Event_ClosePortal )
-// RAVEN BEGIN
-// abahr:
-	EVENT( EV_Mover_ReturnToPos1,		idDoor::Event_ReturnToPos1 )
-// RAVEN END
 END_CLASS
 
 /*
@@ -4034,7 +3298,7 @@ idDoor::idDoor( void ) {
 	nextSndTriggerTime = 0;
 	localTriggerOrigin.Zero();
 	localTriggerAxis.Identity();
-	requirement.Clear();
+	requiredItem.Clear();
 	removeItem = 0;
 	syncLock.Clear();
 	companionDoor = NULL;
@@ -4067,25 +3331,24 @@ void idDoor::Save( idSaveGame *savefile ) const {
 	savefile->WriteBool( noTouch );
 	savefile->WriteBool( aas_area_closed );
 	savefile->WriteString( buddyStr );
-
-	savefile->WriteClipModel( trigger );
-	savefile->WriteClipModel( sndTrigger );
 	savefile->WriteInt( nextSndTriggerTime );
 
 	savefile->WriteVec3( localTriggerOrigin );
 	savefile->WriteMat3( localTriggerAxis );
 
-	savefile->WriteString( requirement );
+	savefile->WriteString( requiredItem );
 	savefile->WriteInt( removeItem );
 	savefile->WriteString( syncLock );
 	savefile->WriteInt( normalAxisIndex );
 
+	savefile->WriteClipModel( trigger );
+	savefile->WriteClipModel( sndTrigger );
+
 	savefile->WriteObject( companionDoor );
 
-// RAVEN BEGIN
-// abahr:
-	doorFrameController.Save( savefile );
-// RAVEN END
+	// HUMANHEAD mdl
+	savefile->WriteStringList( buddyNames );
+	// HUMANHEAD END
 }
 
 /*
@@ -4101,25 +3364,24 @@ void idDoor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( aas_area_closed );
 	SetAASAreaState( aas_area_closed );
 	savefile->ReadString( buddyStr );
-
-	savefile->ReadClipModel( trigger );
-	savefile->ReadClipModel( sndTrigger );
 	savefile->ReadInt( nextSndTriggerTime );
 
 	savefile->ReadVec3( localTriggerOrigin );
 	savefile->ReadMat3( localTriggerAxis );
 
-	savefile->ReadString( requirement );
+	savefile->ReadString( requiredItem );
 	savefile->ReadInt( removeItem );
 	savefile->ReadString( syncLock );
 	savefile->ReadInt( normalAxisIndex );
 
+	savefile->ReadClipModel( trigger );
+	savefile->ReadClipModel( sndTrigger );
+
 	savefile->ReadObject( reinterpret_cast<idClass *&>( companionDoor ) );
 
-// RAVEN BEGIN
-// abahr:
-	doorFrameController.Restore( savefile );
-// RAVEN END
+	// HUMANHEAD mdl
+	savefile->ReadStringList( buddyNames );
+	// HUMANHEAD END
 }
 
 /*
@@ -4166,12 +3428,20 @@ void idDoor::Spawn( void ) {
 	spawnArgs.GetBool( "start_open", "0", start_open );
 	spawnArgs.GetBool( "no_touch", "0", noTouch );
 
+	// HUMANHEAD pdm: alwaysLocked implies noTouch, don't make trigger
+	if (spawnArgs.GetBool("alwaysLocked")) {
+		noTouch = true;
+	}
+
 	// expects syncLock to be a door that must be closed before this door will open
 	spawnArgs.GetString( "syncLock", "", syncLock );
 
 	spawnArgs.GetString( "buddy", "", buddyStr );
+	// HUMANHEAD nla
+	hhUtils::GetValues( spawnArgs, "buddy", buddyNames, true );	
+	// HUMANHEAD END
 
-	spawnArgs.GetString( "requires", "", requirement );
+	spawnArgs.GetString( "requires", "", requiredItem );
 	spawnArgs.GetInt( "removeItem", "0", removeItem );
 
 	// ever separate piece of a door is considered solid when other team mates push entities
@@ -4188,11 +3458,13 @@ void idDoor::Spawn( void ) {
 	distance = ( abs_movedir * size ) - lip;
 	pos2 = pos1 + distance * movedir;
 
+#if !HUMANHEAD//aob - we are just going to set moverState to POS2
 	// if "start_open", reverse position 1 and 2
 	if ( start_open ) {
 		// post it after EV_SpawnBind
 		PostEventMS( &EV_Door_StartOpen, 1 );		
 	}
+#endif
 
 	if ( spawnArgs.GetFloat( "time", "1", time ) ) {
 		InitTime( pos1, pos2, time, 0, 0 );
@@ -4200,11 +3472,15 @@ void idDoor::Spawn( void ) {
 		InitSpeed( pos1, pos2, speed, 0, 0 );
 	}
 
+#ifdef HUMANHEAD//aob - need to do this here because InitTime and InitSpeed both set moverState
+	SetMoverState( (start_open) ? MOVER_POS2 : MOVER_POS1, gameLocal.time );
+#endif
+
 	if ( moveMaster == this ) {
 		if ( health ) {
 			fl.takedamage = true;
 		}
-		if ( noTouch || health ) {
+		if ( noTouch ) { // || health ) {  // HUMANHEAD nla - The EV_Door_SpawnDoorTrigger needs to be called
 			// non touch/shoot doors
 			PostEventMS( &EV_Mover_MatchTeam, 0, moverState, gameLocal.time );
 
@@ -4231,6 +3507,9 @@ void idDoor::Spawn( void ) {
 		PostEventMS( &EV_Door_Lock, 0, locked );
 	}
 
+	// HUMANHEAD pdm
+	SetShaderParm( SHADERPARM_MODE, GetDoorShaderParm( locked != 0, true ) );	// 2=locked, 1=unlocked, 0=never locked
+
 	if ( spawnArgs.GetBool( "continuous" ) ) {
 		PostEventSec( &EV_Activate, spawnArgs.GetFloat( "delay" ), this );
 	}
@@ -4242,14 +3521,6 @@ void idDoor::Spawn( void ) {
 
 	enabled = true;
 	blocked = false;
-	
-// RAVEN BEGIN
-// bdube: added
-	// Instruct ai to avoid standing in doors
-	if ( !spawnArgs.GetBool ( "noavoid" ) ) {
-		aiManager.AddAvoid ( GetPhysics()->GetAbsBounds().GetCenter(), GetPhysics()->GetBounds().GetRadius(), -1 );
-	}
-// RAVEN END
 }
 
 /*
@@ -4267,16 +3538,10 @@ void idDoor::Think( void ) {
 		// update trigger position
 		if ( GetMasterPosition( masterOrigin, masterAxis ) ) {
 			if ( trigger ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				trigger->Link( this, 0, masterOrigin + localTriggerOrigin * masterAxis, localTriggerAxis * masterAxis );
-// RAVEN END
+				trigger->Link( gameLocal.clip, this, 0, masterOrigin + localTriggerOrigin * masterAxis, localTriggerAxis * masterAxis );
 			}
 			if ( sndTrigger ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				sndTrigger->Link( this, 0, masterOrigin + localTriggerOrigin * masterAxis, localTriggerAxis * masterAxis );
-// RAVEN END
+				sndTrigger->Link( gameLocal.clip, this, 0, masterOrigin + localTriggerOrigin * masterAxis, localTriggerAxis * masterAxis );
 			}
 		}
 	}
@@ -4413,7 +3678,7 @@ idDoor::Use
 ================
 */
 void idDoor::Use( idEntity *other, idEntity *activator ) {
-	if ( gameLocal.RequirementMet( activator, requirement, removeItem ) ) {
+	if ( gameLocal.RequirementMet( activator, requiredItem, removeItem ) ) {
 		if ( syncLock.Length() ) {
 			idEntity *sync = gameLocal.FindEntity( syncLock );
 			if ( sync && sync->IsType( idDoor::Type ) ) {
@@ -4470,12 +3735,20 @@ void idDoor::Lock( int f ) {
 				}
 			}
 			door->spawnArgs.SetInt( "locked", f );
-// RAVEN BEGIN
-// jdischler
-			// locking/unlocking doors should update the shaderparm7 of any buddies
-			door->UpdateBuddies( !f );
-// RAVEN END
 
+			// HUMANHEAD pdm: set shader parm properly of door parts as well as buddies
+			float parmValue = GetDoorShaderParm( f != 0, false );
+			door->SetShaderParm( SHADERPARM_MODE, parmValue );	// 2=locked, 1=unlocked, 0=never locked
+
+			for ( int i = 0; i < buddyNames.Num(); ++i ) {
+				if ( buddyNames[i].Length() ) {
+					idEntity *buddy = gameLocal.FindEntity( buddyNames[i] );
+					if ( buddy ) {
+						buddy->SetShaderParm( SHADERPARM_MODE, parmValue );	// 2=locked, 1=unlocked, 0=non-openable
+					}
+				}
+			}
+			// HUMANHEAD END
 			if ( ( f == 0 ) || ( !IsHidden() && ( door->moverState == MOVER_POS1 ) ) ) {
 				door->SetAASAreaState( f != 0 );
 			}
@@ -4526,12 +3799,14 @@ void idDoor::CalcTriggerBounds( float size, idBounds &bounds ) {
 	int				i;
 	int				best;
 
+#ifdef HUMANHEAD//aob - used to allow trigger in correct place when we start open
+	bounds.FromTransformedBounds( GetPhysics()->GetBounds(), pos1, GetPhysics()->GetAxis() );
+#else
 	// find the bounds of everything on the team
 	bounds = GetPhysics()->GetAbsBounds();
+#endif
 	
-	if ( health > 0 ) {
-		fl.takedamage = true;
-	}
+	fl.takedamage = true;
 	for( other = activateChain; other != NULL; other = other->GetActivateChain() ) {
 		if ( other->IsType( idDoor::Type ) ) {
 			// find the bounds of everything on the team
@@ -4555,33 +3830,6 @@ void idDoor::CalcTriggerBounds( float size, idBounds &bounds ) {
 	bounds[0] -= GetPhysics()->GetOrigin();
 	bounds[1] -= GetPhysics()->GetOrigin();
 }
-
-// RAVEN BEGIN
-// abahr:
-/*
-==============================
-idDoor::SetDoorFrameController
-==============================
-*/
-void idDoor::SetDoorFrameController( idEntity* controller ) {
-	doorFrameController = controller;
-}
-
-/*
-==============================
-idDoor::ActivateTargets
-
-If we have a frame controller we activate its targets
-==============================
-*/
-void idDoor::ActivateTargets( idEntity *activator ) const {
-	if ( doorFrameController.IsValid() && static_cast< const idMover_Binary *>( GetMoveMaster() ) == this && moverState == MOVER_POS1 ) {
-		doorFrameController->ActivateTargets( activator );
-	}
-
-	idMover_Binary::ActivateTargets( activator );
-}
-// RAVEN END
 
 /*
 ======================
@@ -4653,19 +3901,8 @@ void idDoor::Event_SpawnDoorTrigger( void ) {
 	CalcTriggerBounds( triggersize, bounds );
 
 	// create a trigger clip model
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	trigger = new idClipModel( idTraceModel( bounds ) );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	trigger->Link( this, 255, GetPhysics()->GetOrigin(), mat3_identity );
-// RAVEN END
+	trigger->Link( gameLocal.clip, this, 255, GetPhysics()->GetOrigin(), mat3_identity );
 	trigger->SetContents( CONTENTS_TRIGGER );
 
 	GetLocalTriggerPosition( trigger );
@@ -4690,19 +3927,8 @@ void idDoor::Event_SpawnSoundTrigger( void ) {
 	CalcTriggerBounds( triggersize * 0.5f, bounds );
 
 	// create a trigger clip model
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	sndTrigger = new idClipModel( idTraceModel( bounds ) );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	sndTrigger->Link( this, 254, GetPhysics()->GetOrigin(), mat3_identity );
-// RAVEN END
+	sndTrigger->Link( gameLocal.clip, this, 254, GetPhysics()->GetOrigin(), mat3_identity );
 	sndTrigger->SetContents( CONTENTS_TRIGGER );
 
 	GetLocalTriggerPosition( sndTrigger );
@@ -4716,23 +3942,9 @@ idDoor::Event_Reached_BinaryMover
 void idDoor::Event_Reached_BinaryMover( void ) {
 	if ( moverState == MOVER_2TO1 ) {
 		SetBlocked( false );
-		const idKeyValue *kv = spawnArgs.MatchPrefix( "triggerClosed" );
-		while( kv ) {
-			idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
-			if ( ent ) {
-				ent->PostEventMS( &EV_Activate, 0, moveMaster->GetActivator() );
-			}
-			kv = spawnArgs.MatchPrefix( "triggerClosed", kv );
-		}
+		ActivatePrefixed("triggerClosed", moveMaster->GetActivator());	// HUMANHEAD pdm: replaced with our simplified version
 	} else if ( moverState == MOVER_1TO2 ) {
-		const idKeyValue *kv = spawnArgs.MatchPrefix( "triggerOpened" );
-		while( kv ) {
-			idEntity *ent = gameLocal.FindEntity( kv->GetValue() );
-			if ( ent ) {
-				ent->PostEventMS( &EV_Activate, 0, moveMaster->GetActivator() );
-			}
-			kv = spawnArgs.MatchPrefix( "triggerOpened", kv );
-		}
+		ActivatePrefixed("triggerOpened", moveMaster->GetActivator());	// HUMANHEAD pdm: replaced with our simplified version
 	}
 	idMover_Binary::Event_Reached_BinaryMover();
 }
@@ -4743,40 +3955,6 @@ idDoor::Blocked_Door
 ================
 */
 void idDoor::Event_TeamBlocked( idEntity *blockedEntity, idEntity *blockingEntity ) {
-	if ( !blockingEntity->fl.takedamage ) {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) ) {
-			//burning out already
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() )
-					|| (blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() )) ) {
-			//moveable
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		}
-	} else {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) && blockingEntity->health <= 0 ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() ) ) {
-			//damagable movable?
-            blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-			return;
-		} else if ( blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() ) ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		}
-	}
 	SetBlocked( true );
 
 	if ( crusher ) {
@@ -4809,23 +3987,8 @@ void idDoor::Event_PartBlocked( idEntity *blockingEntity ) {
 	if ( damage > 0.0f ) {
 		blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", damage, INVALID_JOINT );
 	}
+	blockingEntity->SquishedByDoor(this);	// HUMANHEAD pdm
 }
-
-// RAVEN BEGIN
-// abahr:
-/*
-================
-idDoor::Event_ReturnToPos1
-================
-*/
-void idDoor::Event_ReturnToPos1( void ) {
-	idMover_Binary::Event_ReturnToPos1();
-
-	if( doorFrameController.IsValid() ) {
-		doorFrameController->ProcessEvent( &EV_CloseGate );
-	}
-}
-// RAVEN END
 
 /*
 ================
@@ -4843,20 +4006,10 @@ void idDoor::Event_Touch( idEntity *other, trace_t *trace ) {
 
 	if ( trigger && trace->c.id == trigger->GetId() ) {
 		if ( !IsNoTouch() && !IsLocked() && GetMoverState() != MOVER_1TO2 ) {
-// RAVEN BEGIN
-// abahr: allowing animated door frames
-			if( doorFrameController.IsValid() && doorFrameController != other ) {
-				doorFrameController->ProcessEvent( &EV_Touch, other, trace );
-			} else {
-				Use( this, other );
-			}
-// RAVEN END
+			Use( this, other );
 		}
 	} else if ( sndTrigger && trace->c.id == sndTrigger->GetId() ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-		if ( other && other->IsType( idPlayer::GetClassType() ) && IsLocked() && gameLocal.time > nextSndTriggerTime ) {
-// RAVEN END
+		if ( other && other->IsType( idPlayer::Type ) && IsLocked() && gameLocal.time > nextSndTriggerTime ) {
 			StartSound( "snd_locked", SND_CHANNEL_ANY, 0, false, NULL );
 			nextSndTriggerTime = gameLocal.time + 10000;
 		}
@@ -4873,10 +4026,7 @@ void idDoor::Event_SpectatorTouch( idEntity *other, trace_t *trace ) {
 	idBounds	bounds;
 	idPlayer	*p;
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	assert( other && other->IsType( idPlayer::GetClassType() ) && static_cast< idPlayer * >( other )->spectating );
-// RAVEN END
+	assert( other && other->IsType( idPlayer::Type ) && static_cast< idPlayer * >( other )->spectating );
 
 	p = static_cast< idPlayer * >( other );
 	// avoid flicker when stopping right at clip box boundaries
@@ -4912,7 +4062,8 @@ void idDoor::Event_Activate( idEntity *activator ) {
 		if ( !trigger ) {
 			PostEventMS( &EV_Door_SpawnDoorTrigger, 0 );
 		}
-		UpdateBuddies( 1 );
+
+		// HUMANHEAD pdm: removed buddy shaderparm logic, now handled within the lock call
 
 		old_lock = spawnArgs.GetInt( "locked" );
 		Lock( 0 );
@@ -4930,19 +4081,13 @@ void idDoor::Event_Activate( idEntity *activator ) {
   		}
 	}
 
-// RAVEN BEGIN
-// abahr:
-	if( doorFrameController.IsValid() && doorFrameController != activator ) {
-		doorFrameController->ProcessEvent( &EV_Activate, activator );
-	} else {
-		ActivateTargets( activator );
+	ActivateTargets( activator );
 
-		renderEntity.shaderParms[ SHADERPARM_MODE ] = 1;
-		UpdateVisuals();
+// HUMANHEAD pdm: all shaderparm logic moved to lock function
+//	renderEntity.shaderParms[ SHADERPARM_MODE ] = 1;
+//	UpdateVisuals();
 
-		Use_BinaryMover( activator );	
-	}
-//RAVEN END
+	Use_BinaryMover( activator );
 }
 
 /*
@@ -5162,10 +4307,7 @@ void idPlat::Think( void ) {
 		// update trigger position
 		if ( GetMasterPosition( masterOrigin, masterAxis ) ) {
 			if ( trigger ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-				trigger->Link( this, 0, masterOrigin + localTriggerOrigin * masterAxis, localTriggerAxis * masterAxis );
-// RAVEN END
+				trigger->Link( gameLocal.clip, this, 0, masterOrigin + localTriggerOrigin * masterAxis, localTriggerAxis * masterAxis );
 			}
 		}
 	}
@@ -5239,19 +4381,9 @@ void idPlat::SpawnPlatTrigger( idVec3 &pos ) {
 		tmin[1] = ( bounds[0][1] + bounds[1][1] ) * 0.5f;
 		tmax[1] = tmin[1] + 1;
 	}
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
+	
 	trigger = new idClipModel( idTraceModel( idBounds( tmin, tmax ) ) );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	trigger->Link( this, 255, GetPhysics()->GetOrigin(), mat3_identity );
-// RAVEN END
+	trigger->Link( gameLocal.clip, this, 255, GetPhysics()->GetOrigin(), mat3_identity );
 	trigger->SetContents( CONTENTS_TRIGGER );
 }
 
@@ -5261,10 +4393,7 @@ idPlat::Event_Touch
 ===============
 */
 void idPlat::Event_Touch( idEntity *other, trace_t *trace ) {
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
-	if ( !other->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
+	if ( !other->IsType( idPlayer::Type ) ) {
 		return;
 	}
 
@@ -5281,9 +4410,6 @@ idPlat::Event_TeamBlocked
 void idPlat::Event_TeamBlocked( idEntity *blockedEntity, idEntity *blockingEntity ) {
 	// reverse direction
 	Use_BinaryMover( activatedBy.GetEntity() );
-
-	Use_BinaryMover( this );
-	
 }
 
 /*
@@ -5295,6 +4421,7 @@ void idPlat::Event_PartBlocked( idEntity *blockingEntity ) {
 	if ( damage > 0.0f ) {
 		blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", damage, INVALID_JOINT );
 	}
+	blockingEntity->SquishedByDoor(this);	// HUMANHEAD pdm
 }
 
 
@@ -5321,10 +4448,6 @@ idMover_Periodic::idMover_Periodic( void ) {
 	fl.neverDormant	= false;
 }
 
-idMover_Periodic::~idMover_Periodic( void ) {
-	SetPhysics( NULL );
-}
-
 /*
 ===============
 idMover_Periodic::Spawn
@@ -5343,8 +4466,8 @@ idMover_Periodic::Save
 ===============
 */
 void idMover_Periodic::Save( idSaveGame *savefile ) const {
-	savefile->WriteStaticObject( physicsObj );
 	savefile->WriteFloat( damage );
+	savefile->WriteStaticObject( physicsObj );
 }
 
 /*
@@ -5353,9 +4476,8 @@ idMover_Periodic::Restore
 ===============
 */
 void idMover_Periodic::Restore( idRestoreGame *savefile ) {
-	savefile->ReadStaticObject( physicsObj );
 	savefile->ReadFloat( damage );
-
+	savefile->ReadStaticObject( physicsObj );
 	RestorePhysics( &physicsObj );
 }
 
@@ -5380,40 +4502,6 @@ idMover_Periodic::Event_TeamBlocked
 ===============
 */
 void idMover_Periodic::Event_TeamBlocked( idEntity *blockedEntity, idEntity *blockingEntity ) {
-	if ( !blockingEntity->fl.takedamage ) {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) ) {
-			//burning out already
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() )
-					|| (blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() )) ) {
-			//moveable
-			blockingEntity->ProcessEvent( &EV_Remove );
-			return;
-		}
-	} else {
-		if ( blockingEntity->IsType( idAI::GetClassType() ) && blockingEntity->health <= 0 ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		} else if ( blockingEntity->IsType( idMoveable::GetClassType() ) ||  blockingEntity->IsType( idMoveableItem::GetClassType() ) ) {
-			//damagable movable?
-            blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-			return;
-		} else if ( blockingEntity->IsType( idAFEntity_Base::GetClassType() ) && !blockingEntity->IsType( idActor::GetClassType() ) ) {
-			if ( blockingEntity->spawnArgs.GetBool( "gib" ) ) {
-                blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", 20, INVALID_JOINT );
-				return;
-			} else {
-				blockingEntity->ProcessEvent( &EV_Remove );
-				return;
-			}
-		}
-	}
 }
 
 /*
@@ -5425,6 +4513,7 @@ void idMover_Periodic::Event_PartBlocked( idEntity *blockingEntity ) {
 	if ( damage > 0.0f ) {
 		blockingEntity->Damage( this, this, vec3_origin, "damage_moverCrush", damage, INVALID_JOINT );
 	}
+	blockingEntity->SquishedByDoor(this);	// HUMANHEAD pdm
 }
 
 /*
@@ -5479,22 +4568,26 @@ idRotater::Spawn
 ===============
 */
 void idRotater::Spawn( void ) {
+
+	// HUMANHEAD pdm: added support for noclipmodel
+	idClipModel *clipModel = NULL;
+	int clipMask = 0;
+	bool allowPush = false;
+	if (!spawnArgs.GetBool("noclipmodel")) {
+		clipModel = new idClipModel( GetPhysics()->GetClipModel() );
+		clipMask = MASK_SOLID;
+		allowPush = true;
+	}
+
 	physicsObj.SetSelf( this );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
-	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
+	physicsObj.SetClipModel( clipModel, 1.0f );
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() );
 	physicsObj.SetAxis( GetPhysics()->GetAxis() );
-	physicsObj.SetClipMask( MASK_SOLID );
-	if ( !spawnArgs.GetBool( "nopush" ) ) {
+	physicsObj.SetClipMask( clipMask );
+	if ( allowPush && (!renderEntity.hModel || !spawnArgs.GetBool( "nopush" )) ) {
 		physicsObj.SetPusher( 0 );
 	}
+	// HUMANHEAD END
 	physicsObj.SetLinearExtrapolation( EXTRAPOLATION_NONE, gameLocal.time, 0, GetPhysics()->GetOrigin(), vec3_origin, vec3_origin );
 	physicsObj.SetAngularExtrapolation( extrapolation_t(EXTRAPOLATION_LINEAR|EXTRAPOLATION_NOSTOP), gameLocal.time, 0, GetPhysics()->GetAxis().ToAngles(), ang_zero, ang_zero );
 	SetPhysics( &physicsObj );
@@ -5608,15 +4701,7 @@ void idBobber::Spawn( void ) {
 	}
 
 	physicsObj.SetSelf( this );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() );
 	physicsObj.SetAxis( GetPhysics()->GetAxis() );
 	physicsObj.SetClipMask( MASK_SOLID );
@@ -5672,23 +4757,11 @@ void idPendulum::Spawn( void ) {
 			length = 8;
 		}
 
-		if( gameLocal.isMultiplayer ) {
-			freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( g_mp_gravity.GetFloat() / ( 3 * length ) );
-		} else {
-			freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( g_gravity.GetFloat() / ( 3 * length ) );
-		}
+		freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( g_gravity.GetFloat() / ( 3 * length ) );
 	}
 
 	physicsObj.SetSelf( this );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() );
 	physicsObj.SetAxis( GetPhysics()->GetAxis() );
 	physicsObj.SetClipMask( MASK_SOLID );
@@ -5728,15 +4801,7 @@ idRiser::Spawn
 */
 void idRiser::Spawn( void ) {
 	physicsObj.SetSelf( this );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_PUSH_HEAP_MEM(this);
-// RAVEN END
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-// RAVEN BEGIN
-// mwhitlock: Dynamic memory consolidation
-	RV_POP_HEAP();
-// RAVEN END
 	physicsObj.SetOrigin( GetPhysics()->GetOrigin() );
 	physicsObj.SetAxis( GetPhysics()->GetAxis() );
 
@@ -5775,203 +4840,3 @@ void idRiser::Event_Activate( idEntity *activator ) {
 		physicsObj.SetLinearExtrapolation( EXTRAPOLATION_LINEAR, gameLocal.time, time * 1000, physicsObj.GetOrigin(), delta, vec3_origin );
 	}
 }
-
-
-/*
-===============================================================================
-
-rvConveyor
-
-===============================================================================
-*/
-
-CLASS_DECLARATION( idEntity, rvConveyor )
-	EVENT( EV_FindTargets,	rvConveyor::Event_FindTargets )
-END_CLASS
-
-/*
-================
-rvConveyor::rvConveyor
-================
-*/
-rvConveyor::rvConveyor ( void ) {
-}
-
-/*
-================
-rvConveyor::Spawn
-================
-*/
-void rvConveyor::Spawn ( void ) {
-	spawnArgs.GetFloat ( "speed", "100", moveSpeed );
-	
-	float angle;
-	if ( spawnArgs.GetFloat ( "moveAngle", "0", angle ) ) {
-		moveDir = idAngles ( 0, angle, 0 ).ToMat3()[0];
-	} else { 
-		moveDir = GetPhysics()->GetAxis()[0];
-	}
-	
-	GetPhysics()->SetContents ( CONTENTS_SOLID );
-	GetPhysics()->SetClipMask( MASK_SOLID );
-	GetPhysics()->EnableClip ( );
-	
-	BecomeActive ( TH_THINK|TH_PHYSICS );
-}
-
-/*
-================
-rvConveyor::Think
-================
-*/
-void rvConveyor::Think ( void ) {
-	trace_t pushResults;	
-	idVec3	newOrigin;
-	idMat3	newAxis;
-	idVec3	oldOrigin;
-	idMat3	oldAxis;
-	
-	oldOrigin = GetPhysics()->GetOrigin ( );
-	oldAxis   = GetPhysics()->GetAxis ( );
-	
-	newOrigin = GetPhysics()->GetOrigin() + moveDir * moveSpeed * MS2SEC ( gameLocal.GetMSec() );
-	newAxis   = oldAxis;
-	gameLocal.push.ClipPush( pushResults, this, 0, 
-							 GetPhysics()->GetOrigin(), oldAxis, newOrigin, newAxis );
-
-	GetPhysics()->SetOrigin ( oldOrigin );
-	GetPhysics()->SetAxis ( oldAxis );
-	
-	idEntity::Think();	
-}
-
-/*
-================
-rvConveyor::Save
-================
-*/
-void rvConveyor::Save( idSaveGame *savefile ) const
-{
-	savefile->WriteVec3( moveDir );
-	savefile->WriteFloat( moveSpeed );
-}
-
-/*
-================
-rvConveyor::Restore
-================
-*/
-void rvConveyor::Restore( idRestoreGame *savefile )
-{
-	savefile->ReadVec3( moveDir );
-	savefile->ReadFloat( moveSpeed );
-}
-
-/*
-================
-rvConveyor::Event_FindTargets
-================
-*/
-void rvConveyor::Event_FindTargets ( void ) {
-	FindTargets ( );
-
-	moveDir = GetPhysics()->GetAxis ( )[0];
-	if ( !targets.Num ( ) || !targets[0] ) {
-		return;
-	}
-	
-	idEntity* path;
-	idEntity* next;
-	path = targets[0];
-	path->FindTargets ( );
-	next = path->targets.Num() ? path->targets[0].GetEntity() : NULL;
-	if ( !next ) {
-		return;
-	}
-
-	moveDir = next->GetPhysics()->GetOrigin() - path->GetPhysics()->GetOrigin();
-	moveDir.Normalize ( );
-
-	path->PostEventMS ( &EV_Remove, 0 );
-}
-
-
-CLASS_DECLARATION( idMover, rvPusher )
-END_CLASS
-
-/*
-================
-rvPusher::rvPusher
-================
-*/
-rvPusher::rvPusher( void ) {
-	parent = 0;
-}
-
-/*
-================
-rvPusher::~rvPusher
-================
-*/
-rvPusher::~rvPusher( void ) {
-}
-
-/*
-================
-rvPusher::Spawn
-================
-*/
-void rvPusher::Spawn( void ) {
-	parent = 0;
-}
-
-/*
-================
-rvPusher::Think
-================
-*/
-void rvPusher::Think( void ) {
-	
-	// Total hack, but it gets the job done
-	BecomeActive( TH_ALL );
-	
-	if ( parent ) {
-		idAnimator *parentAnimator = parent->GetAnimator();
-		if ( parentAnimator ) {
-		
-			idStr jointName;
-			if ( spawnArgs.GetString( "attachedBone", "", jointName ) ) {	
-				bindJointHandle = parentAnimator->GetJointHandle( jointName );
-				
-				trace_t pushResults;	
-				idVec3	oldOrigin;
-				idMat3	oldAxis;
-				
-				oldOrigin = GetPhysics()->GetOrigin();
-				oldAxis = GetPhysics()->GetAxis();
-
-				parentAnimator->CreateFrame( gameLocal.time, true );
-				parentAnimator->ServiceAnims( gameLocal.previousTime, gameLocal.time );
-				parentAnimator->GetJointTransform( bindJointHandle, gameLocal.time, pusherOrigin, pusherAxis );
-				pusherAxis *= parent->GetRenderEntity()->axis;
-				pusherOrigin = parent->GetRenderEntity()->origin + pusherOrigin * parent->GetRenderEntity()->axis;
-				MoveToPos( pusherOrigin );
-				gameLocal.push.ClipTranslationalPush(pushResults, this, 0, pusherOrigin, pusherOrigin - oldOrigin );
-				GetPhysics()->SetOrigin ( pusherOrigin );
-			}
-
-		}
-	} else {
-		idStr bindEntName;
-		parent = 0;
-		if ( spawnArgs.GetString( "attachedEntity", "", bindEntName ) ) {
-			parent = gameLocal.FindEntity( bindEntName );
-		}
-	}
-
-	idMover::Think();
-}
-
-
-
-// RAVEN END

@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_SECURITYCAMERA_H__
 #define __GAME_SECURITYCAMERA_H__
@@ -14,8 +16,6 @@
 class idSecurityCamera : public idEntity {
 public:
 	CLASS_PROTOTYPE( idSecurityCamera );
-	
-							~idSecurityCamera( void );
 
 	void					Spawn( void );
 
@@ -28,6 +28,7 @@ public:
 	virtual void			Killed( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
 	virtual bool			Pain( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
 	virtual void			Present( void );
+
 
 private:
 

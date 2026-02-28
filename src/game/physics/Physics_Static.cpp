@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -97,10 +99,7 @@ void idPhysics_Static::SetClipModel( idClipModel *model, float density, int id, 
 	}
 	clipModel = model;
 	if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 	}
 }
 
@@ -113,10 +112,7 @@ idClipModel *idPhysics_Static::GetClipModel( int id ) const {
 	if ( clipModel ) {
 		return clipModel;
 	}
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-	return idClip::DefaultClipModel();
-// RAVEN END
+	return gameLocal.clip.DefaultClipModel();
 }
 
 /*
@@ -144,20 +140,6 @@ idPhysics_Static::GetMass
 float idPhysics_Static::GetMass( int id ) const {
 	return 0.0f;
 }
-
-// RAVEN BEGIN
-// bdube: Added center mass call
-/*
-================
-idPhysics_Static::GetCenterMass
-
-default center of mass is origin
-================
-*/
-idVec3 idPhysics_Static::GetCenterMass ( int id ) const {
-	return GetOrigin();
-}
-// RAVEN END
 
 /*
 ================
@@ -232,15 +214,12 @@ idPhysics_Static::Evaluate
 ================
 */
 bool idPhysics_Static::Evaluate( int timeStepMSec, int endTimeMSec ) {
-// RAVEN BEGIN
-// bdube: draw bbox
-	if ( hasMaster ) {
-		idVec3 masterOrigin;
-		idVec3 oldOrigin;
-		idMat3 masterAxis;
-		idMat3 oldAxis;
-// RAVEN END
+	PROFILE_SCOPE("Static", PROFMASK_PHYSICS);
+	idVec3 masterOrigin, oldOrigin;
+	idMat3 masterAxis, oldAxis;
 
+
+	if ( hasMaster ) {
 		oldOrigin = current.origin;
 		oldAxis = current.axis;
 
@@ -252,14 +231,18 @@ bool idPhysics_Static::Evaluate( int timeStepMSec, int endTimeMSec ) {
 			current.axis = current.localAxis;
 		}
 		if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-			clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+			clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 		}
 
 		return ( current.origin != oldOrigin || current.axis != oldAxis );
 	}
+
+	// HUMANHEAD pdm: Statics occasionally get physics activated by things binding to them.
+	// Allow this, but immediately become inactive again since we can't move unless bound to something else.
+	if (self->IsActive(TH_PHYSICS)) {
+		self->BecomeInactive( TH_PHYSICS );
+	}
+
 	return false;
 }
 
@@ -348,18 +331,6 @@ bool idPhysics_Static::IsPushable( void ) const {
 	return false;
 }
 
-// RAVEN BEGIN
-// bdube: water interraction
-/*
-================
-idPhysics_Static::IsInWater
-================
-*/
-bool idPhysics_Static::IsInWater ( void ) const {
-	return false;
-}
-// RAVEN END	
-
 /*
 ================
 idPhysics_Static::SaveState
@@ -395,10 +366,7 @@ void idPhysics_Static::SetOrigin( const idVec3 &newOrigin, int id ) {
 	}
 
 	if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 	}
 }
 
@@ -421,10 +389,7 @@ void idPhysics_Static::SetAxis( const idMat3 &newAxis, int id ) {
 	}
 
 	if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 	}
 }
 
@@ -438,10 +403,7 @@ void idPhysics_Static::Translate( const idVec3 &translation, int id ) {
 	current.origin += translation;
 
 	if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 	}
 }
 
@@ -467,10 +429,7 @@ void idPhysics_Static::Rotate( const idRotation &rotation, int id ) {
 	}
 
 	if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 	}
 }
 
@@ -541,10 +500,6 @@ idPhysics_Static::GetGravity
 */
 const idVec3 &idPhysics_Static::GetGravity( void ) const {
 	static idVec3 gravity( 0, 0, -g_gravity.GetFloat() );
-	if( gameLocal.isMultiplayer ) {
-		gravity = idVec3( 0, 0, -g_mp_gravity.GetFloat() );	
-	} 
-
 	return gravity;
 }
 
@@ -565,14 +520,11 @@ idPhysics_Static::ClipTranslation
 */
 void idPhysics_Static::ClipTranslation( trace_t &results, const idVec3 &translation, const idClipModel *model ) const {
 	if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.TranslationModel( self, results, current.origin, current.origin + translation,
-			clipModel, current.axis, MASK_SOLID, model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+		gameLocal.clip.TranslationModel( results, current.origin, current.origin + translation,
+			clipModel, current.axis, MASK_SOLID, model->Handle(), model->GetOrigin(), model->GetAxis() );
 	} else {
-		gameLocal.Translation( self, results, current.origin, current.origin + translation,
+		gameLocal.clip.Translation( results, current.origin, current.origin + translation,
 			clipModel, current.axis, MASK_SOLID, self );
-// RAVEN END
 	}	
 }
 
@@ -583,14 +535,11 @@ idPhysics_Static::ClipRotation
 */
 void idPhysics_Static::ClipRotation( trace_t &results, const idRotation &rotation, const idClipModel *model ) const {
 	if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		gameLocal.RotationModel( self, results, current.origin, rotation,
-			clipModel, current.axis, MASK_SOLID, model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+		gameLocal.clip.RotationModel( results, current.origin, rotation,
+			clipModel, current.axis, MASK_SOLID, model->Handle(), model->GetOrigin(), model->GetAxis() );
 	} else {
-		gameLocal.Rotation( self, results, current.origin, rotation, clipModel, current.axis, MASK_SOLID, self );
+		gameLocal.clip.Rotation( results, current.origin, rotation, clipModel, current.axis, MASK_SOLID, self );
 	}
-// RAVEN END
 }
 
 /*
@@ -601,13 +550,10 @@ idPhysics_Static::ClipContents
 int idPhysics_Static::ClipContents( const idClipModel *model ) const {
 	if ( clipModel ) {
 		if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
-			return gameLocal.ContentsModel( self, clipModel->GetOrigin(), clipModel, clipModel->GetAxis(), -1,
-				model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
+			return gameLocal.clip.ContentsModel( clipModel->GetOrigin(), clipModel, clipModel->GetAxis(), -1,
+				model->Handle(), model->GetOrigin(), model->GetAxis() );
 		} else {
-			return gameLocal.Contents( self, clipModel->GetOrigin(), clipModel, clipModel->GetAxis(), -1, NULL );
-// RAVEN END
+			return gameLocal.clip.Contents( clipModel->GetOrigin(), clipModel, clipModel->GetAxis(), -1, NULL );
 		}
 	}
 	return 0;
@@ -653,10 +599,7 @@ idPhysics_Static::LinkClip
 */
 void idPhysics_Static::LinkClip( void ) {
 	if ( clipModel ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
-		clipModel->Link( self, 0, current.origin, current.axis );
-// RAVEN END
+		clipModel->Link( gameLocal.clip, self, 0, current.origin, current.axis );
 	}
 }
 
@@ -880,3 +823,14 @@ void idPhysics_Static::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	current.axis = quat.ToMat3();
 	current.localAxis = localQuat.ToMat3();
 }
+
+//HUMANHEAD rww
+/*
+================
+idPhysics_Static::GetPState
+================
+*/
+staticPState_t *idPhysics_Static::GetPState(void) {
+	return &current;
+}
+//HUMANHEAD END

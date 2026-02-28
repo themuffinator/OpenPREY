@@ -1,6 +1,8 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -34,7 +36,6 @@ idForce_Constant::Save
 */
 void idForce_Constant::Save( idSaveGame *savefile ) const {
 	savefile->WriteVec3( force );
-	// TOSAVE: idPhysics *		physics	
 	savefile->WriteInt( id );
 	savefile->WriteVec3( point );
 }

@@ -48,12 +48,7 @@ idCVar	idSessionLocal::com_aviDemoHeight( "com_aviDemoHeight", "256", CVAR_SYSTE
 idCVar	idSessionLocal::com_aviDemoTics( "com_aviDemoTics", "2", CVAR_SYSTEM | CVAR_INTEGER, "", 1, 60 );
 idCVar	idSessionLocal::com_wipeSeconds( "com_wipeSeconds", "1", CVAR_SYSTEM, "" );
 idCVar	idSessionLocal::com_guid( "com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_ROM, "" );
-idCVar	com_skipLoadingContinue( "com_skipLoadingContinue", "0", CVAR_SYSTEM | CVAR_BOOL, "skip the single-player loading-screen continue gate (testing)" );
-idCVar	s_muteUnfocused( "s_muteUnfocused", "1", CVAR_ARCHIVE | CVAR_BOOL, "mute all audio when the application is out of focus" );
-
-#if defined( _WIN32 )
-bool Sys_IsGameWindowFocused( void );
-#endif
+idCVar	s_muteUnfocused( "s_muteUnfocused", "0", CVAR_ARCHIVE | CVAR_BOOL, "mute all audio when the application is out of focus" );
 
 idSessionLocal		sessLocal;
 idSession			*session = &sessLocal;
@@ -63,6 +58,82 @@ const int PREVIEW_X = 211;
 const int PREVIEW_Y = 31;
 const int PREVIEW_WIDTH = 398;
 const int PREVIEW_HEIGHT = 298;
+
+static const idMaterial *Session_FindCompatibleWipeMaterial( const char *requestedName ) {
+	if ( requestedName == NULL || requestedName[0] == '\0' ) {
+		return NULL;
+	}
+
+	const idMaterial *material = declManager->FindMaterial( requestedName, false );
+	if ( material != NULL ) {
+		return material;
+	}
+
+	// Prey retail content uses Doom 3-era wipe decl names instead of Q4 gfx/wipes/*.
+	const char *fallbackName = NULL;
+	if ( idStr::Icmp( requestedName, "gfx/wipes/fade" ) == 0 ) {
+		fallbackName = "wipeMaterial";
+	} else if ( idStr::Icmp( requestedName, "gfx/wipes/fade_blend" ) == 0 ) {
+		fallbackName = "wipe2Material";
+	}
+
+	if ( fallbackName != NULL ) {
+		material = declManager->FindMaterial( fallbackName, false );
+		if ( material != NULL ) {
+			common->DPrintf( "Session: remapped wipe material '%s' to '%s'\n", requestedName, fallbackName );
+			return material;
+		}
+	}
+
+	return NULL;
+}
+
+static const idMaterial *Session_FindFirstResolvedMaterial( const char * const *materialNames, const int materialCount ) {
+	const idMaterial *fallback = NULL;
+
+	for ( int i = 0; i < materialCount; i++ ) {
+		const char *materialName = materialNames[ i ];
+		if ( materialName == NULL || materialName[ 0 ] == '\0' ) {
+			continue;
+		}
+
+		const idMaterial *material = declManager->FindMaterial( materialName, true );
+		if ( fallback == NULL ) {
+			fallback = material;
+		}
+		if ( material != NULL && material->GetState() != DS_DEFAULTED ) {
+			return material;
+		}
+	}
+
+	return fallback;
+}
+
+static const idDeclEntityDef *Session_FindMapDeclForLoading( const char *mapName ) {
+	if ( mapName == NULL || mapName[ 0 ] == '\0' ) {
+		return NULL;
+	}
+
+	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapName, false );
+	if ( mapDecl != NULL ) {
+		return static_cast<const idDeclEntityDef *>( mapDecl );
+	}
+
+	idStr pathName = mapName;
+	pathName.StripFileExtension();
+	mapDecl = declManager->FindType( DECL_MAPDEF, pathName.c_str(), false );
+	if ( mapDecl != NULL ) {
+		return static_cast<const idDeclEntityDef *>( mapDecl );
+	}
+
+	pathName.StripPath();
+	mapDecl = declManager->FindType( DECL_MAPDEF, pathName.c_str(), false );
+	if ( mapDecl != NULL ) {
+		return static_cast<const idDeclEntityDef *>( mapDecl );
+	}
+
+	return NULL;
+}
 
 static int Session_CountVisibleSmallChars( const char *string ) {
 	if ( !( string && *string ) ) {
@@ -176,13 +247,40 @@ static void Session_DrawFallbackLoadingScreen() {
 	renderSystem->SetColor( colorBlack );
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
 
-	const idMaterial *splashMaterial = declManager->FindMaterial( "gfx/splashScreen", false );
+	static const char *splashMaterialCandidates[] = {
+		"gfx/guis/loadscreens/generic",
+		"guis/assets/loading/loading",
+		"gfx/splashScreen",
+		"gfx/splashscreen"
+	};
+	const idMaterial *splashMaterial = Session_FindFirstResolvedMaterial(
+		splashMaterialCandidates,
+		sizeof( splashMaterialCandidates ) / sizeof( splashMaterialCandidates[ 0 ] )
+	);
 	if ( splashMaterial ) {
 		renderSystem->SetColor( colorWhite );
 		renderSystem->DrawStretchPic( splashX, splashY, splashW, splashH, 0, 0, 1, 1, splashMaterial );
 	}
 
 	renderSystem->SetColor( colorWhite );
+}
+
+static idUserInterface *Session_FindFallbackLoadingGui() {
+	static const char *fallbackGuiPaths[] = {
+		"guis/map/loading.gui",      // Prey
+		"guis/loading/splevel.gui",  // Doom 3/Q4 compatibility
+		"guis/loading/generic.gui",  // Doom 3/Q4 compatibility
+		"guis/loading/mplevel.gui"   // Doom 3/Q4 compatibility
+	};
+
+	for ( int i = 0; i < ( sizeof( fallbackGuiPaths ) / sizeof( fallbackGuiPaths[ 0 ] ) ); ++i ) {
+		const char *path = fallbackGuiPaths[ i ];
+		if ( uiManager->CheckGui( path ) ) {
+			return uiManager->FindGui( path, true, false, true );
+		}
+	}
+
+	return NULL;
 }
 
 static const char *Session_GetLongMPGameTypeName( const char *gametype ) {
@@ -235,25 +333,27 @@ static idStr Session_GetMPLoadLimitString( const idDict &serverInfo ) {
 	return va( "%s %d", label, limit );
 }
 
-static bool Session_IsLoadingContinueKey( int key ) {
-	if ( key == K_MOUSE1 || key == K_MOUSE2 || key == K_ESCAPE || key == K_ENTER || key == K_KP_ENTER || key == K_SPACE ) {
-		return true;
-	}
-	if ( key >= K_JOY1 && key <= K_JOY32 ) {
-		return true;
-	}
-	if ( key >= K_AUX1 && key <= K_AUX16 ) {
-		return true;
-	}
-	return false;
+static bool Session_ModuleSupportsSingleplayer( const char *moduleName ) {
+	return moduleName
+		&& moduleName[ 0 ]
+		&& (
+			idStr::Icmp( moduleName, "game" ) == 0 ||
+			idStr::Icmp( moduleName, "game_sp" ) == 0 ||
+			idStr::Icmp( moduleName, "game_mp" ) == 0
+		);
 }
 
-static bool Session_ShouldSilenceAudioWhenUnfocused() {
-#if defined( _WIN32 )
-	return s_muteUnfocused.GetBool() && !Sys_IsGameWindowFocused();
-#else
-	return false;
-#endif
+static bool Session_ModuleSupportsMultiplayer( const char *moduleName ) {
+	return moduleName
+		&& moduleName[ 0 ]
+		&& (
+			idStr::Icmp( moduleName, "game" ) == 0 ||
+			idStr::Icmp( moduleName, "game_mp" ) == 0
+		);
+}
+
+static bool Session_IsMultiplayerGameType( const char *gameType ) {
+	return gameType && gameType[ 0 ] && idStr::Icmp( gameType, "singleplayer" ) != 0;
 }
 
 void RandomizeStack( void ) {
@@ -358,7 +458,8 @@ static void Session_DevMap_f( const idCmdArgs &args ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_mp" ) == 0 ) {
+	const char *gameType = cvarSystem->GetCVarString( "si_gameType" );
+	if ( Session_ModuleSupportsMultiplayer( activeModule ) && Session_IsMultiplayerGameType( gameType ) ) {
 		idAsyncNetwork::SetCheatsEnabled( true );
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "spawnServer %s", map.c_str() ) );
 		return;
@@ -393,12 +494,12 @@ static void Session_TestMap_f( const idCmdArgs &args ) {
 
 /*
 ==================
-Session_OpenQ4StartSingleplayer_f
+Session_OpenPreyStartSingleplayer_f
 ==================
 */
-static void Session_OpenQ4StartSingleplayer_f( const idCmdArgs &args ) {
+static void Session_OpenPreyStartSingleplayer_f( const idCmdArgs &args ) {
 	if ( args.Argc() < 2 ) {
-		common->Printf( "USAGE: openq4_startSingleplayer <map> [devmap]\n" );
+		common->Printf( "USAGE: openprey_startSingleplayer <map> [devmap]\n" );
 		return;
 	}
 
@@ -696,6 +797,13 @@ Draws and captures the current state, then starts a wipe with that image
 void idSessionLocal::StartWipe( const char *_wipeMaterial, bool hold ) {
 	console->Close();
 
+	wipeMaterial = Session_FindCompatibleWipeMaterial( _wipeMaterial );
+	if ( wipeMaterial == NULL ) {
+		common->Warning( "idSessionLocal::StartWipe: could not find wipe material '%s'", _wipeMaterial ? _wipeMaterial : "<null>" );
+		ClearWipe();
+		return;
+	}
+
 	// render the current screen into a texture for the wipe model
 	renderSystem->CropRenderSize( 640, 480, true );
 
@@ -703,8 +811,6 @@ void idSessionLocal::StartWipe( const char *_wipeMaterial, bool hold ) {
 
 	renderSystem->CaptureRenderToImage( "_scratch");
 	renderSystem->UnCrop();
-
-	wipeMaterial = declManager->FindMaterial( _wipeMaterial, false );
 
 	wipeStartTic = com_ticNumber;
 	wipeStopTic = wipeStartTic + 1000.0f / USERCMD_MSEC * com_wipeSeconds.GetFloat();
@@ -1153,10 +1259,10 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 
 	// bring up the loading screen manually, since demos won't
 	// call ExecuteMapChange()
-// jmarshall - quake 4 loading gui
-	guiLoading = uiManager->FindGui( "guis/loading/generic.gui", true, false, true );
-// jmarshall end
-	guiLoading->SetStateString( "demo", common->GetLanguageDict()->GetString( "#str_02087" ) );
+	guiLoading = Session_FindFallbackLoadingGui();
+	if ( guiLoading ) {
+		guiLoading->SetStateString( "demo", common->GetLanguageDict()->GetString( "#str_02087" ) );
+	}
 	readDemo = new idDemoFile;
 	demoName.DefaultFileExtension( ".demo" );
 	if ( !readDemo->OpenForReading( demoName ) ) {
@@ -1172,7 +1278,9 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	insideExecuteMapChange = true;
 	UpdateScreen();
 	insideExecuteMapChange = false;
-	guiLoading->SetStateString( "demo", "" );
+	if ( guiLoading ) {
+		guiLoading->SetStateString( "demo", "" );
+	}
 
 	// setup default render demo settings
 	// that's default for <= legacy engine v1.1
@@ -1200,7 +1308,7 @@ void idSessionLocal::TimeRenderDemo( const char *demoName, bool twice ) {
 
 	StartPlayingRenderDemo( demo );
 	
-	if ( twice && readDemo ) {
+	if ( twice && readDemo && guiLoading ) {
 		// cycle through once to precache everything
 		guiLoading->SetStateString( "demo", common->GetLanguageDict()->GetString( "#str_04852" ) );
 		guiLoading->StateChanged( com_frameTime );
@@ -1414,11 +1522,11 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 ) {
+	if ( !Session_ModuleSupportsSingleplayer( activeModule ) ) {
 		cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
-		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game" );
 		idCmdArgs reloadArgs;
-		reloadArgs.AppendArg( "openq4_startSingleplayer" );
+		reloadArgs.AppendArg( "openprey_startSingleplayer" );
 		reloadArgs.AppendArg( mapName );
 		reloadArgs.AppendArg( devmap ? "1" : "0" );
 		cmdSystem->SetupReloadEngine( reloadArgs );
@@ -1595,9 +1703,7 @@ void idSessionLocal::StartPlayingCmdDemo(const char *demoName) {
 		return;
 	}
 
-// jmarshall - quake 4 loading gui
-	guiLoading = uiManager->FindGui("guis/loading/generic.gui", true, false, true);
-// jmarshall end
+	guiLoading = Session_FindFallbackLoadingGui();
 	//cmdDemoFile->Read(&loadGameTime, sizeof(loadGameTime));
 
 	LoadCmdDemoFromFile(cmdDemoFile);
@@ -1693,15 +1799,20 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadingLevelName = mapName;
 	const char *loadingObjectives = "";
 	const char *loadingAuthor = "";
-	const char *loadingBackground = "gfx/guis/loadscreens/generic";
+	char loadingBackgroundPath[ MAX_STRING_CHARS ];
+	fileSystem->FindMapScreenshot( mapName, loadingBackgroundPath, sizeof( loadingBackgroundPath ) );
+	idStr loadingBackground = loadingBackgroundPath;
+	loadingBackground.StripFileExtension();
+	if ( !loadingBackground.Length() ) {
+		loadingBackground = "guis/assets/loading/loading";
+	}
 	const char *loadGuiOverride = "";
 	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
 	const char *spawnMapPath = mapSpawnData.serverInfo.GetString( "si_map", mapName );
 	const bool mapLooksMultiplayer = !idStr::Icmpn( spawnMapPath, "mp/", 3 );
 	const bool isMultiplayerLoad = mapLooksMultiplayer || ( spawnGameType[ 0 ] != '\0' && idStr::Icmp( spawnGameType, "singleplayer" ) != 0 );
 
-	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapName, false );
-	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
+	const idDeclEntityDef *mapDef = Session_FindMapDeclForLoading( mapName );
 	if ( mapDef ) {
 		loadingLevelName = common->GetLanguageDict()->GetString( mapDef->dict.GetString( "name", mapName ) );
 		loadingObjectives = common->GetLanguageDict()->GetString( mapDef->dict.GetString( "objectives", "" ) );
@@ -1729,13 +1840,15 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	} else if ( loadingObjectives[0] && uiManager->CheckGui( "guis/loading/splevel.gui" ) ) {
 		guiLoading = uiManager->FindGui( "guis/loading/splevel.gui", true, false, true );
 	} else {
-		guiLoading = uiManager->FindGui("guis/loading/generic.gui", true, false, true);
+		guiLoading = Session_FindFallbackLoadingGui();
 	}
 
 	if ( guiLoading ) {
 		guiLoading->SetStateFloat( "map_loading", 0.0f );
-		guiLoading->SetStateString( "loading_bkgnd", loadingBackground );
+		guiLoading->SetStateString( "loading_bkgnd", loadingBackground.c_str() );
+		guiLoading->SetStateString( "image", loadingBackground.c_str() );
 		guiLoading->SetStateString( "loading_levelname", loadingLevelName );
+		guiLoading->SetStateString( "friendlyname", loadingLevelName );
 		guiLoading->SetStateString( "loading_objectives", loadingObjectives );
 		guiLoading->SetStateString( "loading_author", loadingAuthor );
 		guiLoading->SetStateInt( "loading_author_visible", loadingAuthor[ 0 ] ? 1 : 0 );
@@ -1745,6 +1858,8 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		guiLoading->SetStateString( "server_ip", "" );
 		guiLoading->SetStateString( "server_gametype", "" );
 		guiLoading->SetStateString( "server_limit", "" );
+		// Prey compatibility: never require an extra keypress to leave the loading screen.
+		guiLoading->SetStateBool( "showddainfo", false );
 
 		if ( isMultiplayerLoad ) {
 			const char *serverName = mapSpawnData.serverInfo.GetString( "si_name", cvarSystem->GetCVarString( "si_name" ) );
@@ -1964,6 +2079,9 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// let the renderSystem load all the geometry
 	if ( !rw->InitFromMap( fullMapName ) ) {
+		insideExecuteMapChange = false;
+		soundSystem->SetMute( false );
+		SetPlayingSoundWorld( menuSoundWorld );
 		common->Error( "couldn't load %s", fullMapName.c_str() );
 	}
 
@@ -1974,30 +2092,30 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// set the user info
 	for ( i = 0; i < numClients; i++ ) {
-		game->SetUserInfo( i, mapSpawnData.userInfo[i], false );
+		game->SetUserInfo( i, mapSpawnData.userInfo[i], false, true );
 		game->SetPersistentPlayerInfo( i, mapSpawnData.persistentPlayerInfo[i] );
 	}
 
 	// load and spawn all other entities ( from a savegame possibly )
 	if ( loadingSaveGame && savegameFile ) {
-		if ( game->InitFromSaveGame( fullMapName, rw, savegameFile ) == false ) {
+		if ( game->InitFromSaveGame( fullMapName, rw, sw, savegameFile ) == false ) {
 			// If the loadgame failed, restart the map with the player persistent data
 			loadingSaveGame = false;
 			fileSystem->CloseFile( savegameFile );
 			savegameFile = NULL;
 
 			game->SetServerInfo( mapSpawnData.serverInfo );
-			game->InitFromNewMap( fullMapName, rw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
+			game->InitFromNewMap( fullMapName, rw, sw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
 		}
 	} else {
 		game->SetServerInfo( mapSpawnData.serverInfo );
-		game->InitFromNewMap( fullMapName, rw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
+		game->InitFromNewMap( fullMapName, rw, sw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
 	}
 
 	if ( !idAsyncNetwork::IsActive() && !loadingSaveGame ) {
 		// spawn players
 		for ( i = 0; i < numClients; i++ ) {
-			game->SpawnPlayer( i, false, NULL );
+			game->SpawnPlayer( i );
 		}
 	}
 
@@ -2016,7 +2134,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	if ( !idAsyncNetwork::IsActive() && !loadingSaveGame ) {
 		// run a few frames to allow everything to settle
 		for ( i = 0; i < 10; i++ ) {
-			game->RunFrame( mapSpawnData.mapSpawnUsercmd, 0, true, 0 ); // serverGameFrame isn't used
+			game->RunFrame( mapSpawnData.mapSpawnUsercmd );
 		}
 	}
 
@@ -2045,53 +2163,14 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 		}
 	}
 
-	const bool waitForSPContinue =
+	const bool shouldClearInputAfterLoad =
 		guiLoading &&
 		!IsMultiplayer() &&
 		!idAsyncNetwork::IsActive() &&
-		!loadingSaveGame &&
-		!com_skipLoadingContinue.GetBool();
-	if ( waitForSPContinue ) {
-		guiLoading->HandleNamedEvent( "FinishedLoading" );
-		guiLoading->StateChanged( com_frameTime );
-		UpdateScreen();
+		!loadingSaveGame;
 
-		bool waitingForContinue = true;
-		bool acceptContinueInput = false;
-		while ( waitingForContinue ) {
-			Sys_GenerateEvents();
-
-			while ( waitingForContinue ) {
-				sysEvent_t ev = eventLoop->GetEvent();
-				if ( ev.evType == SE_NONE ) {
-					break;
-				}
-
-				if ( ev.evType == SE_KEY ) {
-					idKeyInput::PreliminaryKeyEvent( ev.evValue, ( ev.evValue2 != 0 ) );
-				}
-
-				if ( ev.evType == SE_CONSOLE ) {
-					cmdSystem->BufferCommandText( CMD_EXEC_APPEND, (char *)ev.evPtr );
-					cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "\n" );
-				} else if ( waitingForContinue && acceptContinueInput && ev.evType == SE_KEY && ev.evValue2 && Session_IsLoadingContinueKey( ev.evValue ) ) {
-					waitingForContinue = false;
-				}
-
-				if ( ev.evPtr ) {
-					Mem_Free( ev.evPtr );
-				}
-			}
-
-			if ( waitingForContinue ) {
-				UpdateScreen();
-				Sys_Sleep( 16 );
-				acceptContinueInput = true;
-			}
-		}
-
-		// The same key/button used to continue would otherwise remain latched into
-		// the first gameplay frame and can immediately trigger cinematic skip.
+	// Avoid carrying stale input from loading/menu interactions into the first gameplay frame.
+	if ( shouldClearInputAfterLoad ) {
 		idKeyInput::ClearStates();
 	}
 
@@ -2458,9 +2537,9 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 ) {
+	if ( !Session_ModuleSupportsSingleplayer( activeModule ) ) {
 		cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
-		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "loadGame" );
 		reloadArgs.AppendArg( saveName );
@@ -2644,6 +2723,10 @@ void	idSessionLocal::DrawWipeModel() {
 	}
 
 	if ( !wipeHold && latchedTic >= wipeStopTic ) {
+		return;
+	}
+
+	if ( wipeMaterial == NULL ) {
 		return;
 	}
 
@@ -2912,7 +2995,15 @@ void idSessionLocal::Draw() {
 			game->Draw( GetLocalClientNum() );
 		}
 
-		if ( guiActive->State().GetBool( "gameDraw" ) ) {
+		const bool guiDrawsGame = guiActive->State().GetBool( "gameDraw" );
+		const bool fullScreenMenuGui =
+			( guiActive == guiMainMenu ) ||
+			( guiActive == guiIntro ) ||
+			( guiActive == guiLoading ) ||
+			( guiActive == guiRestartMenu ) ||
+			( guiActive == guiGameOver );
+
+		if ( guiDrawsGame ) {
 			if ( mapSpawned && !com_skipGameDraw.GetBool() && GetLocalClientNum() >= 0 ) {
 				bool gameDraw = game->Draw( GetLocalClientNum() );
 				if ( !gameDraw ) {
@@ -2923,6 +3014,10 @@ void idSessionLocal::Draw() {
 				renderSystem->SetColor( colorBlack );
 				renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
 			}
+		} else if ( fullScreenMenuGui ) {
+			// Prey menu art uses alpha-heavy layers and expects an explicitly black backdrop.
+			renderSystem->SetColor( colorBlack );
+			renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
 		}
 
 		guiActive->Redraw( com_frameTime );
@@ -3040,6 +3135,23 @@ idSessionLocal::Frame
 ===============
 */
 void idSessionLocal::Frame() {	
+	// Recover from stale mute states once gameplay is active.
+	// Don't require guiActive == NULL here: stale loading/menu GUI state can otherwise
+	// leave gameplay permanently silent after map transitions.
+	const bool shouldRestoreGameplayAudio =
+		mapSpawned &&
+		!insideExecuteMapChange &&
+		!readDemo &&
+		!writeDemo &&
+		( timeDemo == TD_NO ) &&
+		soundSystem->IsMuted();
+
+	if ( shouldRestoreGameplayAudio ) {
+		soundSystem->SetMute( false );
+		common->DPrintf( "Session: restored gameplay audio from stale mute state.\n" );
+	}
+
+	SetPlayingSoundWorld();
 	soundSystem->Render();
 
 	// Editors that completely take over the game
@@ -3190,7 +3302,7 @@ void idSessionLocal::Frame() {
 	// check for user info changes
 	if ( cvarSystem->GetModifiedFlags() & CVAR_USERINFO ) {
 		mapSpawnData.userInfo[0] = *cvarSystem->MoveCVarsToDict( CVAR_USERINFO );
-		game->SetUserInfo( 0, mapSpawnData.userInfo[0], false );
+		game->SetUserInfo( 0, mapSpawnData.userInfo[0], false, true );
 		cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
 	}
 
@@ -3299,7 +3411,7 @@ void idSessionLocal::RunGameTic() {
 
 	// run the game logic every player move
 	int	start = Sys_Milliseconds();
-	gameReturn_t	ret = game->RunFrame( &cmd, 0, true, 0 ); // jmarshall: serverGameFrame isn't used
+	gameReturn_t	ret = game->RunFrame( &cmd );
 
 	int end = Sys_Milliseconds();
 	time_gameFrame += end - start;	// note time used for com_speeds
@@ -3376,7 +3488,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "writePrecache", Sess_WritePrecache_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "writes precache commands" );
 
 #ifndef	ID_DEDICATED
-	cmdSystem->AddCommand( "openq4_startSingleplayer", Session_OpenQ4StartSingleplayer_f, CMD_FL_SYSTEM, "internal helper to start singleplayer after game-module switches" );
+	cmdSystem->AddCommand( "openprey_startSingleplayer", Session_OpenPreyStartSingleplayer_f, CMD_FL_SYSTEM, "internal helper to start singleplayer after game-module switches" );
 	cmdSystem->AddCommand( "map", Session_Map_f, CMD_FL_SYSTEM, "loads a map", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "devmap", Session_DevMap_f, CMD_FL_SYSTEM, "loads a map in developer mode", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "testmap", Session_TestMap_f, CMD_FL_SYSTEM, "tests a map", idCmdSystem::ArgCompletion_MapName );
@@ -3420,6 +3532,15 @@ void idSessionLocal::Init() {
 
 	cmdSystem->AddCommand( "hitch", Session_Hitch_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "hitches the game" );
 
+	// Keep gameplay audio active unless explicit muting is requested by game code.
+	// Stale archived focus-mute settings can otherwise leave sound permanently muted.
+	s_muteUnfocused.SetBool( false );
+
+	// Enforce windowed runtime policy for local development and validation runs.
+	cvarSystem->SetCVarInteger( "r_fullscreen", 0 );
+	cvarSystem->SetCVarInteger( "r_fullscreenDesktop", 0 );
+	cvarSystem->SetCVarInteger( "r_borderless", 0 );
+
 	// the same idRenderWorld will be used for all games
 	// and demos, insuring that level specific models
 	// will be freed
@@ -3438,7 +3559,12 @@ void idSessionLocal::Init() {
 	guiMainMenu_MapList->Config( guiMainMenu, "mapList" );
 	idAsyncNetwork::client.serverList.GUIConfig( guiMainMenu, "serverList" );
 	guiRestartMenu = uiManager->FindGui( "guis/restart.gui", true, false, true );
-	guiGameOver = uiManager->FindGui( "guis/gameover.gui", true, false, true );
+	if ( fileSystem->ReadFile( "guis/gameover.gui", NULL ) > 0 ) {
+		guiGameOver = uiManager->FindGui( "guis/gameover.gui", true, false, true );
+	} else {
+		guiGameOver = guiMainMenu;
+		common->DPrintf( "Session: guis/gameover.gui not found, using main menu fallback.\n" );
+	}
 	guiMsg = uiManager->FindGui( "guis/msg.gui", true, false, true );
 	guiTakeNotes = uiManager->FindGui( "guis/takeNotes.gui", true, false, true );
 	guiIntro = uiManager->FindGui( "guis/intro.gui", true, false, true );
@@ -3484,17 +3610,15 @@ idSessionLocal::SetPlayingSoundWorld
 ===============
 */
 void idSessionLocal::SetPlayingSoundWorld( idSoundWorld *soundWorld ) {
-	idSoundWorld *targetSoundWorld = soundWorld;
-
-	if ( targetSoundWorld != NULL && Session_ShouldSilenceAudioWhenUnfocused() ) {
-		targetSoundWorld = NULL;
-	}
-
-	soundSystem->SetPlayingSoundWorld( targetSoundWorld );
+	soundSystem->SetPlayingSoundWorld( soundWorld );
 }
 
 void idSessionLocal::SetPlayingSoundWorld() {
-	if ( guiActive && ( guiActive == guiMainMenu || guiActive == guiIntro || guiActive == guiLoading || ( guiActive == guiMsg && !mapSpawned ) ) ) {
+	// Once a map is live, always drive gameplay audio from the game sound world.
+	// This avoids silent gameplay when intro/loading/message GUIs remain active.
+	if ( mapSpawned ) {
+		SetPlayingSoundWorld( sw );
+	} else if ( guiActive && ( guiActive == guiMainMenu || guiActive == guiIntro || guiActive == guiLoading || ( guiActive == guiMsg && !mapSpawned ) ) ) {
 		SetPlayingSoundWorld( menuSoundWorld );
 	} else {
 		SetPlayingSoundWorld( sw );

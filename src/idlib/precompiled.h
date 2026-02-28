@@ -222,8 +222,8 @@ public:
 #include "../idlib/Lib.h"
 
 // framework
-#include "../framework/BuildVersion.h"
 #include "../framework/BuildDefines.h"
+#include "../framework/BuildVersion.h"
 #include "../framework/Licensee.h"
 #include "../framework/CmdSystem.h"
 #include "../framework/CVarSystem.h"
@@ -237,6 +237,8 @@ public:
 #include "../framework/DeclTable.h"
 #include "../framework/DeclSkin.h"
 #include "../framework/DeclEntityDef.h"
+#include "../framework/DeclFX.h"
+#include "../framework/DeclParticle.h"
 #include "../framework/DeclAF.h"
 // RAVEN BEGIN
 // jscott: new decl types
@@ -244,6 +246,7 @@ public:
 #include "../framework/declMatType.h"
 #include "../framework/declLipSync.h"
 #include "../framework/declPlayback.h"
+#include "../framework/declPreyBeam.h"
 // RAVEN END
 
 // We have expression parsing and evaluation code in multiple places:
@@ -284,6 +287,9 @@ const float MAX_BOUND_SIZE = 65536.0f;
 // AAS files and manager
 #include "../aas/AASFile.h"
 #include "../aas/AASFileManager.h"
+
+// Exposed to both engine and game.
+#include "../preyengine/profiler.h"
 
 // game
 #include "../game/Game.h"

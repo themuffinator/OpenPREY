@@ -1157,7 +1157,15 @@ bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC ) {
 		return false;
 	}
 
-	if ( !src.ReadToken( &token ) || token != AAS_FILEVERSION ) {
+	if ( !src.ReadToken( &token ) ) {
+		common->Warning( "AAS file '%s' has no version", name.c_str() );
+		return false;
+	}
+#ifdef HUMANHEAD
+	if ( token != AAS_FILEVERSION && token != "1.07" ) {
+#else
+	if ( token != AAS_FILEVERSION ) {
+#endif
 		common->Warning( "AAS file '%s' has version %s instead of %s", name.c_str(), token.c_str(), AAS_FILEVERSION );
 		return false;
 	}
@@ -1169,7 +1177,7 @@ bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC ) {
 
 	c = token.GetUnsignedLongValue();
 	if ( mapFileCRC && c != mapFileCRC ) {
-		common->Warning( "AAS file '%s' is out of date", name.c_str() );
+		common->DPrintf( "AAS file '%s' is out of date\n", name.c_str() );
 		return false;
 	}
 

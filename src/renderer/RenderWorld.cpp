@@ -1088,6 +1088,7 @@ guiPoint_t	idRenderWorldLocal::GuiTrace( qhandle_t entityHandle, const idVec3 st
 	guiPoint_t	pt;
 
 	pt.x = pt.y = -1;
+	pt.frac = 1.0f;
 	pt.guiId = 0;
 
 	if ( ( entityHandle < 0 ) || ( entityHandle >= entityDefs.Num() ) ) {
@@ -1145,6 +1146,7 @@ guiPoint_t	idRenderWorldLocal::GuiTrace( qhandle_t entityHandle, const idVec3 st
 
 			pt.x = ( cursor * axis[0] ) / ( axisLen[0] * axisLen[0] );
 			pt.y = ( cursor * axis[1] ) / ( axisLen[1] * axisLen[1] );
+			pt.frac = local.fraction;
 			pt.guiId = shader->GetEntityGui();
 
 			return pt;
@@ -1256,7 +1258,7 @@ bool idRenderWorldLocal::ModelTrace( modelTrace_t &trace, qhandle_t entityHandle
 idRenderWorldLocal::Trace
 ===================
 */
-// FIXME: _D3XP added those.
+// Legacy model name fallbacks for skipPlayer traces.
 const char* playerModelExcludeList[] = {
 	"models/md5/characters/player/d3xp_spplayer.md5mesh",
 	"models/md5/characters/player/head/d3xp_head.md5mesh",
@@ -1268,6 +1270,44 @@ const char* playerMaterialExcludeList[] = {
 	"muzzlesmokepuff",
 	NULL
 };
+
+static bool ShouldSkipPlayerTraceEntity( const idRenderEntityLocal* def, const idRenderModel* model ) {
+	// Preferred signal: player/world-weapon style view suppression flags.
+	// This covers Prey player models without hardcoding every mesh path.
+	if ( def != NULL ) {
+		if ( def->parms.suppressSurfaceInViewID != 0 || def->parms.allowSurfaceInViewID != 0 ) {
+			return true;
+		}
+	}
+
+	if ( model == NULL ) {
+		return false;
+	}
+
+	const idStr modelName = model->Name();
+	if ( modelName.IsEmpty() ) {
+		return false;
+	}
+
+	// Prey player/world models are authored under models/player/.
+	if ( modelName.Icmpn( "models/player/", 14 ) == 0 ) {
+		return true;
+	}
+
+	// Legacy Doom 3/D3XP player model locations.
+	if ( modelName.Icmpn( "models/md5/characters/player/", 29 ) == 0 ) {
+		return true;
+	}
+
+	// Keep exact legacy exclusions for compatibility.
+	for ( int k = 0; playerModelExcludeList[k]; ++k ) {
+		if ( modelName == playerModelExcludeList[k] ) {
+			return true;
+		}
+	}
+
+	return false;
+}
 
 bool idRenderWorldLocal::Trace( modelTrace_t &trace, const idVec3 &start, const idVec3 &end, const float radius, bool skipDynamic, bool skipPlayer /*_D3XP*/ ) const {
 	areaReference_t * ref;
@@ -1314,24 +1354,9 @@ bool idRenderWorldLocal::Trace( modelTrace_t &trace, const idVec3 &start, const 
 					continue;
 				}
 
-#if 1	/* _D3XP addition. could use a cleaner approach */
-				if ( skipPlayer ) {
-					idStr name = model->Name();
-					const char *exclude;
-					int k;
-
-					for ( k = 0; playerModelExcludeList[k]; k++ ) {
-						exclude = playerModelExcludeList[k];
-						if ( name == exclude ) {
-							break;
-						}
-					}
-
-					if ( playerModelExcludeList[k] ) {
-						continue;
-					}
+				if ( skipPlayer && ShouldSkipPlayerTraceEntity( def, model ) ) {
+					continue;
 				}
-#endif
 
 				model = R_EntityDefDynamicModel( def );
 				if ( !model ) {

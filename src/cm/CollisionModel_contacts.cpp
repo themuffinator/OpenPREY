@@ -58,9 +58,17 @@ int idCollisionModelManagerLocal::Contacts( contactInfo_t *contacts, const int m
 	trace_t results;
 	idVec3 end;
 
-	// If the model is NULL then assume we are checking the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	// Legacy game code may pass NULL to indicate the world model.
+	if ( model == NULL && models != NULL && numModels > 0 ) {
+		model = models[0];
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		return 0;
 	}
 
 	// same as Translation but instead of storing the first collision we store all collisions as contacts

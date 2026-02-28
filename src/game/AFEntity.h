@@ -1,3 +1,5 @@
+// Copyright (C) 2004 Id Software, Inc.
+//
 
 #ifndef __GAME_AFENTITY_H__
 #define __GAME_AFENTITY_H__
@@ -65,13 +67,8 @@ idAFAttachment
 ===============================================================================
 */
 
-typedef struct {
-	jointModTransform_t		mod;
-	jointHandle_t			from;
-	jointHandle_t			to;
-} copyJoints_t;
-
-class idAFAttachment : public idAnimatedEntity {
+// HUMANHEAD pdm: Changed to inherit from hhAnimatedEntity
+class idAFAttachment : public hhAnimatedEntity {
 public:
 	CLASS_PROTOTYPE( idAFAttachment );
 
@@ -83,89 +80,36 @@ public:
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
 
-	void					SetBody			( idAnimatedEntity* body, const char *headModel, jointHandle_t damageJoint );
-	void					SetDamageJoint	( jointHandle_t damageJoint );
-	void					ClearBody		( void );
-	idEntity *				GetBody			( void ) const;
+	void					SetBody( idEntity *bodyEnt, const char *headModel, jointHandle_t attachJoint );
+	void					ClearBody( void );
+	idEntity *				GetBody( void ) const;
 
-	virtual void			Think						( void );
+	virtual void			Think( void );
 
-	virtual void			Hide						( void );
-	virtual void			Show						( void );
+	virtual void			Hide( void );
+	virtual void			Show( void );
 
-// RAVEN BEGIN
-// bdube: added channel
-	virtual bool			UpdateAnimationControllers	( void );
-
-	void					PlayIdleAnim( int channel, int blendTime );
-
-							// Returns the entity that should take damage for this entity
-	virtual idEntity*		GetDamageEntity ( void );
-							// for getting th speaker position
-	virtual	bool			GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis );
-
-// jshepard: animations for heads
-	void					Event_PlayAnim ( int channel, const char *animname );
-// jdischler: animations for heads
-	void					Event_PlayCycle ( int channel, const char *animname );
-	void					Event_ClearAnims ( void );
-
-
-// RAVEN END
+	void					PlayIdleAnim( int blendTime );
 
 	virtual void			GetImpactInfo( idEntity *ent, int id, const idVec3 &point, impactInfo_t *info );
-	virtual void			ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse, bool splash = false );
+	virtual void			ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse );
 	virtual void			AddForce( idEntity *ent, int id, const idVec3 &point, const idVec3 &force );
 
 	virtual	void			Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location );
-	virtual bool			CanPlayImpactEffect ( idEntity* attacker, idEntity* target );
-	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, idEntity* inflictor );
+	virtual void			AddDamageEffect( const trace_t &collision, const idVec3 &velocity, const char *damageDefName, bool broadcast = false ); //HUMANHEAD rww - added broadcast
 
 	void					SetCombatModel( void );
 	idClipModel *			GetCombatModel( void ) const;
 	virtual void			LinkCombat( void );
 	virtual void			UnlinkCombat( void );
 
-	// Lipsync
-	int						StartLipSyncing( const char *speechDecl );
-	void					HandleLipSync( void );
-	void					EndLipSyncing( void );
-	bool					IsLipSyncing( void ) const;
-
-	void					InitCopyJoints			( void );
-
-	void					CopyJointsFromBody		( void );
-
-	bool					GetNoPlayerImpactFX( void );
-
 protected:
-
-
-	idEntityPtr<idAnimatedEntity>	body;
-	idClipModel *					combatModel;	// render model for hit detection of head
-	int								idleAnim;
-	jointHandle_t					damageJoint;
-
-	jointHandle_t					soundJoint;
-
-	int								lipSyncAnim;	// Anim that contains the visemes
-	class rvLipSyncData*			lipSyncData;	// The current instance of lip syncing data
-
-	idList<copyJoints_t>			copyJoints;		// copied from the body animation to the head model
-
-	bool							noPlayerImpactFX;
+	idEntity *				body;
+	idClipModel *			combatModel;	// render model for hit detection of head
+	int						idleAnim;
+	jointHandle_t			attachJoint;
 };
 
-// RAVEN BEGIN
-// bdube: inlines
-ID_INLINE bool idAFAttachment::IsLipSyncing( void ) const {
-	return !!lipSyncData;
-}
-
-ID_INLINE void idAFAttachment::SetDamageJoint ( jointHandle_t _damageJoint ) {
-	damageJoint = _damageJoint;
-}
-// RAVEN END
 
 /*
 ===============================================================================
@@ -175,7 +119,12 @@ idAFEntity_Base
 ===============================================================================
 */
 
-class idAFEntity_Base : public idAnimatedEntity {
+// HUMANHEAD nla
+extern const idEventDef EV_Dispose;
+// HUMANHEAD
+
+// HUMANHEAD pdm: inherit from hhAnimatedEntity
+class idAFEntity_Base : public hhAnimatedEntity {
 public:
 	CLASS_PROTOTYPE( idAFEntity_Base );
 
@@ -189,15 +138,14 @@ public:
 
 	virtual void			Think( void );
 	virtual void			GetImpactInfo( idEntity *ent, int id, const idVec3 &point, impactInfo_t *info );
-	virtual void			ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse, bool splash = false );
+	virtual void			ApplyImpulse( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse );
 	virtual void			AddForce( idEntity *ent, int id, const idVec3 &point, const idVec3 &force );
-	virtual bool			CanPlayImpactEffect ( idEntity* attacker, idEntity* target );
 	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity );
 	virtual bool			GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis );
 	virtual bool			UpdateAnimationControllers( void );
 	virtual void			FreeModelDef( void );
 
-	virtual bool			LoadAF( const char* keyname = NULL );
+	virtual bool			LoadAF( void );
 	bool					IsActiveAF( void ) const { return af.IsActive(); }
 	const char *			GetAFName( void ) const { return af.GetName(); }
 	idPhysics_AF *			GetAFPhysics( void ) { return af.GetPhysics(); }
@@ -215,13 +163,18 @@ public:
 	void					LoadState( const idDict &args );
 
 	void					AddBindConstraints( void );
+	void					AddBindConstraint( constraintType_t type, int bodyId, jointHandle_t joint );
 	void					RemoveBindConstraints( void );
 
 	virtual void			ShowEditingDialog( void );
 
 	static void				DropAFs( idEntity *ent, const char *type, idList<idEntity *> *list );
 
-	bool					GetNoPlayerImpactFX( void );
+	// HUMANHEAD nla
+	virtual bool			CheckImpulse( idEntity *impulseSource );
+	virtual bool			IsImpulseFromSelf( void ) { return( impulseFromSelf ); }
+	void					Event_SetCollision(int on);
+	// HUMANHEAD END
 
 protected:
 	idAF					af;				// articulated figure
@@ -230,8 +183,12 @@ protected:
 	idVec3					spawnOrigin;	// spawn origin
 	idMat3					spawnAxis;		// rotation axis used when spawned
 	int						nextSoundTime;	// next time this can make a sound
+	int						numSplats;		// HUMANHEAD bjk: splat counter
+	idVec3					splats[16];
 
-	bool					noPlayerImpactFX;
+	// HUMANHEAD nla
+	bool					impulseFromSelf;	// nla Is the impulse from ourselves.  (Used for ragdolls/making sure the ragdolls behave the same regardless if they are made up of 1 body or 100 bodies)
+	// HUMANHEAD END
 
 	void					Event_SetConstraintPosition( const char *name, const idVec3 &pos );
 };
@@ -261,6 +218,10 @@ public:
 	virtual	void			Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location );
 	virtual void			SpawnGibs( const idVec3 &dir, const char *damageDefName );
 
+	// HUMANHEAD mdl:  Moved from idAFEntity_Base
+	virtual	bool			CheckRagdollDamage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, int location );
+	// HUMANHEAD END
+
 protected:
 	idRenderModel *			skeletonModel;
 	int						skeletonModelDefHandle;
@@ -270,6 +231,11 @@ protected:
 	void					InitSkeletonModel( void );
 
 	void					Event_Gib( const char *damageDefName );
+
+	// HUMANHEAD mdl
+protected:
+	int						gibHealth;		// Health at which you gib
+	// HUMANHEAD END
 };
 
 /*
@@ -322,7 +288,7 @@ public:
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
 
-	virtual void			SetupHead( const char* headDefName = "" );
+	void					SetupHead( void );
 
 	virtual void			Think( void );
 
@@ -336,9 +302,8 @@ public:
 protected:
 	virtual void			Gib( const idVec3 &dir, const char *damageDefName );
 
-	idEntityPtr<idAFAttachment>	head;				// safe pointer to attached head
-
 private:
+	idEntityPtr<idAFAttachment>	head;
 
 	void					Event_Gib( const char *damageDefName );
 	void					Event_Activate( idEntity *activator );
@@ -369,9 +334,35 @@ protected:
 	float					wheelRadius;
 	float					steerAngle;
 	float					steerSpeed;
-//	const idDeclParticle *	dustSmoke;
+	const idDeclParticle *	dustSmoke;
 
 	float					GetSteerAngle( void );
+};
+
+
+/*
+===============================================================================
+
+idAFEntity_VehicleSimple
+
+===============================================================================
+*/
+
+class idAFEntity_VehicleSimple : public idAFEntity_Vehicle {
+public:
+	CLASS_PROTOTYPE( idAFEntity_VehicleSimple );
+
+							idAFEntity_VehicleSimple( void );
+							~idAFEntity_VehicleSimple( void );
+
+	void					Spawn( void );
+	virtual void			Think( void );
+
+protected:
+	idClipModel *			wheelModel;
+	idAFConstraint_Suspension *	suspension[4];
+	jointHandle_t			wheelJoints[4];
+	float					wheelAngles[4];
 };
 
 
@@ -482,27 +473,5 @@ private:
 	void					Event_SetFingerAngle( float angle );
 	void					Event_StopFingers( void );
 };
-
-// RAVEN BEGIN
-// bdube: AFAttractor
-
-/*
-===============================================================================
-
-idAFAttractor
-
-===============================================================================
-*/
-
-class rvAFAttractor : public idEntity {
-public:
-	CLASS_PROTOTYPE( rvAFAttractor );
-
-							rvAFAttractor( void ) { }
-
-private:
-};
-
-// RAVEN END
 
 #endif /* !__GAME_AFENTITY_H__ */
