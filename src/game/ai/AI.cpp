@@ -833,13 +833,16 @@ void idAI::Spawn( void ) {
 
 	lookJoints.SetGranularity( 1 );
 	lookJointAngles.SetGranularity( 1 );
+	idStrList invalidLookJointNames;
+	invalidLookJointNames.SetGranularity( 1 );
+	int validLookJointCount = 0;
 	kv = spawnArgs.MatchPrefix( "look_joint", NULL );
 	while( kv ) {
 		jointName = kv->GetKey();
 		jointName.StripLeadingOnce( "look_joint " );
 		joint = animator.GetJointHandle( jointName );
 		if ( joint == INVALID_JOINT ) {
-			gameLocal.Warning( "Unknown look_joint '%s' on entity %s", jointName.c_str(), name.c_str() );
+			invalidLookJointNames.Append( jointName );
 		} else {
 			jointScale = spawnArgs.GetAngles( kv->GetKey(), "0 0 0" );
 			jointScale.roll = 0.0f;
@@ -849,9 +852,19 @@ void idAI::Spawn( void ) {
 			if ( jointScale != ang_zero ) {
 				lookJoints.Append( joint );
 				lookJointAngles.Append( jointScale );
+				validLookJointCount++;
 			}
 		}
 		kv = spawnArgs.MatchPrefix( "look_joint", kv );
+	}
+	if ( invalidLookJointNames.Num() > 0 ) {
+		if ( validLookJointCount == 0 ) {
+			for ( int i = 0; i < invalidLookJointNames.Num(); i++ ) {
+				gameLocal.Warning( "Unknown look_joint '%s' on entity %s", invalidLookJointNames[ i ].c_str(), name.c_str() );
+			}
+		} else {
+			gameLocal.DWarning( "Ignoring %d unknown look_joint entries on entity %s", invalidLookJointNames.Num(), name.c_str() );
+		}
 	}
 
 	// calculate joint positions on attack frames so we can do proper "can hit" tests

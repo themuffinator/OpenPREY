@@ -784,6 +784,8 @@ void Cmd_SetViewpos_f( const idCmdArgs &args ) {
 	origin.z -= pm_normalviewheight.GetFloat() - 0.25f;
 
 	player->Teleport( origin, angles, NULL );
+	// Ensure teleports immediately process nearby triggers.
+	player->TouchTriggers();
 }
 
 /*

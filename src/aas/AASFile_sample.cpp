@@ -578,7 +578,7 @@ idAASFileLocal::MaxTreeDepth_r
 void idAASFileLocal::MaxTreeDepth_r( int nodeNum, int &depth, int &maxDepth ) const {
 	const aasNode_t *node;
 
-	if ( nodeNum <= 0 ) {
+	if ( nodeNum <= 0 || nodeNum >= nodes.Num() ) {
 		return;
 	}
 
@@ -601,6 +601,10 @@ idAASFileLocal::MaxTreeDepth
 */
 int idAASFileLocal::MaxTreeDepth( void ) const {
 	int depth, maxDepth;
+
+	if ( nodes.Num() <= 1 ) {
+		return 0;
+	}
 
 	depth = maxDepth = 0;
 	MaxTreeDepth_r( 1, depth, maxDepth );

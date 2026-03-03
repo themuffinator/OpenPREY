@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "DXT/DXTCodec.h"
 
 /*
 
@@ -114,6 +115,7 @@ void R_WriteTGA( const char *filename, const byte *data, int width, int height, 
 
 static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
 static void LoadJPG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
+static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
 
 /*
 ========================================================================
@@ -565,6 +567,106 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
 
 //===================================================================
 
+static ID_INLINE uint32 R_ReadLittleUInt32( const byte *data ) {
+	return ( (uint32)data[0] ) | ( (uint32)data[1] << 8 ) | ( (uint32)data[2] << 16 ) | ( (uint32)data[3] << 24 );
+}
+
+static ID_INLINE uint32 R_MakeFourCC( const char a, const char b, const char c, const char d ) {
+	return ( (uint32)(byte)a ) | ( (uint32)(byte)b << 8 ) | ( (uint32)(byte)c << 16 ) | ( (uint32)(byte)d << 24 );
+}
+
+/*
+=============
+LoadDDS
+=============
+*/
+static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp ) {
+	int fileSize;
+	byte *buffer;
+
+	if ( !pic ) {
+		fileSystem->ReadFile( name, NULL, timestamp );
+		return;
+	}
+
+	*pic = NULL;
+
+	fileSize = fileSystem->ReadFile( name, (void **)&buffer, timestamp );
+	if ( !buffer ) {
+		return;
+	}
+
+	// DDS magic + 124-byte header.
+	if ( fileSize < 128 ) {
+		fileSystem->FreeFile( buffer );
+		return;
+	}
+
+	const uint32 magic = R_ReadLittleUInt32( buffer + 0 );
+	const uint32 headerSize = R_ReadLittleUInt32( buffer + 4 );
+	if ( magic != R_MakeFourCC( 'D', 'D', 'S', ' ' ) || headerSize != 124 ) {
+		fileSystem->FreeFile( buffer );
+		return;
+	}
+
+	const uint32 ddsHeight = R_ReadLittleUInt32( buffer + 12 );
+	const uint32 ddsWidth = R_ReadLittleUInt32( buffer + 16 );
+	const uint32 pixelFormatFlags = R_ReadLittleUInt32( buffer + 80 );
+	const uint32 fourCC = R_ReadLittleUInt32( buffer + 84 );
+
+	if ( ddsWidth == 0 || ddsHeight == 0 || ( pixelFormatFlags & 0x4 ) == 0 ) {
+		fileSystem->FreeFile( buffer );
+		return;
+	}
+
+	int blockSize = 0;
+	enum ddsCompression_t {
+		DDS_COMPRESSION_DXT1,
+		DDS_COMPRESSION_DXT5
+	} compression;
+
+	if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '1' ) ) {
+		blockSize = 8;
+		compression = DDS_COMPRESSION_DXT1;
+	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '5' ) ) {
+		blockSize = 16;
+		compression = DDS_COMPRESSION_DXT5;
+	} else {
+		fileSystem->FreeFile( buffer );
+		return;
+	}
+
+	const int blocksWide = Max( 1, (int)( ( ddsWidth + 3 ) >> 2 ) );
+	const int blocksHigh = Max( 1, (int)( ( ddsHeight + 3 ) >> 2 ) );
+	const int levelSize = blocksWide * blocksHigh * blockSize;
+	const int dataOffset = 128;
+
+	if ( fileSize < ( dataOffset + levelSize ) ) {
+		fileSystem->FreeFile( buffer );
+		return;
+	}
+
+	byte *ddsRgba = (byte *)R_StaticAlloc( ddsWidth * ddsHeight * 4 );
+	idDxtDecoder decoder;
+	if ( compression == DDS_COMPRESSION_DXT1 ) {
+		decoder.DecompressImageDXT1( buffer + dataOffset, ddsRgba, ddsWidth, ddsHeight );
+	} else {
+		decoder.DecompressImageDXT5( buffer + dataOffset, ddsRgba, ddsWidth, ddsHeight );
+	}
+
+	*pic = ddsRgba;
+	if ( width ) {
+		*width = ddsWidth;
+	}
+	if ( height ) {
+		*height = ddsHeight;
+	}
+
+	fileSystem->FreeFile( buffer );
+}
+
+//===================================================================
+
 /*
 =================
 R_LoadImage
@@ -572,7 +674,7 @@ R_LoadImage
 Loads any of the supported image types into a cannonical
 32 bit format.
 
-Automatically attempts to load .jpg files if .tga files fail to load.
+Automatically attempts to load .jpg / .dds files if .tga files fail to load.
 
 *pic will be NULL if the load failed.
 
@@ -622,8 +724,20 @@ void R_LoadImage( const char *cname, byte **pic, int *width, int *height, ID_TIM
 			name.DefaultFileExtension( ".jpg" );
 			LoadJPG( name.c_str(), pic, width, height, timestamp );
 		}
+		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
+			name.StripFileExtension();
+			name.DefaultFileExtension( ".dds" );
+			LoadDDS( name.c_str(), pic, width, height, timestamp );
+		}
 	} else if ( ext == "jpg" ) {
 		LoadJPG( name.c_str(), pic, width, height, timestamp );
+		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
+			name.StripFileExtension();
+			name.DefaultFileExtension( ".dds" );
+			LoadDDS( name.c_str(), pic, width, height, timestamp );
+		}
+	} else if ( ext == "dds" ) {
+		LoadDDS( name.c_str(), pic, width, height, timestamp );
 	}
 
 	if ( ( width && *width < 1 ) || ( height && *height < 1 ) ) {

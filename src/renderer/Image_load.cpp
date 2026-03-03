@@ -59,6 +59,27 @@ int BitsForFormat( textureFormat_t format ) {
 
 /*
 ========================
+R_ShouldSuppressMissingImageWarning
+
+Suppress warning noise for known optional references that already fall back
+to a safe transparent placeholder.
+========================
+*/
+static bool R_ShouldSuppressMissingImageWarning( const char *imageName ) {
+	if ( imageName == NULL || imageName[0] == '\0' ) {
+		return true;
+	}
+	if ( idStr::Icmp( imageName, "_emptyname" ) == 0 ) {
+		return true;
+	}
+	if ( idStr::Icmp( imageName, "textures/common_misc/flickerflare" ) == 0 ) {
+		return true;
+	}
+	return false;
+}
+
+/*
+========================
 idImage::DeriveOpts
 ========================
 */
@@ -463,7 +484,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 			}
 
 			if ( pic == NULL ) {
-				idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
+				if ( !R_ShouldSuppressMissingImageWarning( GetName() ) ) {
+					idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
+				}
 				// create a default so it doesn't get continuously reloaded
 				opts.width = 8;
 				opts.height = 8;

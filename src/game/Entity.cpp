@@ -4072,7 +4072,13 @@ bool idEntity::TouchTriggers( void ) const {
 		}
 		//HUMANHEAD END
 
-		if ( !GetPhysics()->ClipContents( cm ) ) {
+		bool triggerHit = ( GetPhysics()->ClipContents( cm ) != 0 );
+		if ( !triggerHit && IsType( idPlayer::Type ) ) {
+			// x64 can miss some precise trigger contacts for the player hull.
+			// Fall back to bounds overlap to keep trigger chains reliable.
+			triggerHit = GetPhysics()->GetAbsBounds().IntersectsBounds( cm->GetAbsBounds() );
+		}
+		if ( !triggerHit ) {
 			continue;
 		}
 
