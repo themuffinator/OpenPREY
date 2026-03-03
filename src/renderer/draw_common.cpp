@@ -1451,6 +1451,8 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 			
 			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, newStage->vertexProgram );
 			glEnable( GL_VERTEX_PROGRAM_ARB );
+			glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, newStage->fragmentProgram );
+			glEnable( GL_FRAGMENT_PROGRAM_ARB );
 
 			// megaTextures bind a lot of images and set a lot of parameters
 			//if ( newStage->megaTexture ) {
@@ -1467,6 +1469,14 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 				parm[2] = regs[ newStage->vertexParms[i][2] ];
 				parm[3] = regs[ newStage->vertexParms[i][3] ];
 				glProgramLocalParameter4fvARB( GL_VERTEX_PROGRAM_ARB, i, parm );
+			}
+
+			for ( int i = 0; i < newStage->numFragmentParms; i++ ) {
+				float parm[4];
+				parm[0] = regs[ newStage->fragmentParms[i][0] ];
+				parm[1] = regs[ newStage->fragmentParms[i][1] ];
+				parm[2] = regs[ newStage->fragmentParms[i][2] ];
+				parm[3] = regs[ newStage->fragmentParms[i][3] ];
 				glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, i, parm );
 			}
 
@@ -1476,8 +1486,6 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					newStage->fragmentProgramImages[i]->Bind();
 				}
 			}
-			glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, newStage->fragmentProgram );
-			glEnable( GL_FRAGMENT_PROGRAM_ARB );
 
 			// draw it
 			RB_DrawElementsWithCounters( tri );

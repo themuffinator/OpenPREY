@@ -70,19 +70,10 @@ typedef struct mtrParsingData_s {
 
 idCVar r_useFragmentProgramMaterials(
 	"r_useFragmentProgramMaterials",
-	"0",
+	"1",
 	CVAR_RENDERER | CVAR_ARCHIVE,
-	"enable shaderLevel2/3 fragment-program material stages; disabled by default until Prey blend-shader interactions are fully supported"
+	"enable fragment-program material conditions"
 );
-
-static int MaterialCapabilityRegisterForShaderLevel( const int level ) {
-	if ( level >= 2 ) {
-		return EXP_REG_FRAGMENT_PROGRAMS;
-	}
-
-	// shaderLevel1 is always supported on supported backends.
-	return -1;
-}
 
 
 /*
@@ -978,9 +969,8 @@ void idMaterial::ParseBlend( idLexer &src, shaderStage_t *stage ) {
 		return;
 	}
 	if ( !token.Icmp( "shader" ) ) {
-		// Prey uses this for programmable opaque interaction passes.
-		// Treat as explicit opaque blending so fragment/vertex program skin stages render correctly.
-		stage->drawStateBits = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO;
+		// Prey programmable shader stages accumulate per-mask contributions.
+		stage->drawStateBits = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE;
 		return;
 	}
 	if ( !token.Icmp( "add" ) ) {
@@ -1071,6 +1061,59 @@ void idMaterial::ParseVertexParm( idLexer &src, newShaderStage_t *newStage ) {
 	}
 
 	newStage->vertexParms[parm][3] = ParseExpression( src );
+}
+
+/*
+================
+idMaterial::ParseFragmentParm
+
+If there is a single value, it will be repeated across all elements
+If there are two values, 3 = 0.0, 4 = 1.0
+if there are three values, 4 = 1.0
+================
+*/
+void idMaterial::ParseFragmentParm( idLexer &src, newShaderStage_t *newStage ) {
+	idToken token;
+
+	src.ReadTokenOnLine( &token );
+	int parm = token.GetIntValue();
+	if ( !token.IsNumeric() || parm < 0 || parm >= MAX_FRAGMENT_PARMS ) {
+		common->Warning( "bad fragmentParm number\n" );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+	if ( parm >= newStage->numFragmentParms ) {
+		newStage->numFragmentParms = parm + 1;
+	}
+
+	newStage->fragmentParms[parm][0] = ParseExpression( src );
+
+	src.ReadTokenOnLine( &token );
+	if ( !token[0] || token.Icmp( "," ) ) {
+		newStage->fragmentParms[parm][1] =
+		newStage->fragmentParms[parm][2] =
+		newStage->fragmentParms[parm][3] = newStage->fragmentParms[parm][0];
+		return;
+	}
+
+	newStage->fragmentParms[parm][1] = ParseExpression( src );
+
+	src.ReadTokenOnLine( &token );
+	if ( !token[0] || token.Icmp( "," ) ) {
+		newStage->fragmentParms[parm][2] = GetExpressionConstant( 0 );
+		newStage->fragmentParms[parm][3] = GetExpressionConstant( 1 );
+		return;
+	}
+
+	newStage->fragmentParms[parm][2] = ParseExpression( src );
+
+	src.ReadTokenOnLine( &token );
+	if ( !token[0] || token.Icmp( "," ) ) {
+		newStage->fragmentParms[parm][3] = GetExpressionConstant( 1 );
+		return;
+	}
+
+	newStage->fragmentParms[parm][3] = ParseExpression( src );
 }
 
 
@@ -1902,8 +1945,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			continue;
 		}
 		if ( !token.Icmp( "fragmentParm" ) ) {
-			// ARB fragment program locals share the same local parameter slots.
-			ParseVertexParm( src, &newStage );
+			ParseFragmentParm( src, &newStage );
 			continue;
 		}
 
@@ -1947,23 +1989,11 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			continue;
 		}
 		if ( !token.Icmpn( "shaderlevel", 11 ) ) {
-			const int requiredLevel = atoi( token.c_str() + 11 );
-			const int capabilityRegister = MaterialCapabilityRegisterForShaderLevel( requiredLevel );
-			if ( capabilityRegister != -1 ) {
-				// Gate authored shader levels at runtime so materials parsed before GL init
-				// still evaluate correctly once renderer capabilities are known.
-				ss->conditionRegister = EmitOp( ss->conditionRegister, capabilityRegister, OP_TYPE_AND );
-			}
+			// Prey parses this token but keeps authored fallback and programmable
+			// stages active together on ARB2-capable paths.
 			continue;
 		}
 		if ( !token.Icmpn( "shaderfallback", 14 ) ) {
-			const int fallbackLevel = atoi( token.c_str() + 14 );
-			const int capabilityRegister = MaterialCapabilityRegisterForShaderLevel( fallbackLevel );
-			if ( capabilityRegister != -1 ) {
-				const int zeroRegister = GetExpressionConstant( 0.0f );
-				const int useFallbackRegister = EmitOp( capabilityRegister, zeroRegister, OP_TYPE_EQ );
-				ss->conditionRegister = EmitOp( ss->conditionRegister, useFallbackRegister, OP_TYPE_AND );
-			}
 			continue;
 		}
 		if ( !token.Icmp( "highres" ) ) {

@@ -198,6 +198,7 @@ static const int	MAX_VERTEX_PARMS = 8;
 #else
 static const int	MAX_VERTEX_PARMS = 4;
 #endif
+static const int	MAX_FRAGMENT_PARMS = 8;
 static const int	MAX_GLSL_SHADER_PARMS = 32;
 static const int	MAX_GLSL_SHADER_NAME = 256;
 static const int	MAX_GLSL_SHADER_PARM_NAME = 32;
@@ -206,6 +207,8 @@ typedef struct {
 	int					vertexProgram;
 	int					numVertexParms;
 	int					vertexParms[MAX_VERTEX_PARMS][4];	// evaluated register indexes
+	int					numFragmentParms;
+	int					fragmentParms[MAX_FRAGMENT_PARMS][4];	// evaluated register indexes
 
 	int					fragmentProgram;
 	int					numFragmentProgramImages;
@@ -732,6 +735,7 @@ private:
 	void				ParseSort(idLexer& src);
 	void				ParseBlend(idLexer& src, shaderStage_t* stage);
 	void				ParseVertexParm(idLexer& src, newShaderStage_t* newStage);
+	void				ParseFragmentParm(idLexer& src, newShaderStage_t* newStage);
 	void				ParseFragmentMap(idLexer& src, newShaderStage_t* newStage);
 	void				ParseShaderParm(idLexer& src, newShaderStage_t* newStage);
 	void				ParseShaderTexture(idLexer& src, newShaderStage_t* newStage);
