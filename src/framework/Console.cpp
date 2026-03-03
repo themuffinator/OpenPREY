@@ -45,7 +45,7 @@ void SCR_DrawTextRightAlign( float &y, const char *text, ... ) id_attribute((for
 #define	COMMAND_HISTORY			64
 static const char *kConsoleHistoryFileName = "consolehistory.dat";
 
-static const idVec4 kConsoleBorderColor( 0.9411765f, 0.6196079f, 0.0509804f, 1.0f ); // #f09e0d
+static const idVec4 kConsoleBorderColor( 0.0f, 1.0f, 1.0f, 1.0f ); // #00ffff
 static const idVec4 kConsoleVersionColor( 0.4509804f, 0.4509804f, 0.4509804f, 1.0f ); // #737373
 static const idVec4 kConsoleBackgroundColor( 0.0f, 0.0f, 0.0f, 1.0f );
 
