@@ -353,6 +353,7 @@ public:
 	idRegisterList *RegList() { return &regList; }
 	void AddCommand(const char *cmd);
 	void AddUpdateVar(idWinVar *var);
+	bool SetInternalVarValue( const char *name, const char *value );
 	bool Interactive();
 	bool ContainsStateVars();
 	void SetChildWinVarVal(const char *name, const char *var, const char *val);

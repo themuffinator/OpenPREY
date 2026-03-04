@@ -1132,11 +1132,24 @@ int	idParticleStage::ParticleVerts( particleGen_t *g, idVec3 origin, idDrawVert 
 
 			up -= ( up * forwardDir ) * forwardDir;
 
-			up.Normalize();
-
-
-			left = up.Cross( forwardDir );
-			left *= psize;
+			const float upLengthSqr = up.LengthSqr();
+			if ( upLengthSqr > idMath::FLOAT_EPSILON ) {
+				up *= idMath::InvSqrt( upLengthSqr );
+				left = up.Cross( forwardDir );
+				left *= psize;
+			} else if ( stepLeft.LengthSqr() > idMath::FLOAT_EPSILON ) {
+				// Keep a stable ribbon width when consecutive samples collapse together.
+				left = stepLeft;
+			} else {
+				idVec3 entityLeft;
+				g->renderEnt->axis.ProjectVector( g->renderView->viewaxis[1], entityLeft );
+				const float entityLeftLengthSqr = entityLeft.LengthSqr();
+				if ( entityLeftLengthSqr > idMath::FLOAT_EPSILON ) {
+					left = entityLeft * ( psize * idMath::InvSqrt( entityLeftLengthSqr ) );
+				} else {
+					left.Set( psize, 0.0f, 0.0f );
+				}
+			}
 
 			verts_p[0] = verts[0];
 			verts_p[1] = verts[1];

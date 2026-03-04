@@ -91,6 +91,17 @@ void Script_Set(idWindow *window, idList<idGSWinVar> *src) {
 			}
 			return;
 		} 
+
+		if ( window && src->Num() > 1 && window->SetInternalVarValue( dest->c_str(), (*src)[1].var->c_str() ) ) {
+			if ( gui_debugScript.GetInteger() > 2 ) {
+				common->Printf( "GUI: set %s = %s (caller=%s gui=%s)\n",
+					dest->c_str(),
+					(*src)[1].var->c_str(),
+					window ? window->GetName() : "<null>",
+					window && window->GetGui() ? window->GetGui()->GetSourceFile() : "<null>" );
+			}
+			return;
+		}
 	}
 	(*src)[0].var->Set((*src)[1].var->c_str());
 	(*src)[0].var->SetEval(false);

@@ -1354,11 +1354,11 @@ idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scop
 
 			sprintf( element, "%s_y", def->Name() );
 			def_y = AllocDef( type, element, scope, constant );
-			def_y->value.ptrOffset = def_x->value.ptrOffset + type_float.Size();
+			def_y->value.ptrOffset = def_x->value.ptrOffset + sizeof( float );
 
 			sprintf( element, "%s_z", def->Name() );
 			def_z = AllocDef( type, element, scope, constant );
-			def_z->value.ptrOffset = def_y->value.ptrOffset + type_float.Size();
+			def_z->value.ptrOffset = def_x->value.ptrOffset + ( 2 * sizeof( float ) );
 		} else {
 			// make automatic defs for the vectors elements
 			// origin can be accessed as origin_x, origin_y, and origin_z
@@ -1370,6 +1370,15 @@ idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scop
 
 			sprintf( element, "%s_z", def->Name() );
 			def_z = AllocDef( &type_float, element, scope, constant );
+
+			// Vector ops read/write packed idVec3 data (x/y/z at +0/+4/+8).
+			if ( scope->Type() == ev_function ) {
+				def_y->value.stackOffset = def_x->value.stackOffset + sizeof( float );
+				def_z->value.stackOffset = def_x->value.stackOffset + ( 2 * sizeof( float ) );
+			} else {
+				def_y->value.bytePtr = def_x->value.bytePtr + sizeof( float );
+				def_z->value.bytePtr = def_x->value.bytePtr + ( 2 * sizeof( float ) );
+			}
 
 			// point the vector def to the x coordinate
 			def->value			= def_x->value;

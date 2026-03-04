@@ -176,6 +176,10 @@ public:
 // RAVEN END
 };
 
+// World-surface GUI redraws should bypass 2D screen aspect correction.
+void UI_SetInWorldGuiRendering( bool enabled );
+bool UI_IsInWorldGuiRendering( void );
+
 extern idUserInterfaceManager *	uiManager;
 
 #endif /* !__USERINTERFACE_H__ */

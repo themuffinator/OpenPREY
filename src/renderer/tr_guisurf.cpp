@@ -173,7 +173,9 @@ void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf ) {
 
 	// call the gui, which will call the 2D drawing functions
 	tr.guiModel->Clear();
+	UI_SetInWorldGuiRendering( true );
 	gui->Redraw( tr.viewDef->renderView.time );
+	UI_SetInWorldGuiRendering( false );
 	tr.guiModel->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
 	tr.guiModel->Clear();
 

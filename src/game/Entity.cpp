@@ -21,6 +21,28 @@
 #include "../prey/game_zone.h"
 //HUMANHEAD END
 
+static ID_INLINE bool OpenPrey_IsFiniteFloat( const float value ) {
+	return ( value == value ) && ( idMath::Fabs( value ) < idMath::INFINITY );
+}
+
+static bool OpenPrey_IsReasonablePVSBounds( const idBounds &bounds ) {
+	for ( int axis = 0; axis < 3; axis++ ) {
+		const float mins = bounds[0][axis];
+		const float maxs = bounds[1][axis];
+		if ( !OpenPrey_IsFiniteFloat( mins ) || !OpenPrey_IsFiniteFloat( maxs ) ) {
+			return false;
+		}
+		if ( mins > maxs ) {
+			return false;
+		}
+		if ( ( maxs - mins ) >= 1e4f ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 /*
 ===============================================================================
 
@@ -661,7 +683,7 @@ void idEntity::Spawn( void ) {
 		SetModel( temp );
 	}
 
-	if ( spawnArgs.GetString( "bind", "", &temp ) ) {
+	if ( spawnArgs.GetString( "bind", "", &temp ) || spawnArgs.GetString( "old_bind", "", &temp ) ) {
 		PostEventMS( &EV_SpawnBind, 0 );
 	}
 
@@ -1506,6 +1528,16 @@ void idEntity::UpdatePVSAreas( void ) {
 	int i;
 
 	modelAbsBounds.FromTransformedBounds( renderEntity.bounds, renderEntity.origin, renderEntity.axis );
+	if ( !OpenPrey_IsReasonablePVSBounds( modelAbsBounds ) ) {
+		modelAbsBounds = idBounds( renderEntity.origin ).Expand( 256.0f );
+		if ( !OpenPrey_IsReasonablePVSBounds( modelAbsBounds ) ) {
+			numPVSAreas = 0;
+			for ( i = 0; i < MAX_PVS_AREAS; i++ ) {
+				PVSAreas[i] = 0;
+			}
+			return;
+		}
+	}
 	localNumPVSAreas = gameLocal.pvs.GetPVSAreas( modelAbsBounds, localPVSAreas, sizeof( localPVSAreas ) / sizeof( localPVSAreas[0] ) );
 
 	// FIXME: some particle systems may have huge bounds and end up in many PVS areas
@@ -4340,68 +4372,71 @@ void idEntity::Event_SpawnBind( void ) {
 	const idAnim	*anim;
 	int				animNum;
 	idAnimator		*parentAnimator;
-	
-	if ( spawnArgs.GetString( "bind", "", &bind ) ) {
-		if ( idStr::Icmp( bind, "worldspawn" ) == 0 ) {
-			//FIXME: Completely unneccessary since the worldspawn is called "world"
-			parent = gameLocal.world;
-		} else {
-			parent = gameLocal.FindEntity( bind );
+	bind = "";
+	if ( ( !spawnArgs.GetString( "bind", "", &bind ) || !bind[0] ) &&
+		 ( !spawnArgs.GetString( "old_bind", "", &bind ) || !bind[0] ) ) {
+		return;
+	}
+
+	if ( idStr::Icmp( bind, "worldspawn" ) == 0 ) {
+		//FIXME: Completely unneccessary since the worldspawn is called "world"
+		parent = gameLocal.world;
+	} else {
+		parent = gameLocal.FindEntity( bind );
+	}
+	bindOrientated = spawnArgs.GetBool( "bindOrientated", "1" );
+	if ( parent ) {
+		// HUMANHEAD PDM
+		if ( spawnArgs.GetString( "moveToJoint", "", &joint ) && *joint ) {
+			MoveToJoint( parent, joint );
 		}
-		bindOrientated = spawnArgs.GetBool( "bindOrientated", "1" );
-		if ( parent ) {
-			// HUMANHEAD PDM
-			if ( spawnArgs.GetString( "moveToJoint", "", &joint ) && *joint ) {
-				MoveToJoint( parent, joint );
-			}
-			if ( spawnArgs.GetString( "alignToJoint", "", &joint ) && *joint ) {
-				AlignToJoint( parent, joint );
-			}
-			// HUMANHEAD END
+		if ( spawnArgs.GetString( "alignToJoint", "", &joint ) && *joint ) {
+			AlignToJoint( parent, joint );
+		}
+		// HUMANHEAD END
 
-			// bind to a joint of the skeletal model of the parent
-			if ( spawnArgs.GetString( "bindToJoint", "", &joint ) && *joint ) {
-				parentAnimator = parent->GetAnimator();
-				if ( !parentAnimator ) {
-					gameLocal.Error( "Cannot bind to joint '%s' on '%s'.  Entity does not support skeletal models.", joint, name.c_str() );
+		// bind to a joint of the skeletal model of the parent
+		if ( spawnArgs.GetString( "bindToJoint", "", &joint ) && *joint ) {
+			parentAnimator = parent->GetAnimator();
+			if ( !parentAnimator ) {
+				gameLocal.Error( "Cannot bind to joint '%s' on '%s'.  Entity does not support skeletal models.", joint, name.c_str() );
+			}
+			bindJoint = parentAnimator->GetJointHandle( joint );
+			if ( bindJoint == INVALID_JOINT ) {
+				gameLocal.Error( "Joint '%s' not found for bind on '%s'", joint, name.c_str() );
+			}
+
+			// bind it relative to a specific anim
+			if ( ( parent->spawnArgs.GetString( "bindanim", "", &bindanim ) || parent->spawnArgs.GetString( "anim", "", &bindanim ) ) && *bindanim ) {
+				animNum = parentAnimator->GetAnim( bindanim );
+				if ( !animNum ) {
+					gameLocal.Error( "Anim '%s' not found for bind on '%s'", bindanim, name.c_str() );
 				}
-				bindJoint = parentAnimator->GetJointHandle( joint );
-				if ( bindJoint == INVALID_JOINT ) {
-					gameLocal.Error( "Joint '%s' not found for bind on '%s'", joint, name.c_str() );
+				anim = parentAnimator->GetAnim( animNum );
+				if ( !anim ) {
+					gameLocal.Error( "Anim '%s' not found for bind on '%s'", bindanim, name.c_str() );
 				}
 
-				// bind it relative to a specific anim
-				if ( ( parent->spawnArgs.GetString( "bindanim", "", &bindanim ) || parent->spawnArgs.GetString( "anim", "", &bindanim ) ) && *bindanim ) {
-					animNum = parentAnimator->GetAnim( bindanim );
-					if ( !animNum ) {
-						gameLocal.Error( "Anim '%s' not found for bind on '%s'", bindanim, name.c_str() );
-					}
-					anim = parentAnimator->GetAnim( animNum );
-					if ( !anim ) {
-						gameLocal.Error( "Anim '%s' not found for bind on '%s'", bindanim, name.c_str() );
-					}
+				// make sure parent's render origin has been set
+				parent->UpdateModelTransform();
 
-					// make sure parent's render origin has been set
-					parent->UpdateModelTransform();
-
-					//FIXME: need a BindToJoint that accepts a joint position
-					parentAnimator->CreateFrame( gameLocal.time, true );
-					idJointMat *frame = parent->renderEntity.joints;
-					gameEdit->ANIM_CreateAnimFrame( parentAnimator->ModelHandle(), anim->MD5Anim( 0 ), parent->renderEntity.numJoints, frame, 0, parentAnimator->ModelDef()->GetVisualOffset(), parentAnimator->RemoveOrigin() );
-					BindToJoint( parent, joint, bindOrientated );
-					parentAnimator->ForceUpdate();
-				} else {
-					BindToJoint( parent, joint, bindOrientated );
-				}
+				//FIXME: need a BindToJoint that accepts a joint position
+				parentAnimator->CreateFrame( gameLocal.time, true );
+				idJointMat *frame = parent->renderEntity.joints;
+				gameEdit->ANIM_CreateAnimFrame( parentAnimator->ModelHandle(), anim->MD5Anim( 0 ), parent->renderEntity.numJoints, frame, 0, parentAnimator->ModelDef()->GetVisualOffset(), parentAnimator->RemoveOrigin() );
+				BindToJoint( parent, joint, bindOrientated );
+				parentAnimator->ForceUpdate();
+			} else {
+				BindToJoint( parent, joint, bindOrientated );
 			}
-			// bind to a body of the physics object of the parent
-			else if ( spawnArgs.GetInt( "bindToBody", "0", id ) ) {
-				BindToBody( parent, id, bindOrientated );
-			}
-			// bind to the parent
-			else {
-				Bind( parent, bindOrientated );
-			}
+		}
+		// bind to a body of the physics object of the parent
+		else if ( spawnArgs.GetInt( "bindToBody", "0", id ) ) {
+			BindToBody( parent, id, bindOrientated );
+		}
+		// bind to the parent
+		else {
+			Bind( parent, bindOrientated );
 		}
 	}
 }

@@ -41,6 +41,19 @@ idCVar ui_aspectCorrection( "ui_aspectCorrection", "1", CVAR_GUI | CVAR_ARCHIVE 
 
 idUserInterfaceManagerLocal	uiManagerLocal;
 idUserInterfaceManager *	uiManager = &uiManagerLocal;
+static int uiWorldGuiRedrawDepth = 0;
+
+void UI_SetInWorldGuiRendering( bool enabled ) {
+	if ( enabled ) {
+		uiWorldGuiRedrawDepth++;
+	} else if ( uiWorldGuiRedrawDepth > 0 ) {
+		uiWorldGuiRedrawDepth--;
+	}
+}
+
+bool UI_IsInWorldGuiRendering( void ) {
+	return ( uiWorldGuiRedrawDepth > 0 );
+}
 
 /*
 ===============================================================================
@@ -438,7 +451,7 @@ void idUserInterfaceLocal::Redraw( int _time ) {
 			desktop->Init();
 		}
 
-		const bool aspectCorrect = ui_aspectCorrection.GetBool();
+		const bool aspectCorrect = ui_aspectCorrection.GetBool() && !UI_IsInWorldGuiRendering();
 		uiManagerLocal.SetAspectCorrection( aspectCorrect );
 		uiManagerLocal.SetSize( desktop->forceAspectWidth, desktop->forceAspectHeight );
 		if ( gui_debugScript.GetInteger() > 4 ) {

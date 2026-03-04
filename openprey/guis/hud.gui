@@ -35,6 +35,7 @@ windowDef desktop {
 
 	windowDef NotVisibleInLetterBox {
 		rect		0, 0, 640, 480
+		noclip		1
 		visible		("gui::letterbox" == 0)
 
 		#include "guis/hud/hud_progressbar.guifragment"

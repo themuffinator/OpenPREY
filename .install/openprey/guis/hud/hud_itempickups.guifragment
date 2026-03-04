@@ -43,6 +43,8 @@
 
 	windowDef PickupContainer {
 		rect		AMMO_XPOS, AMMO_YPOS, 32, 32*10
+		screenalignx	right
+		screenaligny	bottom
 		noclip		1
 		visible		("gui::invehicle" == 0)
 		

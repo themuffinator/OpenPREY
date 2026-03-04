@@ -12,6 +12,8 @@
 	windowDef Ammo_parent {
 		// If altammo isn't displayed, move this bar over to the right 18 units
 		rect		592 + 18 * (1-"gui::player_altammobar"), 368, 21, 100
+		screenalignx	right
+		screenaligny	bottom
 		visible		"gui::player_ammobar"
 
 		windowDef fb_dot1 {
@@ -41,6 +43,8 @@
 
 	windowDef AltAmmo_parent {
 		rect		610, 368, 21, 100
+		screenalignx	right
+		screenaligny	bottom
 		visible		"gui::player_altammobar"
 
 		windowDef fb_dot2 {
@@ -70,6 +74,8 @@
 	windowDef AmmoCrop {
 		// If altammo isn't displayed, move this bar over to the right 18 units
 		rect		599 + 18.5 * (1-"gui::player_altammobar"), 378 + AMMO_BAR_HEIGHT * (1 - "gui::player_ammopercent"), AMMO_BAR_WIDTH, AMMO_BAR_HEIGHT
+		screenalignx	right
+		screenaligny	bottom
 		visible		"gui::player_ammobar"
 
 		windowDef AmmoBar {
@@ -81,6 +87,8 @@
 	}
 	windowDef AltAmmoCrop {
 		rect		617.5, 378 + ALTAMMO_BAR_HEIGHT * (1 - "gui::player_altammopercent"), ALTAMMO_BAR_WIDTH, ALTAMMO_BAR_HEIGHT
+		screenalignx	right
+		screenaligny	bottom
 		visible		"gui::player_altammobar"
 
 		windowDef AltAmmoBar {

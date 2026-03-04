@@ -271,6 +271,7 @@ static infoParm_t	infoParms[] = {
 	{"flashlight_trigger",	0,	0,	CONTENTS_FLASHLIGHT_TRIGGER }, // used for triggers that are activated by the flashlight
 #ifdef HUMANHEAD
 	{"forcefield",	0,	0,	CONTENTS_FORCEFIELD },	// forcefield matter
+	{"forcefield_nobullets",	1,	SURFTYPE_FORCEFIELD,	CONTENTS_FORCEFIELD },
 	{"spiritbridge",0,	0,	CONTENTS_SPIRITBRIDGE },	// spirit-walk-only collision
 	{"blockradiusdamage",	0,	0,	CONTENTS_BLOCK_RADIUSDAMAGE },	// blocks splash damage
 	{"shootable",	0,	0,	CONTENTS_SHOOTABLE },	// bullets collide with but players can pass
@@ -1994,8 +1995,6 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			continue;
 		}
 		if ( !token.Icmpn( "shaderlevel", 11 ) ) {
-			// Prey parses this token but keeps authored fallback and programmable
-			// stages active together on ARB2-capable paths.
 			continue;
 		}
 		if ( !token.Icmpn( "shaderfallback", 14 ) ) {

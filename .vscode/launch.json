@@ -29,6 +29,9 @@
         "fs_game",
         "openprey",
         "+set",
+        "+set",
+        "developer",
+        "1",
         "si_gameType",
         "DM"
       ],
@@ -65,6 +68,9 @@
         "+set",
         "si_gameType",
         "singleplayer",
+        "+set",
+        "developer",
+        "1",
         "+map",
         "game/biolabsa"
       ],
@@ -101,6 +107,9 @@
         "+set",
         "si_gameType",
         "singleplayer",
+        "+set",
+        "developer",
+        "1",
         "+map",
         "game/biolabsb"
       ],
@@ -137,6 +146,9 @@
         "+set",
         "si_gameType",
         "singleplayer",
+        "+set",
+        "developer",
+        "1",
         "+map",
         "game/feedingtowera"
       ],

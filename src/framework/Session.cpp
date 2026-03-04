@@ -775,6 +775,10 @@ void idSessionLocal::Shutdown() {
 		guiMainMenu_MapList = NULL;
 	}
 
+	// uiManager is shut down after session shutdown, but sound shutdown may still
+	// ask sessLocal to hide subtitles during teardown.
+	guiSubtitles = NULL;
+
 	Clear();
 }
 

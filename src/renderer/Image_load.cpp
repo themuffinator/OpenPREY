@@ -407,6 +407,36 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
 				break;
 			}
+			// Some retail distributions are missing hybridwall* textures entirely.
+			// Fallback to a shipped organic set to keep materials functional.
+			if ( generatedName.Find( "textures/organic_wall/hybridwall2", false ) >= 0 ) {
+				generatedName.Replace( "hybridwall2_d", "bio_organic_005_d" );
+				generatedName.Replace( "hybridwall2_s", "bio_organic_005_s" );
+				generatedName.Replace( "hybridwall2_local", "bio_organic_005_local" );
+				generatedName.Replace( "hybridwall2_h", "bio_organic_005_h" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
+			// Some retail distributions are missing bio_organic_004 and bio_organic_003.
+			// Reuse a nearby shipped organic set.
+			if ( generatedName.Find( "textures/organic_wall/bio_organic_004", false ) >= 0 ) {
+				generatedName.Replace( "bio_organic_004_d", "bio_organic_005_d" );
+				generatedName.Replace( "bio_organic_004_s", "bio_organic_005_s" );
+				generatedName.Replace( "bio_organic_004_local", "bio_organic_005_local" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
+			// Prey retail content variant: bio_organic_001 uses *_plain maps for D/S channels.
+			if ( generatedName.Find( "textures/organic_wall/bio_organic_001_d", false ) >= 0 ||
+				generatedName.Find( "textures/organic_wall/bio_organic_001_s", false ) >= 0 ) {
+				generatedName.Replace( "bio_organic_001_d", "bio_organic_001_plain_d" );
+				generatedName.Replace( "bio_organic_001_s", "bio_organic_001_plain_s" );
+				im.SetName( generatedName );
+				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
+				break;
+			}
 			if ( generatedName.Find( "models/monsters/skeleton/skeleton01_d#__1000", false ) >= 0 ) {
 				generatedName.Replace( "skeleton01_d#__1000", "skeleton01_d#__0100" );
 				im.SetName( generatedName );
@@ -477,6 +507,19 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 					fallbackProgram.Replace( "g_bonewall_001_s", "g_bonewall_001b_s" );
 					fallbackProgram.Replace( "g_bonewall_001_local", "g_bonewall_001b_local" );
 					fallbackProgram.Replace( "g_bonewall_001_h", "g_bonewall_001b_h" );
+				} else if ( fallbackProgram.Find( "textures/organic_wall/hybridwall2", false ) >= 0 ) {
+					fallbackProgram.Replace( "hybridwall2_d", "bio_organic_005_d" );
+					fallbackProgram.Replace( "hybridwall2_s", "bio_organic_005_s" );
+					fallbackProgram.Replace( "hybridwall2_local", "bio_organic_005_local" );
+					fallbackProgram.Replace( "hybridwall2_h", "bio_organic_005_h" );
+				} else if ( fallbackProgram.Find( "textures/organic_wall/bio_organic_004", false ) >= 0 ) {
+					fallbackProgram.Replace( "bio_organic_004_d", "bio_organic_005_d" );
+					fallbackProgram.Replace( "bio_organic_004_s", "bio_organic_005_s" );
+					fallbackProgram.Replace( "bio_organic_004_local", "bio_organic_005_local" );
+				} else if ( fallbackProgram.Find( "textures/organic_wall/bio_organic_001_d", false ) >= 0 ||
+					fallbackProgram.Find( "textures/organic_wall/bio_organic_001_s", false ) >= 0 ) {
+					fallbackProgram.Replace( "bio_organic_001_d", "bio_organic_001_plain_d" );
+					fallbackProgram.Replace( "bio_organic_001_s", "bio_organic_001_plain_s" );
 				}
 				if ( fallbackProgram != GetName() ) {
 					R_LoadImageProgram( fallbackProgram.c_str(), &pic, &width, &height, &sourceFileTime, &usage );

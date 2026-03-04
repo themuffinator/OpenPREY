@@ -382,4 +382,26 @@ public:
 	virtual	idBounds		Bounds( const struct renderEntity_s *ent ) const;
 };
 
+class hhRenderModelBeam : public idRenderModelStatic {
+public:
+	void					InitFromFile( const char *fileName );
+	void					LoadModel();
+
+	dynamicModel_t			IsDynamicModel() const;
+	virtual idRenderModel *	InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
+	virtual idBounds		Bounds( const struct renderEntity_s *ent ) const;
+
+private:
+	void					UpdateSurface( const struct renderEntity_s *ent, const int index, const hhBeamNodes_t *beam, modelSurface_t *surf );
+	void					UpdateQuadSurface( const struct renderEntity_s *ent, const int index, int quadIndex, const hhBeamNodes_t *beam, modelSurface_t *surf );
+
+	struct deformInfo_s		*deformInfo;
+	idList<idDrawVert>		verts;
+
+	struct deformInfo_s		*quadDeformInfo[2];
+	idList<idDrawVert>		quadVerts[2];
+
+	const hhDeclBeam		*declBeam;
+};
+
 #endif /* !__MODEL_LOCAL_H__ */

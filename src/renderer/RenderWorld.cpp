@@ -1058,13 +1058,29 @@ int idRenderWorldLocal::BoundsInAreas( const idBounds &bounds, int *areas, int m
 	int numAreas = 0;
 
 	assert( areas );
-	assert( bounds[0][0] <= bounds[1][0] && bounds[0][1] <= bounds[1][1] && bounds[0][2] <= bounds[1][2] );
-	assert( bounds[1][0] - bounds[0][0] < 1e4f && bounds[1][1] - bounds[0][1] < 1e4f && bounds[1][2] - bounds[0][2] < 1e4f );
+
+	if ( bounds[0][0] > bounds[1][0] || bounds[0][1] > bounds[1][1] || bounds[0][2] > bounds[1][2] ) {
+		return numAreas;
+	}
+
+	idBounds queryBounds = bounds;
+	const float spanX = bounds[1][0] - bounds[0][0];
+	const float spanY = bounds[1][1] - bounds[0][1];
+	const float spanZ = bounds[1][2] - bounds[0][2];
+	if ( spanX != spanX || spanY != spanY || spanZ != spanZ || spanX >= 1e4f || spanY >= 1e4f || spanZ >= 1e4f ) {
+		const idVec3 center = bounds.GetCenter();
+		if ( center[0] != center[0] || center[1] != center[1] || center[2] != center[2] ) {
+			return numAreas;
+		}
+
+		// Clamp pathological bounds to a local region so PVS queries remain stable.
+		queryBounds = idBounds( center ).Expand( 4096.0f );
+	}
 
 	if ( !areaNodes ) {
 		return numAreas;
 	}
-	BoundsInAreas_r( 0, bounds, areas, &numAreas, maxAreas );
+	BoundsInAreas_r( 0, queryBounds, areas, &numAreas, maxAreas );
 	return numAreas;
 }
 

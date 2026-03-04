@@ -515,23 +515,118 @@ bool	R_GenerateSurfaceSubview( drawSurf_t *drawSurf ) {
 		return true;
 	}
 
-	// issue a new view command
-	parms = R_MirrorViewBySurface( drawSurf );
-	if ( !parms ) {
-		return false;
+	switch ( shader->GetSubviewClass() ) {
+		case SC_PORTAL: {
+			const renderView_t *remoteRenderView = drawSurf->space->entityDef->parms.remoteRenderView;
+			if ( !remoteRenderView ) {
+				return false;
+			}
+
+			// directportal parmN can limit portal rendering distance.
+			const int index = shader->GetDirectPortalDistance();
+			if ( index >= 0 && index < EXP_REG_NUM_PREDEFINED ) {
+				const float maxPortalDistanceLimit = drawSurf->space->entityDef->parms.shaderParms[index];
+				if ( maxPortalDistanceLimit > 0.0f &&
+					( tr.viewDef->renderView.vieworg - drawSurf->space->entityDef->parms.origin ).LengthFast() > maxPortalDistanceLimit ) {
+					return false;
+				}
+			}
+
+			parms = (viewDef_t *)R_FrameAlloc( sizeof( *parms ) );
+			if ( !parms ) {
+				return false;
+			}
+			*parms = *tr.viewDef;
+
+			parms->isSubview = true;
+			parms->isMirror = false;
+			parms->renderView.viewID = 0;	// clear to allow player bodies to show up, and suppress view weapons
+
+			const float *dsm = drawSurf->space->modelMatrix;
+			float mm[16] = {
+				-dsm[0], -dsm[1], -dsm[2], dsm[3],
+				-dsm[4], -dsm[5], -dsm[6], dsm[7],
+				dsm[8], dsm[9], dsm[10], dsm[11],
+				dsm[12], dsm[13], dsm[14], dsm[15],
+			};
+
+			parms->numClipPlanes = 1;
+			parms->clipPlanes[0] = remoteRenderView->viewaxis[0];
+			parms->clipPlanes[0][3] = -( remoteRenderView->vieworg * parms->clipPlanes[0].Normal() );
+
+			idVec3 forward, left, up;
+			idVec3 forward2, left2, up2;
+			R_GlobalVectorToLocal( mm, tr.viewDef->renderView.viewaxis[0], forward );
+			R_GlobalVectorToLocal( mm, tr.viewDef->renderView.viewaxis[1], left );
+			R_GlobalVectorToLocal( mm, tr.viewDef->renderView.viewaxis[2], up );
+
+			float mmm[16];
+			R_AxisToModelMatrix( remoteRenderView->viewaxis, remoteRenderView->vieworg, mmm );
+			R_LocalVectorToGlobal( mmm, forward, forward2 );
+			R_LocalVectorToGlobal( mmm, left, left2 );
+			R_LocalVectorToGlobal( mmm, up, up2 );
+
+			parms->renderView.viewaxis = idMat3( forward2, left2, up2 );
+			parms->initialViewAreaOrigin = remoteRenderView->vieworg + remoteRenderView->viewaxis[0] * 16.0f;
+			parms->renderView.vieworg = remoteRenderView->vieworg;
+
+			parms->superView = tr.viewDef;
+			parms->subviewSurface = drawSurf;
+
+			R_RenderView( parms );
+			return true;
+		}
+		case SC_PORTAL_SKYBOX: {
+			const renderView_t *remoteRenderView = drawSurf->space->entityDef->parms.remoteRenderView;
+			if ( !remoteRenderView ) {
+				return false;
+			}
+
+			// Retail-like behavior: allow at most one skybox subview per frame.
+			if ( tr.SkyboxRenderedInFrame() || tr.viewDef->isSubview ) {
+				return false;
+			}
+
+			parms = (viewDef_t *)R_FrameAlloc( sizeof( *parms ) );
+			if ( !parms ) {
+				return false;
+			}
+			tr.RenderSkyboxInFrame();
+			*parms = *tr.viewDef;
+
+			parms->isSubview = true;
+			parms->isMirror = false;
+			parms->renderView.viewID = 0;	// clear to allow player bodies to show up, and suppress view weapons
+			parms->initialViewAreaOrigin = remoteRenderView->vieworg;
+			parms->renderView.vieworg = remoteRenderView->vieworg;
+
+			parms->superView = tr.viewDef;
+			parms->subviewSurface = drawSurf;
+
+			R_RenderView( parms );
+			return true;
+		}
+		case SC_MIRROR:
+		default: {
+			// issue a new view command
+			parms = R_MirrorViewBySurface( drawSurf );
+			if ( !parms ) {
+				return false;
+			}
+
+			parms->scissor = scissor;
+			parms->superView = tr.viewDef;
+			parms->subviewSurface = drawSurf;
+
+			// triangle culling order changes with mirroring
+			parms->isMirror = ( ( (int)parms->isMirror ^ (int)tr.viewDef->isMirror ) != 0 );
+
+			// generate render commands for it
+			R_RenderView( parms );
+
+			return true;
+		}
 	}
-
-	parms->scissor = scissor;
-	parms->superView = tr.viewDef;
-	parms->subviewSurface = drawSurf;
-
-	// triangle culling order changes with mirroring
-	parms->isMirror = ( ( (int)parms->isMirror ^ (int)tr.viewDef->isMirror ) != 0 );
-
-	// generate render commands for it
-	R_RenderView( parms );
-
-	return true;
 }
 
 /*

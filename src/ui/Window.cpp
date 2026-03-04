@@ -4963,6 +4963,58 @@ bool idWindow::Interactive() {
 
 /*
 ================
+idWindow::SetInternalVarValue
+================
+*/
+bool idWindow::SetInternalVarValue( const char *name, const char *value ) {
+	if ( name == NULL || value == NULL ) {
+		return false;
+	}
+
+	idStr key = name;
+	const int scopeSeparator = key.Find( "::" );
+	if ( scopeSeparator > 0 ) {
+		idStr winName = key.Left( scopeSeparator );
+		idStr varName = key.Right( key.Length() - scopeSeparator - 2 );
+
+		if ( gui != NULL && gui->GetDesktop() != NULL ) {
+			drawWin_t *target = gui->GetDesktop()->FindChildByName( winName );
+			if ( target != NULL && target->win != NULL ) {
+				return target->win->SetInternalVarValue( varName, value );
+			}
+		}
+
+		return false;
+	}
+
+	idParser src( value, static_cast<int>( strlen( value ) ), "SetInternalVarValue",
+		LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
+	idToken token;
+	if ( !src.ReadToken( &token ) ) {
+		return false;
+	}
+
+	if ( idStr::Icmp( key, "screenalignx" ) == 0 || idStr::Icmp( key, "screenalignh" ) == 0 ) {
+		if ( !ParseScreenAlignXToken( token, screenAlignX ) ) {
+			common->Warning( "Window %s in gui %s: unknown screenalignx value '%s' (expected: middle|left|right)",
+				GetName(), gui ? gui->GetSourceFile() : "<unknown>", token.c_str() );
+		}
+		return true;
+	}
+
+	if ( idStr::Icmp( key, "screenaligny" ) == 0 || idStr::Icmp( key, "screenalignv" ) == 0 ) {
+		if ( !ParseScreenAlignYToken( token, screenAlignY ) ) {
+			common->Warning( "Window %s in gui %s: unknown screenaligny value '%s' (expected: middle|top|bottom)",
+				GetName(), gui ? gui->GetSourceFile() : "<unknown>", token.c_str() );
+		}
+		return true;
+	}
+
+	return false;
+}
+
+/*
+================
 idWindow::SetChildWinVarVal
 ================
 */

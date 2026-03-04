@@ -490,7 +490,7 @@ void hhBeamSystem::Think( void ) {
 	if (thinkFlags & TH_UPDATEPARTICLES) {
 
 		if( targets.Num() > 0 ) {
-			SetTargetEntity( targets[0].GetEntity(), 0 );
+			SetTargetEntity( targets[0].GetEntity(), static_cast<const char *>( NULL ) );
 		}
 
 		// Update the beamAxis to correctly reflect the target

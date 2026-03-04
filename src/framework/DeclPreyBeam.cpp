@@ -68,17 +68,17 @@ static bool ParseBeamCommand( idLexer &src, const idToken &token, beamCmd_t &cmd
 	if ( !token.Icmp( "SplineAddSin" ) ) {
 		cmd.type = BEAMCMD_SplineAddSin;
 		cmd.index = src.ParseInt();
-		return ParseBeamVec3( src, cmd.phase ) && ParseBeamVec3( src, cmd.offset );
+		return ParseBeamVec3( src, cmd.offset ) && ParseBeamVec3( src, cmd.phase );
 	}
 	if ( !token.Icmp( "SplineAddSinTime" ) ) {
 		cmd.type = BEAMCMD_SplineAddSinTim;
 		cmd.index = src.ParseInt();
-		return ParseBeamVec3( src, cmd.phase ) && ParseBeamVec3( src, cmd.offset );
+		return ParseBeamVec3( src, cmd.offset ) && ParseBeamVec3( src, cmd.phase );
 	}
 	if ( !token.Icmp( "SplineAddSinTimeScaled" ) ) {
 		cmd.type = BEAMCMD_SplineAddSinTimeScaled;
 		cmd.index = src.ParseInt();
-		return ParseBeamVec3( src, cmd.phase ) && ParseBeamVec3( src, cmd.offset );
+		return ParseBeamVec3( src, cmd.offset ) && ParseBeamVec3( src, cmd.phase );
 	}
 
 	return false;

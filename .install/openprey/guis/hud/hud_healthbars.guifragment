@@ -50,6 +50,8 @@
 
 	windowDef spiritTommyBack {
 		rect		TOMMYSPIRIT_XPOS, TOMMYSPIRIT_YPOS, TOMMYSPIRIT_WIDTH, TOMMYSPIRIT_HEIGHT
+		screenalignx	left
+		screenaligny	bottom
 		matcolor	SPIRIT2_RGB_COMMAS
 		background	"guis/assets/hud/tommy.tga"
 		visible		("gui::showspiritpower" != 0)
@@ -104,6 +106,8 @@
 
 	windowDef healthTommy {
 		rect		TOMMYHEALTH_XPOS, TOMMYHEALTH_YPOS, TOMMYHEALTH_WIDTH, TOMMYHEALTH_HEIGHT
+		screenalignx	left
+		screenaligny	bottom
 		matcolor	HEALTHBG_RGB_COMMAS
 		background	"guis/assets/hud/tommy.tga"
 		visible		("gui::showhealth" != 0)
@@ -150,6 +154,8 @@
 
 	windowDef spiritTommyFront {
 		rect		TOMMYSPIRIT_XPOS, TOMMYSPIRIT_YPOS, TOMMYSPIRIT_WIDTH, TOMMYSPIRIT_HEIGHT
+		screenalignx	left
+		screenaligny	bottom
 		matcolor	SPIRIT2_RGB_COMMAS_GONE
 		background	"guis/assets/hud/tommy.tga"
 		visible		("gui::showspiritpower" != 0)
@@ -206,6 +212,8 @@
 	#define TOMMYHEALTH_MAX_RECT				// for maxspirit effect
 	windowDef Anim_TommyMaxHealth {
 		rect		0, 0, 640, 480
+		screenalignx	left
+		screenaligny	bottom
 		noTime		1
 
 		// Used to cover up the existing health bar until anim is complete
