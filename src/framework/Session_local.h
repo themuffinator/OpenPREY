@@ -163,6 +163,7 @@ public:
 
 	bool				LoadGame(const char *saveName);
 	bool				SaveGame(const char *saveName, bool autosave = false);
+	bool				HandleQuickLoad( void );
 
 	const char			*GetAuthMsg( void );
 
@@ -253,6 +254,7 @@ public:
 	idUserInterface *	guiIntro;
 	idUserInterface *	guiGameOver;
 	idUserInterface *	guiTest;
+	idUserInterface *	guiSave;
 	idUserInterface *	guiSubtitles;
 	idUserInterface *	guiTakeNotes;
 	
@@ -264,6 +266,8 @@ public:
 	bool				msgIgnoreButtons;
 	
 	bool				waitingOnBind;
+	int					saveGuiExpireTime;
+	int					quickLoadConfirmTime;
 
 	const idMaterial *	whiteMaterial;
 
@@ -281,6 +285,9 @@ public:
 
 	void				DrawCmdGraph();
 	void				Draw();
+	void				DrawSaveGui();
+	void				HideSaveGuiMessage();
+	void				ShowSaveGuiMessage( int messageType, int durationMS, const char *saveKey = NULL, const char *keyMaterial = NULL, bool keyWide = false );
 
 	void				WriteCmdDemo( const char *name, bool save = false);
 	void				StartPlayingCmdDemo( const char *demoName);

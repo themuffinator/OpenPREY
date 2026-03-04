@@ -225,6 +225,7 @@ public:
 
 	virtual const char *		KeysFromBinding( const char *bind );
 	virtual const char *		BindingFromKey( const char *key );
+	virtual void				MaterialKeyForBinding( const char *binding, char *keyMaterial, char *key, bool &isWide );
 
 	virtual int					ButtonState( int key );
 	virtual int					KeyState( int key );
@@ -1230,6 +1231,29 @@ void idCommonLocal::WriteConfiguration( void ) {
 	com_developer.SetBool( developer );
 }
 
+namespace {
+static const int PREY_TIP_BIND_BUFFER_SIZE = 256;
+
+static const char *Common_GetFirstKeyForBinding( const char *binding, bool localized ) {
+	if ( binding == NULL || binding[0] == '\0' ) {
+		return "";
+	}
+
+	for ( int keyNum = 0; keyNum < 256; keyNum++ ) {
+		const char *boundCommand = idKeyInput::GetBinding( keyNum );
+		if ( boundCommand != NULL && idStr::Icmp( boundCommand, binding ) == 0 ) {
+			return idKeyInput::KeyNumToString( keyNum, localized );
+		}
+	}
+
+	return "";
+}
+
+static bool Common_KeyMatches( const char *keyName, const char *comparison ) {
+	return idStr::Icmp( keyName, comparison ) == 0;
+}
+}
+
 /*
 ===============
 KeysFromBinding()
@@ -1248,6 +1272,122 @@ Returns the binding bound to key
 */
 const char* idCommonLocal::BindingFromKey( const char *key ) {
 	return idKeyInput::BindingFromKey( key );
+}
+
+/*
+===============
+MaterialKeyForBinding()
+Retail Prey bind-tip image/text selection.
+===============
+*/
+void idCommonLocal::MaterialKeyForBinding( const char *binding, char *keyMaterial, char *key, bool &isWide ) {
+	if ( keyMaterial != NULL ) {
+		keyMaterial[0] = '\0';
+	}
+	if ( key != NULL ) {
+		key[0] = '\0';
+	}
+	isWide = false;
+
+	if ( keyMaterial == NULL || key == NULL ) {
+		return;
+	}
+
+	const char *keyName = Common_GetFirstKeyForBinding( binding, false );
+	const char *localizedKeyName = Common_GetFirstKeyForBinding( binding, true );
+	const int localizedKeyLen = idStr::Length( localizedKeyName );
+
+	if ( keyName[0] == '\0' ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/keywide", PREY_TIP_BIND_BUFFER_SIZE );
+		idStr::Copynz( key, common->GetLanguageDict()->GetString( "#str_07133" ), PREY_TIP_BIND_BUFFER_SIZE );
+		idStr::ToLower( key );
+		isWide = true;
+		return;
+	}
+
+	if ( Common_KeyMatches( keyName, "mouse1" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/mouse1", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "mouse2" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/mouse2", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "mouse3" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/mouse3", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "mwheelup" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/mouseup", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "mwheeldown" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/mousedn", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "uparrow" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/uparrow", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "downarrow" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/downarrow", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "leftarrow" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/leftarrow", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "rightarrow" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/rightarrow", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "enter" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/enter", PREY_TIP_BIND_BUFFER_SIZE );
+		isWide = true;
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "backspace" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/backspace", PREY_TIP_BIND_BUFFER_SIZE );
+		isWide = true;
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "tab" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/tab", PREY_TIP_BIND_BUFFER_SIZE );
+		isWide = true;
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "menu" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/menu", PREY_TIP_BIND_BUFFER_SIZE );
+		return;
+	}
+	if ( Common_KeyMatches( keyName, "shift" ) ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/shift", PREY_TIP_BIND_BUFFER_SIZE );
+		isWide = true;
+		return;
+	}
+
+	const bool shouldUseWideKey =
+		Common_KeyMatches( keyName, "printscreen" ) ||
+		idStr::Icmpn( keyName, "kp_", 3 ) == 0 ||
+		Common_KeyMatches( keyName, "pause" ) ||
+		Common_KeyMatches( keyName, "capslock" ) ||
+		Common_KeyMatches( keyName, "lwin" ) ||
+		Common_KeyMatches( keyName, "rwin" ) ||
+		Common_KeyMatches( keyName, "shift" ) ||
+		Common_KeyMatches( keyName, "ctrl" ) ||
+		Common_KeyMatches( keyName, "alt" ) ||
+		Common_KeyMatches( keyName, "space" ) ||
+		localizedKeyLen > 3;
+
+	if ( shouldUseWideKey ) {
+		idStr::Copynz( keyMaterial, "textures/interface/tips/keywide", PREY_TIP_BIND_BUFFER_SIZE );
+		idStr::Copynz( key, localizedKeyName, PREY_TIP_BIND_BUFFER_SIZE );
+		isWide = true;
+		return;
+	}
+
+	idStr::Copynz( keyMaterial, "textures/interface/tips/key", PREY_TIP_BIND_BUFFER_SIZE );
+	idStr::Copynz( key, localizedKeyName, PREY_TIP_BIND_BUFFER_SIZE );
 }
 
 /*

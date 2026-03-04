@@ -661,6 +661,8 @@ void idSessionLocal::Clear() {
 	msgIgnoreButtons = false;
 
 	bytesNeededForMapLoad = 0;
+	saveGuiExpireTime = 0;
+	quickLoadConfirmTime = 0;
 
 #if ID_CONSOLE_LOCK
 	emptyDrawCount = 0;
@@ -684,7 +686,7 @@ idSessionLocal::idSessionLocal
 idSessionLocal::idSessionLocal() {
 	guiInGame = guiMainMenu = guiIntro \
 		= guiRestartMenu = guiLoading = guiGameOver = guiActive \
-		= guiTest = guiMsg = guiMsgRestore = guiTakeNotes = guiSubtitles = NULL;	
+		= guiTest = guiMsg = guiMsgRestore = guiTakeNotes = guiSave = guiSubtitles = NULL;	
 	
 	menuSoundWorld = NULL;
 	
@@ -2224,11 +2226,59 @@ LoadGame_f
 void LoadGame_f( const idCmdArgs &args ) {
 	console->Close();
 	if ( args.Argc() < 2 || idStr::Icmp(args.Argv(1), "quick" ) == 0 ) {
-		idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
-		sessLocal.LoadGame( saveName );
+		sessLocal.HandleQuickLoad();
 	} else {
 		sessLocal.LoadGame( args.Argv(1) );
 	}
+}
+
+/*
+===============
+idSessionLocal::HandleQuickLoad
+===============
+*/
+bool idSessionLocal::HandleQuickLoad( void ) {
+	static const int QUICKLOAD_PROMPT_DURATION_MS = 5000;
+
+	idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
+
+	if ( mapSpawned ) {
+		if ( com_frameTime > quickLoadConfirmTime ) {
+			char keyMaterial[256];
+			char key[256];
+			bool keyWide = false;
+			keyMaterial[0] = '\0';
+			key[0] = '\0';
+
+			common->MaterialKeyForBinding( "loadgame quick", keyMaterial, key, keyWide );
+			if ( key[0] != '\0' ) {
+				ShowSaveGuiMessage( 2, QUICKLOAD_PROMPT_DURATION_MS, key, keyMaterial, keyWide );
+			}
+
+			quickLoadConfirmTime = com_frameTime + QUICKLOAD_PROMPT_DURATION_MS;
+			return false;
+		}
+
+		quickLoadConfirmTime = 0;
+		HideSaveGuiMessage();
+	}
+
+	idStr loadFile = saveName;
+	ScrubSaveGameFileName( loadFile );
+	loadFile.SetFileExtension( ".save" );
+
+	idStr fullPath = "savegames/";
+	fullPath += loadFile;
+
+	idStr game = cvarSystem->GetCVarString( "fs_game" );
+	idFile *quickSaveFile = fileSystem->OpenFileRead( fullPath, true, game.Length() ? game.c_str() : NULL );
+	if ( quickSaveFile == NULL ) {
+		common->Warning( "Quick save file was not found." );
+		return false;
+	}
+
+	fileSystem->CloseFile( quickSaveFile );
+	return LoadGame( saveName );
 }
 
 /*
@@ -2516,6 +2566,9 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 	}
 
 	syncNextGameFrame = true;
+	if ( !autosave ) {
+		ShowSaveGuiMessage( 1, 3000 );
+	}
 
 
 	return true;
@@ -3047,6 +3100,9 @@ void idSessionLocal::Draw() {
 			int end = Sys_Milliseconds();
 			time_gameDraw += ( end - start );	// note time used for com_speeds
 		}
+
+		DrawSaveGui();
+
 		if ( !gameDraw ) {
 			renderSystem->SetColor( colorBlack );
 			renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
@@ -3582,7 +3638,9 @@ void idSessionLocal::Init() {
 	guiTakeNotes = uiManager->FindGui( "guis/takeNotes.gui", true, false, true );
 	guiIntro = uiManager->FindGui( "guis/intro.gui", true, false, true );
 	guiSubtitles = uiManager->CheckGui( "guis/subtitles.gui" ) ? uiManager->FindGui( "guis/subtitles.gui", true, false, true ) : NULL;
+	guiSave = uiManager->CheckGui( "guis/save.gui" ) ? uiManager->FindGui( "guis/save.gui", true, false, true ) : NULL;
 	HideSubtitle();
+	HideSaveGuiMessage();
 
 	whiteMaterial = declManager->FindMaterial( "_white" );
 
@@ -3689,6 +3747,58 @@ void idSessionLocal::HideSubtitle() const {
 	guiSubtitles->SetStateFloat( "subtitleAlpha3", 0.0f );
 	guiSubtitles->SetStateFloat( "subtitleAlpha4", 0.0f );
 	guiSubtitles->SetStateFloat( "subtitleAlpha5", 0.0f );
+}
+
+/*
+===============
+idSessionLocal::DrawSaveGui
+===============
+*/
+void idSessionLocal::DrawSaveGui() {
+	if ( guiSave == NULL ) {
+		return;
+	}
+
+	if ( saveGuiExpireTime > com_frameTime ) {
+		guiSave->Redraw( com_frameTime );
+	}
+}
+
+/*
+===============
+idSessionLocal::HideSaveGuiMessage
+===============
+*/
+void idSessionLocal::HideSaveGuiMessage() {
+	if ( guiSave == NULL ) {
+		saveGuiExpireTime = 0;
+		return;
+	}
+
+	guiSave->SetStateInt( "messagetype", 0 );
+	guiSave->StateChanged( com_frameTime );
+	saveGuiExpireTime = 0;
+}
+
+/*
+===============
+idSessionLocal::ShowSaveGuiMessage
+===============
+*/
+void idSessionLocal::ShowSaveGuiMessage( int messageType, int durationMS, const char *saveKey, const char *keyMaterial, bool keyWide ) {
+	if ( guiSave == NULL ) {
+		saveGuiExpireTime = 0;
+		return;
+	}
+
+	guiSave->SetStateInt( "messagetype", messageType );
+	if ( messageType == 2 ) {
+		guiSave->SetStateString( "saveKey", saveKey ? saveKey : "" );
+		guiSave->SetStateString( "keyMaterial", keyMaterial ? keyMaterial : "" );
+		guiSave->SetStateBool( "keywide", keyWide );
+	}
+	guiSave->StateChanged( com_frameTime );
+	saveGuiExpireTime = com_frameTime + durationMS;
 }
 
 /*
