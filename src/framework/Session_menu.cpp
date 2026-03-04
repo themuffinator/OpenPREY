@@ -189,6 +189,10 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 
 	// start playing the menu sounds
 	SetPlayingSoundWorld( menuSoundWorld );
+	if ( menuSoundWorld != NULL ) {
+		// Retail Prey starts the main menu loop explicitly from session startup.
+		menuSoundWorld->PlayShaderDirectly( "guisounds_menu_music", 3 );
+	}
 
 	SetGUI( guiMainMenu, NULL );
 	guiMainMenu->HandleNamedEvent( playIntro ? "playIntro" : "noIntro" );

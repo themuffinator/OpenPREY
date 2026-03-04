@@ -3629,11 +3629,13 @@ void idSessionLocal::SetPlayingSoundWorld( idSoundWorld *soundWorld ) {
 }
 
 void idSessionLocal::SetPlayingSoundWorld() {
-	// Once a map is live, always drive gameplay audio from the game sound world.
-	// This avoids silent gameplay when intro/loading/message GUIs remain active.
-	if ( mapSpawned ) {
+	// Keep explicit menu/intro screens on the menu sound world, even while a map is loaded.
+	if ( guiActive && ( guiActive == guiMainMenu || guiActive == guiIntro ) ) {
+		SetPlayingSoundWorld( menuSoundWorld );
+	} else if ( mapSpawned ) {
+		// Once gameplay is active, keep using the game sound world to avoid stale GUI audio routing.
 		SetPlayingSoundWorld( sw );
-	} else if ( guiActive && ( guiActive == guiMainMenu || guiActive == guiIntro || guiActive == guiLoading || ( guiActive == guiMsg && !mapSpawned ) ) ) {
+	} else if ( guiActive && ( guiActive == guiLoading || guiActive == guiMsg ) ) {
 		SetPlayingSoundWorld( menuSoundWorld );
 	} else {
 		SetPlayingSoundWorld( sw );
