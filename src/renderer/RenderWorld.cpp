@@ -1123,7 +1123,16 @@ guiPoint_t	idRenderWorldLocal::GuiTrace( qhandle_t entityHandle, const idVec3 st
 	}
 
 	model = def->parms.hModel;
-	if ( def->parms.callback || !def->parms.hModel || def->parms.hModel->IsDynamicModel() != DM_STATIC ) {
+	if ( !model || model->IsDynamicModel() == DM_CONTINUOUS ) {
+		return pt;
+	}
+	if ( def->parms.callback && model->IsDynamicModel() == DM_STATIC ) {
+		return pt;
+	}
+
+	// Retail Prey traces GUIs on cached animated models such as item cabinets.
+	model = R_EntityDefDynamicModel( def );
+	if ( !model ) {
 		return pt;
 	}
 
