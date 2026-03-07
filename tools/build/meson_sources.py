@@ -73,7 +73,6 @@ ENGINE_SOURCE_GLOBS = [
     "sound/*.cpp",
     "sound/OpenAL/*.cpp",
     "sys/*.cpp",
-    "sys/win32/*.cpp",
     "ui/*.cpp",
 ]
 
@@ -101,6 +100,32 @@ SDL3_WIN32_SOURCES = {
     "src/sys/win32/win_sdl3.cpp",
 }
 
+LINUX_PLATFORM_SOURCES = (
+    "sys/posix/posix_input.cpp",
+    "sys/posix/posix_main.cpp",
+    "sys/posix/posix_net.cpp",
+    "sys/posix/posix_signal.cpp",
+    "sys/posix/posix_threads.cpp",
+    "sys/linux/glimp.cpp",
+    "sys/linux/input.cpp",
+    "sys/linux/main.cpp",
+    "sys/linux/stack.cpp",
+    "sys/linux/libXNVCtrl/NVCtrl.c",
+)
+
+DARWIN_PLATFORM_SOURCES = (
+    "sys/posix/posix_input.cpp",
+    "sys/posix/posix_main.cpp",
+    "sys/posix/posix_net.cpp",
+    "sys/posix/posix_signal.cpp",
+    "sys/posix/posix_threads.cpp",
+    "sys/osx/macosx_compat.mm",
+    "sys/osx/macosx_event.mm",
+    "sys/osx/macosx_glimp.mm",
+    "sys/osx/macosx_misc.mm",
+    "sys/osx/macosx_sys.mm",
+)
+
 
 def add_source(
     source_set: set[str], ordered_sources: list[str], rel_path: pathlib.Path
@@ -120,6 +145,19 @@ def remove_source(
     ordered_sources[:] = [path for path in ordered_sources if path != normalized]
 
 
+def add_required_source(
+    source_set: set[str],
+    ordered_sources: list[str],
+    source_root: pathlib.Path,
+    rel_path: str,
+) -> None:
+    full_path = source_root / rel_path
+    if not full_path.is_file():
+        print(f"Missing expected source file: {full_path}", file=sys.stderr)
+        raise FileNotFoundError(rel_path)
+    add_source(source_set, ordered_sources, pathlib.Path("src") / rel_path)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -130,9 +168,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--platform-backend",
-        choices=("sdl3", "legacy_win32"),
+        choices=("sdl3", "legacy_win32", "native"),
         default="sdl3",
-        help="Win32 platform backend source selection.",
+        help="Platform backend source selection (Windows: sdl3/legacy_win32, non-Windows: native).",
     )
     parser.add_argument(
         "--include-game",
@@ -151,15 +189,6 @@ def main(argv: list[str]) -> int:
 
     if not source_root.is_dir():
         print(f"Missing source root: {source_root}", file=sys.stderr)
-        return 1
-
-    if args.host_system != "windows":
-        print(
-            "Meson source selection for this host is staged. "
-            "Current active target is Windows x64. "
-            "See docs-dev/platform-support.md for Linux/macOS roadmap.",
-            file=sys.stderr,
-        )
         return 1
 
     source_set: set[str] = set()
@@ -196,18 +225,40 @@ def main(argv: list[str]) -> int:
                         pathlib.Path("src") / match.relative_to(source_root),
                     )
 
-    if args.platform_backend == "sdl3":
-        for path in LEGACY_WIN32_SOURCES:
-            remove_source(source_set, ordered_sources, path)
-        for path in SDL3_WIN32_SOURCES:
-            full_path = repo_root / path
-            if not full_path.is_file():
-                print(f"Missing expected SDL3 backend file: {full_path}", file=sys.stderr)
-                return 1
-            add_source(source_set, ordered_sources, pathlib.Path(path))
-    else:
-        for path in SDL3_WIN32_SOURCES:
-            remove_source(source_set, ordered_sources, path)
+    try:
+        if args.host_system == "windows":
+            for match in sorted(source_root.glob("sys/win32/*.cpp")):
+                if match.is_file():
+                    add_source(
+                        source_set,
+                        ordered_sources,
+                        pathlib.Path("src") / match.relative_to(source_root),
+                    )
+
+            if args.platform_backend == "sdl3":
+                for path in LEGACY_WIN32_SOURCES:
+                    remove_source(source_set, ordered_sources, path)
+                for path in SDL3_WIN32_SOURCES:
+                    add_required_source(
+                        source_set,
+                        ordered_sources,
+                        repo_root / "src",
+                        pathlib.Path(path).relative_to("src").as_posix(),
+                    )
+            else:
+                for path in SDL3_WIN32_SOURCES:
+                    remove_source(source_set, ordered_sources, path)
+        elif args.host_system == "linux":
+            for rel_path in LINUX_PLATFORM_SOURCES:
+                add_required_source(source_set, ordered_sources, source_root, rel_path)
+        elif args.host_system == "darwin":
+            for rel_path in DARWIN_PLATFORM_SOURCES:
+                add_required_source(source_set, ordered_sources, source_root, rel_path)
+        else:
+            print(f"Unsupported host system: {args.host_system}", file=sys.stderr)
+            return 1
+    except FileNotFoundError:
+        return 1
 
     if not ordered_sources:
         print("No source files discovered.", file=sys.stderr)

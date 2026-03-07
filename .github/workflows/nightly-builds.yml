@@ -75,6 +75,20 @@ jobs:
             platform_backend: sdl3
             archive_format: zip
             archive_ext: .zip
+          - os: ubuntu-latest
+            platform: linux
+            label: Linux
+            binary_arch: x64
+            platform_backend: sdl3
+            archive_format: tar.xz
+            archive_ext: .tar.xz
+          - os: macos-latest
+            platform: macos
+            label: macOS
+            binary_arch: arm64
+            platform_backend: sdl3
+            archive_format: tar.gz
+            archive_ext: .tar.gz
 
     steps:
       - name: Checkout
@@ -97,7 +111,28 @@ jobs:
           echo "Nightly version: ${{ needs.metadata.outputs.version }}"
           echo "Nightly version tag: ${{ needs.metadata.outputs.version_tag }}"
 
-      - name: Build and install
+      - name: Install Linux native dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            libglew-dev \
+            libopenal-dev \
+            libx11-dev \
+            libxext-dev \
+            libxxf86vm-dev
+
+      - name: Install macOS native dependencies
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install glew
+
+      - name: Build and install (Windows)
+        if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -113,31 +148,75 @@ jobs:
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Validate staged payload
-        shell: pwsh
+      - name: Build and install (Linux/macOS)
+        if: matrix.platform != 'windows'
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
+          set -euo pipefail
+          export OPENPREY_SKIP_GAMELIBS_SYNC=1
+          export OPENPREY_SKIP_GAMELIBS_BUILD=1
 
-          if (-not (Test-Path ".install\\openprey")) {
-            throw "Staged openprey payload directory is missing."
-          }
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=default -Dplatform_backend=${{ matrix.platform_backend }}
+          bash tools/build/meson_setup.sh compile -C builddir
+          bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 
-          $payloadFiles = Get-ChildItem ".install\\openprey" -File -Recurse | Select-Object -First 1
-          if ($null -eq $payloadFiles) {
-            throw "Staged openprey payload directory has no files."
-          }
+      - name: Validate staged payload
+        shell: bash
+        run: |
+          set -euo pipefail
 
-          if (-not (Test-Path ".install\\OpenPrey-client_${{ matrix.binary_arch }}.exe")) {
-            throw "Missing staged client executable."
-          }
+          if [ ! -d ".install/openprey" ]; then
+            echo "Staged openprey payload directory is missing."
+            exit 1
+          fi
 
-          if (-not (Test-Path ".install\\OpenPrey-ded_${{ matrix.binary_arch }}.exe")) {
-            throw "Missing staged dedicated executable."
-          }
+          has_payload_files="$(find ".install/openprey" -type f -print -quit 2>/dev/null || true)"
+          if [ -z "${has_payload_files}" ]; then
+            echo "Staged openprey payload directory has no files."
+            exit 1
+          fi
 
-          if (-not (Test-Path ".install\\openprey\\game_${{ matrix.binary_arch }}.dll")) {
-            throw "Missing staged unified game module."
-          }
+          case "${{ matrix.platform }}" in
+            windows)
+              client=".install/OpenPrey-client_${{ matrix.binary_arch }}.exe"
+              ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}.exe"
+              game_module=".install/openprey/game_${{ matrix.binary_arch }}.dll"
+              ;;
+            linux)
+              client=".install/OpenPrey-client_${{ matrix.binary_arch }}"
+              ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}"
+              game_module=".install/openprey/game_${{ matrix.binary_arch }}.so"
+              ;;
+            macos)
+              client=".install/OpenPrey-client_${{ matrix.binary_arch }}"
+              ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}"
+              game_module=".install/openprey/game_${{ matrix.binary_arch }}.dylib"
+              ;;
+          esac
+
+          if [ ! -f "${client}" ]; then
+            echo "Missing staged client executable: ${client}"
+            exit 1
+          fi
+          if [ ! -f "${ded}" ]; then
+            echo "Missing staged dedicated executable: ${ded}"
+            exit 1
+          fi
+          if [ ! -f "${game_module}" ]; then
+            echo "Missing staged unified game module: ${game_module}"
+            exit 1
+          fi
+
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            if [ ! -f ".install/share/applications/openprey.desktop" ]; then
+              echo "Missing Linux desktop entry in staged payload."
+              exit 1
+            fi
+            if [ ! -f ".install/share/icons/hicolor/256x256/apps/openprey.png" ]; then
+              echo "Missing Linux 256x256 icon in staged payload."
+              exit 1
+            fi
+          fi
 
       - name: Prepare package
         id: package
@@ -166,6 +245,29 @@ jobs:
           fi
           echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
           echo "package_dir=${package_dir}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate macOS app bundle
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_root="${{ steps.package.outputs.package_dir }}/OpenPrey.app"
+          app_plist="${app_root}/Contents/Info.plist"
+          app_exec="${app_root}/Contents/MacOS/OpenPrey"
+          app_icon="${app_root}/Contents/Resources/OpenPrey.icns"
+
+          if [ ! -f "${app_plist}" ]; then
+            echo "Missing macOS app Info.plist: ${app_plist}"
+            exit 1
+          fi
+          if [ ! -x "${app_exec}" ]; then
+            echo "Missing or non-executable macOS app launcher: ${app_exec}"
+            exit 1
+          fi
+          if [ ! -f "${app_icon}" ]; then
+            echo "Missing macOS app icon: ${app_icon}"
+            exit 1
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -221,6 +323,8 @@ jobs:
 
           expected=(
             "openprey-${{ needs.metadata.outputs.version_tag }}-windows.zip"
+            "openprey-${{ needs.metadata.outputs.version_tag }}-linux.tar.xz"
+            "openprey-${{ needs.metadata.outputs.version_tag }}-macos.tar.gz"
           )
 
           missing=0

@@ -4,8 +4,8 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Version](https://img.shields.io/badge/version-0.0.1-green.svg)](https://github.com/themuffinator/OpenPrey)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](https://github.com/themuffinator/OpenPrey)
-[![Architecture](https://img.shields.io/badge/arch-x64-orange.svg)](https://github.com/themuffinator/OpenPrey)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/themuffinator/OpenPrey)
+[![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20arm64-orange.svg)](https://github.com/themuffinator/OpenPrey)
 [![Build System](https://img.shields.io/badge/build-Meson%20%2B%20Ninja-yellow.svg)](https://mesonbuild.com/)
 
 **A modern, open-source engine and game-code replacement for Prey (2006)**
@@ -30,7 +30,7 @@ The **OpenPrey Project** is a minimal, Prey-focused adaptation of the current Op
 To use OpenPrey, you need:
 - A legitimate copy of Prey (2006)
 - OpenPrey engine binaries from this repository
-- A modern 64-bit Windows system (Windows x64 is the current actively validated platform)
+- A supported host system for the current build/package flow: Windows x64, Linux x64, or macOS arm64
 
 ---
 
@@ -50,6 +50,7 @@ To use OpenPrey, you need:
 ### Modernization And Tooling
 - **SDL3-first Windows Backend**: SDL3 is the default window/input/display backend; the legacy Win32 backend remains transitional
 - **Meson + Ninja Build System**: Canonical configure/build/install path with repo-local staging under `.install/`
+- **Cross-platform Nightly Builds**: GitHub Actions builds and packages Windows, Linux, and macOS artifacts from the same Meson staging flow
 - **Debug-Oriented Local Workflow**: `.install/` for staged runtime files, `.home/` for configs/logs/saves, `.tmp/` for task artifacts
 - **Crash Diagnostics**: Windows debug builds write crash logs and minidumps into `crashes/` beside the executable
 
@@ -70,16 +71,17 @@ This status focuses on compatibility with official Prey assets and the OpenPrey 
 - **Unified Game Module Loader**: OpenPrey builds and stages a unified `game_<arch>` module under `openprey/`
 - **Companion Repo Tooling**: Sync/build tooling now targets `OpenPrey-GameLibs` and supports both Meson-wrapper and legacy VC-solution layouts
 - **Official PK4 Layout Validation**: Engine startup rejects missing or modified required base-pack layouts when `fs_validateOfficialPaks 1` is enabled
+- **Cross-host Meson Support**: Meson source selection, dependency wiring, and nightly packaging now cover Windows, Linux, and macOS hosts
 
 ### In Progress
 - **Stock-asset SP/MP Smoke Validation**: Default staged launch flow is still being verified across single-player and multiplayer startup cases
 - **Prey Gameplay Bring-up**: Active `src/Prey` game-library integration and runtime verification continue during the migration
 - **Particle And FX Compatibility**: Doom 3 / Prey-era particle behavior and dependent runtime paths still need restoration and parity checks
+- **Cross-host Runtime Validation**: Windows remains the deepest runtime-validation path while Linux/macOS map validation is extended
 
 ### Not Yet Claimed
 - **Full Campaign Completion**: The project does not yet claim end-to-end single-player completion against stock assets
 - **Multiplayer Parity**: Multiplayer compatibility remains under active validation
-- **Non-Windows Host Support**: Linux and macOS remain roadmap items; current Meson host validation is Windows-first
 
 Current follow-up work is tracked in [TODO.md](TODO.md), [docs-dev/release-completion.md](docs-dev/release-completion.md), and [docs-dev/prey-gamelibs-compatibility-plan.md](docs-dev/prey-gamelibs-compatibility-plan.md).
 
@@ -89,9 +91,11 @@ Current follow-up work is tracked in [TODO.md](TODO.md), [docs-dev/release-compl
 
 ### Prerequisites
 - **Prey (2006)** installed from original media or another legitimate distribution
-- **Windows x64**
+- **Supported build hosts**: Windows x64, Linux x64, or macOS arm64
 - **Build tools**: [Meson](https://mesonbuild.com/), [Ninja](https://ninja-build.org/), and Python 3
-- **MSVC toolchain**: Visual Studio 2026+ recommended (MSVC 19.46+)
+- **Windows compiler/toolchain**: Visual Studio 2026+ recommended (MSVC 19.46+)
+- **Linux compiler/toolchain**: GCC or Clang plus system `glew`, `openal`, `x11`, `xext`, and `xxf86vm` development packages
+- **macOS compiler/toolchain**: Apple Clang with Homebrew `glew`
 
 > [!NOTE]
 > `tools/build/meson_setup.ps1` automatically syncs `../OpenPrey-GameLibs` on `setup`, `compile`, and `install`. Clone the companion repo alongside OpenPrey, or set `OPENPREY_SKIP_GAMELIBS_SYNC=1` if you intentionally want to build only from the in-repo mirror.
@@ -119,6 +123,18 @@ Current follow-up work is tracked in [TODO.md](TODO.md), [docs-dev/release-compl
    powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
    ```
 
+   **Linux / macOS (bash)**
+   ```bash
+   # Setup the build
+   bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release -Dplatform_backend=sdl3
+
+   # Compile
+   bash tools/build/meson_setup.sh compile -C builddir
+
+   # Stage the local runtime package
+   bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
+   ```
+
 3. **Run the staged build**
 
    ```powershell
@@ -139,14 +155,15 @@ For a short single-player smoke test, append `+set si_gameType singleplayer +map
 - **Meson** 1.2.0 or newer
 - **Ninja** build system
 - **Python 3**
-- **C++23-capable MSVC toolchain**
-  - **Windows**: Visual Studio 2026 / MSVC 19.46+ recommended
+- **Windows toolchain**: Visual Studio 2026 / MSVC 19.46+ recommended
+- **Linux toolchain**: GCC or Clang with system OpenGL/X11/OpenAL development packages
+- **macOS toolchain**: Apple Clang with Homebrew `glew`
 
 ### Build Options
 ```text
 -Dbuild_engine=true|false         # Build OpenPrey-client_<arch> and OpenPrey-ded_<arch>
 -Dbuild_games=true|false          # Build the unified game module from the synchronized mirror
--Dplatform_backend=sdl3|legacy_win32
+-Dplatform_backend=sdl3|legacy_win32|native
 -Duse_pch=true|false
 -Denforce_msvc_2026=true          # Fail configure if MSVC is older than 19.46+
 ```
@@ -173,6 +190,18 @@ meson compile -C builddir
 meson install -C builddir --no-rebuild --skip-subprojects
 ```
 
+**Linux / macOS**
+```bash
+# Configure
+bash tools/build/meson_setup.sh setup builddir . --backend ninja --buildtype=release -Dplatform_backend=sdl3
+
+# Build
+bash tools/build/meson_setup.sh compile -C builddir
+
+# Stage the runtime tree used for local validation
+bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
+```
+
 ### Output Files
 
 **Build directory** (`builddir/`):
@@ -192,12 +221,17 @@ meson install -C builddir --no-rebuild --skip-subprojects
 
 ### Nightly Packaging
 
-GitHub nightly builds package the staged `.install/` tree into `openprey-<version-tag>-windows.zip`.
+GitHub nightly builds package the staged `.install/` tree into:
 
-- `openprey/game_<arch>.dll` stays as a loose runtime module inside the packaged `openprey/` directory
+- `openprey-<version-tag>-windows.zip`
+- `openprey-<version-tag>-linux.tar.xz`
+- `openprey-<version-tag>-macos.tar.gz`
+
+- `openprey/game_<arch>.(dll|so|dylib)` stays as a loose runtime module inside the packaged `openprey/` directory
 - staged overlay content is bundled into `openprey/pak0.pk4`
+- Linux nightlies include staged `share/applications` and `share/icons` payloads
+- macOS nightlies include an `OpenPrey.app` launcher bundle beside the packaged binaries
 - the workflow publishes or updates a `nightly-<version-tag>` GitHub release with generated notes
-- Windows is the only actively published nightly target until non-Windows Meson hosts are enabled
 
 </details>
 

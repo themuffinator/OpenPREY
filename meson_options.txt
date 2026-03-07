@@ -36,9 +36,9 @@ option(
 option(
   'platform_backend',
   type: 'combo',
-  choices: ['sdl3', 'legacy_win32'],
+  choices: ['sdl3', 'legacy_win32', 'native'],
   value: 'sdl3',
-  description: 'Window/input backend on Windows (SDL3 is the portability default; legacy_win32 is transitional).',
+  description: 'Window/input backend on Windows (SDL3 is the portability default; legacy_win32 is transitional). Non-Windows hosts always use native platform sources.',
 )
 
 option(
