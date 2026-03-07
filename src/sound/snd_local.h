@@ -72,6 +72,10 @@ ID_INLINE_EXTERN float DBtoLinear( float db )
 {
 	return idMath::Pow( 2.0f, db * ( 1.0f / 6.0f ) );
 }
+ID_INLINE_EXTERN float DBtoLinearClamped( float db )
+{
+	return ( db <= DB_SILENCE ) ? 0.0f : Max( 0.0f, DBtoLinear( db ) );
+}
 ID_INLINE_EXTERN float LinearToDB( float linear )
 {
 	return ( linear > 0.0f ) ? ( idMath::Log( linear ) * ( 6.0f / 0.693147181f ) ) : -999.0f;

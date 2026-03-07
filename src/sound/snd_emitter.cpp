@@ -38,7 +38,6 @@ idCVar s_centerFractionVO( "s_centerFractionVO", "0.75", CVAR_FLOAT, "Portion of
 extern idCVar s_playDefaultSound;
 extern idCVar s_noSound;
 extern idCVar s_musicvolume_dB;
-extern idCVar s_volume_dB;
 
 static ID_INLINE float VolumeScaleToDB( const float volumeScale )
 {
@@ -47,6 +46,11 @@ static ID_INLINE float VolumeScaleToDB( const float volumeScale )
 		return DB_SILENCE;
 	}
 	return LinearToDB( volumeScale );
+}
+
+static ID_INLINE bool IsMusicSound( const soundShaderParms_t& parms )
+{
+	return ( parms.soundShaderFlags & SSF_MUSIC ) != 0 || parms.soundClass == SOUNDCLASS_MUSIC;
 }
 
 static ID_INLINE bool IsProfanityCensorEnabled()
@@ -329,12 +333,11 @@ void idSoundChannel::UpdateVolume( int currentTime )
 	newVolumeDB += volumeFade.GetVolume( currentTime );
 	newVolumeDB += soundWorld->volumeFade.GetVolume( currentTime );
 	newVolumeDB += soundWorld->pauseFade.GetVolume( currentTime );
-	newVolumeDB += s_volume_dB.GetFloat();
 	if( parms.soundClass >= 0 && parms.soundClass < SOUND_MAX_CLASSES )
 	{
 		newVolumeDB += soundWorld->soundClassFade[parms.soundClass].GetVolume( currentTime );
 	}
-	if( ( parms.soundShaderFlags & SSF_MUSIC ) != 0 )
+	if( IsMusicSound( parms ) )
 	{
 		newVolumeDB += s_musicvolume_dB.GetFloat();
 	}
@@ -358,7 +361,7 @@ void idSoundChannel::UpdateVolume( int currentTime )
 		}
 	}
 
-	if( soundSystemLocal.musicMuted && ( parms.soundShaderFlags & SSF_MUSIC ) != 0 )
+	if( soundSystemLocal.musicMuted && IsMusicSound( parms ) )
 	{
 		newVolumeDB = DB_SILENCE;
 	}
@@ -410,7 +413,7 @@ void idSoundChannel::UpdateHardware( float volumeAdd, int currentTime )
 	}
 
 	// convert volumes from decibels to linear
-	float volume = Max( 0.0f, DBtoLinear( volumeDB + volumeAdd ) );
+	float volume = DBtoLinearClamped( volumeDB + volumeAdd );
 
 	if( ( parms.soundShaderFlags & SSF_UNCLAMPED ) == 0 )
 	{

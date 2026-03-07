@@ -31,6 +31,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "../framework/Session_local.h"
 
 extern idCVar g_subtitles;
+extern idCVar s_volume_dB;
+extern idCVar s_musicvolume_dB;
 
 idCVar s_noSound( "s_noSound", "0", CVAR_BOOL, "returns NULL for all sounds loaded and does not update the sound rendering" );
 idCVar s_volume( "s_volume", "1.0", CVAR_ARCHIVE | CVAR_FLOAT, "master volume (0-1)" );
@@ -57,6 +59,58 @@ idCVar preLoad_Samples( "preLoad_Samples", "1", CVAR_SYSTEM | CVAR_BOOL, "preloa
 
 idSoundSystemLocal soundSystemLocal;
 idSoundSystem* soundSystem = &soundSystemLocal;
+
+static ID_INLINE float SoundAliasLinearToDB( const float linear )
+{
+	const float clampedLinear = idMath::ClampFloat( 0.0f, 1.0f, linear );
+	if( clampedLinear <= 0.0f )
+	{
+		return DB_SILENCE;
+	}
+	return idMath::ClampFloat( DB_SILENCE, 0.0f, LinearToDB( clampedLinear ) );
+}
+
+static ID_INLINE float SoundAliasDBToLinear( const float db )
+{
+	return idMath::ClampFloat( 0.0f, 1.0f, DBtoLinearClamped( db ) );
+}
+
+static void SyncVolumeAliasCVars( idCVar& linearCvar, idCVar& dbCvar )
+{
+	const bool linearModified = linearCvar.IsModified();
+	const bool dbModified = dbCvar.IsModified();
+	if( !linearModified && !dbModified )
+	{
+		return;
+	}
+
+	// Prey menu sliders write the dB cvars directly, so prefer them when both change.
+	if( dbModified )
+	{
+		const float linearValue = SoundAliasDBToLinear( dbCvar.GetFloat() );
+		if( idMath::Fabs( linearCvar.GetFloat() - linearValue ) > 0.0001f )
+		{
+			linearCvar.SetFloat( linearValue );
+		}
+	}
+	else
+	{
+		const float dbValue = SoundAliasLinearToDB( linearCvar.GetFloat() );
+		if( idMath::Fabs( dbCvar.GetFloat() - dbValue ) > 0.0001f )
+		{
+			dbCvar.SetFloat( dbValue );
+		}
+	}
+
+	linearCvar.ClearModified();
+	dbCvar.ClearModified();
+}
+
+static void SyncVolumeCompatibilityCVars()
+{
+	SyncVolumeAliasCVars( s_volume, s_volume_dB );
+	SyncVolumeAliasCVars( s_musicVolume, s_musicvolume_dB );
+}
 
 /*
 ================================================================================================
@@ -221,6 +275,8 @@ void idSoundSystemLocal::Init()
 	cmdSystem->AddCommand( "s_restart", RestartSound_f, 0, "restart sound system" );
 	cmdSystem->AddCommand( "listSamples", ListSamples_f, 0, "lists all loaded sound samples" );
 	cmdSystem->AddCommand( "listSubtitles", ListSubtitles_f, 0, "lists registered subtitle entries" );
+
+	SyncVolumeCompatibilityCVars();
 
 	idLib::Printf( "sound system initialized.\n" );
 	idLib::Printf( "--------------------------------------\n" );
@@ -404,6 +460,8 @@ void idSoundSystemLocal::Render()
 		needsRestart = false;
 		Restart();
 	}
+
+	SyncVolumeCompatibilityCVars();
 
 //	SCOPED_PROFILE_EVENT( "SoundSystem::Render" );
 

@@ -38,7 +38,7 @@ idCVar s_meterTopTime( "s_meterTopTime", "1000", CVAR_INTEGER | CVAR_ARCHIVE, "H
 idCVar s_meterPosition( "s_meterPosition", "100 100 20 200", CVAR_ARCHIVE, "VU meter location (x y w h)" );
 idCVar s_device( "s_device", "-1", CVAR_INTEGER | CVAR_ARCHIVE, "Which audio device to use (listDevices to list, -1 for default)" );
 idCVar s_showPerfData( "s_showPerfData", "0", CVAR_BOOL, "Show XAudio2 Performance data" );
-extern idCVar s_volume;
+extern idCVar s_volume_dB;
 extern idCVar s_deviceName;
 extern idCVar s_useEAXReverb;
 
@@ -653,7 +653,7 @@ void idSoundHardware_OpenAL::Update()
 	}
 	else
 	{
-		alListenerf( AL_GAIN, idMath::ClampFloat( 0.0f, 1.0f, s_volume.GetFloat() ) );
+		alListenerf( AL_GAIN, idMath::ClampFloat( 0.0f, 1.0f, DBtoLinearClamped( s_volume_dB.GetFloat() ) ) );
 	}
 
 	// IXAudio2SourceVoice::Stop() has been called for every sound on the
