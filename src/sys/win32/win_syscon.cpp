@@ -111,7 +111,7 @@ typedef struct {
 } WinConData;
 
 static WinConData s_wcd;
-static const COLORREF CONSOLE_TEXT_BACKGROUND_COLOR = RGB(0xd7, 0xee, 0xea);
+static const COLORREF CONSOLE_TEXT_BACKGROUND_COLOR = RGB(0xb8, 0xdd, 0xd7);
 static const COLORREF CONSOLE_TEXT_COLOR = RGB(0x12, 0x34, 0x63);
 
 static LONG WINAPI ConWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
