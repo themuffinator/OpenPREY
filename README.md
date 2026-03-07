@@ -17,7 +17,7 @@
 ---
 
 > [!WARNING]
-> **Development Status:** OpenPrey is in active migration from OpenQ4. Windows x64 is the current validated host, and full gameplay/runtime parity with stock Prey assets is still being established.
+> **Development Notice:** This project leans heavily on exploratory, agentic AI "vibe coding" for speed. If you want a traditionally engineered codebase, this isn't for you.
 
 ---
 
