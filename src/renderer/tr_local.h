@@ -897,6 +897,14 @@ extern idCVar r_bloomThreshold;		// bloom bright-pass threshold
 extern idCVar r_bloomSoftKnee;			// bloom soft threshold knee
 extern idCVar r_bloomIntensity;		// bloom contribution scale
 extern idCVar r_bloomRadius;			// bloom sample radius scale
+extern idCVar r_ssao;					// enable SSAO post-process
+extern idCVar r_ssaoRadius;			// SSAO sampling radius in view-space units
+extern idCVar r_ssaoBias;				// SSAO horizon bias in view-space units
+extern idCVar r_ssaoIntensity;			// SSAO darkening strength
+extern idCVar r_ssaoPower;				// SSAO response curve
+extern idCVar r_ssaoMaxDistance;		// SSAO far-distance fade
+extern idCVar r_ssaoSamples;			// SSAO spiral sample count
+extern idCVar r_ssaoDebug;				// visualize SSAO only
 extern idCVar r_glowAlpha;				// starting blur alpha for retail glow
 extern idCVar r_glowAlphaChange;		// per-step glow blur alpha change
 extern idCVar r_glowSteps;				// number of glow blur steps

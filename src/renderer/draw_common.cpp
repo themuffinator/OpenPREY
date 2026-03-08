@@ -417,6 +417,213 @@ struct rbBuiltinUniformDef_t {
 	int components;
 };
 
+enum rbSSAOUniformIndex_t {
+	RB_SSAO_UNIFORM_INV_TEX_SIZE = 0,
+	RB_SSAO_UNIFORM_PROJECTION_INFO,
+	RB_SSAO_UNIFORM_DEPTH_PROJECTION,
+	RB_SSAO_UNIFORM_PROJECTION_SCALE,
+	RB_SSAO_UNIFORM_RADIUS,
+	RB_SSAO_UNIFORM_BIAS,
+	RB_SSAO_UNIFORM_INTENSITY,
+	RB_SSAO_UNIFORM_POWER,
+	RB_SSAO_UNIFORM_MAX_DISTANCE,
+	RB_SSAO_UNIFORM_SAMPLE_COUNT,
+	RB_SSAO_UNIFORM_DEBUG_VIEW,
+	RB_SSAO_UNIFORM_COUNT
+};
+
+static newShaderStage_t rbSSAOStage;
+static bool rbSSAOStageInitialized = false;
+
+static void RB_InitSSAOStage( void ) {
+	if ( rbSSAOStageInitialized ) {
+		return;
+	}
+
+	memset( &rbSSAOStage, 0, sizeof( rbSSAOStage ) );
+	rbSSAOStage.glslProgram = true;
+	idStr::Copynz( rbSSAOStage.glslProgramName, "openprey_ssao.fs", sizeof( rbSSAOStage.glslProgramName ) );
+
+	static const rbBuiltinUniformDef_t uniforms[RB_SSAO_UNIFORM_COUNT] = {
+		{ "invTexSize", 2 },
+		{ "projectionInfo", 4 },
+		{ "depthProjection", 2 },
+		{ "projectionScale", 1 },
+		{ "ssaoRadius", 1 },
+		{ "ssaoBias", 1 },
+		{ "ssaoIntensity", 1 },
+		{ "ssaoPower", 1 },
+		{ "ssaoMaxDistance", 1 },
+		{ "ssaoSampleCount", 1 },
+		{ "ssaoDebugView", 1 }
+	};
+
+	rbSSAOStage.numShaderParms = RB_SSAO_UNIFORM_COUNT;
+	for ( int i = 0; i < RB_SSAO_UNIFORM_COUNT; i++ ) {
+		idStr::Copynz( rbSSAOStage.shaderParmNames[i], uniforms[i].name, sizeof( rbSSAOStage.shaderParmNames[i] ) );
+		rbSSAOStage.shaderParmNumRegisters[i] = uniforms[i].components;
+	}
+
+	rbSSAOStage.numShaderTextures = 2;
+	idStr::Copynz( rbSSAOStage.shaderTextureNames[0], "Scene", sizeof( rbSSAOStage.shaderTextureNames[0] ) );
+	idStr::Copynz( rbSSAOStage.shaderTextureNames[1], "DepthBuffer", sizeof( rbSSAOStage.shaderTextureNames[1] ) );
+
+	rbSSAOStageInitialized = true;
+}
+
+static void RB_STD_SSAO( void ) {
+	if ( r_skipPostProcess.GetBool() || !r_ssao.GetBool() ) {
+		return;
+	}
+
+	if ( !glConfig.GLSLProgramAvailable ) {
+		return;
+	}
+
+	if ( !RB_IsMainScenePostProcessView() ) {
+		return;
+	}
+
+	const GLfloat radius = r_ssaoRadius.GetFloat();
+	const GLfloat intensity = r_ssaoIntensity.GetFloat();
+	if ( radius <= 0.0f || intensity <= 0.0f ) {
+		return;
+	}
+
+	RB_InitSSAOStage();
+	if ( !RB_ResolveGLSLProgram( &rbSSAOStage ) ) {
+		return;
+	}
+
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	if ( viewportWidth <= 0 || viewportHeight <= 0 ) {
+		return;
+	}
+
+	idImage *sceneImage = globalImages->currentRenderImage;
+	idImage *depthImage = globalImages->currentDepthImage;
+	if ( sceneImage == NULL || depthImage == NULL ) {
+		return;
+	}
+
+	const GLfloat projX = backEnd.viewDef->projectionMatrix[0];
+	const GLfloat projY = backEnd.viewDef->projectionMatrix[5];
+	if ( idMath::Fabs( projX ) <= 0.00001f || idMath::Fabs( projY ) <= 0.00001f ) {
+		return;
+	}
+
+	RB_LogComment( "---------- RB_STD_SSAO ----------\n" );
+
+	sceneImage->CopyFramebuffer(
+		backEnd.viewDef->viewport.x1,
+		backEnd.viewDef->viewport.y1,
+		viewportWidth,
+		viewportHeight );
+	depthImage->CopyDepthbuffer(
+		backEnd.viewDef->viewport.x1,
+		backEnd.viewDef->viewport.y1,
+		viewportWidth,
+		viewportHeight );
+
+	const int textureWidth = sceneImage->GetOpts().width;
+	const int textureHeight = sceneImage->GetOpts().height;
+	const int depthTextureWidth = depthImage->GetOpts().width;
+	const int depthTextureHeight = depthImage->GetOpts().height;
+	if ( textureWidth <= 0 || textureHeight <= 0 || depthTextureWidth <= 0 || depthTextureHeight <= 0 ) {
+		return;
+	}
+
+	backEnd.currentScissor = backEnd.viewDef->scissor;
+
+	RB_BeginFullscreenPostProcessPass(
+		backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+
+	GL_SelectTexture( 0 );
+	sceneImage->Bind();
+	GL_SelectTexture( 1 );
+	depthImage->Bind();
+	GL_SelectTexture( 0 );
+
+	glUseProgramObjectARB( (GLhandleARB)rbSSAOStage.glslProgramObject );
+
+	const int sceneLocation = rbSSAOStage.shaderTextureLocations[0];
+	if ( sceneLocation >= 0 ) {
+		glUniform1iARB( sceneLocation, 0 );
+	}
+
+	const int depthLocation = rbSSAOStage.shaderTextureLocations[1];
+	if ( depthLocation >= 0 ) {
+		glUniform1iARB( depthLocation, 1 );
+	}
+
+	const GLfloat invTexSize[2] = {
+		1.0f / static_cast<GLfloat>( depthTextureWidth ),
+		1.0f / static_cast<GLfloat>( depthTextureHeight )
+	};
+	const GLfloat projectionInfo[4] = {
+		1.0f / projX,
+		1.0f / projY,
+		backEnd.viewDef->projectionMatrix[8],
+		backEnd.viewDef->projectionMatrix[9]
+	};
+	const GLfloat depthProjection[2] = {
+		backEnd.viewDef->projectionMatrix[10],
+		backEnd.viewDef->projectionMatrix[14]
+	};
+	const GLfloat projectionScale = 0.5f * static_cast<GLfloat>( depthTextureHeight ) * idMath::Fabs( projY );
+	const GLfloat bias = r_ssaoBias.GetFloat();
+	const GLfloat power = r_ssaoPower.GetFloat();
+	const GLfloat maxDistance = r_ssaoMaxDistance.GetFloat();
+	const GLfloat sampleCount = static_cast<GLfloat>( idMath::ClampInt( 4, 32, r_ssaoSamples.GetInteger() ) );
+	const GLfloat debugView = r_ssaoDebug.GetBool() ? 1.0f : 0.0f;
+
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_INV_TEX_SIZE] >= 0 ) {
+		glUniform2fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_INV_TEX_SIZE], 1, invTexSize );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_PROJECTION_INFO] >= 0 ) {
+		glUniform4fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_PROJECTION_INFO], 1, projectionInfo );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_DEPTH_PROJECTION] >= 0 ) {
+		glUniform2fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_DEPTH_PROJECTION], 1, depthProjection );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_PROJECTION_SCALE] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_PROJECTION_SCALE], projectionScale );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_RADIUS] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_RADIUS], radius );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_BIAS] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_BIAS], bias );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_INTENSITY] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_INTENSITY], intensity );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_POWER] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_POWER], power );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_MAX_DISTANCE] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_MAX_DISTANCE], maxDistance );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_SAMPLE_COUNT] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_SAMPLE_COUNT], sampleCount );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_DEBUG_VIEW] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_DEBUG_VIEW], debugView );
+	}
+
+	RB_DrawFullscreenPostProcessQuad( viewportWidth, viewportHeight, textureWidth, textureHeight );
+
+	glUseProgramObjectARB( 0 );
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
+	RB_EndFullscreenPostProcessPass();
+}
+
 enum rbBloomUniformIndex_t {
 	RB_BLOOM_UNIFORM_INV_TEX_SIZE = 0,
 	RB_BLOOM_UNIFORM_THRESHOLD,
@@ -2787,6 +2994,9 @@ void	RB_STD_DrawView( void ) {
 
 	// fob and blend lights
 	RB_STD_FogAllLights();
+
+	// Apply SSAO before bloom and tonemapping so indirect shadowing modulates the lit scene.
+	RB_STD_SSAO();
 
 	// Apply Prey-style scene bloom before authored post-process overlays.
 	RB_STD_Bloom();

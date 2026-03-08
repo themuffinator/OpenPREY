@@ -740,7 +740,59 @@ void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 
 	opts.width = imageWidth;
 	opts.height = imageHeight;
-	glCopyTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, x, y, imageWidth, imageHeight, 0 );
+
+	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetDepthImage() != NULL );
+	if ( readingFromRenderTexture && ( GLEW_EXT_framebuffer_blit || GLEW_VERSION_3_0 ) ) {
+		GLint previousReadFbo = 0;
+		GLint previousDrawFbo = 0;
+		GLint previousReadBuffer = GL_BACK;
+		GLint previousDrawBuffer = GL_BACK;
+
+		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFbo );
+		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFbo );
+		glGetIntegerv( GL_READ_BUFFER, &previousReadBuffer );
+		glGetIntegerv( GL_DRAW_BUFFER, &previousDrawBuffer );
+
+		static GLuint copyDepthFbo = 0;
+		if ( copyDepthFbo == 0 ) {
+			glGenFramebuffers( 1, &copyDepthFbo );
+		}
+
+		glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, imageWidth, imageHeight, 0, dataFormat, dataType, NULL );
+		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
+		glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
+		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, copyDepthFbo );
+		glFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texnum, 0 );
+		glReadBuffer( GL_NONE );
+		glDrawBuffer( GL_NONE );
+
+		const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
+		GLint previousScissorBox[4] = { 0, 0, 0, 0 };
+		if ( scissorWasEnabled ) {
+			glGetIntegerv( GL_SCISSOR_BOX, previousScissorBox );
+			glDisable( GL_SCISSOR_TEST );
+		}
+
+		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
+
+		if ( scissorWasEnabled ) {
+			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
+			glEnable( GL_SCISSOR_TEST );
+		}
+
+		glFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0 );
+
+		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
+		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previousDrawFbo );
+		glReadBuffer( previousReadBuffer );
+		glDrawBuffer( previousDrawBuffer );
+	} else {
+		glCopyTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, x, y, imageWidth, imageHeight, 0 );
+	}
 
 	//backEnd.pc.c_copyFrameBuffer++;
 }

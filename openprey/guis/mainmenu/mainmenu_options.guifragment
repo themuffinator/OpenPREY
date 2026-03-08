@@ -3111,7 +3111,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									choices		"Off;2x MSAA;4x MSAA;8x MSAA"
+									choices		"#str_122023"
 									values		"0;2;4;8"
 									cvar		"r_multiSamples"
 									choiceType	1
@@ -3477,7 +3477,7 @@
 						buttonActiveLeftMat		"guis/assets/menu/tabtopactive.tga"
 						buttonActiveMiddleMat	"guis/assets/menu/tabhstripactive.tga"
 						buttonActiveRightMat	"guis/assets/menu/tabbottomactive.tga"
-						text					"Post FX"
+						text					"#str_122003"
 						textaligny				30
 						buttonEdgeWidth			16
 						seperatorLines			1, 1, 1, 1
@@ -3497,7 +3497,7 @@
 								noevents	1
 								forecolor	HEADING_FORECOLOR_DARK_COMMA
 								font		"fonts/menu"
-								text		"Post Processing"
+								text		"#str_122005"
 								textalign	1
 								textaligny	-3
 								textscale	0.45
@@ -3517,7 +3517,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"MSAA Samples"
+									text		"#str_122007"
 								}
 								choiceDef OVP_Choice_MSAASamples {
 									rect		200, 0, 200, 25
@@ -3527,7 +3527,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									choices		"Off;2x MSAA;4x MSAA;8x MSAA"
+									choices		"#str_122023"
 									values		"0;2;4;8"
 									cvar		"r_multiSamples"
 									choiceType	1
@@ -3550,7 +3550,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"Post Anti-Aliasing"
+									text		"#str_122008"
 								}
 								choiceDef OVP_Choice_PostAA {
 									rect		200, 0, 200, 25
@@ -3560,15 +3560,44 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									choices		"Off;SMAA 1x"
+									choices		"#str_122024"
 									values		"0;1"
 									cvar		"r_postAA"
 									choiceType	1
 								}
 							}
 
-							buttonDef OVP_Bloom {
+							buttonDef OVP_SSAO {
 								rect			10, 96, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVP_Title_SSAO {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122009"
+								}
+								choiceDef OVP_Choice_SSAO {
+									rect		200, 0, 200, 25
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									choices		"#str_20152"
+									cvar		"r_ssao"
+									choiceType	0
+								}
+							}
+
+							buttonDef OVP_Bloom {
+								rect			10, 124, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3580,7 +3609,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"Bloom"
+									text		"#str_122010"
 								}
 								choiceDef OVP_Choice_Bloom {
 									rect		200, 0, 200, 25
@@ -3597,7 +3626,7 @@
 							}
 
 							buttonDef OVP_BloomIntensity {
-								rect			10, 124, 400, 25
+								rect			10, 152, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3609,7 +3638,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"Bloom Intensity"
+									text		"#str_122011"
 								}
 								windowDef OVP_BloomIntensityBG {
 									rect		250, 4, 100, 16
@@ -3628,7 +3657,7 @@
 							}
 
 							buttonDef OVP_CRT {
-								rect			10, 152, 400, 25
+								rect			10, 236, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3656,37 +3685,8 @@
 								}
 							}
 
-							buttonDef OVP_MSAAAlphaCoverage {
-								rect			10, 180, 400, 25
-								leftMat			"guis/assets/menu/textbar_corner.tga"
-								middleMat		"guis/assets/menu/textbarstrip.tga"
-								rightMat		"guis/assets/menu/textbar_invcorner.tga"
-
-								windowDef OVP_Title_MSAAAlphaCoverage {
-									rect		0, 0, 200, 25
-									forecolor	STATIC_FORECOLOR_COMMA
-									textalign	1
-									textaligny	0
-									textscale	0.33
-									shadow		1
-									text		"MSAA Alpha Coverage"
-								}
-								choiceDef OVP_Choice_MSAAAlphaCoverage {
-									rect		200, 0, 200, 25
-									forecolor	EDITABLE_FORECOLOR_COMMA
-									hovercolor	EDITABLE_HOVERCOLOR_COMMA
-									textalign	1
-									textaligny	0
-									textscale	0.33
-									shadow		1
-									choices		"#str_20152"
-									cvar		"r_msaaAlphaToCoverage"
-									choiceType	0
-								}
-							}
-
 							buttonDef OVP_HDRToneMap {
-								rect			10, 208, 400, 25
+								rect			10, 180, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3698,7 +3698,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"HDR Tone Mapping"
+									text		"#str_122012"
 								}
 								choiceDef OVP_Choice_HDRToneMap {
 									rect		200, 0, 200, 25
@@ -3715,7 +3715,7 @@
 							}
 
 							buttonDef OVP_HDRExposure {
-								rect			10, 236, 400, 25
+								rect			10, 208, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3727,7 +3727,7 @@
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"HDR Exposure"
+									text		"#str_122013"
 								}
 								windowDef OVP_HDRExposureBG {
 									rect		250, 4, 100, 16
@@ -3745,26 +3745,258 @@
 								}
 							}
 
-							buttonDef OVP_HDRSaturation {
-								rect			10, 264, 400, 25
+							buttonDef OVP_ApplyChanges {
+								rect			280, 320, 115, 28
+								text			"#str_20294"
+								textalign		1
+								textaligny		-1
+								shadow			1
+								forecolor		BUTTON_FORECOLOR_GREYED_COMMA
+								hoverColor		BUTTON_HOVERCOLOR_COMMA
+								leftMat			"guis/assets/menu/button/corner"
+								middleMat		"guis/assets/menu/button/strip"
+								leftHoverMat	"guis/assets/menu/button/rollover_corner"
+								middleHoverMat	"guis/assets/menu/button/rollover_strip"
+								rightMat		"guis/assets/menu/button/invcorner"
+								rightHoverMat	"guis/assets/menu/button/rollover_invcorner"
+								edgeWidth		12
+								noEvents		1
+
+								onNamedEvent NeedVidRestart {
+									set "noevents" "0";
+									set "forecolor" BUTTON_FORECOLOR_STRING;
+									set "hovercolor" BUTTON_HOVERCOLOR_STRING;
+								}
+
+								onNamedEvent VidRestart {
+									set "noevents" "1";
+									set "forecolor" BUTTON_FORECOLOR_GREYED_STRING;
+									set "hovercolor" BUTTON_FORECOLOR_GREYED_STRING;
+								}
+
+								onAction {
+									set	"cmd"	"play guisounds_menu_clickin" ;
+									namedEvent "VidRestart";
+								}
+							}
+						}
+					}
+
+					tabDef Options_Video_PostFXAdvanced {
+						rect					100, 0, 470, 370
+						backcolor				TAB_PAGE_BACKCOLOR_COMMA
+						background				"guis/assets/menu/fadebg.tga"
+						forecolor				TAB_FORECOLOR_COMMA
+						hovercolor				TAB_HOVERCOLOR_COMMA
+						activeColor				TAB_ACTIVECOLOR_COMMA
+						matcolor				1, 1, 1, 1
+						hoverMatColor			TAB_HOVERMAT_COLOR_COMMA
+						buttonLeftMat			"guis/assets/menu/tabtop.tga"
+						buttonMiddleMat			"guis/assets/menu/tabhstrip.tga"
+						buttonRightMat			"guis/assets/menu/tabbottom.tga"
+						buttonActiveLeftMat		"guis/assets/menu/tabtopactive.tga"
+						buttonActiveMiddleMat	"guis/assets/menu/tabhstripactive.tga"
+						buttonActiveRightMat	"guis/assets/menu/tabbottomactive.tga"
+						text					"#str_122004"
+						textaligny				30
+						buttonEdgeWidth			16
+						seperatorLines			1, 1, 1, 1
+						seperatorMargin			1
+
+						onTabActivate {
+							set "cmd" "play guisounds_menu_tabflip" ;
+						}
+
+						windowDef OVT_Page {
+							rect		25, 18, 420, 350
+
+							buttonDef OVT_Headings {
+								rect		0, 0, 420, 30
+								leftMat		"guis/assets/menu/text_titlebar_corner.tga"
+								middleMat	"guis/assets/menu/text_titlebarstrip.tga"
+								noevents	1
+								forecolor	HEADING_FORECOLOR_DARK_COMMA
+								font		"fonts/menu"
+								text		"#str_122006"
+								textalign	1
+								textaligny	-3
+								textscale	0.45
+								shadow		1
+							}
+
+							buttonDef OVT_MSAAAlphaCoverage {
+								rect			10, 40, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
 
-								windowDef OVP_Title_HDRSaturation {
+								windowDef OVT_Title_MSAAAlphaCoverage {
 									rect		0, 0, 200, 25
 									forecolor	STATIC_FORECOLOR_COMMA
 									textalign	1
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"Color Saturation"
+									text		"#str_122014"
 								}
-								windowDef OVP_HDRSaturationBG {
+								choiceDef OVT_Choice_MSAAAlphaCoverage {
+									rect		200, 0, 200, 25
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									choices		"#str_20152"
+									cvar		"r_msaaAlphaToCoverage"
+									choiceType	0
+								}
+							}
+
+							buttonDef OVT_SSAORadius {
+								rect			10, 68, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_SSAORadius {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122015"
+								}
+								windowDef OVT_SSAORadiusBG {
 									rect		250, 4, 100, 16
 									background	"guis/assets/sliderbackground.tga"
 								}
-								sliderDef OVP_HDRSaturationSlider {
+								sliderDef OVT_SSAORadiusSlider {
+									rect		250, 4, 100, 16
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									low			4.0
+									high		256.0
+									step		4.0
+									thumbShader	"guis/assets/sliderbutton.tga"
+									cvar		"r_ssaoRadius"
+								}
+							}
+
+							buttonDef OVT_SSAOIntensity {
+								rect			10, 96, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_SSAOIntensity {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122016"
+								}
+								windowDef OVT_SSAOIntensityBG {
+									rect		250, 4, 100, 16
+									background	"guis/assets/sliderbackground.tga"
+								}
+								sliderDef OVT_SSAOIntensitySlider {
+									rect		250, 4, 100, 16
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									low			0.0
+									high		4.0
+									step		0.05
+									thumbShader	"guis/assets/sliderbutton.tga"
+									cvar		"r_ssaoIntensity"
+								}
+							}
+
+							buttonDef OVT_BloomRadius {
+								rect			10, 124, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_BloomRadius {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122017"
+								}
+								windowDef OVT_BloomRadiusBG {
+									rect		250, 4, 100, 16
+									background	"guis/assets/sliderbackground.tga"
+								}
+								sliderDef OVT_BloomRadiusSlider {
+									rect		250, 4, 100, 16
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									low			0.1
+									high		8.0
+									step		0.05
+									thumbShader	"guis/assets/sliderbutton.tga"
+									cvar		"r_bloomRadius"
+								}
+							}
+
+							buttonDef OVT_HDRWhitePoint {
+								rect			10, 152, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_HDRWhitePoint {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122018"
+								}
+								windowDef OVT_HDRWhitePointBG {
+									rect		250, 4, 100, 16
+									background	"guis/assets/sliderbackground.tga"
+								}
+								sliderDef OVT_HDRWhitePointSlider {
+									rect		250, 4, 100, 16
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									low			1.0
+									high		16.0
+									step		0.25
+									thumbShader	"guis/assets/sliderbutton.tga"
+									cvar		"r_hdrWhitePoint"
+								}
+							}
+
+							buttonDef OVT_HDRSaturation {
+								rect			10, 180, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_HDRSaturation {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122019"
+								}
+								windowDef OVT_HDRSaturationBG {
+									rect		250, 4, 100, 16
+									background	"guis/assets/sliderbackground.tga"
+								}
+								sliderDef OVT_HDRSaturationSlider {
 									rect		250, 4, 100, 16
 									forecolor	EDITABLE_FORECOLOR_COMMA
 									hovercolor	EDITABLE_HOVERCOLOR_COMMA
@@ -3776,38 +4008,100 @@
 								}
 							}
 
-							buttonDef OVP_HDRContrast {
-								rect			10, 292, 400, 25
+							buttonDef OVT_HDRContrast {
+								rect			10, 208, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
 
-								windowDef OVP_Title_HDRContrast {
+								windowDef OVT_Title_HDRContrast {
 									rect		0, 0, 200, 25
 									forecolor	STATIC_FORECOLOR_COMMA
 									textalign	1
 									textaligny	0
 									textscale	0.33
 									shadow		1
-									text		"Color Contrast"
+									text		"#str_122020"
 								}
-								windowDef OVP_HDRContrastBG {
+								windowDef OVT_HDRContrastBG {
 									rect		250, 4, 100, 16
 									background	"guis/assets/sliderbackground.tga"
 								}
-								sliderDef OVP_HDRContrastSlider {
+								sliderDef OVT_HDRContrastSlider {
 									rect		250, 4, 100, 16
 									forecolor	EDITABLE_FORECOLOR_COMMA
 									hovercolor	EDITABLE_HOVERCOLOR_COMMA
 									low			0.5
-									high		2.0
+									high		3.0
 									step		0.05
 									thumbShader	"guis/assets/sliderbutton.tga"
 									cvar		"r_hdrContrast"
 								}
 							}
 
-							buttonDef OVP_ApplyChanges {
+							buttonDef OVT_CRTAmount {
+								rect			10, 236, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_CRTAmount {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122021"
+								}
+								windowDef OVT_CRTAmountBG {
+									rect		250, 4, 100, 16
+									background	"guis/assets/sliderbackground.tga"
+								}
+								sliderDef OVT_CRTAmountSlider {
+									rect		250, 4, 100, 16
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									low			0.0
+									high		1.0
+									step		0.05
+									thumbShader	"guis/assets/sliderbutton.tga"
+									cvar		"r_crtAmount"
+								}
+							}
+
+							buttonDef OVT_CRTChromatic {
+								rect			10, 264, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVT_Title_CRTChromatic {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122022"
+								}
+								windowDef OVT_CRTChromaticBG {
+									rect		250, 4, 100, 16
+									background	"guis/assets/sliderbackground.tga"
+								}
+								sliderDef OVT_CRTChromaticSlider {
+									rect		250, 4, 100, 16
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									low			0.0
+									high		8.0
+									step		0.05
+									thumbShader	"guis/assets/sliderbutton.tga"
+									cvar		"r_crtChromatic"
+								}
+							}
+
+							buttonDef OVT_ApplyChanges {
 								rect			280, 320, 115, 28
 								text			"#str_20294"
 								textalign		1
