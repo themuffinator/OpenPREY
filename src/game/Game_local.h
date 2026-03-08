@@ -1070,7 +1070,7 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 #include "../Prey/prey_projectiletrigger.h"			//HUMANHEAD: jsh
 #include "../Prey/prey_projectilefreezer.h"			//HUMANHEAD: bjk
 #include "../Prey/prey_projectilewrench.h"			//HUMANHEAD: bjk
-#include "item.h"								//HUMANHEAD: aob - must be above weapon.h
+#include "Item.h"								//HUMANHEAD: aob - must be above weapon.h
 #include "../Prey/game_dda.h"
 #include "../Prey/game_utils.h"					//HUMANHEAD: aob
 #include "../Prey/prey_soundleadincontroller.h" //HUMANHEAD: aob
