@@ -6,7 +6,7 @@
 
 #include "Game_local.h"
 //HUMANHEAD: aob
-#include "../prey/prey_local.h"
+#include "../Prey/prey_local.h"
 #include "../framework/BuildVersion.h" // HUMANHEAD mdl
 //HUMANHEAD END
 

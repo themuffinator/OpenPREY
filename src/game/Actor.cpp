@@ -5,7 +5,7 @@
 #pragma hdrstop
 
 #include "Game_local.h"
-#include "../prey/prey_local.h"	// HUMANHEAD tmj: for typeinfo parsing
+#include "../Prey/prey_local.h"	// HUMANHEAD tmj: for typeinfo parsing
 
 
 

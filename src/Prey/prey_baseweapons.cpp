@@ -284,7 +284,7 @@ void hhWeapon::Restore( idRestoreGame *savefile ) {
 	savefile->ReadString( objectname );
 	weaponDef = gameLocal.FindEntityDef( objectname, false );
 	if (!weaponDef) {
-		gameLocal.Error( "Unknown weaponDef:  %s\n", objectname );
+		gameLocal.Error( "Unknown weaponDef:  %s\n", objectname.c_str() );
 	}
     dict = &(weaponDef->dict);
 

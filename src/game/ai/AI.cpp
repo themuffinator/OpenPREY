@@ -603,7 +603,7 @@ void idAI::Restore( idRestoreGame *savefile ) {
 	if ( projectileName.Length() ) {
 		projectileDef = gameLocal.FindEntityDefDict( projectileName );
 		if ( !projectileDef ) {
-			gameLocal.Warning( "Unknown projectileDef '%s'", projectileName );
+			gameLocal.Warning( "Unknown projectileDef '%s'", projectileName.c_str() );
 		}
 	} else {
 		projectileDef = NULL;

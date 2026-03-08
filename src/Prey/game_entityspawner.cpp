@@ -81,7 +81,7 @@ void hhEntitySpawner::Event_SpawnEntity( void ) {
 			gameLocal.Error("NULL entDefName in hhEntitySpawner::Event_SpawnEntity\n");
 		}
 		else {
-			gameLocal.Warning( "Unknown Def '%s'", entDefName );
+			gameLocal.Warning( "Unknown Def '%s'", entDefName.c_str() );
 		}
 		return;
 	}
@@ -99,7 +99,7 @@ void hhEntitySpawner::Event_SpawnEntity( void ) {
 	idEntity *e = gameLocal.SpawnObject(entDefName, &args);
 	
 	if(!e) {
-		gameLocal.Error("hhEntitySpawner: Failed to spawn entity def named: %s", entDefName);
+		gameLocal.Error("hhEntitySpawner: Failed to spawn entity def named: %s", entDefName.c_str());
 		return;
 	}		
 	

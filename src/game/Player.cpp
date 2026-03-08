@@ -6,7 +6,7 @@
 
 #include "Game_local.h"
 
-#include "../prey/game_portal.h" // HUMANHEAD
+#include "../Prey/game_portal.h" // HUMANHEAD
 
 /*
 ===============================================================================

@@ -421,7 +421,7 @@ void hhMonsterAI::Event_FindReaction( const char* effect ) {
 					}
 					break;
 				default:
-					gameLocal.Error( "effect '%s' not supported yet under simple_ai", hhReactionDesc::EffectToStr(react->desc->effect) );
+					gameLocal.Error( "effect '%s' not supported yet under simple_ai", hhReactionDesc::EffectToStr(react->desc->effect).c_str() );
 			}
 			// if we have actually gotten this far, do our intense calculations last..
 			int rank = EvaluateReaction( react );

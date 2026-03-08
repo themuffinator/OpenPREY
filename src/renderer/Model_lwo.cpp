@@ -2179,7 +2179,7 @@ int lwGetPolygons5( idFile *fp, int cksize, lwPolygonList *plist, int ptoffset )
          bp += 2;
       }
       j -= 1;
-      pp->surf = ( lwSurface * ) j;
+      pp->surf = ( lwSurface * )(uintptr_t)j;
 
       pp++;
       pv += nv;
@@ -2696,7 +2696,7 @@ int lwResolvePolySurfaces( lwPolygonList *polygon, lwTagList *tlist,
    }
 
    for ( i = 0; i < polygon->count; i++ ) {
-      index = ( int ) polygon->pol[ i ].surf;
+      index = ( int )(uintptr_t)polygon->pol[ i ].surf;
       if ( index < 0 || index > tlist->count ) return 0;
       if ( !s[ index ] ) {
          s[ index ] = lwDefaultSurface();
@@ -2876,7 +2876,7 @@ int lwGetPolygonTags( idFile *fp, int cksize, lwTagList *tlist, lwPolygonList *p
 		if ( rlen < 0 || rlen > cksize ) return 0;
 
 		switch ( type ) {
-			case ID_SURF:  plist->pol[ i ].surf = ( lwSurface * ) j;  break;
+			case ID_SURF:  plist->pol[ i ].surf = ( lwSurface * )(uintptr_t)j;  break;
 			case ID_PART:  plist->pol[ i ].part = j;  break;
 			case ID_SMGP:  plist->pol[ i ].smoothgrp = j;  break;
 		}
