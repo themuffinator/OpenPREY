@@ -523,6 +523,10 @@ const void	RB_SwapBuffers( const void *data ) {
 
     RB_LogComment( "***************** RB_SwapBuffers *****************\n\n\n" );
 
+	if ( !r_frontBuffer.GetBool() ) {
+		RB_ApplyCRTToBackBuffer();
+	}
+
 	// don't flip if drawing to front buffer
 	if ( !r_frontBuffer.GetBool() ) {
 	    GLimp_SwapBuffers();
