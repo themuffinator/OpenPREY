@@ -38,6 +38,15 @@ extern "C" {
 #	include "libXNVCtrl/NVCtrlLib.h"
 }
 
+#ifdef ID_GL_HARDLINK
+#define qglGetString glGetString
+#define qglXChooseVisual glXChooseVisual
+#define qglXCreateContext glXCreateContext
+#define qglXDestroyContext glXDestroyContext
+#define qglXMakeCurrent glXMakeCurrent
+#define qglXSwapBuffers glXSwapBuffers
+#endif
+
 idCVar sys_videoRam( "sys_videoRam", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Texture memory on the video card (in megabytes) - 0: autodetect", 0, 512 );
 
 Display *dpy = NULL;

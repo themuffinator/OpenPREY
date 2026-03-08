@@ -515,7 +515,7 @@ float hhInventory::AmmoPercentage(idPlayer *player, ammo_t type) {
 	float amount = ammo[type];
 	const char *ammoName = idWeapon::GetAmmoNameForNum( type );
 	float max = MaxAmmoForAmmoClass( player, ammoName );
-	max = max(1, max);
+	max = Max(1.0f, max);
 	return amount / max;
 }
 

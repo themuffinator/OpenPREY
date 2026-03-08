@@ -41,6 +41,10 @@ If you have questions concerning this license or the applicable additional terms
 #include <mcheck.h>
 #endif
 
+#ifndef LINUX_DEFAULT_PATH
+#define LINUX_DEFAULT_PATH "/usr/local/games/openprey"
+#endif
+
 static idStr	basepath;
 static idStr	savepath;
 
@@ -248,21 +252,16 @@ Sys_GetClockticks
 ===============
 */
 double Sys_GetClockTicks( void ) {
-#if defined( __i386__ )
-	unsigned long lo, hi;
+#if defined( __i386__ ) || defined( __x86_64__ )
+	unsigned int lo = 0;
+	unsigned int hi = 0;
 
-	__asm__ __volatile__ (
-						  "push %%ebx\n"			\
-						  "xor %%eax,%%eax\n"		\
-						  "cpuid\n"					\
-						  "rdtsc\n"					\
-						  "mov %%eax,%0\n"			\
-						  "mov %%edx,%1\n"			\
-						  "pop %%ebx\n"
-						  : "=r" (lo), "=r" (hi) );
-	return (double) lo + (double) 0xFFFFFFFF * hi;
+	__asm__ __volatile__( "rdtsc" : "=a"( lo ), "=d"( hi ) );
+	return ( (double)hi * 4294967296.0 ) + (double)lo;
 #else
-#error unsupported CPU
+	struct timespec ts;
+	clock_gettime( CLOCK_MONOTONIC, &ts );
+	return (double)ts.tv_sec * 1000000000.0 + (double)ts.tv_nsec;
 #endif
 }
 
@@ -288,6 +287,11 @@ Sys_ClockTicksPerSecond
 double Sys_ClockTicksPerSecond(void) {
 	static bool		init = false;
 	static double	ret;
+#if !defined( __i386__ ) && !defined( __x86_64__ )
+	ret = 1000000000.0;
+	init = true;
+	return ret;
+#endif
 
 	int		fd, len, pos, end;
 	char	buf[ 4096 ];

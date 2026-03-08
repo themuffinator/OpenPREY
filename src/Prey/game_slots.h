@@ -18,7 +18,7 @@
 	#define MASK_BARBARBAR	0x00000400
 
 	#define MASK_ANYBAR		0x00000700
-	#define MASK_ANY		0xffffffff
+	#define MASK_ANY		-1
 
 	typedef enum {
 		FRUIT_CHERRY=0,

@@ -11,7 +11,7 @@
 //=============================================================================
 
 CLASS_DECLARATION( hhWraith, hhDeathWraith )
-	EVENT( AI_FindEnemy,		hhWraith::Event_FindEnemy )
+	EVENT( AI_FindEnemy,		hhDeathWraith::Event_FindEnemy )
 END_CLASS
 
 

@@ -1535,7 +1535,7 @@ void hhCreatureX::Event_AttackMissile( const char *jointname, const idDict *proj
 	idProjectile *proj = NULL;
 
 	// Bonedir launch?
-	if((BOOL)boneDir) {
+	if ( boneDir != 0 ) {
 		proj = hhProjectile::SpawnProjectile(projDef);
 		if ( proj ) {
 			idMat3 axis;

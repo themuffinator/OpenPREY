@@ -34,8 +34,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "idlib/math/Matrix.h"
 #include "idlib/math/Random.h"
 #include "idlib/bv/Bounds.h"
-#include "framework/DeclManager.h"
-#include "framework/DeclTable.h"
+#include "framework/declManager.h"
+#include "framework/declTable.h"
 
 /*
 ===============================================================================

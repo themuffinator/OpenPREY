@@ -279,8 +279,8 @@ private:
 	idStrList					warningList;
 	idStrList					errorList;
 
-	INT_PTR						gameDLL;
-	INT_PTR						bseDLL;
+	intptr_t					gameDLL;
+	intptr_t					bseDLL;
 	BSE_SetRuntimePointers_t	bseSetRuntimePointers;
 
 	idLangDict					languageDict;

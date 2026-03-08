@@ -1,7 +1,7 @@
 #ifndef __HH_VEHICLE_FIRE_CONTROLLER_H
 #define __HH_VEHICLE_FIRE_CONTROLLER_H
 
-#include "gamesys/Class.h"
+#include "game/gamesys/Class.h"
 
 class hhVehicleFireController : public hhFireController {
 	CLASS_PROTOTYPE(hhVehicleFireController);

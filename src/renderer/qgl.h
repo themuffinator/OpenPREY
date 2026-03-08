@@ -9,6 +9,7 @@
 
 #include "../external/glew/glew.h"
 
+#if defined(_WIN32) || defined(_WINDOWS)
 // RAVEN BEGIN
 // dluetscher: added some wgl calls to the XENON version, as well as the Windows version
 typedef struct tagPIXELFORMATDESCRIPTOR PIXELFORMATDESCRIPTOR, *PPIXELFORMATDESCRIPTOR, FAR *LPPIXELFORMATDESCRIPTOR;
@@ -56,5 +57,6 @@ extern int  ( WINAPI * qwglGetLayerPaletteEntries)(HDC, int, int, int,
                                                 COLORREF * RESTRICT );
 extern BOOL ( WINAPI * qwglRealizeLayerPalette)(HDC, int, BOOL);
 extern BOOL ( WINAPI * qwglSwapLayerBuffers)(HDC, UINT);
+#endif
 
 #endif

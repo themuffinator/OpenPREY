@@ -379,8 +379,8 @@ protected:
 // RAVEN BEGIN
 public:
 	static const bool	printableCharacter[256];
-	static const char	upperCaseCharacter[256];
-	static const char	lowerCaseCharacter[256];
+	static const byte	upperCaseCharacter[256];
+	static const byte	lowerCaseCharacter[256];
 // RAVEN END
 };
 

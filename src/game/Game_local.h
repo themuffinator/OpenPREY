@@ -19,6 +19,15 @@
 #define LAGO_MATERIAL	"textures/sfx/lagometer"
 #define LAGO_IMAGE		"textures/sfx/lagometer.tga"
 
+#ifndef _WIN32
+#ifndef TRUE
+#define TRUE true
+#endif
+#ifndef FALSE
+#define FALSE false
+#endif
+#endif
+
 // if set to 1 the server sends the client PVS with snapshots and the client compares against what it sees
 #ifndef ASYNC_WRITE_PVS
 	#define ASYNC_WRITE_PVS 0
@@ -752,7 +761,7 @@ public:
 	//HUMANHEAD rww
 	bool					logitechLCDEnabled;
 	bool					logitechLCDDisplayAlt;
-	DWORD					logitechLCDButtonsLast;
+	uint32_t				logitechLCDButtonsLast;
 	int						logitechLCDUpdateTime;
 	//HUMANHEAD END
 

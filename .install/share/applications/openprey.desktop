@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=OpenPrey
+GenericName=First-person shooter
+Comment=Modern open-source engine and game-code replacement for Prey (2006)
+Exec=OpenPrey-client_x64
+Icon=openprey
+Terminal=false
+Categories=Game;ActionGame;Shooter;
+Keywords=prey;idtech;fps;multiplayer;
+StartupNotify=true
+X-OpenPrey-Version=0.0.1

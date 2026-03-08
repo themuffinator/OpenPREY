@@ -10,6 +10,7 @@ class hhDeathWraith : public hhWraith {
 		virtual void	SetEnemy( idActor *newEnemy ) { enemy = newEnemy; }
 		virtual void	Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location );
 		virtual void	Think( void );
+		void			Event_FindEnemy( int useFOV );
 
 	protected:
 		virtual int		PlayAnim( const char *name, int blendFrame );
@@ -26,7 +27,6 @@ class hhDeathWraith : public hhWraith {
 		virtual void	FlyUp();
 		virtual void	FlyMove( void );
 		virtual void	EnemyDead();
-		void			Event_FindEnemy( int useFOV );
 		void			TeleportIn( idEntity *activator );
 
 	protected:

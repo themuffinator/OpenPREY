@@ -116,15 +116,117 @@ class ThreadedAlloc;		// class that is only used to expand the AutoCrit template
 	#pragma warning( disable : 4458 )			//  hides class member
 // jmarshall end
 
-	class AlignmentChecker
-	{
-	public:
-		static void UpdateCount(void const * const ptr) {}
-		static void ClearCount() {}
-		static void Print() {}
-	};
+	#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker
+{
+public:
+	static void UpdateCount(void const * const ptr) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
 
 #endif // _WINDOWS
+
+#ifdef __linux__
+
+// for offsetof
+#include <stddef.h>
+// FLT_MAX and such
+#include <limits.h>
+#include <float.h>
+
+	#define __WITH_PB__
+	#undef WIN32
+	#undef _XBOX
+	#undef _CONSOLE
+	#define _OPENGL
+	#define _LITTLE_ENDIAN
+	#define _CASE_SENSITIVE_FILESYSTEM
+	#define _USE_OPENAL
+
+	#define NEWLINE				"\n"
+
+	#define _GLVAS_SUPPPORT
+
+	#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker
+{
+public:
+	static void UpdateCount(void const * const ptr) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
+
+	#define RESTRICT
+	#define TIME_THIS_SCOPE(x)
+
+	// Enables the batching of vertex cache request in SMP mode.
+	// Note (TTimo): is tied to ENABLE_INTEL_SMP
+	#ifdef ENABLE_INTEL_SMP
+	#define ENABLE_INTEL_VERTEXCACHE_OPT
+	#endif
+
+#endif
+
+#ifdef MACOS_X
+
+// for offsetof
+#include <stddef.h>
+#include <limits.h>
+#include <float.h>				// for FLT_MIN
+
+	// SMP support for running the backend on a 2nd thread
+	#ifndef ENABLE_INTEL_SMP
+	#define ENABLE_INTEL_SMP
+	#endif
+	// Enables the batching of vertex cache request in SMP mode.
+	// Note (TTimo): is tied to ENABLE_INTEL_SMP
+	#define ENABLE_INTEL_VERTEXCACHE_OPT
+
+	#define __WITH_PB__
+	#undef WIN32
+	#undef _XBOX
+	#undef _CONSOLE
+	#define _OPENGL
+	#ifdef __ppc__
+	#undef _LITTLE_ENDIAN
+	#else
+	#define _LITTLE_ENDIAN
+	#endif
+	#define _CASE_SENSITIVE_FILESYSTEM
+	#define _USE_OPENAL
+	#define ID_INLINE inline
+	#define NEWLINE				"\n"
+
+	#define _GLVAS_SUPPPORT
+
+	#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker
+{
+public:
+	static void UpdateCount(void const * const ptr) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
+
+	#define RESTRICT
+	#define TIME_THIS_SCOPE(x)
+
+#endif
+
+#ifndef RESTRICT
+	#define RESTRICT
+#endif
+
+#ifndef TIME_THIS_SCOPE
+	#define TIME_THIS_SCOPE(x)
+#endif
 
 #ifndef BIT
 #define BIT( num )				BITT< num >::VALUE
@@ -224,7 +326,7 @@ public:
 // framework
 #include "../framework/BuildDefines.h"
 #include "../framework/BuildVersion.h"
-#include "../framework/Licensee.h"
+#include "../framework/licensee.h"
 #include "../framework/CmdSystem.h"
 #include "../framework/CVarSystem.h"
 #include "../framework/Common.h"
@@ -233,13 +335,13 @@ public:
 #include "../framework/UsercmdGen.h"
 
 // decls
-#include "../framework/DeclManager.h"
-#include "../framework/DeclTable.h"
-#include "../framework/DeclSkin.h"
-#include "../framework/DeclEntityDef.h"
+#include "../framework/declManager.h"
+#include "../framework/declTable.h"
+#include "../framework/declSkin.h"
+#include "../framework/declEntityDef.h"
 #include "../framework/DeclFX.h"
 #include "../framework/DeclParticle.h"
-#include "../framework/DeclAF.h"
+#include "../framework/declAF.h"
 // RAVEN BEGIN
 // jscott: new decl types
 #include "../framework/DeclPlayerModel.h"

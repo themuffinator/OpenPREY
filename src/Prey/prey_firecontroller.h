@@ -1,7 +1,7 @@
 #ifndef __HH_FIRE_CONTROLLER_H
 #define __HH_FIRE_CONTROLLER_H
 
-#include "gamesys/Class.h"
+#include "game/gamesys/Class.h"
 
 #define MAX_NET_PROJECTILES		3 //rww
 

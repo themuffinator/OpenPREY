@@ -4230,7 +4230,7 @@ void hhPlayer::DisableEthereal( void ) {
 		if ( hhMonsterAI::allSimpleMonsters[i]->GetEnemy() == spiritProxy.GetEntity() ) {
 			hhMonsterAI::allSimpleMonsters[i]->ProcessEvent( &MA_EnemyIsPhysical, this, spiritProxy.GetEntity() );
 		} else if ( hhMonsterAI::allSimpleMonsters[i]->GetEnemy() == this ) { // Targetting spirit that is going away
-			hhMonsterAI::allSimpleMonsters[i]->ProcessEvent( &MA_EnemyIsPhysical, this, NULL );
+			hhMonsterAI::allSimpleMonsters[i]->ProcessEvent( &MA_EnemyIsPhysical, this, static_cast<const idEntity *>( NULL ) );
 		}
 	}
 
@@ -7810,7 +7810,7 @@ void hhPlayer::SetupWeaponInfo() {
 
 					ammoName = idWeapon::GetAmmoNameForNum( weaponInfo[ix].ammoType );
 					maxAmmo = inventory.MaxAmmoForAmmoClass( this, ammoName );
-					weaponInfo[ix].ammoMax = max(1, maxAmmo);
+					weaponInfo[ix].ammoMax = static_cast<int>( Max( 1.0f, maxAmmo ) );
 				}
 
 				fireInfoName = weaponObjDecl->dict.GetString("def_altFireInfo");
@@ -7822,7 +7822,7 @@ void hhPlayer::SetupWeaponInfo() {
 
 					ammoName = idWeapon::GetAmmoNameForNum( altWeaponInfo[ix].ammoType );
 					maxAmmo = inventory.MaxAmmoForAmmoClass( this, ammoName );
-					altWeaponInfo[ix].ammoMax = max(1, maxAmmo);
+					altWeaponInfo[ix].ammoMax = static_cast<int>( Max( 1.0f, maxAmmo ) );
 				}
 			}
 		}

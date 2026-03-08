@@ -580,7 +580,7 @@ void hhGameLocal::LogitechLCDUpdate(void) {
 		return;
 	}
 
-	DWORD buttons;
+	uint32_t buttons = 0;
 	sys->LGLCD_ReadSoftButtons(&buttons);
 	if (logitechLCDButtonsLast != buttons && buttons) {
 		logitechLCDDisplayAlt = !logitechLCDDisplayAlt;

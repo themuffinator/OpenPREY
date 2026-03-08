@@ -348,6 +348,8 @@ typedef union varEval_s {
 	int						ptrOffset;
 } varEval_t;
 
+class idVarDefName;
+
 class idVarDef {
 	friend class idVarDefName;
 

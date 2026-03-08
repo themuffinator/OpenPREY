@@ -9,8 +9,8 @@
 	
 ***********************************************************************/
 CLASS_DECLARATION( hhProjectile, hhProjectileSpiritArrow )
-	EVENT( EV_AllowCollision_Spirit,	hhProjectile::Event_AllowCollision_Collide )
-	EVENT( EV_AllowCollision_Chaff,		hhProjectile::Event_AllowCollision_PassThru )
+	EVENT( EV_AllowCollision_Spirit,	hhProjectileSpiritArrow::Event_AllowCollision_Collide )
+	EVENT( EV_AllowCollision_Chaff,		hhProjectileSpiritArrow::Event_AllowCollision_PassThru )
 
 	EVENT( EV_AllowCollision_Flesh,		hhProjectileSpiritArrow::Event_AllowCollision_Collide )
 	EVENT( EV_AllowCollision_Metal,		hhProjectileSpiritArrow::Event_AllowCollision_Collide )
@@ -38,6 +38,14 @@ END_CLASS
 
 int hhProjectileSpiritArrow::DetermineClipmask() {
 	return MASK_SPIRITARROW;
+}
+
+void hhProjectileSpiritArrow::Event_AllowCollision_Collide( const trace_t* collision ) {
+	hhProjectile::Event_AllowCollision_Collide( collision );
+}
+
+void hhProjectileSpiritArrow::Event_AllowCollision_PassThru( const trace_t* collision ) {
+	hhProjectile::Event_AllowCollision_PassThru( collision );
 }
 
 /*

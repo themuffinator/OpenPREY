@@ -12,7 +12,7 @@ template< class type >
 class hhStack : public idList<type> {
 public:
 							hhStack(int newgranularity=16);
-							~hhStack<type>();
+							~hhStack();
 	type					Top(void);
 	type					Pop(void);
 	void					Push(type &object);

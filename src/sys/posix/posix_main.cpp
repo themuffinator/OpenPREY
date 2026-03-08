@@ -146,9 +146,11 @@ void idSysLocal::StartProcess( const char *exeName, bool quit ) {
 Sys_Quit
 ================
 */
+#ifndef MACOS_X
 void Sys_Quit(void) {
 	Posix_Exit( EXIT_SUCCESS );
 }
+#endif
 
 /*
 ================
@@ -366,7 +368,9 @@ Sys_Init
 Posix_EarlyInit/Posix_LateInit is better
 =================
 */
+#ifndef MACOS_X
 void Sys_Init( void ) { }
+#endif
 
 /*
 =================
@@ -385,12 +389,12 @@ Sys_DLL_Load
 TODO: OSX - use the native API instead? NSModule
 =================
 */
-int Sys_DLL_Load( const char *path ) {
+intptr_t Sys_DLL_Load( const char *path ) {
 	void *handle = dlopen( path, RTLD_NOW );
 	if ( !handle ) {
 		Sys_Printf( "dlopen '%s' failed: %s\n", path, dlerror() );
 	}
-	return (int)handle;
+	return (intptr_t)handle;
 }
 
 /*
@@ -398,7 +402,7 @@ int Sys_DLL_Load( const char *path ) {
 Sys_DLL_GetProcAddress
 =================
 */
-void* Sys_DLL_GetProcAddress( int handle, const char *sym ) {
+void* Sys_DLL_GetProcAddress( intptr_t handle, const char *sym ) {
 	const char *error;
 	void *ret = dlsym( (void *)handle, sym );
 	if ((error = dlerror()) != NULL)  {
@@ -412,7 +416,7 @@ void* Sys_DLL_GetProcAddress( int handle, const char *sym ) {
 Sys_DLL_Unload
 =================
 */
-void Sys_DLL_Unload( int handle ) {
+void Sys_DLL_Unload( intptr_t handle ) {
 	dlclose( (void *)handle );
 }
 
@@ -436,6 +440,7 @@ long Sys_FileTimeStamp(FILE * fp) {
 	return st.st_mtime;
 }
 
+#ifndef MACOS_X
 void Sys_Sleep(int msec) {
 	if ( msec < 20 ) {
 		static int last = 0;
@@ -451,6 +456,7 @@ void Sys_Sleep(int msec) {
 	if (usleep(msec * 1000) == -1)
 		Sys_Printf("usleep: %s\n", strerror(errno));
 }
+#endif
 
 char *Sys_GetClipboardData(void) {
 	Sys_Printf( "TODO: Sys_GetClipboardData\n" );
