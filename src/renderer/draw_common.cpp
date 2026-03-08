@@ -436,6 +436,13 @@ static void RB_STD_Bloom( void ) {
 		return;
 	}
 
+	// Fullscreen 2D GUI/menu passes are emitted as standalone views without
+	// view entities. Skip the scene bloom/tone-map pass on those views so
+	// menu assets stay unfiltered while in-world GUIs remain part of 3D views.
+	if ( !backEnd.viewDef->viewEntitys ) {
+		return;
+	}
+
 	RB_InitBloomStage();
 	if ( !RB_ResolveGLSLProgram( &rbBloomStage ) ) {
 		return;
