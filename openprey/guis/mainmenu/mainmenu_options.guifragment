@@ -3538,7 +3538,7 @@
 							}
 
 							buttonDef OVP_PostAA {
-								rect			10, 70, 400, 25
+								rect			10, 68, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3568,7 +3568,7 @@
 							}
 
 							buttonDef OVP_Bloom {
-								rect			10, 100, 400, 25
+								rect			10, 96, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3597,7 +3597,7 @@
 							}
 
 							buttonDef OVP_BloomIntensity {
-								rect			10, 130, 400, 25
+								rect			10, 124, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3627,8 +3627,37 @@
 								}
 							}
 
+							buttonDef OVP_CRT {
+								rect			10, 152, 400, 25
+								leftMat			"guis/assets/menu/textbar_corner.tga"
+								middleMat		"guis/assets/menu/textbarstrip.tga"
+								rightMat		"guis/assets/menu/textbar_invcorner.tga"
+
+								windowDef OVP_Title_CRT {
+									rect		0, 0, 200, 25
+									forecolor	STATIC_FORECOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									text		"#str_122002"
+								}
+								choiceDef OVP_Choice_CRT {
+									rect		200, 0, 200, 25
+									forecolor	EDITABLE_FORECOLOR_COMMA
+									hovercolor	EDITABLE_HOVERCOLOR_COMMA
+									textalign	1
+									textaligny	0
+									textscale	0.33
+									shadow		1
+									choices		"#str_20152"
+									cvar		"r_crt"
+									choiceType	0
+								}
+							}
+
 							buttonDef OVP_MSAAAlphaCoverage {
-								rect			10, 160, 400, 25
+								rect			10, 180, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3657,7 +3686,7 @@
 							}
 
 							buttonDef OVP_HDRToneMap {
-								rect			10, 190, 400, 25
+								rect			10, 208, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3686,7 +3715,7 @@
 							}
 
 							buttonDef OVP_HDRExposure {
-								rect			10, 220, 400, 25
+								rect			10, 236, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3717,7 +3746,7 @@
 							}
 
 							buttonDef OVP_HDRSaturation {
-								rect			10, 250, 400, 25
+								rect			10, 264, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3748,7 +3777,7 @@
 							}
 
 							buttonDef OVP_HDRContrast {
-								rect			10, 280, 400, 25
+								rect			10, 292, 400, 25
 								leftMat			"guis/assets/menu/textbar_corner.tga"
 								middleMat		"guis/assets/menu/textbarstrip.tga"
 								rightMat		"guis/assets/menu/textbar_invcorner.tga"
@@ -3779,7 +3808,7 @@
 							}
 
 							buttonDef OVP_ApplyChanges {
-								rect			280, 315, 115, 28
+								rect			280, 320, 115, 28
 								text			"#str_20294"
 								textalign		1
 								textaligny		-1
