@@ -458,14 +458,18 @@ void Sys_Sleep(int msec) {
 }
 #endif
 
+#if !defined(MACOS_X) && !defined(__APPLE__)
 char *Sys_GetClipboardData(void) {
 	Sys_Printf( "TODO: Sys_GetClipboardData\n" );
 	return NULL;
 }
+#endif
 
+#if !defined(MACOS_X) && !defined(__APPLE__)
 void Sys_SetClipboardData( const char *string ) {
 	Sys_Printf( "TODO: Sys_SetClipboardData\n" );
 }
+#endif
 	
 
 // stub pretty much everywhere - heavy calling
@@ -1039,6 +1043,7 @@ void Sys_VPrintf(const char *msg, va_list arg) {
 Sys_Error
 ================
 */
+#if !defined(MACOS_X) && !defined(__APPLE__)
 void Sys_Error(const char *error, ...) {
 	va_list argptr;
 
@@ -1050,6 +1055,7 @@ void Sys_Error(const char *error, ...) {
 
 	Posix_Exit( EXIT_FAILURE );
 }
+#endif
 
 /*
 ===============
