@@ -9,7 +9,7 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
-#include "../../prey/prey_local.h"	// HUMANHEAD tmj: Prey types should be included in parse
+#include "../../Prey/prey_local.h"	// HUMANHEAD tmj: Prey types should be included in parse
 
 #ifdef ID_DEBUG_MEMORY
 #include "GameTypeInfo.h"				// Make sure this is up to date!

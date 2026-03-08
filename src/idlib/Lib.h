@@ -339,8 +339,8 @@ bool IsSignedType(const _type_ t) {
 #ifdef _XENON
 #include "math/Simd_generic.h"
 #include "math/Simd_Xenon.h"
-#include "Threads/ThreadEventManager.h"
-#include "Threads/WorkerThreadManager.h"
+#include "threads/ThreadEventManager.h"
+#include "threads/WorkerThreadManager.h"
 #endif
 // RAVEN END
 

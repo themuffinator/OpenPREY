@@ -66,6 +66,11 @@ int main(int argc, const char *argv[]) {
     return NSApplicationMain(argc, argv);
 }
 
+const char *macosx_scanForLibraryDirectory(void)
+{
+    return "/Library/OpenPrey";
+}
+
 //===========================================================================
 
 void Sys_Sleep( const int time ) {
@@ -169,7 +174,7 @@ void Sys_Error(const char *error, ...)
     va_end(argptr);
 
     NSLog(@"Sys_Error: %@", formattedString);
-    NSRunAlertPanel(@"OpenQ4 Error", formattedString, nil, nil, nil);
+    NSRunAlertPanel(@"OpenPrey Error", formattedString, nil, nil, nil);
 
     Sys_Quit();
 }
