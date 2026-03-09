@@ -90,9 +90,8 @@ static void OpenPrey_RemapLegacyImageName( idStr& name ) {
 		if ( mapName.Length() ) {
 			if ( mapName.Icmp( "generic" ) == 0 ) {
 				name = "guis/assets/loading/loading";
-			} else {
-				name = "guis/assets/loading/";
-				name += mapName;
+			} else if ( mapName.Icmp( "roadhouse" ) == 0 || mapName.Icmp( "game/roadhouse" ) == 0 ) {
+				name = "guis/assets/loading/roadhouse";
 			}
 		}
 	}

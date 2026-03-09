@@ -4965,11 +4965,29 @@ idFileSystemLocal::FindMapScreenshot
 */
 void idFileSystemLocal::FindMapScreenshot( const char *path, char *buf, int len ) {
 	idFile	*file;
-	idStr	mapname = path;
+	idStr	mapPath = path ? path : "";
+	idStr	mapLeaf;
 	idStr	candidatePath;
 
-	mapname.StripPath();
-	mapname.StripFileExtension();
+	mapPath.BackSlashesToSlashes();
+	mapPath.StripFileExtension();
+	mapLeaf = mapPath;
+	mapLeaf.StripPath();
+
+	idStr mapCandidates[ 2 ];
+	int mapCandidateCount = 0;
+	if ( mapPath.Length() ) {
+		mapCandidates[ mapCandidateCount++ ] = mapPath;
+	}
+	if ( mapLeaf.Length() && idStr::Icmp( mapLeaf.c_str(), mapPath.c_str() ) != 0 ) {
+		mapCandidates[ mapCandidateCount++ ] = mapLeaf;
+	}
+
+	// Preserve the OpenPrey-authored roadhouse loading art, but use individual
+	// legacy map loadscreens for every other map when available.
+	const bool isRoadhouseMap =
+		( idStr::Icmp( mapPath.c_str(), "game/roadhouse" ) == 0 ) ||
+		( idStr::Icmp( mapLeaf.c_str(), "roadhouse" ) == 0 );
 
 	const char *runtimeCandidates[] = {
 		"guis/assets/loading/%s.tga",
@@ -4977,26 +4995,37 @@ void idFileSystemLocal::FindMapScreenshot( const char *path, char *buf, int len 
 		"gfx/guis/loadscreens/%s.tga"
 	};
 
-	for ( int i = 0; i < (int)( sizeof( runtimeCandidates ) / sizeof( runtimeCandidates[ 0 ] ) ); i++ ) {
-		idStr::snPrintf( buf, len, runtimeCandidates[ i ], mapname.c_str() );
-		if ( ReadFile( buf, NULL, NULL ) != -1 ) {
-			return;
+	for ( int mapIndex = 0; mapIndex < mapCandidateCount; mapIndex++ ) {
+		for ( int i = 0; i < (int)( sizeof( runtimeCandidates ) / sizeof( runtimeCandidates[ 0 ] ) ); i++ ) {
+			// game/roadhouse should keep its OpenPrey-specific loadscreen.
+			if ( isRoadhouseMap && i == 2 ) {
+				continue;
+			}
+
+			idStr::snPrintf( buf, len, runtimeCandidates[ i ], mapCandidates[ mapIndex ].c_str() );
+			if ( ReadFile( buf, NULL, NULL ) != -1 ) {
+				return;
+			}
 		}
 	}
 
-	// Addon map screenshots follow the legacy Quake 4 loadscreens location.
-	candidatePath = va( "gfx/guis/loadscreens/%s.tga", mapname.c_str() );
-	file = OpenFileReadFlags( candidatePath.c_str(), FSFLAG_SEARCH_ADDONS );
-	if ( file ) {
-		// Save the extracted addon splash image to a stable location.
-		int dlen = file->Length();
-		char *data = new char[ dlen ];
-		file->Read( data, dlen );
-		CloseFile( file );
-		idStr::snPrintf( buf, len, "guis/assets/splash/addon/%s.tga", mapname.c_str() );
-		WriteFile( buf, data, dlen );
-		delete[] data;
-		return;
+	if ( !isRoadhouseMap ) {
+		// Addon map screenshots follow the legacy Quake 4 loadscreens location.
+		for ( int mapIndex = 0; mapIndex < mapCandidateCount; mapIndex++ ) {
+			candidatePath = va( "gfx/guis/loadscreens/%s.tga", mapCandidates[ mapIndex ].c_str() );
+			file = OpenFileReadFlags( candidatePath.c_str(), FSFLAG_SEARCH_ADDONS );
+			if ( file ) {
+				// Save the extracted addon splash image to a stable location.
+				int dlen = file->Length();
+				char *data = new char[ dlen ];
+				file->Read( data, dlen );
+				CloseFile( file );
+				idStr::snPrintf( buf, len, "guis/assets/splash/addon/%s.tga", mapCandidates[ mapIndex ].c_str() );
+				WriteFile( buf, data, dlen );
+				delete[] data;
+				return;
+			}
+		}
 	}
 
 	idStr::Copynz( buf, "guis/assets/loading/loading.tga", len );

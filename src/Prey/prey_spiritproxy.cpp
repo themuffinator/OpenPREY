@@ -475,6 +475,24 @@ void hhSpiritProxy::UpdateModelTransform( void ) {
 	}
 }
 
+void hhSpiritProxy::GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const {
+	idVec3 visualOrigin;
+	idMat3 visualAxis;
+
+	if ( af.IsActive() ) {
+		idActor::GetCurrentModelTransform( origin, axis );
+		return;
+	}
+
+	if ( const_cast<hhSpiritProxy *>( this )->GetPhysicsToVisualTransform( visualOrigin, visualAxis ) ) {
+		axis = visualAxis;
+		origin = GetPhysics()->GetOrigin() + visualOrigin * axis;
+	} else {
+		axis = GetAxis();
+		origin = GetOrigin();
+	}
+}
+
 bool hhSpiritProxy::AllowCollision(const trace_t &collision) {
 	if (collision.fraction < 1.0f && collision.c.entityNum < MAX_CLIENTS && collision.c.entityNum >= 0 && gameLocal.entities[collision.c.entityNum]) {
 		if (player.GetEntity() == gameLocal.entities[collision.c.entityNum]) {

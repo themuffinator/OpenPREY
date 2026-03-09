@@ -12,6 +12,7 @@
 
 
 #include "Game_local.h"
+#include "physics/Physics_PreyPlayer.h"
 
 //HUMANHEAD: aob - needed for helper functions
 #include "../Prey/ai_speech.h"
@@ -1465,21 +1466,30 @@ void idEntity::Show( void ) {
 
 /*
 ================
+idEntity::GetCurrentModelTransform
+================
+*/
+void idEntity::GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const {
+	idVec3 visualOrigin;
+	idMat3 visualAxis;
+
+	if ( const_cast<idEntity *>( this )->GetPhysicsToVisualTransform( visualOrigin, visualAxis ) ) {
+		axis = visualAxis * GetPhysics()->GetAxis();
+		origin = GetPhysics()->GetOrigin() + visualOrigin * axis;
+	} else {
+		axis = GetPhysics()->GetAxis();
+		origin = GetPhysics()->GetOrigin();
+	}
+}
+
+/*
+================
 idEntity::UpdateModelTransform
 NOTE: Please notify nla if this changes. Is used in hhModelProxy::SetOriginAndAxis
 ================
 */
 void idEntity::UpdateModelTransform( void ) {
-	idVec3 origin;
-	idMat3 axis;
-
-	if ( GetPhysicsToVisualTransform( origin, axis ) ) {
-		renderEntity.axis = axis * GetPhysics()->GetAxis();
-		renderEntity.origin = GetPhysics()->GetOrigin() + origin * renderEntity.axis;
-	} else {
-		renderEntity.axis = GetPhysics()->GetAxis();
-		renderEntity.origin = GetPhysics()->GetOrigin();
-	}
+	GetCurrentModelTransform( renderEntity.origin, renderEntity.axis );
 }
 
 /*
@@ -2486,10 +2496,13 @@ idEntity::ConvertLocalToWorldTransform
 =====================
 */
 void idEntity::ConvertLocalToWorldTransform( idVec3 &offset, idMat3 &axis ) {
-	UpdateModelTransform();
+	idVec3 modelOrigin;
+	idMat3 modelAxis;
 
-	offset = renderEntity.origin + offset * renderEntity.axis;
-	axis *= renderEntity.axis;
+	GetCurrentModelTransform( modelOrigin, modelAxis );
+
+	offset = modelOrigin + offset * modelAxis;
+	axis *= modelAxis;
 }
 
 /*
@@ -2614,9 +2627,13 @@ bool idEntity::GetMasterPosition( idVec3 &masterOrigin, idMat3 &masterAxis ) con
 				masterAxis = mat3_identity;
 				return false;
 			} else {
+				idVec3 bindMasterOrigin;
+				idMat3 bindMasterAxis;
+
 				masterAnimator->GetJointTransform( bindJoint, gameLocal.time, masterOrigin, masterAxis );
-				masterAxis *= bindMaster->renderEntity.axis;
-				masterOrigin = bindMaster->renderEntity.origin + masterOrigin * bindMaster->renderEntity.axis;
+				bindMaster->GetCurrentModelTransform( bindMasterOrigin, bindMasterAxis );
+				masterAxis *= bindMasterAxis;
+				masterOrigin = bindMasterOrigin + masterOrigin * bindMasterAxis;
 			}
 		} else if ( bindBody >= 0 && bindMaster->GetPhysics() ) {
 			masterOrigin = bindMaster->GetPhysics()->GetOrigin( bindBody );
@@ -4101,12 +4118,25 @@ bool idEntity::TouchTriggers( void ) const {
 	idClipModel *	clipModels[ MAX_GENTITIES ];
 	idEntity *		ent;
 	trace_t			trace;
+	const idBounds	currentBounds = GetPhysics()->GetAbsBounds();
+	idBounds			queryBounds = currentBounds;
+	idBounds			oldBounds;
+	const idVec3 *	sweptStart = NULL;
 
 	memset( &trace, 0, sizeof( trace ) );
 	trace.endpos = GetPhysics()->GetOrigin();
 	trace.endAxis = GetPhysics()->GetAxis();
 
-	numClipModels = gameLocal.clip.ClipModelsTouchingBounds( GetPhysics()->GetAbsBounds(), CONTENTS_TRIGGER, clipModels, MAX_GENTITIES );
+	if ( IsType( idPlayer::Type ) && GetPhysics()->IsType( hhPhysics_Player::Type ) ) {
+		const hhPhysics_Player *playerPhysics = static_cast<const hhPhysics_Player *>( GetPhysics() );
+		if ( playerPhysics->GetOldOrigin() != trace.endpos ) {
+			oldBounds = currentBounds.Translate( playerPhysics->GetOldOrigin() - trace.endpos );
+			queryBounds.AddBounds( oldBounds );
+			sweptStart = &playerPhysics->GetOldOrigin();
+		}
+	}
+
+	numClipModels = gameLocal.clip.ClipModelsTouchingBounds( queryBounds, CONTENTS_TRIGGER, clipModels, MAX_GENTITIES );
 	numEntities = 0;
 
 	for ( i = 0; i < numClipModels; i++ ) {
@@ -4131,9 +4161,18 @@ bool idEntity::TouchTriggers( void ) const {
 
 		bool triggerHit = ( GetPhysics()->ClipContents( cm ) != 0 );
 		if ( !triggerHit && IsType( idPlayer::Type ) ) {
-			// x64 can miss some precise trigger contacts for the player hull.
-			// Fall back to bounds overlap to keep trigger chains reliable.
-			triggerHit = GetPhysics()->GetAbsBounds().IntersectsBounds( cm->GetAbsBounds() );
+			// Thin trigger volumes can be skipped when the player moves quickly
+			// or on a rotated gravity axis, so fall back to a swept AABB test.
+			const idBounds &triggerBounds = cm->GetAbsBounds();
+			triggerHit = currentBounds.IntersectsBounds( triggerBounds );
+			if ( !triggerHit && sweptStart ) {
+				triggerHit = oldBounds.IntersectsBounds( triggerBounds );
+				if ( !triggerHit ) {
+					idBounds expandedTrigger = triggerBounds;
+					expandedTrigger.ExpandSelf( currentBounds.Size() * 0.5f );
+					triggerHit = expandedTrigger.LineIntersection( *sweptStart, trace.endpos );
+				}
+			}
 		}
 		if ( !triggerHit ) {
 			continue;

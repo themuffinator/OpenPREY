@@ -71,12 +71,12 @@ const char *cm_contentsNameByIndex[] = {
 	"spiritbridge",					// 18
 	"areaportal",					// 19
 	"nocsg",						// 20
-	"blockradiusdamage",			// 21
+	"block_radiusdamage",			// 21
 	"shootable",					// 22
 	"deathvolume",					// 23
 	"vehicleclip",					// 24
-	"ownertoowner",					// 25
-	"gameportal",					// 26
+	"owner_to_owner",				// 25
+	"game_portal",					// 26
 	"shootablebyarrow",				// 27
 	"hunterclip",					// 28
 #else
@@ -168,6 +168,22 @@ int idCollisionModelManagerLocal::ContentsFromString( const char *string ) const
 		if ( token == "," ) {
 			continue;
 		}
+#ifdef HUMANHEAD
+		// Retail Prey uses underscore-separated names in .cm data.
+		// Keep accepting older no-underscore aliases for compatibility.
+		if ( token.Icmp( "blockradiusdamage" ) == 0 ) {
+			contents |= CONTENTS_BLOCK_RADIUSDAMAGE;
+			continue;
+		}
+		if ( token.Icmp( "ownertoowner" ) == 0 ) {
+			contents |= CONTENTS_OWNER_TO_OWNER;
+			continue;
+		}
+		if ( token.Icmp( "gameportal" ) == 0 ) {
+			contents |= CONTENTS_GAME_PORTAL;
+			continue;
+		}
+#endif
 		for ( i = 1; cm_contentsNameByIndex[i] != NULL; i++ ) {
 			if ( token.Icmp( cm_contentsNameByIndex[i] ) == 0 ) {
 				contents |= cm_contentsFlagByIndex[i];

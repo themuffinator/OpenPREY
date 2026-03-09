@@ -100,6 +100,7 @@ public:
 	void			BecameBound(hhBindController *b);
 	void			BecameUnbound(hhBindController *b);
 	void			UpdateModelTransform();
+	void			GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const;
 	virtual // HUMANHEAD CJR
 	void			CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity );
 	hhEntityFx*		SpawnFxLocal( const char *fxName, const idVec3 &origin, const idMat3& axis = mat3_identity, const hhFxInfo* const fxInfo = NULL, bool forceClient = false );

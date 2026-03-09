@@ -20,9 +20,9 @@ This guide covers OpenPrey display/window settings for end users, including mult
 | `r_windowHeight` | `720` | Windowed height. |
 | `win_xpos` | (auto) | Window X position (updated automatically when you move the window). |
 | `win_ypos` | (auto) | Window Y position (updated automatically when you move the window). |
-| `r_mode` | `3` | Preset mode index. Use `-1` for custom width/height. |
-| `r_customWidth` | `720` | Custom width used when `r_mode -1`. |
-| `r_customHeight` | `486` | Custom height used when `r_mode -1`. |
+| `r_mode` | `-2` | Fullscreen mode selector: `-2` = native desktop resolution, `-1` = custom width/height, `0+` = preset mode index. |
+| `r_customWidth` | `1920` | Custom width used when `r_mode -1`. |
+| `r_customHeight` | `1080` | Custom height used when `r_mode -1`. |
 | `r_displayRefresh` | `0` | Requested fullscreen refresh rate (0 = default/driver choice). |
 | `r_screen` | `-1` | SDL3 monitor target (`-1` auto/current, `0..N` explicit index). |
 
@@ -54,6 +54,7 @@ Notes:
 - For **exclusive fullscreen** (explicit mode switch), set `r_fullscreenDesktop 0`. In this mode, `r_mode`/`r_customWidth`/`r_customHeight` control the requested fullscreen resolution.
 
 Notes:
+- `r_mode -2` requests native desktop resolution for fullscreen mode selection.
 - When `r_fullscreenDesktop 1`, `r_mode` and `r_custom*` are ignored for fullscreen sizing (they still exist for legacy configs and exclusive mode).
 - Use `listDisplayModes` to see what your monitor actually supports in exclusive mode.
 

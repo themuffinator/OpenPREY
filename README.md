@@ -343,6 +343,7 @@ OpenPrey validates the official Prey base-pack layout at startup when `fs_valida
 - `r_fullscreen 0|1` - windowed vs fullscreen
 - `r_fullscreenDesktop 1` - desktop-native fullscreen (default)
 - `r_fullscreenDesktop 0` - exclusive fullscreen using `r_mode`/`r_custom*`
+- `r_mode -2` - request native desktop resolution for fullscreen mode selection
 - `r_borderless 1` - borderless window when `r_fullscreen 0`
 
 ### Windowed Sizing

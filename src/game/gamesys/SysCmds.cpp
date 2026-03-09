@@ -849,6 +849,7 @@ void Cmd_Teleport_f( const idCmdArgs &args ) {
 	origin = ent->GetPhysics()->GetOrigin();
 
 	player->Teleport( origin, angles, ent );
+	player->TouchTriggers();
 }
 
 /*

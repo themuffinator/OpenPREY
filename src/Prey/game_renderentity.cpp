@@ -126,6 +126,15 @@ void hhRenderEntity::Present( void ) {
 	} else {
 		gameRenderWorld->UpdateEntityDef( modelDefHandle, &renderEntity );
 	}
+
+	// Non-animated hhRenderEntity users such as shuttle consoles rely on render-model
+	// combat clips for interaction traces, but may not think every frame to relink them.
+	if( spawnArgs.GetBool("useCombatModel") ) {
+		if( !combatModel ) {
+			InitCombatModel( modelDefHandle );
+		}
+		LinkCombatModel( this, modelDefHandle );
+	}
 }
 
 /*
@@ -135,7 +144,9 @@ hhRenderEntity::Event_ModelDefHandleIsValid
 */
 void hhRenderEntity::Event_ModelDefHandleIsValid() {
 	if( spawnArgs.GetBool("useCombatModel") ) {
-		InitCombatModel( GetModelDefHandle() );
+		if( !combatModel ) {
+			InitCombatModel( GetModelDefHandle() );
+		}
 		LinkCombatModel( this, GetModelDefHandle() );
 	}
 }

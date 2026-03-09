@@ -591,6 +591,14 @@ void hhDroid::UpdateModelTransform( void ) {
 	}
 }
 
+void hhDroid::GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const {
+	hhMonsterAI::GetCurrentModelTransform( origin, axis );
+
+	if ( bHealer ) {
+		axis = idAngles( 0, 0, spinAngle ).ToMat3() * axis;
+	}
+}
+
 /*
 =====================
 hhDroid::Save

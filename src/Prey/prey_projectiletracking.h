@@ -26,6 +26,7 @@ class hhProjectileTracking: public hhProjectile {
 		idVec3			DetermineEnemyPosition( const idEntity* enemy ) const;
 		idVec3			DetermineEnemyDir( const idEntity* enemy ) const;
 		bool			GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis );
+		virtual void	GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const;
 	protected:
 		void			Event_Hover();
 		virtual void	Event_TrackTarget();

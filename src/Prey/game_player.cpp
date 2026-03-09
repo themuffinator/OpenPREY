@@ -1598,6 +1598,7 @@ void hhPlayer::Weapon_Combat( void ) {
 
 	// Preserve retail "press fire to interact" behavior for nearby talk/use targets.
 	if ( !gameLocal.isMultiplayer ) {
+		const bool attackPressed = ( usercmd.buttons & BUTTON_ATTACK ) && !( oldButtons & BUTTON_ATTACK );
 		const idVec3 start = GetEyePosition();
 		const idVec3 viewDir = ( untransformedViewAngles.ToMat3() * GetEyeAxis() )[0];
 		const idVec3 end = start + viewDir * 80.0f;
@@ -1614,63 +1615,144 @@ void hhPlayer::Weapon_Combat( void ) {
 				}
 				return;
 			}
+		}
 
-			if ( interactionEntity && ( usercmd.buttons & BUTTON_ATTACK ) && !( oldButtons & BUTTON_ATTACK ) && !ActiveGui() ) {
-				renderEntity_t *interactionRender = interactionEntity->GetRenderEntity();
+		if ( attackPressed ) {
+			idClipModel *clipModelList[ MAX_GENTITIES ];
+			idBounds bounds( start );
+			guiPoint_t bestPoint;
+			idEntity *bestGuiEntity = NULL;
+			idUserInterface *bestGui = NULL;
+			int listedClipModels;
+
+			bestPoint.x = -1.0f;
+			bestPoint.y = -1.0f;
+			bestPoint.frac = 1.0f;
+			bestPoint.guiId = 0;
+
+			bounds.AddPoint( end );
+			listedClipModels = gameLocal.clip.ClipModelsTouchingBounds( bounds, -1, clipModelList, MAX_GENTITIES );
+
+			for ( int i = 0; i < listedClipModels; i++ ) {
+				idClipModel *clip = clipModelList[ i ];
+				idEntity *ent = clip->GetEntity();
+				renderEntity_t *renderEnt;
+				idUserInterface *ui;
+				guiPoint_t pt;
 				int interactiveMask = 0;
-				if ( interactionRender ) {
-					for ( int ix = 0; ix < MAX_RENDERENTITY_GUI; ix++ ) {
-						if ( interactionRender->gui[ ix ] && interactionRender->gui[ ix ]->IsInteractive() ) {
-							interactiveMask |= ( 1 << ix );
-						}
+
+				if ( !ent || ent->IsHidden() || ent->spawnArgs.GetBool( "inv_item" ) ) {
+					continue;
+				}
+
+				renderEnt = ent->GetRenderEntity();
+				if ( !renderEnt ) {
+					continue;
+				}
+
+				for ( int ix = 0; ix < MAX_RENDERENTITY_GUI; ix++ ) {
+					if ( renderEnt->gui[ ix ] && renderEnt->gui[ ix ]->IsInteractive() ) {
+						interactiveMask |= ( 1 << ix );
 					}
 				}
 
-				if ( interactionRender && interactiveMask != 0 ) {
-					guiPoint_t pt = gameRenderWorld->GuiTrace( interactionEntity->GetModelDefHandle(), start, end, interactiveMask );
-					if ( interactionEntity->fl.accurateGuiTrace ) {
-						trace_t tr;
-						gameLocal.clip.TracePoint( tr, start, end, CONTENTS_SOLID, this );
-						if ( tr.fraction < pt.frac ) {
-							pt.x = -1;
-						}
-					}
+				if ( !interactiveMask ) {
+					continue;
+				}
 
-					if ( pt.x != -1 && pt.guiId >= 1 && pt.guiId <= MAX_RENDERENTITY_GUI ) {
-						idUserInterface *ui = interactionRender->gui[ pt.guiId - 1 ];
-						if ( ui ) {
-							sysEvent_t ev;
-							const char *command = NULL;
-							bool updateVisuals = false;
-
-							StopFiring();
-							weapon.GetEntity()->LowerWeapon();
-
-							ClearFocus();
-							focusGUIent = interactionEntity;
-							focusUI = ui;
-							focusTime = gameLocal.time + FOCUS_GUI_TIME;
-
-							// Match focus update + GUI click flow for useables (for example item cabinets).
-							ev = sys->GenerateMouseMoveEvent( -2000, -2000 );
-							command = focusUI->HandleEvent( &ev, gameLocal.time );
-							HandleGuiCommands( focusGUIent, command );
-
-							ev = sys->GenerateMouseMoveEvent( pt.x * SCREEN_WIDTH, pt.y * SCREEN_HEIGHT );
-							command = focusUI->HandleEvent( &ev, gameLocal.time );
-							HandleGuiCommands( focusGUIent, command );
-
-							ev = sys->GenerateMouseButtonEvent( 1, true );
-							command = focusUI->HandleEvent( &ev, gameLocal.time, &updateVisuals );
-							if ( updateVisuals && focusGUIent ) {
-								focusGUIent->UpdateVisuals();
-							}
-							HandleGuiCommands( focusGUIent, command );
-
-							return;
-						}
+				pt = gameRenderWorld->GuiTrace( ent->GetModelDefHandle(), start, end, interactiveMask );
+				if ( ent->fl.accurateGuiTrace ) {
+					trace_t tr;
+					gameLocal.clip.TracePoint( tr, start, end, CONTENTS_SOLID, this );
+					if ( tr.fraction < pt.frac ) {
+						continue;
 					}
 				}
+
+				if ( pt.x == -1 || pt.guiId < 1 || pt.guiId > MAX_RENDERENTITY_GUI || pt.frac >= bestPoint.frac ) {
+					continue;
+				}
+
+				ui = renderEnt->gui[ pt.guiId - 1 ];
+				if ( !ui ) {
+					continue;
+				}
+
+				bestPoint = pt;
+				bestGuiEntity = ent;
+				bestGui = ui;
+			}
+
+			if ( bestGuiEntity && bestGui ) {
+				idEntity *oldFocus = focusGUIent;
+				idUserInterface *oldUI = focusUI;
+				const idKeyValue *kv;
+				sysEvent_t ev;
+				const char *command = NULL;
+				int j;
+
+				StopFiring();
+				weapon.GetEntity()->LowerWeapon();
+
+				ClearFocus();
+				focusGUIent = bestGuiEntity;
+				focusUI = bestGui;
+				focusTime = gameLocal.time + FOCUS_GUI_TIME;
+
+				if ( oldFocus && oldUI && ( oldFocus != focusGUIent || oldUI != focusUI ) ) {
+					command = oldUI->Activate( false, gameLocal.time );
+					HandleGuiCommands( oldFocus, command );
+				}
+
+				if ( oldFocus != focusGUIent || oldUI != focusUI ) {
+					focusUI->SetStateInt( "inv_count", inventory.items.Num() );
+					for ( j = 0; j < inventory.items.Num(); j++ ) {
+						idDict *item = inventory.items[ j ];
+						const char *iname = item->GetString( "inv_name" );
+						const char *iicon = item->GetString( "inv_icon" );
+						const char *itext = item->GetString( "inv_text" );
+
+						focusUI->SetStateString( va( "inv_name_%i", j ), iname );
+						focusUI->SetStateString( va( "inv_icon_%i", j ), iicon );
+						focusUI->SetStateString( va( "inv_text_%i", j ), itext );
+
+						kv = item->MatchPrefix( "inv_id", NULL );
+						if ( kv ) {
+							focusUI->SetStateString( va( "inv_id_%i", j ), kv->GetValue() );
+						}
+
+						kv = item->MatchPrefix( "passtogui_", NULL );
+						while ( kv ) {
+							focusUI->SetStateString( kv->GetKey(), kv->GetValue() );
+							kv = item->MatchPrefix( "passtogui_", kv );
+						}
+
+						focusUI->SetStateInt( iname, 1 );
+					}
+
+					focusUI->SetStateString( "player_health", va( "%i", health ) );
+					focusUI->SetStateBool( "player_spiritwalking", IsSpiritWalking() );
+
+					kv = focusGUIent->spawnArgs.MatchPrefix( "gui_parm", NULL );
+					while ( kv ) {
+						focusUI->SetStateString( kv->GetKey(), kv->GetValue() );
+						kv = focusGUIent->spawnArgs.MatchPrefix( "gui_parm", kv );
+					}
+
+					command = focusUI->Activate( true, gameLocal.time );
+					HandleGuiCommands( focusGUIent, command );
+				}
+
+				ev = sys->GenerateMouseMoveEvent( -2000, -2000 );
+				command = focusUI->HandleEvent( &ev, gameLocal.time );
+				HandleGuiCommands( focusGUIent, command );
+
+				ev = sys->GenerateMouseMoveEvent( bestPoint.x * SCREEN_WIDTH, bestPoint.y * SCREEN_HEIGHT );
+				command = focusUI->HandleEvent( &ev, gameLocal.time );
+				HandleGuiCommands( focusGUIent, command );
+
+				Weapon_GUI();
+				return;
 			}
 		}
 	}
@@ -5771,6 +5853,19 @@ void hhPlayer::UpdateModelTransform( void ) {
 		GetRenderEntity()->axis = GetAxis();
 		GetRenderEntity()->origin = GetOrigin();
 		//HUMANHEAD END
+	}
+}
+
+void hhPlayer::GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const {
+	idVec3 visualOrigin;
+	idMat3 visualAxis;
+
+	if ( const_cast<hhPlayer *>( this )->GetPhysicsToVisualTransform( visualOrigin, visualAxis ) ) {
+		axis = visualAxis;
+		origin = TransformToPlayerSpaceNotInterpolated( visualOrigin );
+	} else {
+		axis = GetAxis();
+		origin = GetOrigin();
 	}
 }
 

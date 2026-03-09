@@ -241,6 +241,16 @@ bool hhProjectileTracking::GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &
 	return hhProjectile::GetPhysicsToVisualTransform( origin, axis );
 }
 
+void hhProjectileTracking::GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const {
+	if ( spinDelta != 0.0f ) {
+		axis = idAngles( 0, 0, spinAngle ).ToMat3() * GetPhysics()->GetAxis();
+		origin = GetPhysics()->GetOrigin();
+		return;
+	}
+
+	hhProjectile::GetCurrentModelTransform( origin, axis );
+}
+
 /*
 ================
 hhProjectileTracking::Event_TrackTarget

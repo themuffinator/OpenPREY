@@ -51,6 +51,7 @@ protected:
 	void				FlyMove( void );
 	void				Killed(idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
 	void				UpdateModelTransform();
+	void				GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const;
 
 	idVec3				savedGravity;
 	float				chargeShotSize;

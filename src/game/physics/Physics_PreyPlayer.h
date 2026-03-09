@@ -27,6 +27,7 @@ class hhPhysics_Player: public idPhysics_Player
 
 		bool				IsWallWalking() const { return isWallWalking; }
 		bool				WasWallWalking() const { return wasWallWalking; }
+		const idVec3 &		GetOldOrigin() const { return oldOrigin; }
 		void				IsWallWalking( bool wallwalking ) { isWallWalking = wallwalking; }
 		void				WasWallWalking( bool wallwalking ) { wasWallWalking = wallwalking; }
 		bool				AlignedWithGravity() const;

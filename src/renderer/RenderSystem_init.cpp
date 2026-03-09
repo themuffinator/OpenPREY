@@ -36,6 +36,14 @@ If you have questions concerning this license or the applicable additional terms
 #include "../sys/win32/win_local.h"
 #endif
 
+#ifdef __linux__
+#include <X11/Xlib.h>
+#endif
+
+#if defined( MACOS_X ) || defined( __APPLE__ )
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 // functions that are not called every frame
 
 glconfig_t	glConfig;
@@ -79,19 +87,19 @@ idCVar r_crt( "r_crt", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable CR
 idCVar r_crtAmount( "r_crtAmount", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "overall blend amount for the CRT monitor post-process", 0.0f, 1.0f );
 idCVar r_crtScanlineStrength( "r_crtScanlineStrength", "0.55", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "scanline intensity for the CRT monitor post-process", 0.0f, 1.0f );
 idCVar r_crtMaskStrength( "r_crtMaskStrength", "0.35", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "phosphor mask intensity for the CRT monitor post-process", 0.0f, 1.0f );
-idCVar r_crtCurvature( "r_crtCurvature", "0.06", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "screen curvature amount for the CRT monitor post-process", 0.0f, 0.25f );
+idCVar r_crtCurvature( "r_crtCurvature", "0.01", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "screen curvature amount for the CRT monitor post-process", 0.0f, 0.25f );
 idCVar r_crtChromatic( "r_crtChromatic", "1.35", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "channel convergence offset in pixel units for the CRT monitor post-process", 0.0f, 8.0f );
 idCVar r_msaaResolveDepth( "r_msaaResolveDepth", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "resolve depth when blitting MSAA render targets" );
 idCVar r_msaaAlphaToCoverage( "r_msaaAlphaToCoverage", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable alpha-to-coverage for perforated materials on MSAA render targets" );
-idCVar r_mode( "r_mode", "3", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_INTEGER, "video mode number" );
+idCVar r_mode( "r_mode", "-2", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_INTEGER, "video mode number (-2 = native desktop, -1 = custom width/height)" );
 idCVar r_displayRefresh( "r_displayRefresh", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NOCHEAT, "optional display refresh rate option for vid mode", 0.0f, 200.0f );
 idCVar r_fullscreen( "r_fullscreen", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "0 = windowed, 1 = full screen" );
 idCVar r_fullscreenDesktop( "r_fullscreenDesktop", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "1 = native desktop fullscreen, 0 = exclusive mode using r_mode/r_customWidth/r_customHeight" );
 idCVar r_borderless( "r_borderless", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "1 = borderless window mode when r_fullscreen is 0" );
 idCVar r_windowWidth( "r_windowWidth", "1280", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "windowed mode width" );
 idCVar r_windowHeight( "r_windowHeight", "720", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "windowed mode height" );
-idCVar r_customWidth( "r_customWidth", "720", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "custom screen width. set r_mode to -1 to activate" );
-idCVar r_customHeight( "r_customHeight", "486", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "custom screen height. set r_mode to -1 to activate" );
+idCVar r_customWidth( "r_customWidth", "1920", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "custom screen width. set r_mode to -1 to activate" );
+idCVar r_customHeight( "r_customHeight", "1080", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "custom screen height. set r_mode to -1 to activate" );
 idCVar r_singleTriangle( "r_singleTriangle", "0", CVAR_RENDERER | CVAR_BOOL, "only draw a single triangle per primitive" );
 idCVar r_checkBounds( "r_checkBounds", "0", CVAR_RENDERER | CVAR_BOOL, "compare all surface bounds with precalculated ones" );
 
@@ -468,9 +476,9 @@ static void R_CheckPortableExtensions( void ) {
 R_GetModeInfo
 
 r_mode is normally a small non-negative integer that
-looks resolutions up in a table, but if it is set to -1,
-the values from r_customWidth, amd r_customHeight
-will be used instead.
+looks resolutions up in a table. If it is set to -2, the
+current desktop resolution will be used. If it is set to -1,
+the values from r_customWidth and r_customHeight will be used.
 ====================
 */
 typedef struct vidmode_s {
@@ -493,6 +501,69 @@ vidmode_t r_vidModes[] = {
 };
 static int	s_numVidModes = ( sizeof( r_vidModes ) / sizeof( r_vidModes[0] ) );
 
+static bool R_GetDesktopModeInfo( int *width, int *height ) {
+#if defined( _WIN32 )
+	int desktopWidth = win32.desktopWidth;
+	int desktopHeight = win32.desktopHeight;
+
+	if ( desktopWidth <= 0 || desktopHeight <= 0 ) {
+		HDC hDC = GetDC( GetDesktopWindow() );
+		if ( hDC != NULL ) {
+			desktopWidth = GetDeviceCaps( hDC, HORZRES );
+			desktopHeight = GetDeviceCaps( hDC, VERTRES );
+			ReleaseDC( GetDesktopWindow(), hDC );
+		}
+	}
+
+	if ( desktopWidth > 0 && desktopHeight > 0 ) {
+		if ( width ) {
+			*width = desktopWidth;
+		}
+		if ( height ) {
+			*height = desktopHeight;
+		}
+		return true;
+	}
+#endif
+
+#ifdef __linux__
+	Display *display = XOpenDisplay( NULL );
+	if ( display != NULL ) {
+		const int screen = DefaultScreen( display );
+		const int desktopWidth = DisplayWidth( display, screen );
+		const int desktopHeight = DisplayHeight( display, screen );
+		XCloseDisplay( display );
+
+		if ( desktopWidth > 0 && desktopHeight > 0 ) {
+			if ( width ) {
+				*width = desktopWidth;
+			}
+			if ( height ) {
+				*height = desktopHeight;
+			}
+			return true;
+		}
+	}
+#endif
+
+#if defined( MACOS_X ) || defined( __APPLE__ )
+	const CGDirectDisplayID display = CGMainDisplayID();
+	const int desktopWidth = static_cast<int>( CGDisplayPixelsWide( display ) );
+	const int desktopHeight = static_cast<int>( CGDisplayPixelsHigh( display ) );
+	if ( desktopWidth > 0 && desktopHeight > 0 ) {
+		if ( width ) {
+			*width = desktopWidth;
+		}
+		if ( height ) {
+			*height = desktopHeight;
+		}
+		return true;
+	}
+#endif
+
+	return false;
+}
+
 #if MACOS_X
 bool R_GetModeInfo( int *width, int *height, int mode ) {
 #else
@@ -501,9 +572,9 @@ static bool R_GetModeInfo( int *width, int *height, int mode ) {
 	vidmode_t	*vm;
 	const int originalMode = mode;
 
-	if ( mode < -1 ) {
-		common->Printf( "^3R_GetModeInfo: r_mode %d is invalid, using custom mode (-1)\n", mode );
-		mode = -1;
+	if ( mode < -2 ) {
+		common->Printf( "^3R_GetModeInfo: r_mode %d is invalid, using desktop mode (-2)\n", mode );
+		mode = -2;
 	}
 	if ( mode >= s_numVidModes ) {
 		common->Printf( "^3R_GetModeInfo: r_mode %d out of range, using mode 0 (%dx%d)\n",
@@ -514,6 +585,30 @@ static bool R_GetModeInfo( int *width, int *height, int mode ) {
 	if ( mode != originalMode && r_mode.GetInteger() == originalMode ) {
 		r_mode.SetInteger( mode );
 		r_mode.ClearModified();
+	}
+
+	if ( mode == -2 ) {
+		if ( R_GetDesktopModeInfo( width, height ) ) {
+			return true;
+		}
+		if ( glConfig.vidWidth > 0 && glConfig.vidHeight > 0 ) {
+			if ( width ) {
+				*width = glConfig.vidWidth;
+			}
+			if ( height ) {
+				*height = glConfig.vidHeight;
+			}
+			return true;
+		}
+		common->Printf( "^3R_GetModeInfo: unable to query desktop resolution, using mode 0 (%dx%d)\n",
+			r_vidModes[0].width, r_vidModes[0].height );
+		if ( width ) {
+			*width = r_vidModes[0].width;
+		}
+		if ( height ) {
+			*height = r_vidModes[0].height;
+		}
+		return true;
 	}
 
 	if ( mode == -1 ) {
@@ -571,9 +666,9 @@ static void R_NormalizeDisplayCvars( void ) {
 	const int originalMode = r_mode.GetInteger();
 	int normalizedMode = originalMode;
 
-	if ( normalizedMode < -1 ) {
-		common->Printf( "^3R_GetModeInfo: r_mode %d is invalid, using custom mode (-1)\n", normalizedMode );
-		normalizedMode = -1;
+	if ( normalizedMode < -2 ) {
+		common->Printf( "^3R_GetModeInfo: r_mode %d is invalid, using desktop mode (-2)\n", normalizedMode );
+		normalizedMode = -2;
 	} else if ( normalizedMode >= s_numVidModes ) {
 		common->Printf( "^3R_GetModeInfo: r_mode %d out of range, using mode 0 (%dx%d)\n",
 			normalizedMode, r_vidModes[0].width, r_vidModes[0].height );
@@ -875,6 +970,7 @@ static void R_ListModes_f( const idCmdArgs &args ) {
 	for ( i = 0; i < s_numVidModes; i++ ) {
 		common->Printf( "%s\n", r_vidModes[i].description );
 	}
+	common->Printf( "Mode -2: native desktop fullscreen resolution\n" );
 	common->Printf( "Mode -1: custom fullscreen using r_customWidth / r_customHeight\n" );
 	common->Printf( "Windowed sizing uses r_windowWidth / r_windowHeight when r_fullscreen is 0\n" );
 	common->Printf( "r_mode/r_custom* only affect fullscreen when r_fullscreenDesktop is 0 (exclusive mode)\n" );

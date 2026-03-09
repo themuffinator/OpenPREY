@@ -744,3 +744,189 @@ void FadeAll_Pulse( entity eSelf) {
 void FadeAll_PulseOff( entity eSelf) {
 	eSelf.setKey( "isRunning", FALSE );
 }
+
+// Temporary diagnostics: trace test for energynode leech collision behavior.
+void OP_ProbeEnergyNode( string nodeName ) {
+	entity node;
+	entity hit;
+	vector opAng;
+	vector opFwd;
+	vector opRight;
+	vector opUp;
+	vector opLocalLeech;
+	vector opStart;
+	vector opEnd;
+	float shotMask;
+	float solidMask;
+	float allMask;
+	float fracSolid;
+	float fracShot;
+	float fracAll;
+	string hitSolid;
+	string hitShot;
+	string hitAll;
+
+	node = sys.getEntity( nodeName );
+	if ( !node ) {
+		sys.println( "OP_NODE_TRACE missing " + nodeName );
+		return;
+	}
+
+	opAng = node.getAngles();
+	opFwd = sys.angToForward( opAng );
+	opRight = sys.angToRight( opAng );
+	opUp = sys.angToUp( opAng );
+	opLocalLeech = node.getVectorKey( "leechPoint" );
+
+	opStart = node.getWorldOrigin() + opFwd * ( opLocalLeech_x + 200 ) + opRight * opLocalLeech_y + opUp * opLocalLeech_z;
+	opEnd = node.getWorldOrigin() + opFwd * ( opLocalLeech_x - 120 ) + opRight * opLocalLeech_y + opUp * opLocalLeech_z;
+
+	// 33556481 == MASK_SHOT_RENDERMODEL (2049) | CONTENTS_GAME_PORTAL (33554432)
+	shotMask = 33556481;
+	solidMask = CONTENTS_SOLID;
+	allMask = -1;
+
+	fracSolid = sys.tracePoint( opStart, opEnd, solidMask, $player1 );
+	hit = sys.getTraceEntity();
+	hitSolid = "<none>";
+	if ( hit ) {
+		hitSolid = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	fracShot = sys.tracePoint( opStart, opEnd, shotMask, $player1 );
+	hit = sys.getTraceEntity();
+	hitShot = "<none>";
+	if ( hit ) {
+		hitShot = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	fracAll = sys.tracePoint( opStart, opEnd, allMask, $player1 );
+	hit = sys.getTraceEntity();
+	hitAll = "<none>";
+	if ( hit ) {
+		hitAll = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	sys.println( "OP_NODE_COORD " + nodeName + " org=" + node.getWorldOrigin() + " ang=" + opAng + " start=" + opStart + " end=" + opEnd );
+	sys.println( "OP_NODE_BOUNDS " + nodeName + " mins=" + node.getMins() + " maxs=" + node.getMaxs() + " size=" + node.getSize() );
+	sys.println( "OP_NODE_TRACE_SOLID " + nodeName + " frac=" + fracSolid + " hit=" + hitSolid );
+	sys.println( "OP_NODE_TRACE_SHOTPORTAL " + nodeName + " frac=" + fracShot + " hit=" + hitShot );
+	sys.println( "OP_NODE_TRACE_ALL " + nodeName + " frac=" + fracAll + " hit=" + hitAll );
+}
+
+void OP_ProbeEnergyNodes_Biolabsa() {
+	sys.println( "OP_NODE_TRACE_BEGIN" );
+	OP_ProbeEnergyNode( "object_energynode_plasma_1" );
+	OP_ProbeEnergyNode( "object_energynode_plasma_2" );
+	OP_ProbeEnergyNode( "object_energynode_freeze_1" );
+	sys.println( "OP_NODE_TRACE_END" );
+}
+
+void OP_RunLeechProbe_Biolabsa() {
+	entity p;
+	entity w;
+	float i;
+	float r;
+
+	p = $player1;
+	if ( !p ) {
+		sys.println( "OP_LEECH no player1" );
+		return;
+	}
+
+	p.setOrigin( '-1200 -684 20' );
+	p.setAngles( '0 180 0' );
+	p.selectWeapon( "weaponobj_soulstripper" );
+	sys.wait( 0.2 );
+	p.selectWeapon( "weapon4" );
+	sys.wait( 0.2 );
+
+	w = p.getWeaponEntity();
+	if ( !w ) {
+		sys.println( "OP_LEECH no weapon entity" );
+		return;
+	}
+
+	sys.println( "OP_LEECH_WEAPON " + w.getName() + ":" + w.getKey( "classname" ) );
+
+	for ( i = 0; i < 12; i++ ) {
+		r = w.leech();
+		sys.println( "OP_LEECH_STEP i=" + i + " r=" + r );
+		sys.wait( 0.1 );
+	}
+
+	r = w.endLeech();
+	sys.println( "OP_LEECH_END r=" + r );
+}
+
+void OP_RunLeechProbe_Salvage() {
+	entity p;
+	entity w;
+	entity hit;
+	float i;
+	float r;
+	float fracSolid;
+	float fracShotPortal;
+	vector wAng;
+	vector wFwd;
+	vector wStart;
+	vector wEnd;
+	string hitSolid;
+	string hitShotPortal;
+
+	p = $player1;
+	if ( !p ) {
+		sys.println( "OP_SALVAGE_LEECH no player1" );
+		return;
+	}
+
+	// object_energynode_plasma_1 @ 608 -8264 -676 (yaw 0)
+	// Salvage map scripts force player view; place player so forced aim intersects node.
+	sys.println( "OP_SALVAGE_LEECH origin_before=" + p.getWorldOrigin() );
+	p.setWorldOrigin( '300 -8232 -647' );
+	sys.println( "OP_SALVAGE_LEECH origin_after_set=" + p.getWorldOrigin() );
+	p.setAngles( '0 180 0' );
+	sys.wait( 0.2 );
+	sys.println( "OP_SALVAGE_LEECH origin_after_wait=" + p.getWorldOrigin() );
+
+	sys.println( "OP_SALVAGE_LEECH current=" + p.getCurrentWeapon() );
+	w = p.getWeaponEntity();
+	if ( !w ) {
+		sys.println( "OP_SALVAGE_LEECH no weapon entity" );
+		return;
+	}
+
+	sys.println( "OP_SALVAGE_LEECH weapon=" + w.getName() + ":" + w.getKey( "classname" ) );
+
+	wAng = w.getAngles();
+	wFwd = sys.angToForward( wAng );
+	wStart = w.getWorldOrigin();
+	wEnd = wStart + wFwd * 1200;
+
+	fracSolid = sys.tracePoint( wStart, wEnd, CONTENTS_SOLID, $player1 );
+	hit = sys.getTraceEntity();
+	hitSolid = "<none>";
+	if ( hit ) {
+		hitSolid = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	fracShotPortal = sys.tracePoint( wStart, wEnd, 33556481, $player1 );
+	hit = sys.getTraceEntity();
+	hitShotPortal = "<none>";
+	if ( hit ) {
+		hitShotPortal = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	sys.println( "OP_SALVAGE_TRACE weaponStart=" + wStart + " ang=" + wAng + " end=" + wEnd );
+	sys.println( "OP_SALVAGE_TRACE_SOLID frac=" + fracSolid + " hit=" + hitSolid );
+	sys.println( "OP_SALVAGE_TRACE_SHOTPORTAL frac=" + fracShotPortal + " hit=" + hitShotPortal );
+
+	for ( i = 0; i < 12; i++ ) {
+		r = w.leech();
+		sys.println( "OP_SALVAGE_LEECH step=" + i + " r=" + r );
+		sys.wait( 0.1 );
+	}
+
+	r = w.endLeech();
+	sys.println( "OP_SALVAGE_LEECH end=" + r );
+}

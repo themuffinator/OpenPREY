@@ -415,6 +415,7 @@ public:
 	void					UpdateModel( void );
 	virtual //HUMANHEAD: aob
 	void					UpdateModelTransform( void );
+	virtual void			GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const;
 	virtual void			ProjectOverlay( const idVec3 &origin, const idVec3 &dir, float size, const char *material );
 	int						GetNumPVSAreas( void );
 	const int *				GetPVSAreas( void );

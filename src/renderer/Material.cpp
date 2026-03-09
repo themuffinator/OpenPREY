@@ -283,6 +283,7 @@ static infoParm_t	infoParms[] = {
 	{"forcefield_nobullets",	1,	SURFTYPE_FORCEFIELD,	CONTENTS_FORCEFIELD },
 	{"spiritbridge",0,	0,	CONTENTS_SPIRITBRIDGE },	// spirit-walk-only collision
 	{"blockradiusdamage",	0,	0,	CONTENTS_BLOCK_RADIUSDAMAGE },	// blocks splash damage
+	{"block_radiusdamage",	0,	0,	CONTENTS_BLOCK_RADIUSDAMAGE },	// compatibility alias
 	{"shootable",	0,	0,	CONTENTS_SHOOTABLE },	// bullets collide with but players can pass
 	{"deathvolume",	0,	0,	CONTENTS_DEATHVOLUME },	// instant-death zones
 	{"vehicleclip",	0,	0,	CONTENTS_VEHICLECLIP },	// solid to vehicles

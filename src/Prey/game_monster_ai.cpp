@@ -864,6 +864,28 @@ bool hhMonsterAI::GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis ) {
 	return true;
 }
 
+void hhMonsterAI::GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const {
+	idVec3 visualOrigin;
+	idMat3 visualAxis;
+
+	if ( const_cast<hhMonsterAI *>( this )->GetPhysicsToVisualTransform( visualOrigin, visualAxis ) ) {
+		if ( bBindAxis && GetBindMaster() ) {
+			axis = GetBindMaster()->GetAxis();
+		} else {
+			axis = visualAxis * GetPhysics()->GetAxis();
+		}
+
+		if ( GetBindMaster() && bindJoint != INVALID_JOINT ) {
+			origin = visualOrigin;
+		} else {
+			origin = GetPhysics()->GetOrigin() + visualOrigin * axis;
+		}
+	} else {
+		axis = GetPhysics()->GetAxis();
+		origin = GetPhysics()->GetOrigin();
+	}
+}
+
 void hhMonsterAI::UpdateModelTransform( void ) {
 	idVec3 origin;
 	idMat3 axis;

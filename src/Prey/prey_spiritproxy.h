@@ -33,6 +33,7 @@ public:
 	virtual void			ShouldRemainAlignedToAxial( bool remainAligned );
 	virtual bool			ShouldRemainAlignedToAxial() const { return physicsObj.ShouldRemainAlignedToAxial(); }
 	virtual void			UpdateModelTransform( void ); // mdl
+	virtual void			GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const;
 	virtual bool			AllowCollision(const trace_t &collision); //rww
 
 	void					Save( idSaveGame *savefile ) const;

@@ -297,6 +297,7 @@ public:
 	bool				IsPortalColliding( void ) { return bCollidingWithPortal; }
 
 	virtual void		UpdateModelTransform( void );//aob
+	virtual void		GetCurrentModelTransform( idVec3 &origin, idMat3 &axis ) const;
 
 	virtual void		PlayFootstepSound();//aob
 	virtual void		PlayPainSound();//aob
