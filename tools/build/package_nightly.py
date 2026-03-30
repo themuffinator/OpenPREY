@@ -13,7 +13,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 
 PRODUCT_NAME = "OpenPrey"
-GAME_DIR_NAME = "basepy"
+PACKAGE_STEM_NAME = "openprey"
+GAME_DIR_NAME = "basepr"
 SUPPORTED_ARCHES = ("x64", "x86", "arm64")
 
 PLATFORM_EXECUTABLE_EXT = {
@@ -179,18 +180,18 @@ def copy_required_game_binary(
     return []
 
 
-def create_basepy_pk4(
-    install_basepy_dir: Path, destination_pk4: Path
+def create_game_pk4(
+    install_game_dir: Path, destination_pk4: Path
 ) -> tuple[int, list[str]]:
     added_files = 0
     skipped_samples: list[str] = []
 
     with ZipFile(destination_pk4, "w", compression=ZIP_DEFLATED, compresslevel=9) as pk4:
-        for path in sorted(install_basepy_dir.rglob("*")):
+        for path in sorted(install_game_dir.rglob("*")):
             if not path.is_file():
                 continue
 
-            rel = path.relative_to(install_basepy_dir)
+            rel = path.relative_to(install_game_dir)
             rel_parts_lower = {part.lower() for part in rel.parts}
 
             if rel_parts_lower & OPENPREY_EXCLUDED_DIRS:
@@ -352,7 +353,7 @@ def main(argv: list[str]) -> int:
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    package_stem = f"{GAME_DIR_NAME}-{args.version_tag}-{args.platform}"
+    package_stem = f"{PACKAGE_STEM_NAME}-{args.version_tag}-{args.platform}"
     package_root = output_dir / package_stem
     if package_root.exists():
         shutil.rmtree(package_root)
@@ -367,25 +368,25 @@ def main(argv: list[str]) -> int:
         args.allow_missing_binaries,
     )
 
-    basepy_package_dir = package_root / GAME_DIR_NAME
-    basepy_package_dir.mkdir(parents=True, exist_ok=True)
+    package_game_dir = package_root / GAME_DIR_NAME
+    package_game_dir.mkdir(parents=True, exist_ok=True)
     missing_game_modules = copy_required_game_binary(
         args.platform,
         args.arch,
         install_game_dir,
-        basepy_package_dir,
+        package_game_dir,
         args.allow_missing_binaries,
     )
 
-    basepy_pk4_name = "pak0.pk4"
-    basepy_pk4_path = basepy_package_dir / basepy_pk4_name
+    game_pk4_name = "pak0.pk4"
+    game_pk4_path = package_game_dir / game_pk4_name
 
-    added_files, skipped_samples = create_basepy_pk4(
-        install_game_dir, basepy_pk4_path
+    added_files, skipped_samples = create_game_pk4(
+        install_game_dir, game_pk4_path
     )
     if added_files == 0:
         print(
-            "error: basepy pk4 packaging found no eligible files after filtering",
+            f"error: {GAME_DIR_NAME} pk4 packaging found no eligible files after filtering",
             file=sys.stderr,
         )
         return 1
@@ -409,7 +410,7 @@ def main(argv: list[str]) -> int:
     print(f"Package directory: {package_root}")
     print(f"Release archive: {archive_path}")
     print(f"Archive format: {archive_format}")
-    print(f"basepy pk4: {basepy_pk4_path} ({added_files} files)")
+    print(f"{GAME_DIR_NAME} pk4: {game_pk4_path} ({added_files} files)")
     if copied_share:
         print(f"Share payload: {package_root / 'share'}")
     if macos_app_bundle is not None:

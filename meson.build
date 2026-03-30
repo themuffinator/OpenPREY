@@ -71,7 +71,7 @@ build_games = get_option('build_games')
 legacy_build_game_sp = get_option('build_game_sp')
 legacy_build_game_mp = get_option('build_game_mp')
 install_root_dir = meson.project_source_root() / '.install'
-install_gamedir_dir = install_root_dir / 'basepy'
+install_gamedir_dir = install_root_dir / 'basepr'
 game_module_defs_file = meson.project_source_root() / 'src' / 'game' / 'Game.def'
 
 if legacy_build_game_sp or legacy_build_game_mp

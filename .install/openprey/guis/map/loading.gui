@@ -1,0 +1,85 @@
+// Level loading gui, can have a unique one for each map
+
+windowDef Desktop {
+	rect		0, 0, 640, 480
+	backcolor	0.20, 0.20, 0.40, 1
+	forecolor	1, 1, 0, 1
+	nocursor	1
+	menugui		1
+
+	onTime 0 {
+		if ( "gui::image" == "" ) {
+			set "gui::image" "guis/assets/loading/loading"
+			set "gui::image_left" "guis/assets/loading/loading_left"
+			set "gui::image_right" "guis/assets/loading/loading_right"
+			set "gui::image_top" "guis/assets/loading/loading_top"
+			set "gui::image_bottom" "guis/assets/loading/loading_bottom"
+		}
+	}
+
+	windowDef Background {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"gui::image"
+		backgroundLeft "gui::image_left"
+		backgroundRight "gui::image_right"
+		backgroundTop "gui::image_top"
+		backgroundBottom "gui::image_bottom"
+		noclip		1
+	}
+
+/*	windowDef FadeIn {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, (1 - "gui::map_loading")
+	}
+*/
+
+	windowDef FriendlyBack {
+		rect		0, 10, 640, 35
+		screenaligny top
+		background	"textures/gfx/colors/white"
+		matcolor	0.0, 0.0, 0, 0.55
+	}
+
+	windowDef FriendlyName {
+		rect		0, 10, 640, 30
+		screenaligny top
+		forecolor	0.65, 0.75, 1, 0.8
+		text		"gui::friendlyname"
+		textscale	0.6
+		textalign	1
+		textaligny	-5
+		shadow		1
+		font		"fonts/menu"
+	}
+
+	// Progress Bar
+	windowDef ProgressBarClip {
+		rect	192, 455, ("gui::map_loading" * 256), 12
+		screenaligny bottom
+		
+		windowDef ProgressBarFill {
+			rect		0, 0, 256, 12
+			background	"textures/gfx/colors/white"
+			matcolor	0.35, 0.35, 1, 0.65
+		}
+	}
+	windowDef baroutline {
+		rect		168, 443, 304, 30
+		screenaligny bottom
+		background	"guis/assets/menu/bottombar"
+		matcolor	1, 1, 1, 1
+	}
+
+/*	windowDef loadingtext {
+		rect		470, 446, 150, 40
+		text		"gui::demo"			// Displays "Loading...", "Precaching...", etc.
+		textscale	0.4
+		textalign	2
+		shadow		1
+		backcolor	0, 0, 0, 0
+		forecolor	0.65, 0.75, 1, 0.4 + jitter6[time * 0.2] * 0.4
+	}
+*/
+}

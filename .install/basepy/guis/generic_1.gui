@@ -1,0 +1,312 @@
+// generic on/off_1 gui
+//--------------------------------------------------
+
+// gui_parm25:		if on, allows one use only
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 1
+	forecolor		1, 1, 1, 1
+	float turnedon	0
+	float innerrot	90
+	float outerrot	-45
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+
+	windowDef TurnOnSequence {
+		rect		0, 0, 0, 0
+		noTime		1
+
+		onTime 0 {
+			set "tick::matcolor" "0 1 0 0" ;
+			set "tick2::matcolor" "0 1 0 0" ;
+			transition "tick3::rect" "255 247 50 50" "255 247 50 50" "0" ;
+			resetTime "tick" "10000" ;
+			resetTime "tick2" "10000" ;
+		 	resetTime "tick3" "10000" ;
+		 	resetTime "tick4" "10000" ;
+		 	set "tick1::notime" "1" ;
+		 	set "tick2::notime" "1" ;
+		 	set "tick3::notime" "1" ;
+			set "tick4::notime" "1" ;
+			set "tick3::visible" "0" ;
+			set "tick4::visible" "0" ;
+		}
+		onTime 500 {
+			set "tick::visible" "1" ;
+			set "tick2::visible" "1" ;
+			set "tick3::visible" "1" ;
+			set "tick4::visible" "1" ;
+			set "tick3::matcolor" "0 1 0 1" ;
+			resetTime "tick" "0" ;
+			resetTime "tick2" "0" ;
+			resetTime "tick3" "0" ;
+			resetTime "tick4" "0" ;
+		}
+		onTime 1000 {
+			set "OnButton1::noEvents" "0";
+		}
+	}
+	windowDef TurnOffSequence {
+		rect		0, 0, 0, 0
+		noTime		1
+
+		onTime 0 {
+		 	set "tick3::notime" "1";
+			set "tick::visible" "0";
+			set "tick2::visible" "0";
+			set "tick3::visible" "0";
+			set "tick4::visible" "0";
+		}
+		onTime 500 {
+			set "OnButton1::noEvents" "0";
+		}
+	}
+
+
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	
+	windowDef bg {
+		rect		0, 4, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1 
+		background	"guis/assets/generic_on_off/bg"
+	}
+	windowDef out {
+		rect		143, 66, 352, 352
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.25, 0, 1
+		background	"guis/assets/generic_on_off/out"
+		rotate		"desktop::outerrot"
+	}
+	windowDef in_1 {
+		rect		227, 145, 185, 185
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.95, 0.6, 1
+		background	"guis/assets/generic_on_off/in_1"
+		visible		1
+		rotate		"desktop::innerrot"
+	}
+	windowDef tick {
+		rect		255, 247, 50, 50
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/tick"
+		visible		0
+		notime		1
+		onTime 0 {
+			transition "matcolor" "0 1 0 0" "0 1 0 1" "200";
+		}
+		onTime 500 {
+			transition "matcolor" "0 1 0 1" "0 1 0 0" "400";
+		}
+		onTime 1500 {
+			resetTime "0";
+		}
+	}
+	windowDef tick2 {
+		rect		192, 264, 95, 95
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generic_on_off/tick"
+		visible		0
+		notime		1
+		onTime 0 {
+			set "matcolor" "0 1 0 0";
+		}
+		onTime 600 {
+			transition "matcolor" "0 1 0 0" "0 1 0 1" "200";
+		}
+		onTime 800 {
+			transition "matcolor" "0 1 0 1" "0 1 0 0" "800";
+		}
+		onTime 1500 {
+			resetTime "0";
+		}
+	}
+	windowDef tick3 {
+		rect		255, 247, 50, 50
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	0, 1, 0, 1
+		background	"guis/assets/generic_on_off/tick"
+		visible		0
+		noTime		1
+		onTime 0 {
+			transition "tick3::rect" "255 247 50 50" "162 272 116.5 116.5" "1000";
+			transition "tick3::matcolor" "0 1 0 1" "0 1 0 0" "1000";
+		}
+		onTime 1500 {
+			resetTime "0";
+		}
+		onTime 5000 {
+		}
+		onTime 6000 {
+			resetTime "tick3" "5000" ;
+		}
+	}
+	windowDef tick4 {
+		rect		143, 66, 352, 352
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	0, 1, 0, 1
+		background	"guis/assets/generic_on_off/out_ring"
+		visible		0
+		notime		1
+		onTime 0 {
+			set "matcolor" "0 1 0 0";
+		}
+		onTime 600 {
+			transition "matcolor" "0 1 0 0" "0 1 0 1" "200";
+		}
+		onTime 800 {
+			transition "matcolor" "0 1 0 1" "0 1 0 0" "800";
+		}
+		onTime 1500 {
+			resetTime "0";
+		}
+	}
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.05
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.002]
+
+	}
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.02
+		background	"textures/sfx/static"
+	}
+
+//-----------------------------------------
+// buttons
+//-----------------------------------------
+
+
+
+	windowDef OnButton1 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	0.7, 0.7, 0.38, 0.6
+		visible		1
+		onMouseEnter {
+			set "in_1::matColor" "1 0.95 0.6 1" ;
+		}
+		onMouseExit {
+		}
+		onAction {
+			if ("desktop::turnedon" == 0) {	// Turn on
+				transition "desktop::innerrot" "90" "0" "500" ;
+				transition "desktop::outerrot" "-45" "0" "500" ;
+				set "desktop::turnedon" "1";
+				resetTime "TurnOnSequence" "0";
+				set "AlienTextBot::visible" "1";
+				set "AlienTextTop::visible" "0";
+				set "cmd" "activate ; play console_generic_activate" ;
+				if ("gui::gui_parm25" != 0) {
+					set "desktop::noninteractive" "1" ;
+				}
+
+				// Reset a bunch of stuff before turning events off, because they'll be ignored afterwards !@#$
+				set "tick::matcolor" "0 1 0 0" ;
+				set "tick2::matcolor" "0 1 0 0" ;
+				transition "tick3::rect" "255 247 50 50" "255 247 50 50" "0" ;
+				resetTime "tick" "10000" ;
+				resetTime "tick2" "10000" ;
+		 		resetTime "tick3" "10000" ;
+		 		set "tick3::notime" "1" ;
+				set "tick3::visible" "0" ;
+				
+				set "OnButton1::noEvents" "1";
+			}
+			else {	// Turn off
+				transition "desktop::innerrot" "0" "90" "500" ;
+				transition "desktop::outerrot" "0" "-45" "500" ;
+				set "desktop::turnedon" "0" ;
+				resetTime "TurnOffSequence" "0";
+				set "AlienTextBot::visible" "0";
+				set "AlienTextTop::visible" "1";
+				set "cmd" "activate ; play console_generic_deactivate" ;
+				if ("gui::gui_parm25" != 0) {
+					set "desktop::noninteractive" "1" ;
+				}
+				set "OnButton1::noEvents" "1";
+			}
+		} 
+	}
+
+	
+
+	// -------------------------------------------------------------------------------
+	// Text
+	// -------------------------------------------------------------------------------
+
+	windowDef AlienTextTop {
+		rect		20, 20, 50, 50
+		text		"#str_20478"
+		font		"fonts/alien"
+		textscale	0.8
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.5, 1
+		visible		1
+
+		onTime 0 {
+			transition "AlienTextTop::rect" "35 60 1 50" "35 60 350 50" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienTextTop" "0" ;
+		}
+	}
+	windowDef AlienTextBot {
+		rect		20, 20, 50, 50
+		text		"#str_20479"
+		font		"fonts/alien"
+		textscale	0.7
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.5, 1
+		visible		0
+
+		onTime 0 {
+			transition "AlienTextBot::rect" "35 60 1 50" "35 60 400 50" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienTextBot" "0" ;
+		}
+	}
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

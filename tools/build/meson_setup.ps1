@@ -216,8 +216,8 @@ if ($exitCode -eq 0 -and $effectiveArgs.Length -gt 0 -and $effectiveArgs[0] -eq 
         "game_mp_*.dll", "game_mp_*.lib", "game_mp_*.pdb", "game_mp_*.exp"
     )
     $cleanupDirs = @(
-        (Join-Path $repoRoot ".install\basepy"),
-        (Join-Path $repoRoot "builddir\basepy")
+        (Join-Path $repoRoot ".install\basepr"),
+        (Join-Path $repoRoot "builddir\basepr")
     )
     foreach ($cleanupDir in $cleanupDirs) {
         if (-not (Test-Path $cleanupDir)) {

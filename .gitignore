@@ -49,7 +49,7 @@ __pycache__/
 /subprojects/packagecache/
 /subprojects/SDL3-*/
 /.install/crashes/
-/.install/openprey/
+/.install/basepr/
 /.install/openbase/*.cfg
 _tmp_*
 /.tmp/

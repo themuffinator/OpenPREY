@@ -1,0 +1,82 @@
+// Generic translatable GUI
+// Allows placing of generic text to be translated
+
+// gui_parm1			Text
+// gui_parm4			Top margin
+// gui_parm5			Text scale
+// gui_parm6			Text color
+// gui_parm7			Text color
+// gui_parm8			Text color
+// gui_parm20			Red entity color component of console I'm applied to
+// gui_parm21			Green entity color component of console I'm applied to
+// gui_parm22			Blue entity color component of console I'm applied to
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+
+/*	// For testing
+	onEvent {
+		set "gui::gui_parm1" "#str_10056" ;
+		set "gui::gui_parm4" "160";		// Top margin (200)
+		set "gui::gui_parm5" "1";		// Text scale (1.4)
+		set "gui::gui_parm6" "0.7";		// Text color (0.7)
+		set "gui::gui_parm7" "0.2";		// Text color (0.2)
+		set "gui::gui_parm8" "0.1";		// Text color (0.1)
+		set "gui::gui_parm20" "1";		// border(mat) color
+		set "gui::gui_parm21" "1";		// border(mat) color
+		set "gui::gui_parm22" "1";		// border(mat) color
+	}
+*/
+
+	windowDef background {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	"gui::gui_parm20", "gui::gui_parm21", "gui::gui_parm22", 1
+		background	"guis/assets/non_interact/f/bg"
+	}
+
+	windowDef translatableText {
+		rect		50, "gui::gui_parm4", 540, 440
+		text		"gui::gui_parm1"
+		textalign	1
+		textaligny	0
+		textscale	"gui::gui_parm5"
+		font		"fonts/alien"
+		backcolor	0, 0, 0, 0
+		forecolor	"gui::gui_parm6", "gui::gui_parm7", "gui::gui_parm8", 1
+	}
+
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.02
+		background	"textures/sfx/static"
+	}
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.5
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

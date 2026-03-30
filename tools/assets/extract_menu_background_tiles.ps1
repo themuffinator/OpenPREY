@@ -1,9 +1,9 @@
 param(
-    [string]$InputPath = ".install\basepy\guis\assets\menu\background_tiled.tga",
+    [string]$InputPath = ".install\basepr\guis\assets\menu\background_tiled.tga",
     [string]$TileStem = "background",
     [string[]]$OutputDirs = @(
-        "basepy\guis\assets\menu",
-        ".install\basepy\guis\assets\menu"
+        "basepr\guis\assets\menu",
+        ".install\basepr\guis\assets\menu"
     )
 )
 

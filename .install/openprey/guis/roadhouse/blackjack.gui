@@ -1,0 +1,1028 @@
+#define DIAMONDS	0
+#define HEARTS		1
+#define SPADES		2
+#define CLUBS		3
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	float gameisover	0
+	float incingbet		0
+	float decingbet		0
+	cursor 2		// Earth cursor
+
+	onNamedEvent Update {
+		// Variables just updated.  Do any maintenance here
+		if ("gui::bgameover" != 0 && "desktop::gameisover" == 0) {
+			set "cmd" "play console_game_gameover" ;
+			set "desktop::gameisover" "1";
+			set "GameOver::textscale" "0.2" ;
+			resettime "GameOver" "0";
+		}
+	}
+
+	onAction {
+		if ("gui::bgameover") {
+			set "cmd" "restart ; play console_game_insertcredit" ;
+			set "desktop::gameisover" "0" ;
+		}
+	}
+	
+	//--------------------------------------------------------------------
+	//			On/Off logic
+	//--------------------------------------------------------------------
+	onNamedEvent TurnOff {
+		resettime "PowerOffAnim" "0";
+	}
+	onNamedEvent TurnOn {
+		set "cmd" "reset" ;
+		resettime "PowerOnAnim" "0";
+	}
+	
+	windowDef BlackOut {
+		rect		0, 0, 640, 480
+		background	"guis/assets/arcade/cardscreen"
+		matcolor	1, 1, 1, 1
+		visible		0
+	}
+
+	windowDef PowerOffAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "desktop::noninteractive" "1" ;
+			set "WholeScreen::visible" "0" ;
+			set "BlackOut::visible" "1" ;
+			transition "BlackOut::rect" "0 0 640 480" "320 240 0 0" "300";
+		}
+	}
+	
+	windowDef PowerOnAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			transition "BlackOut::rect" "320 240 0 0" "0 0 640 480" "300";
+		}
+		onTime 300 {
+			set "desktop::noninteractive" "0" ;
+			set "WholeScreen::visible" "1" ;
+			set "BlackOut::visible" "0" ;
+		}
+	}
+
+	//--------------------------------------------------------------------
+	// Game screen
+	//--------------------------------------------------------------------
+	windowDef WholeScreen {
+		rect		0, 0, 640, 480
+		background	"guis/assets/arcade/cardscreen"
+		matcolor	1, 1, 1, 1
+
+		windowDef Payout {
+			text		"#str_20392"
+			rect		25, 385, 100, 35
+			backcolor	0 ,0 ,0 ,0 
+			forecolor	1 ,1 ,1 ,0.8 
+			bordersize	0
+			bordercolor	1 ,1 ,1 ,1 
+			textscale	0.4
+			textalign	1
+			shadow		1
+		}
+		windowDef Credits {
+			text		"#str_20355"
+			rect		520, 385, 100, 35
+			backcolor	0 ,0 ,0 ,0 
+			forecolor	1 ,1 ,1 ,0.8 
+			bordersize	0
+			bordercolor	1 ,1 ,1 ,1 
+			textscale	0.4
+			textalign	1
+			shadow		1
+		}
+		
+		windowDef NumCredits {
+			text		"gui::credits"
+			rect		485, 410, 100, 35
+			backcolor	0 ,0 ,0 ,0 
+			forecolor	0.1 ,1 ,0.9 ,0.9
+			bordersize	0
+			bordercolor	1 ,1 ,1 ,1 
+			textscale	0.45
+			textalign	2
+			shadow		1
+		}
+
+		windowDef Deck {
+			text		""
+			rect		30, 150, 75, 120 
+			forecolor	1 ,0 ,0 ,1 
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1 ,1 ,1 ,1 
+		}
+
+		windowDef PlaceBet {
+			text		"#str_20356"
+			rect		415, 185, 100, 35
+			backcolor	0 ,0 ,0 ,0 
+			forecolor	1 ,1 ,1 ,0.9
+			bordersize	0
+			bordercolor	1 ,1 ,1 ,1 
+			textscale	0.6
+			textalign	2
+			visible		"gui::bcanincbet"
+			shadow		1
+		}
+
+		windowDef IncButtonGfx {
+			rect		537, 147, 70, 35
+			background	"guis/assets/arcade/cred_button.tga"
+			matcolor	0, 1, 1, 1
+			visible		"gui::bcanincbet"
+			noevents	1
+		}
+		windowDef IncButton {
+			rect		520, 140, 105, 50
+			visible		"gui::bcanincbet"
+			notime		1
+			
+			onMouseEnter {
+				set	"matcolor" "1 1 0 1" ; 
+			} 
+			onMouseExit {
+				set	"matcolor" "0 1 1 1" ; 
+				set "desktop::incingbet" "0" ;
+			} 
+			onAction {
+				set "cmd" "incbet" ;
+				set "desktop::incingbet" "1" ;
+				set "gui::increment" "1";
+				resetTime "0" ;
+			} 
+			onActionRelease {
+				set "desktop::incingbet" "0" ;
+			}
+			onDeactivate {
+				set "desktop::incingbet" "0" ;
+			}
+			onTime 300 {
+				if ("desktop::incingbet") {
+					set "cmd" "incbet" ;
+					inc "gui::increment" "1";
+					resetTime "250" ;
+				}
+			}
+		}
+
+		windowDef Bet {
+			text		"gui::currentbet"
+			rect		520, 189, 80, 30
+			backcolor	0 ,0 ,0 ,0 
+			forecolor	0.1 ,1 ,0.9 ,0.9
+			bordersize	0
+			bordercolor	1 ,1 ,1 ,1 
+			textscale	0.50
+			textalign	2
+			visible		1
+		}
+
+		windowDef DecButtonGfx {
+			rect		537, 230, 70, 35
+			background	"guis/assets/arcade/cred_button2.tga"
+			matcolor	0, 1, 1, 1
+			visible		"gui::bcandecbet"
+			noevents	1
+		}
+		windowDef DecButton {
+			rect		520, 220, 105, 58
+			visible		"gui::bcandecbet"
+			notime		1
+			
+			onMouseEnter {
+				set	"matcolor" "1 1 0 1" ; 
+			} 
+			onMouseExit {
+				set	"matcolor" "0 1 1 1" ; 
+				set "desktop::decingbet" "0" ;
+			} 
+			onAction {
+				set "cmd" "decbet" ; 
+				set "desktop::decingbet" "1" ;
+				set "gui::increment" "1";
+				resetTime "0" ;
+			} 
+			onActionRelease {
+				set "desktop::decingbet" "0" ;
+			}
+			onDeactivate {
+				set "desktop::decingbet" "0" ;
+			}
+			onTime 300 {
+				if ("desktop::decingbet") {
+					set "cmd" "decbet" ;
+					inc "gui::increment" "1";
+					resetTime "250" ;
+				}
+			}
+		}
+
+
+		windowDef Buttons {
+			rect 125, 185, 390, 50
+
+			windowDef DealButton {
+				text		"#str_20357"
+				rect		0, 0, 80, 40 
+				background	"guis/assets/arcade/button.tga"
+				matcolor	0, 1, 1, 1
+				forecolor	0, 0, 0, 0.9
+				textscale	0.45
+				textalign	1
+				textaligny	3
+				visible		"gui::bcandeal"
+				onMouseEnter {
+					set	"matcolor" "1 1 0 1" ; 
+					set "cmd" "play console_generic_mouseover" ;
+				} 
+				onMouseExit {
+					set	"matcolor" "0 1 1 1" ; 
+				} 
+				onAction {
+					set "cmd" "deal ; play console_cards_activate" ;
+				} 
+			}
+			windowDef HitButton {
+				text		"#str_20358"
+				rect		90, 0, 60, 40 
+				background	"guis/assets/arcade/button.tga"
+				matcolor	0, 1, 1, 1
+				forecolor	0, 0, 0, 0.9
+				textscale	0.45
+				textalign	1
+				textaligny	3
+				shadow		0
+				visible		"gui::bCanHit"
+				onMouseEnter {
+					set "cmd" "play console_generic_mouseover" ;
+					set	"matcolor" "1 1 0 1" ; 
+				} 
+				onMouseExit {
+					set	"matcolor" "0 1 1 1" ; 
+				} 
+				onAction {
+					set "cmd" "hit ; play console_cards_activate" ;
+				} 
+			}
+			windowDef StayButton {
+				text		"#str_20359"
+				rect		160, 0, 80, 40
+				background	"guis/assets/arcade/button.tga"
+				matcolor	0.5, 1, 0, 1
+				forecolor	0, 0, 0, 0.9
+				textscale	0.45
+				textalign	1
+				textaligny	3
+				shadow		0
+				visible		"gui::bCanStay"
+				onMouseEnter {
+					set "cmd" "play console_generic_mouseover" ;
+					set	"matcolor" "1 1sd 0 1" ; 
+				} 
+				onMouseExit {
+					set	"matcolor" "0 1 0 1" ; 
+				} 
+				onAction {
+					set "cmd" "stay ; play console_cards_activate" ;
+				} 
+			}
+			windowDef DoubleButton {
+				text		"#str_20360"
+				rect		250, 0, 115, 40 
+				background	"guis/assets/arcade/button.tga"
+				matcolor	1, 0, 0, 1
+				forecolor	0, 0, 0, 0.9
+				textscale	0.45
+				textalign	1
+				textaligny	3
+				shadow		0
+				visible		"gui::bCanDouble"
+				onMouseEnter {
+					set "cmd" "play console_generic_mouseover" ;
+					set	"matcolor" "0 1 0 1" ; 
+				} 
+				onMouseExit {
+					set	"matcolor" "1 0 0 1" ; 
+				} 
+				onAction {
+					set "cmd" "double ; play console_cards_activate" ;
+				} 
+			}
+		}
+
+
+		windowDef DealerCard1 {
+			text		""
+			rect		117, 45, 75, 120 
+			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1, 1, 1, 1
+			visible		"gui::Dealer1_Visible"
+
+			windowDef DC1Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Dealer1_Flipped"
+			}
+			windowDef DC1SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer1_Flipped" != 0 && "gui::Dealer1_Suit" == DIAMONDS )
+			}
+			windowDef DC1SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer1_Flipped" != 0 && "gui::Dealer1_Suit" == HEARTS )
+			}
+			windowDef DC1SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer1_Flipped" != 0 && "gui::Dealer1_Suit" == SPADES )
+			}
+			windowDef DC1SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer1_Flipped" != 0 && "gui::Dealer1_Suit" == CLUBS )
+			}
+			windowDef DC1Upper {
+				text		"gui::Dealer1_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Dealer1_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Dealer1_Flipped"
+			}
+			windowDef DC1Lower {
+				text		"gui::Dealer1_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Dealer1_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Dealer1_Flipped"
+			}
+		}
+		windowDef DealerCard2 {
+			text		""
+			rect		197, 45, 75, 120 
+			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1 ,1 ,1 ,1 
+			visible		"gui::Dealer2_Visible"
+			windowDef DC2Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Dealer2_Flipped"
+			}
+			windowDef DC2SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer2_Flipped" != 0 && "gui::Dealer2_Suit" == DIAMONDS )
+			}
+			windowDef DC2SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer2_Flipped" != 0 && "gui::Dealer2_Suit" == HEARTS )
+			}
+			windowDef DC2SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer2_Flipped" != 0 && "gui::Dealer2_Suit" == SPADES )
+			}
+			windowDef DC2SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer2_Flipped" != 0 && "gui::Dealer2_Suit" == CLUBS )
+			}
+			windowDef DC2Upper {
+				text		"gui::Dealer2_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Dealer2_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Dealer2_Flipped"
+			}
+			windowDef DC2Lower {
+				text		"gui::Dealer2_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Dealer2_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Dealer2_Flipped"
+			}
+		}
+		windowDef DealerCard3 {
+			text		""
+			rect		278, 45, 75, 120 
+			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1 ,1 ,1 ,1 
+			visible		"gui::Dealer3_Visible"
+			windowDef DC3Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Dealer3_Flipped"
+			}
+			windowDef DC3SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer3_Flipped" != 0 && "gui::Dealer3_Suit" == DIAMONDS )
+			}
+			windowDef DC3SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer3_Flipped" != 0 && "gui::Dealer3_Suit" == HEARTS )
+			}
+			windowDef DC3SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer3_Flipped" != 0 && "gui::Dealer3_Suit" == SPADES )
+			}
+			windowDef DC3SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer3_Flipped" != 0 && "gui::Dealer3_Suit" == CLUBS )
+			}
+			windowDef DC3Upper {
+				text		"gui::Dealer3_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Dealer3_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Dealer3_Flipped"
+			}
+			windowDef DC3Lower {
+				text		"gui::Dealer3_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Dealer3_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Dealer3_Flipped"
+			}
+		}
+		windowDef DealerCard4 {
+			text		""
+			rect		358, 45, 75, 120 
+			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1 ,1 ,1 ,1 
+			visible		"gui::Dealer4_Visible"
+			windowDef DC4Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Dealer4_Flipped"
+			}
+			windowDef DC4SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer4_Flipped" != 0 && "gui::Dealer4_Suit" == DIAMONDS )
+			}
+			windowDef DC4SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer4_Flipped" != 0 && "gui::Dealer4_Suit" == HEARTS )
+			}
+			windowDef DC4SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer4_Flipped" != 0 && "gui::Dealer4_Suit" == SPADES )
+			}
+			windowDef DC4SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer4_Flipped" != 0 && "gui::Dealer4_Suit" == CLUBS )
+			}
+			windowDef DC4Upper {
+				text		"gui::Dealer4_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Dealer4_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Dealer4_Flipped"
+			}
+			windowDef DC4Lower {
+				text		"gui::Dealer4_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Dealer4_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Dealer4_Flipped"
+			}
+		}
+		windowDef DealerCard5 {
+			text		""
+			rect		438, 45, 75, 120 
+			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1,1,1,1 
+			visible		"gui::Dealer5_Visible"
+			windowDef DC5Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Dealer5_Flipped"
+			}
+			windowDef DC5SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer5_Flipped" != 0 && "gui::Dealer5_Suit" == DIAMONDS )
+			}
+			windowDef DC5SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer5_Flipped" != 0 && "gui::Dealer5_Suit" == HEARTS )
+			}
+			windowDef DC5SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer5_Flipped" != 0 && "gui::Dealer5_Suit" == SPADES )
+			}
+			windowDef DC5SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Dealer5_Flipped" != 0 && "gui::Dealer5_Suit" == CLUBS )
+			}
+			windowDef DC5Upper {
+				text		"gui::Dealer5_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Dealer5_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Dealer5_Flipped"
+			}
+			windowDef DC5Lower {
+				text		"gui::Dealer5_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Dealer5_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Dealer5_Flipped"
+			}
+		}
+
+		windowDef PlayerCard1 {
+			text		""
+			rect		117, 245, 75, 120 
+ 			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1, 1, 1, 1 
+			visible		"gui::Player1_Visible"
+			windowDef PC1Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Player1_Flipped"
+			}
+			windowDef PC1SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player1_Flipped" != 0 && "gui::Player1_Suit" == DIAMONDS )
+			}
+			windowDef PC1SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player1_Flipped" != 0 && "gui::Player1_Suit" == HEARTS )
+			}
+			windowDef PC1SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player1_Flipped" != 0 && "gui::Player1_Suit" == SPADES )
+			}
+			windowDef PC1SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player1_Flipped" != 0 && "gui::Player1_Suit" == CLUBS )
+			}
+			windowDef PC1Upper {
+				text		"gui::Player1_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Player1_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Player1_Flipped"
+			}
+			windowDef PC1Lower {
+				text		"gui::Player1_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Player1_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Player1_Flipped"
+			}
+		}
+		windowDef PlayerCard2 {
+			text		""
+			rect		197, 245, 75, 120 
+ 			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1, 1, 1, 1 
+			visible		"gui::Player2_Visible"
+			windowDef PC2Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Player2_Flipped"
+			}
+			windowDef PC2SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player2_Flipped" != 0 && "gui::Player2_Suit" == DIAMONDS )
+			}
+			windowDef PC2SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player2_Flipped" != 0 && "gui::Player2_Suit" == HEARTS )
+			}
+			windowDef PC2SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player2_Flipped" != 0 && "gui::Player2_Suit" == SPADES )
+			}
+			windowDef PC2SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player2_Flipped" != 0 && "gui::Player2_Suit" == CLUBS )
+			}
+			windowDef PC2Upper {
+				text		"gui::Player2_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Player2_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Player2_Flipped"
+			}
+			windowDef PC2Lower {
+				text		"gui::Player2_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Player2_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Player2_Flipped"
+			}
+		}
+		windowDef PlayerCard3 {
+			text		""
+			rect		278, 245, 75, 120 
+ 			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1, 1, 1, 1 
+			visible		"gui::Player3_Visible"
+			windowDef PC3Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Player3_Flipped"
+			}
+			windowDef PC3SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player3_Flipped" != 0 && "gui::Player3_Suit" == DIAMONDS )
+			}
+			windowDef PC3SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player3_Flipped" != 0 && "gui::Player3_Suit" == HEARTS )
+			}
+			windowDef PC3SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player3_Flipped" != 0 && "gui::Player3_Suit" == SPADES )
+			}
+			windowDef PC3SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player3_Flipped" != 0 && "gui::Player3_Suit" == CLUBS )
+			}
+			windowDef PC3Upper {
+				text		"gui::Player3_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Player3_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Player3_Flipped"
+			}
+			windowDef PC3Lower {
+				text		"gui::Player3_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Player3_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Player3_Flipped"
+			}
+		}
+		windowDef PlayerCard4 {
+			text		""
+			rect		358, 245, 75, 120 
+ 			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1, 1, 1, 1 
+			visible		"gui::Player4_Visible"
+			windowDef PC4Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Player4_Flipped"
+			}
+			windowDef PC4SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player4_Flipped" != 0 && "gui::Player4_Suit" == DIAMONDS )
+			}
+			windowDef PC4SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player4_Flipped" != 0 && "gui::Player4_Suit" == HEARTS )
+			}
+			windowDef PC4SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player4_Flipped" != 0 && "gui::Player4_Suit" == SPADES )
+			}
+			windowDef PC4SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player4_Flipped" != 0 && "gui::Player4_Suit" == CLUBS )
+			}
+			windowDef PC4Upper {
+				text		"gui::Player4_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Player4_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Player4_Flipped"
+			}
+			windowDef PC4Lower {
+				text		"gui::Player4_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Player4_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Player4_Flipped"
+			}
+		}
+		windowDef PlayerCard5 {
+			text		""
+			rect		438, 245, 75, 120 
+ 			forecolor	1, 0, 0, 1
+			background	"guis/assets/bj/deck.tga"
+			matcolor	1, 1, 1, 1 
+			visible		"gui::Player5_Visible"
+			
+			windowDef PC5Blank {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/arcade/card.tga"
+				matcolor	1, 1, 1, 1
+				visible		"gui::Player5_Flipped"
+			}
+			windowDef PC5SuitDiamonds {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/diamond"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player5_Flipped" != 0 && "gui::Player5_Suit" == DIAMONDS )
+			}
+			windowDef PC5SuitHearts {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/heart"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player5_Flipped" != 0 && "gui::Player5_Suit" == HEARTS )
+			}
+			windowDef PC5SuitSpades {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/spade"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player5_Flipped" != 0 && "gui::Player5_Suit" == SPADES )
+			}
+			windowDef PC5SuitClubs {
+				rect		0, 0, 75, 120 
+				background	"guis/assets/bj/club"
+				matcolor	1, 1, 1, 1
+				visible		( "gui::Player5_Flipped" != 0 && "gui::Player5_Suit" == CLUBS )
+			}
+			windowDef PC5Upper {
+				text		"gui::Player5_Card"
+				rect		5, 0, 30, 30 
+				forecolor	"gui::Player5_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				visible		"gui::Player5_Flipped"
+			}
+			windowDef PC5Lower {
+				text		"gui::Player5_Card"
+				rect		40, 85, 30, 30 
+				forecolor	"gui::Player5_Red", 0, 0, 1
+				textscale	0.5
+				textaligny	-5
+				textalign	2
+				visible		"gui::Player5_Flipped"
+			}
+		}
+		
+		windowDef ResultBust {
+			text		"#str_20361"
+			rect		115, 411, 415, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 0.9
+			textscale	0.60
+			textalign	1
+			shadow		1
+			visible		( "gui::result" == 0 )
+		}
+
+		windowDef ResultPush {
+			text		"#str_20362"
+			rect		115, 411, 415, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 0.9
+			textscale	0.60
+			textalign	1
+			shadow		1
+			visible		( "gui::result" == 1 )
+		}
+
+		windowDef ResultWin {
+			text		"#str_20363"
+			rect		115, 411, 415, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 0.9
+			textscale	0.60
+			textalign	1
+			shadow		1
+			visible		( "gui::result" == 2 )
+		}
+
+		windowDef ResultLose {
+			text		"#str_20364"
+			rect		115, 411, 415, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 0.9
+			textscale	0.60
+			textalign	1
+			shadow		1
+			visible		( "gui::result" == 3 )
+		}
+		
+		windowDef ResultBlackjack {
+			text		"#str_20365"
+			rect		115, 411, 415, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 0.9
+			textscale	0.60
+			textalign	1
+			shadow		1
+			visible		( "gui::result" == 4 )
+		}
+
+		windowDef ResultFiveCard {
+			text		"#str_20366"
+			rect		115, 411, 415, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 0.9
+			textscale	0.60
+			textalign	1
+			shadow		1
+			visible		( "gui::result" == 5 )
+		}
+		windowDef ResultWinAmount {
+			text		"gui::creditswon"
+			rect		60, 410, 100, 35
+			forecolor	0.1 ,1 ,0.9 ,0.9
+			bordersize	0
+			bordercolor	1 ,1 ,1 ,0.9
+			textscale	0.45
+			textalign	0
+			shadow		1
+			visible		("gui::result" >= 0) && ("gui::creditswon" > 0)
+		}
+		
+		windowDef GameOver {
+			text		"#str_20367"
+			rect		0, 150, 640, 180
+			backcolor	0, 0, 0, 0
+			forecolor	1, 0, 1, 1
+			textalign	1
+			textscale	0.2
+			shadow		1
+			visible		"gui::bgameover"
+			notime		1
+			onTime 0 {
+				transition "textscale" "0.2" "3.2" "4000" ;
+			}
+			onTime 1 {
+				transition "forecolor" "1 0 1 1" "1 0 0 1" "2000" ;
+			}
+			onTime 2000 {
+				transition "forecolor" "1 0 0 1" "1 1 0 1" "2000" ;
+			}
+			onTime 4000 {
+				transition "forecolor" "1 1 0 1" "0 1 0 1" "2000" ;
+			}
+			onTime 6000 {
+				transition "forecolor" "0 1 0 1" "0 1 1 1" "2000" ;
+			}
+			onTime 8000 {
+				transition "forecolor" "0 1 1 1" "0 0 1 1" "2000" ;
+			}
+			onTime 10000 {
+				transition "forecolor" "0 0 1 1" "1 0 1 1" "2000" ;
+			}
+			onTime 12000 {
+				resettime "1";
+			}
+		}
+		
+		windowDef scan1 {
+			rect		0, 0, 640, 480
+			backcolor	0, 0, 0, 0
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/scanline/g_scan2"
+			noevents	1
+		}
+		windowDef flicker {
+			rect		0, 0, 640, 480
+			backcolor	0, 0, 0, 0.09-powersurge2[time*0.002]
+			noevents	1
+		}
+		
+		// Damage overlays, visible when console has been damaged
+		windowDef damageOverlayStatic {
+			rect		0, 0, 640, 480
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/damageOverlayStatic"
+			visible		"gui::damaged"
+			noevents	1
+		}
+
+		windowDef damageOverlayVHold {
+			rect		0, 0, 640, 480
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/damageOverlayVHold"
+			visible		"gui::damaged"
+			noevents	1
+		}
+		windowDef damageOverlayMask {
+			rect		0, 0, 640, 480
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/arcade/maskstatic"
+			visible		"gui::damaged"
+			noevents	1
+		}
+	
+	}	// wholescreen
+}

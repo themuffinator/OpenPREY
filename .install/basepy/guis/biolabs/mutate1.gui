@@ -1,0 +1,375 @@
+// generic on/off_1 gui
+//--------------------------------------------------
+
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+
+
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	windowDef background {
+		rect		7, 3, 625, 470
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/mutate_background"
+	}
+	
+	windowDef outerbody {
+		rect		28, 40, 340, 409
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, alpha_opp[time*0.0004]
+		background	"guis/assets/mutate/1/outerbody"
+	}
+	windowDef outerbody2 {
+		rect		28, 40, 340, 409
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.25
+		background	"guis/assets/mutate/1/outerbody"
+	}
+	windowDef innerbody {
+		rect		28, 40, 340, 409
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, heartbeat3[time*0.002]
+		background	"guis/assets/mutate/1/innerbody"
+	}
+
+	windowDef dna1 {
+		rect		420, 200, 40, 0
+		backcolor	0, 0, 0, 0
+		matcolor	0.2, 0.8, 1, 0.6
+		background	"guis/assets/mutate/1/dna"
+		onTime 0 {		
+		}
+		onTime 1000 {
+			transition "dna1::rect" "410, 250, 0, 0" "450, 200, 40, 160" "400" ;	
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+	windowDef dna2 {
+		rect		420, 200, 40, 0
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.6, 0.5, 0.6
+		background	"guis/assets/mutate/1/dna"
+		onTime 0 {		
+		}
+		onTime 1000 {
+			transition "dna2::rect" "530, 250, 0, 0" "450, 200, 40, 160" "400" ;	
+		}
+		onTime 1400 {
+			set matcolor	1, 1, 1, 1;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+//========================================
+//METER ON THE SIDE
+//========================================
+
+	windowDef meter {
+		rect        584, 100, 32, 0
+		backcolor    0, 0, 0, 0
+		matcolor    1, 1, 1, 1
+		background    "guis/assets/mutate/1/tick2"
+		visible        0
+		onTime 0 {
+		}
+		onTime 2800 {
+			transition "meter::rect" "584, 155, 32, 0" "584, 100, 32, 56" "400" ;
+			set "meter::visible" "1" ;
+		}
+		onTime 4000 {
+			resetTime "0";
+			transition "meter::rect" "584, 100, 32, 56" "584, 155, 32, 0" "0" ;
+			set "meter::visible" "0" ;
+		}
+	} 
+	windowDef tick1 {
+		rect		584, 352, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick1::visible" "0" ;	
+		}
+		onTime 1000 {
+			set "tick1::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick2 {
+		rect		584, 329.5, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick2::visible" "0" ;	
+		}
+		onTime 1200 {
+			set "tick2::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick3 {
+		rect		584, 307, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick3::visible" "0" ;	
+		}
+		onTime 1400 {
+			set "tick3::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick4 {
+		rect		584, 284.5, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick4::visible" "0" ;	
+		}
+		onTime 1600 {
+			set "tick4::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick5 {
+		rect		584, 261.5, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick5::visible" "0" ;	
+		}
+		onTime 1800 {
+			set "tick5::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick6 {
+		rect		584, 239, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick6::visible" "0" ;	
+		}
+		onTime 2000 {
+			set "tick6::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick7 {
+		rect		584, 216.5, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick7::visible" "0" ;	
+		}
+		onTime 2200 {
+			set "tick7::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick8 {
+		rect		584, 194, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick8::visible" "0" ;	
+		}
+		onTime 2400 {
+			set "tick8::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+	windowDef tick9 {
+		rect		584, 171, 32, 8.5
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/mutate/1/tick1"
+		visible		0
+		onTime 0 {
+			set "tick9::visible" "0" ;	
+		}
+		onTime 2600 {
+			set "tick9::visible" "1" ;	
+		}
+		onTime 4000 {
+			resettime "0";
+		}
+	}
+//========================================
+//TEXT!
+//========================================
+
+	windowDef AlienText1 {
+		rect		400, 30, 300, 40
+		text		"#str_20008"
+		font		"fonts/alien"
+		textscale	0.6
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.5, .7
+		visible		1
+
+		onTime 1000 {
+			transition "AlienText1::rect" "400, 30, 0, 40" "400, 30, 300, 40" "2000" ;
+		}
+		onTime 3000 {
+			resetTime "AlienText1" "0" ;
+		}
+	}
+	windowDef AlienText2 {
+		rect		400, 60, 300, 40
+		text		"#str_20007"
+		font		"fonts/alien"
+		textscale	0.6
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.5, .7
+		visible		1
+
+		onTime 0 {
+			transition "AlienText2::rect" "400, 60, 0, 40" "400, 60, 300, 40" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienText2" "0" ;
+		}
+	}
+	windowDef AlienText3 {
+		rect		400, 160, 300, 40
+		text		"86358322"
+		font		"fonts/alien"
+		textscale	0.6
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.5, .7
+		visible		1
+
+		onTime 0 {
+			transition "AlienText3::rect" "400, 160, 0, 40" "400, 160, 300, 40" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienText3" "0" ;
+		}
+	}
+	windowDef AlienText4 {
+		rect		400, 400, 300, 40
+		text		"#str_20009"
+		font		"fonts/alien"
+		textscale	0.6
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.5, .7
+		visible		1
+
+		onTime 0 {
+			transition "AlienText4::rect" "400, 400, 0, 40" "400, 400, 300, 40" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienText4" "0" ;
+		}
+	}
+
+
+//========================================
+//BLURRED CIRCLES
+//========================================
+
+	windowDef blur1 {
+		rect		162, 143, 50, 50
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.9, 0.5, (sixbump1[time*0.001])
+		background	"guis/assets/mutate/1/blur1"
+	}
+	windowDef blur2 {
+		rect		217, 180, 40, 40
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.9, 0.5, (sixbump2[time*0.001])
+		background	"guis/assets/mutate/1/blur1"
+	}
+	windowDef blur3 {
+		rect		165, 205, 32, 32
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.9, 0.5, (sixbump3[time*0.001])
+		background	"guis/assets/mutate/1/blur1"
+	}
+	windowDef blur4 {
+		rect		136, 244, 52, 52
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.9, 0.5, (sixbump4[time*0.001] )
+		background	"guis/assets/mutate/1/blur1"
+	}
+	windowDef blur5 {
+		rect		199, 240, 55, 55
+		backcolor	0, 0, 0, 0
+		matcolor	1, 0.9, 0.5, (sixbump5[time*0.001] )
+		background	"guis/assets/mutate/1/blur1"
+	}
+
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.2
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+
+
+
+
+
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	} 
+}

@@ -35,7 +35,7 @@ Run your existing copy of Prey on modern hardware across Windows, Linux, and mac
 ## Features
 
 ### Prey Compatibility
-- **Prey-first Runtime Layout** — Unified `basepy/` directory for engine overlays, game modules, GUI scripts, shaders, maps, and strings
+- **Prey-first Runtime Layout** — Unified `basepr/` directory for engine overlays, game modules, GUI scripts, shaders, maps, and strings
 - **Unified Game Module Model** — Engine loads `game_<arch>` for both SP and MP paths, with legacy `gamex86`/`gamex64` aliases accepted during migration
 - **Legacy Install Discovery** — Windows install detection covers CD-era registry keys, App Paths, uninstall entries, and known install roots without assuming Steam/GOG-only layouts
 - **Official Asset Validation** — Startup validation checks the required official Prey base PK4 layout before the game runs

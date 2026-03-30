@@ -1,0 +1,156 @@
+// scanner.gui
+
+windowDef desktop {
+	rect				0, 0, 640, 480
+	backcolor			0, 0, 0, 1
+	
+
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	
+	windowDef bg {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/non_interact/scanner/bg"
+	}
+	windowDef BarPARENT {
+		rect	50, 80, 540, 320
+		visible	1
+		windowDef bar {
+			rect		50, 80, 540, 320
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/non_interact/scanner/oscope"
+			onTime 0 {
+				transition "rect" "0 0 560 350" "0 160 560 0" "400" ;
+			}
+			onTime 400 {
+				transition "rect" "0 160 560 0" "0 0 560 -350" "400" ;
+			}
+			onTime 800 {
+				transition "rect" "0 0 560 -350" "0 160 560 0" "400" ;
+			}
+			onTime 1200 {
+				transition "rect" "0 160 560 0" "0 0 560 350" "400" ;
+			}
+			onTime 1600 {
+				resetTime "0" ;
+			}
+		}
+		windowDef bar2 {
+			rect		50, 80, 540, 320
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/non_interact/scanner/oscope2"
+			onTime 0 {
+				transition "rect" "0 0 560 350" "0 160 560 0" "200" ;
+			}
+			onTime 200 {
+				transition "rect" "0 160 560 0" "0 0 560 -350" "200" ;
+			}
+			onTime 400 {
+				transition "rect" "0 0 560 -350" "0 160 560 0" "200" ;
+			}
+			onTime 600 {
+				transition "rect" "0 160 560 0" "0 0 560 350" "200" ;
+			}
+			onTime 800 {
+				resetTime "0" ;
+			}
+		}
+		windowDef bar3 {
+			rect		50, 80, 540, 320
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/non_interact/scanner/oscope"
+			onTime 0 {
+				transition "rect" "0 0 560 350" "0 160 560 0" "500" ;
+			}
+			onTime 500 {
+				transition "rect" "0 160 560 0" "0 0 560 -350" "500" ;
+			}
+			onTime 1000 {
+				transition "rect" "0 0 560 -350" "0 160 560 0" "500" ;
+			}
+			onTime 1500 {
+				transition "rect" "0 160 560 0" "0 0 560 350" "500" ;
+			}
+			onTime 2000 {
+				resetTime "0" ;
+			}
+		}
+	}
+	windowDef crop_rect1 {
+		rect 40 ,370 ,640 ,100
+		visible 1
+		forecolor 1, 1, 1, 1
+		matcolor	1 ,1, 1, 1 
+		onTime 500 {
+			transition "crop_rect1::rect" "40 370 0 100" "40 370 600 100" "1200" ;
+		}
+		onTime 3600 {
+			resetTime "crop_rect1" "0" ;
+		}
+		windowDef TextPhase {
+			text	"#str_20635"
+			rect	40 , 0 ,640 ,480 
+			forecolor	1 ,1 ,1 ,0.8
+			font		"fonts/alien"
+			visible		1
+			textscale	0.9
+			textalign	0
+		}
+	}	
+	windowDef scan {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/wallwalk/scanline"
+	}
+	windowDef scan2 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan3 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.0012]
+
+	}
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.03
+		background	"textures/sfx/static"
+	}
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

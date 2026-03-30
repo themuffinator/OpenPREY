@@ -165,14 +165,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ ! -d ".install/openprey" ]; then
-            echo "Staged openprey payload directory is missing."
+          if [ ! -d ".install/basepr" ]; then
+            echo "Staged basepr payload directory is missing."
             exit 1
           fi
 
-          has_payload_files="$(find ".install/openprey" -type f -print -quit 2>/dev/null || true)"
+          has_payload_files="$(find ".install/basepr" -type f -print -quit 2>/dev/null || true)"
           if [ -z "${has_payload_files}" ]; then
-            echo "Staged openprey payload directory has no files."
+            echo "Staged basepr payload directory has no files."
             exit 1
           fi
 
@@ -180,17 +180,17 @@ jobs:
             windows)
               client=".install/OpenPrey-client_${{ matrix.binary_arch }}.exe"
               ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}.exe"
-              game_module=".install/openprey/game_${{ matrix.binary_arch }}.dll"
+              game_module=".install/basepr/game_${{ matrix.binary_arch }}.dll"
               ;;
             linux)
               client=".install/OpenPrey-client_${{ matrix.binary_arch }}"
               ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}"
-              game_module=".install/openprey/game_${{ matrix.binary_arch }}.so"
+              game_module=".install/basepr/game_${{ matrix.binary_arch }}.so"
               ;;
             macos)
               client=".install/OpenPrey-client_${{ matrix.binary_arch }}"
               ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}"
-              game_module=".install/openprey/game_${{ matrix.binary_arch }}.dylib"
+              game_module=".install/basepr/game_${{ matrix.binary_arch }}.dylib"
               ;;
           esac
 

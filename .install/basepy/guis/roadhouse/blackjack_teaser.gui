@@ -1,0 +1,41 @@
+windowDef Desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	nocursor	1
+	
+	windowDef NamePlate {
+		rect		0, 0, 640, 110
+		background	"guis/assets/arcade/arcade_marquis"
+		matcolor	1, 1, 1, 1
+		forecolor	0,0,0,0.7
+		text		"#str_20368"
+		textscale	1.0
+		textalign	1
+		textaligny	15
+
+		onNamedEvent TurnOff {
+			set "visible" "0" ;
+		}
+		onNamedEvent TurnOn {
+			set "visible" "1" ;
+		}
+	}	
+	windowDef NamePlateOff {
+		rect		0, 0, 640, 110
+		background	"guis/assets/arcade/arcade_marquis_off"
+		matcolor	1, 1, 1, 1
+		forecolor	0,0,0,0.6
+		text		"#str_20368"
+		textscale	1.0
+		textalign	1
+		textaligny	15
+		visible 	0
+
+		onNamedEvent TurnOff {
+			set "visible" "1" ;
+		}
+		onNamedEvent TurnOn {
+			set "visible" "0" ;
+		}
+	}
+}

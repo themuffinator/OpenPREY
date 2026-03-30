@@ -1,0 +1,1935 @@
+// Help.gui
+//
+
+#include "guis/mainmenu/menucolors.guifragment"
+
+//--------------------------------------------------------------
+// Keyboard Defines
+//--------------------------------------------------------------
+
+#define MARGINX				1
+#define MARGINY				1
+#define KEY_WIDTH			22
+#define KEY_HEIGHT			22
+
+#define KEYBOARD_WIDTH		KEY_WIDTH*22.5
+#define KEYBOARD_HEIGHT		KEY_HEIGHT*6.6
+#define HALFWIDTH			KEY_WIDTH*0.5
+
+#define TABWIDTH			KEY_WIDTH*1.5
+#define CAPSLOCKWIDTH		KEY_WIDTH*1.76
+#define SHIFTWIDTH			(KEY_WIDTH*2.5-MARGINX)
+#define CONTROLWIDTH		KEY_WIDTH*1.5				// 2*C + 5*A + S = 15*K
+#define ALTWIDTH			KEY_WIDTH*1.32
+#define SPACEBARWIDTH		(KEY_WIDTH*5.5-MARGINX)
+
+#define ENTERWIDTH			KEY_WIDTH*2.24-MARGINX
+#define RIGHTSHIFTWIDTH		KEY_WIDTH*2.52
+
+#define KEY_ARROWCOLUMN		KEY_WIDTH*15.2
+#define KEY_KPADCOLUMN		KEY_WIDTH*18.4
+
+#define KEY_ROW1			0
+#define KEY_ROW2			MARGINY*5+KEY_HEIGHT
+#define KEY_ROW3			MARGINY*5+KEY_HEIGHT*2
+#define KEY_ROW4			MARGINY*5+KEY_HEIGHT*3
+#define KEY_ROW5			MARGINY*5+KEY_HEIGHT*4
+#define KEY_ROW6			MARGINY*5+KEY_HEIGHT*5
+
+#define KEY_PROPS			backcolor		0, 0, 0, 0	\
+
+#define KEYBOARDBG_WIDTH	(KEYBOARD_WIDTH+10)
+#define KEYBOARDBG_HEIGHT	(KEYBOARD_HEIGHT+10)
+#define KEYBOARDMOUSEGAP	5
+#define MOUSE_WIDTH			(640-(KEYBOARDBG_WIDTH+KEYBOARDMOUSEGAP))
+#define MOUSE_HEIGHT		KEYBOARDBG_HEIGHT
+
+
+//--------------------------------------------------------------
+// Binding Defines
+//--------------------------------------------------------------
+#define BIND_VMARGIN			5
+#define BIND_MARGIN				32
+#define TITLE_WIDTH				220
+#define BIND_WIDTH				220
+#define BIND_HEIGHT				20
+#define HEADER_WIDTH			TITLE_WIDTH+BIND_WIDTH
+#define HEADER_HEIGHT			25
+
+#define COLUMN123_HEIGHT		20
+#define COLUMN456_HEIGHT		135
+
+#define COLUMNBG_X				(300 - ((TITLE_WIDTH+BIND_WIDTH)*3 + BIND_MARGIN*2)*0.5)
+#define COLUMNBG_Y				15
+#define COLUMNBG_WIDTH			(TITLE_WIDTH+BIND_WIDTH)
+#define COLUMNBG_HEIGHT			240
+#define COLUMNBG_COLOR			0, 0, 0, 0.5
+
+#define MOVEMENT_FORECOLOR			0, 0.38, 0.38, 1
+#define MOVEMENT_FORECOLOR_STRING	"0 0.38 0.38 1"
+#define MOVEMENT_GROUPCOLOR			1, 0, 0, 1
+#define WEAPONS_FORECOLOR			0.47, 0.71, 0.47, 1
+#define WEAPONS_FORECOLOR_STRING	"0.47 0.71 0.47 1"
+#define WEAPONS_GROUPCOLOR			0, 0.7, 0, 1
+#define COMBAT_FORECOLOR			0.43, 0.43, 0.71, 1
+#define COMBAT_FORECOLOR_STRING		"0.43 0.43 0.71 1"
+#define COMBAT_GROUPCOLOR			0.2, 0.4, 0.9, 1
+#define LOOK_FORECOLOR				0.74, 0.73, 0.52, 1
+#define LOOK_FORECOLOR_STRING		"0.74 0.73 0.52 1"
+#define LOOK_GROUPCOLOR				0.9, 0.9, 0.2, 1
+#define SYSTEM_FORECOLOR			0.39, 0.77, 0.76, 1
+#define SYSTEM_FORECOLOR_STRING		"0.39 0.77 0.76 1"
+#define SYSTEM_GROUPCOLOR			0, 0.8, 0.8, 1
+#define MULTIPLAYER_FORECOLOR		0.76, 0.58, 0.41, 1
+#define MULTIPLAYER_FORECOLOR_STRING	"0.76 0.58 0.41 1"
+#define MULTIPLAYER_GROUPCOLOR		1, 0.6, 0.0, 1
+#define TITLE_HIGHLIGHT_COLOR		"1 1 1 1"
+#define HIGHLIGHT_TIME				"200"
+
+#define HEADER_PROPS			textscale	0.3						\
+								textalignx	5						\
+								textaligny	-7						\
+								shadow		1
+
+#define TITLE_PROPS_MOVEMENT	textscale	0.33					\
+								textalignx	15						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								shadow		1						\
+								noTime		1						\
+								onTrigger {							\
+									resetTime "0";					\
+								}									\
+								onTime 0 {							\
+									transition "forecolor" MOVEMENT_FORECOLOR_STRING TITLE_HIGHLIGHT_COLOR HIGHLIGHT_TIME;	\
+								}									\
+								onTime 200 {						\
+									transition "forecolor" TITLE_HIGHLIGHT_COLOR MOVEMENT_FORECOLOR_STRING HIGHLIGHT_TIME;	\
+								}
+
+#define BIND_PROPS_MOVEMENT		textscale	0.33					\
+								textalign	1						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								groupColor	MOVEMENT_GROUPCOLOR		\
+								shadow		1
+
+#define TITLE_PROPS_WEAPONS		textscale	0.33					\
+								textalignx	15						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								shadow		1						\
+								noTime		1						\
+								onTrigger {							\
+									resetTime "0";					\
+								}									\
+								onTime 0 {							\
+									transition "forecolor" WEAPONS_FORECOLOR_STRING TITLE_HIGHLIGHT_COLOR HIGHLIGHT_TIME;	\
+								}									\
+								onTime 200 {						\
+									transition "forecolor" TITLE_HIGHLIGHT_COLOR WEAPONS_FORECOLOR_STRING HIGHLIGHT_TIME;	\
+								}
+
+#define BIND_PROPS_WEAPONS		textscale	0.33					\
+								textalign	1						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								groupColor	WEAPONS_GROUPCOLOR		\
+								shadow		1
+
+#define TITLE_PROPS_COMBAT		textscale	0.33					\
+								textalignx	15						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								shadow		1						\
+								noTime		1						\
+								onTrigger {							\
+									resetTime "0";					\
+								}									\
+								onTime 0 {							\
+									transition "forecolor" COMBAT_FORECOLOR_STRING TITLE_HIGHLIGHT_COLOR HIGHLIGHT_TIME;	\
+								}									\
+								onTime 200 {						\
+									transition "forecolor" TITLE_HIGHLIGHT_COLOR COMBAT_FORECOLOR_STRING HIGHLIGHT_TIME;	\
+								}
+
+#define BIND_PROPS_COMBAT		textscale	0.33					\
+								textalign	1						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								groupColor	COMBAT_GROUPCOLOR		\
+								shadow		1
+
+#define TITLE_PROPS_SYSTEM		textscale	0.33					\
+								textalignx	15						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								shadow		1						\
+								noTime		1						\
+								onTrigger {							\
+									resetTime "0";					\
+								}									\
+								onTime 0 {							\
+									transition "forecolor" SYSTEM_FORECOLOR_STRING TITLE_HIGHLIGHT_COLOR HIGHLIGHT_TIME;	\
+								}									\
+								onTime 200 {						\
+									transition "forecolor" TITLE_HIGHLIGHT_COLOR SYSTEM_FORECOLOR_STRING HIGHLIGHT_TIME;	\
+								}
+
+#define BIND_PROPS_SYSTEM		textscale	0.33					\
+								textalign	1						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								groupColor	SYSTEM_GROUPCOLOR		\
+								shadow		1
+
+#define TITLE_PROPS_LOOK		textscale	0.33					\
+								textalignx	15						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								shadow		1						\
+								noTime		1						\
+								onTrigger {							\
+									resetTime "0";					\
+								}									\
+								onTime 0 {							\
+									transition "forecolor" LOOK_FORECOLOR_STRING TITLE_HIGHLIGHT_COLOR HIGHLIGHT_TIME;	\
+								}									\
+								onTime 200 {						\
+									transition "forecolor" TITLE_HIGHLIGHT_COLOR LOOK_FORECOLOR_STRING HIGHLIGHT_TIME;	\
+								}
+
+#define BIND_PROPS_LOOK			textscale	0.33					\
+								textalign	1						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								groupColor	LOOK_GROUPCOLOR			\
+								shadow		1
+
+#define TITLE_PROPS_MULTIPLAYER	textscale	0.33					\
+								textalignx	15						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								shadow		1						\
+								noTime		1						\
+								onTrigger {							\
+									resetTime "0";					\
+								}									\
+								onTime 0 {							\
+									transition "forecolor" MULTIPLAYER_FORECOLOR_STRING TITLE_HIGHLIGHT_COLOR HIGHLIGHT_TIME;	\
+								}									\
+								onTime 200 {						\
+									transition "forecolor" TITLE_HIGHLIGHT_COLOR MULTIPLAYER_FORECOLOR_STRING HIGHLIGHT_TIME;	\
+								}
+
+#define BIND_PROPS_MULTIPLAYER	textscale	0.33					\
+								textalign	1						\
+								textaligny	-3						\
+								forecolor	1, 1, 1, 1				\
+								groupColor	MULTIPLAYER_GROUPCOLOR	\
+								shadow		1
+
+
+//--------------------------------------------------------------
+// GUI
+//--------------------------------------------------------------
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0.3, 0.3, 0.3, 0
+	menugui		1
+
+	onEsc {
+		set "cmd" "close";
+	}
+
+	windowDef Controls {
+		rect		67.5, 20, 505, 210
+		// english=0, spanish=1, italian=2, german=3, french=4, russian=5, polish=6, korean=7, japanese=8, chinese=9, NULL
+		visible		("gui::language" == 0)
+
+		superWindowDef KeyboardBG {
+			rect		0, 0, KEYBOARDBG_WIDTH, KEYBOARDBG_HEIGHT
+			cornerMat	"guis/assets/menu/pictureframe_corner.tga"
+			leftMat		"guis/assets/menu/pictureframe_left.tga"
+			topMat		"guis/assets/menu/pictureframe_strip.tga"
+			backcolor	0.29, 0.32, 0.39, 0.8
+			margins		4, 4, 4, 4	// left, right, top, bottom
+			cornerSize	4, 4
+			edgeSize	4, 4
+			noevents	1
+		}
+
+		windowDef Keys {
+			rect		5, 5, KEYBOARD_WIDTH, KEYBOARD_HEIGHT
+
+			//------------------------------------------------------------------------
+			// Row 1
+			//------------------------------------------------------------------------
+			keyDef Key_ESC {
+				rect		KEY_WIDTH*0, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20483"
+				key			"ESCAPE"
+				KEY_PROPS
+			}
+			keyDef Key_F1 {
+				rect		KEY_WIDTH*2, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20484"
+				key			"F1"
+				KEY_PROPS
+			}
+			keyDef Key_F2 {
+				rect		KEY_WIDTH*3, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20485"
+				key			"F2"
+				KEY_PROPS
+			}
+			keyDef Key_F3 {
+				rect		KEY_WIDTH*4, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20486"
+				key			"F3"
+				KEY_PROPS
+			}
+			keyDef Key_F4 {
+				rect		KEY_WIDTH*5, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20487"
+				key			"F4"
+				KEY_PROPS
+			}
+			keyDef Key_F5 {
+				rect		HALFWIDTH+KEY_WIDTH*6, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20488"
+				key			"F5"
+				KEY_PROPS
+			}
+			keyDef Key_F6 {
+				rect		HALFWIDTH+KEY_WIDTH*7, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20489"
+				key			"F6"
+				KEY_PROPS
+			}
+			keyDef Key_F7 {
+				rect		HALFWIDTH+KEY_WIDTH*8, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20490"
+				key			"F7"
+				KEY_PROPS
+			}
+			keyDef Key_F8 {
+				rect		HALFWIDTH+KEY_WIDTH*9, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20491"
+				key			"F8"
+				KEY_PROPS
+			}
+			keyDef Key_F9 {
+				rect		KEY_WIDTH*11, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20492"
+				key			"F9"
+				KEY_PROPS
+			}
+			keyDef Key_F10 {
+				rect		KEY_WIDTH*12, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20493"
+				key			"F10"
+				KEY_PROPS
+			}
+			keyDef Key_F11 {
+				rect		KEY_WIDTH*13, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20494"
+				key			"F11"
+				KEY_PROPS
+			}
+			keyDef Key_F12 {
+				rect		KEY_WIDTH*14, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20495"
+				key			"F12"
+				KEY_PROPS
+			}
+			keyDef Key_PrintScreen {
+				rect		KEY_ARROWCOLUMN, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20496"
+				key			"PRINTSCREEN"
+				KEY_PROPS
+				textscale	0.15
+			}
+			keyDef Key_ScrollLock {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20497"
+				key			"SCROLL"
+				KEY_PROPS
+				textscale	0.15
+			}
+			keyDef Key_Pause {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH*2, KEY_ROW1, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20498"
+				key			"PAUSE"
+				KEY_PROPS
+				textscale	0.15
+			}
+
+			//------------------------------------------------------------------------
+			// Row 2
+			//------------------------------------------------------------------------
+			keyDef Key_Tilda {
+				rect		0, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21000"
+				key			"~"
+				KEY_PROPS
+			}
+			keyDef Key_One {
+				rect		KEY_WIDTH, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21001"
+				key			"1"
+				KEY_PROPS
+			}
+			keyDef Key_Two {
+				rect		KEY_WIDTH*2, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21002"
+				key			"2"
+				KEY_PROPS
+			}
+			keyDef Key_Three {
+				rect		KEY_WIDTH*3, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21003"
+				key			"3"
+				KEY_PROPS
+			}
+			keyDef Key_Four {
+				rect		KEY_WIDTH*4, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21004"
+				key			"4"
+				KEY_PROPS
+			}
+			keyDef Key_Five {
+				rect		KEY_WIDTH*5, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21005"
+				key			"5"
+				KEY_PROPS
+			}
+			keyDef Key_Six {
+				rect		KEY_WIDTH*6, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21006"
+				key			"6"
+				KEY_PROPS
+			}
+			keyDef Key_Seven {
+				rect		KEY_WIDTH*7, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21007"
+				key			"7"
+				KEY_PROPS
+			}
+			keyDef Key_Eight {
+				rect		KEY_WIDTH*8, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21008"
+				key			"8"
+				KEY_PROPS
+			}
+			keyDef Key_Nine {
+				rect		KEY_WIDTH*9, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21009"
+				key			"9"
+				KEY_PROPS
+			}
+			keyDef Key_Zero {
+				rect		KEY_WIDTH*10, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21010"
+				key			"0"
+				KEY_PROPS
+			}
+			keyDef Key_Minus {
+				rect		KEY_WIDTH*11, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21011"
+				key			"-"
+				KEY_PROPS
+			}
+			keyDef Key_Equal {
+				rect		KEY_WIDTH*12, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21012"
+				key			"="
+				KEY_PROPS
+			}
+			keyDef Key_Backspace {
+				rect		KEY_WIDTH*13, KEY_ROW2, KEY_WIDTH*2-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20499"
+				key			"BACKSPACE"
+				KEY_PROPS
+				
+				windowDef Backspace_graphic {
+					rect		14, 0, 20, 20
+					background	"guis/assets/help/keyboard/backspace.tga"
+				}
+			}
+
+			keyDef Key_Insert {
+				rect		KEY_ARROWCOLUMN, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20500"
+				key			"INS"
+				KEY_PROPS
+				textscale	0.18
+			}
+			keyDef Key_Home {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20501"
+				key			"HOME"
+				KEY_PROPS
+				textscale	0.18
+			}
+			keyDef Key_PageUp {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH*2, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20502"
+				key			"PGUP"
+				KEY_PROPS
+				textscale	0.18
+			}
+
+			keyDef Key_NumLock {
+				rect		KEY_KPADCOLUMN, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20503"
+				key			"KP_NUMLOCK"
+				KEY_PROPS
+			}
+			keyDef Key_PadSlash {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21013"
+				key			"KP_SLASH"
+				KEY_PROPS
+			}
+			keyDef Key_PadAsterisk {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*2, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21014"
+				key			"KP_STAR"
+				KEY_PROPS
+			}
+			keyDef Key_PadMinus {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*3, KEY_ROW2, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21015"
+				key			"KP_MINUS"
+				KEY_PROPS
+				textscale	0.4
+				textaligny	-6
+			}
+
+			//------------------------------------------------------------------------
+			// Row 3
+			//------------------------------------------------------------------------
+			keyDef Key_Tab {
+				rect		0, KEY_ROW3, TABWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20504"
+				key			"TAB"
+				KEY_PROPS
+				windowDef Tab_graphic {
+					rect		7, 2, 16, 16
+					background	"guis/assets/help/keyboard/tab.tga"
+				}
+			}
+			keyDef Key_Q {
+				rect		TABWIDTH+0, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21016"
+				key			"q"
+				KEY_PROPS
+			}
+			keyDef Key_W {
+				rect		TABWIDTH+KEY_WIDTH, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21017"
+				key			"w"
+				KEY_PROPS
+			}
+			keyDef Key_E {
+				rect		TABWIDTH+KEY_WIDTH*2, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21018"
+				key			"e"
+				KEY_PROPS
+			}
+			keyDef Key_R {
+				rect		TABWIDTH+KEY_WIDTH*3, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21019"
+				key			"r"
+				KEY_PROPS
+			}
+			keyDef Key_T {
+				rect		TABWIDTH+KEY_WIDTH*4, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21020"
+				key			"t"
+				KEY_PROPS
+			}
+			keyDef Key_Y {
+				rect		TABWIDTH+KEY_WIDTH*5, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21021"
+				key			"y"
+				KEY_PROPS
+			}
+			keyDef Key_U {
+				rect		TABWIDTH+KEY_WIDTH*6, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21022"
+				key			"u"
+				KEY_PROPS
+			}
+			keyDef Key_I {
+				rect		TABWIDTH+KEY_WIDTH*7, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21023"
+				key			"i"
+				KEY_PROPS
+			}
+			keyDef Key_O {
+				rect		TABWIDTH+KEY_WIDTH*8, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21024"
+				key			"o"
+				KEY_PROPS
+			}
+			keyDef Key_P {
+				rect		TABWIDTH+KEY_WIDTH*9, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21025"
+				key			"p"
+				KEY_PROPS
+			}
+			keyDef Key_LeftBracket {
+				rect		TABWIDTH+KEY_WIDTH*10, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21026"
+				key			"["
+				KEY_PROPS
+			}
+			keyDef Key_RightBracket {
+				rect		TABWIDTH+KEY_WIDTH*11, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21027"
+				key			"]"
+				KEY_PROPS
+			}
+			keyDef Key_Backslash {
+				rect		TABWIDTH+KEY_WIDTH*12, KEY_ROW3, TABWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21028"
+				key			"\\"
+				KEY_PROPS
+			}
+
+			keyDef Key_Delete {
+				rect		KEY_ARROWCOLUMN, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20505"
+				key			"DEL"
+				KEY_PROPS
+				textscale	0.18
+			}
+			keyDef Key_End {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20506"
+				key			"END"
+				KEY_PROPS
+				textscale	0.18
+			}
+			keyDef Key_PageDown {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH*2, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20507"
+				key			"PGDN"
+				KEY_PROPS
+				textscale	0.18
+			}
+
+			keyDef Key_PAD7 {
+				rect		KEY_KPADCOLUMN, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21029"
+				key			"KP_HOME"
+				KEY_PROPS
+			}
+			keyDef Key_PAD8 {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21030"
+				key			"KP_UPARROW"
+				KEY_PROPS
+			}
+			keyDef Key_PAD9 {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*2, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21031"
+				key			"KP_PGUP"
+				KEY_PROPS
+			}
+			keyDef Key_PADPLUS {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*3, KEY_ROW3, KEY_WIDTH-MARGINX, KEY_HEIGHT*2-MARGINY
+				text		"#str_21032"
+				key			"KP_PLUS"
+				KEY_PROPS
+				textscale	0.3
+				textaligny	-2
+			}
+
+
+			//------------------------------------------------------------------------
+			// Row 4
+			//------------------------------------------------------------------------
+			keyDef Key_CapsLock {
+				rect		0, KEY_ROW4, CAPSLOCKWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20508"
+				key			"CAPSLOCK"
+				KEY_PROPS
+			}
+			keyDef Key_A {
+				rect		CAPSLOCKWIDTH+0, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21033"
+				key			"a"
+				KEY_PROPS
+			}
+			keyDef Key_S {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21034"
+				key			"s"
+				KEY_PROPS
+			}
+			keyDef Key_D {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*2, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21035"
+				key			"d"
+				KEY_PROPS
+			}
+			keyDef Key_F {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*3, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21036"
+				key			"f"
+				KEY_PROPS
+			}
+			keyDef Key_G {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*4, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21037"
+				key			"g"
+				KEY_PROPS
+			}
+			keyDef Key_H {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*5, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21038"
+				key			"h"
+				KEY_PROPS
+			}
+			keyDef Key_J {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*6, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21039"
+				key			"j"
+				KEY_PROPS
+			}
+			keyDef Key_K {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*7, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21040"
+				key			"k"
+				KEY_PROPS
+			}
+			keyDef Key_L {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*8, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21041"
+				key			"l"
+				KEY_PROPS
+			}
+			keyDef Key_SemiColon {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*9, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21042"
+				key			"SEMICOLON"
+				KEY_PROPS
+			}
+			keyDef Key_Apostrophe {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*10, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21043"
+				key			"APOSTROPHE"
+				KEY_PROPS
+			}
+			keyDef Key_Enter {
+				rect		CAPSLOCKWIDTH+KEY_WIDTH*11, KEY_ROW4, ENTERWIDTH, KEY_HEIGHT-MARGINY
+				text		"#str_20509"
+				key			"ENTER"
+				KEY_PROPS
+				windowDef Enter_graphic {
+					rect		14, 0, 20, 20
+					background	"guis/assets/help/keyboard/enter.tga"
+				}
+			}
+
+			keyDef Key_PAD4 {
+				rect		KEY_KPADCOLUMN, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21044"
+				key			"KP_LEFTARROW"
+				KEY_PROPS
+			}
+			keyDef Key_PAD5 {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21045"
+				key			"KP_5"
+				KEY_PROPS
+			}
+			keyDef Key_PAD6 {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*2, KEY_ROW4, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21046"
+				key			"KP_RIGHTARROW"
+				KEY_PROPS
+			}
+
+
+			//------------------------------------------------------------------------
+			// Row 5
+			//------------------------------------------------------------------------
+			keyDef Key_LeftShift {
+				rect		0, KEY_ROW5, SHIFTWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20510"
+				key			"SHIFT"
+				KEY_PROPS
+				windowDef Lshift_graphic {
+					rect		8, 4, 12, 12
+					background	"guis/assets/help/keyboard/shift.tga"
+				}
+			}
+			keyDef Key_Z {
+				rect		SHIFTWIDTH, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21047"
+				key			"z"
+				KEY_PROPS
+			}
+			keyDef Key_X {
+				rect		SHIFTWIDTH+KEY_WIDTH, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21048"
+				key			"x"
+				KEY_PROPS
+			}
+			keyDef Key_C {
+				rect		SHIFTWIDTH+KEY_WIDTH*2, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21049"
+				key			"c"
+				KEY_PROPS
+			}
+			keyDef Key_V {
+				rect		SHIFTWIDTH+KEY_WIDTH*3, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21050"
+				key			"v"
+				KEY_PROPS
+			}
+			keyDef Key_B {
+				rect		SHIFTWIDTH+KEY_WIDTH*4, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21051"
+				key			"b"
+				KEY_PROPS
+			}
+			keyDef Key_N {
+				rect		SHIFTWIDTH+KEY_WIDTH*5, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21052"
+				key			"n"
+				KEY_PROPS
+			}
+			keyDef Key_M {
+				rect		SHIFTWIDTH+KEY_WIDTH*6, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21053"
+				key			"m"
+				KEY_PROPS
+			}
+			keyDef Key_Comma {
+				rect		SHIFTWIDTH+KEY_WIDTH*7, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21054"
+				key			","
+				KEY_PROPS
+			}
+			keyDef Key_Period {
+				rect		SHIFTWIDTH+KEY_WIDTH*8, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21055"
+				key			"."
+				KEY_PROPS
+			}
+			keyDef Key_Slash {
+				rect		SHIFTWIDTH+KEY_WIDTH*9, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21056"
+				key			"/"
+				KEY_PROPS
+			}
+			keyDef Key_RightShift {
+				rect		SHIFTWIDTH+KEY_WIDTH*10, KEY_ROW5, RIGHTSHIFTWIDTH, KEY_HEIGHT-MARGINY
+				text		"#str_20510"
+				key			"SHIFT"
+				KEY_PROPS
+				windowDef Rshift_graphic {
+					rect		34, 4, 12, 12
+					background	"guis/assets/help/keyboard/shift.tga"
+				}
+			}
+
+			keyDef Key_UpArrow {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21057"
+				key			"UPARROW"
+				KEY_PROPS
+				windowDef Uarrow_graphic {
+					rect		3, 2, 16, 16
+					background	"guis/assets/help/keyboard/uparrow.tga"
+				}
+			}
+
+			keyDef Key_PAD1 {
+				rect		KEY_KPADCOLUMN, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21058"
+				key			"KP_END"
+				KEY_PROPS
+			}
+			keyDef Key_PAD2 {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21059"
+				key			"KP_DOWNARROW"
+				KEY_PROPS
+			}
+			keyDef Key_PAD3 {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*2, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21060"
+				key			"KP_PGDN"
+				KEY_PROPS
+			}
+			keyDef Key_PADENTER {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*3, KEY_ROW5, KEY_WIDTH-MARGINX, KEY_HEIGHT*2-MARGINY
+				text		"#str_20511"
+				key			"KP_ENTER"
+				KEY_PROPS
+				windowDef Padenter_graphic {
+					rect		4, 10, 16, 16
+					background	"guis/assets/help/keyboard/enter.tga"
+				}
+			}
+
+
+			//------------------------------------------------------------------------
+			// Row 6
+			//------------------------------------------------------------------------
+			keyDef Key_LeftControl {
+				rect		0, KEY_ROW6, CONTROLWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20512"
+				key			"CTRL"
+				KEY_PROPS
+			}
+			keyDef Key_LeftWindows {
+				rect		CONTROLWIDTH+0, KEY_ROW6, ALTWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21061"
+				key			"LWIN"
+				KEY_PROPS
+			}
+			keyDef Key_LeftAlt {
+				rect		CONTROLWIDTH+ALTWIDTH, KEY_ROW6, ALTWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20513"
+				key			"ALT"
+				KEY_PROPS
+			}
+			keyDef Key_SpaceBar {
+				rect		CONTROLWIDTH+ALTWIDTH*2, KEY_ROW6, SPACEBARWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20514"
+				key			"SPACE"
+				KEY_PROPS
+				background		"guis/assets/help/spacebar.tga"
+				pressedImage	"guis/assets/help/spacebar_highlight.tga"
+				highlightImage	"guis/assets/help/spacebar_highlight.tga"
+			}
+			keyDef Key_RightAlt {
+				rect		CONTROLWIDTH+ALTWIDTH*2+SPACEBARWIDTH, KEY_ROW6, ALTWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20513"
+				key			"RIGHTALT"
+				KEY_PROPS
+			}
+			keyDef Key_RightWindows {
+				rect		CONTROLWIDTH+ALTWIDTH*3+SPACEBARWIDTH, KEY_ROW6, ALTWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21061"
+				key			"RWIN"
+				KEY_PROPS
+			}
+			keyDef Key_RightWinKey {
+				rect		CONTROLWIDTH+ALTWIDTH*4+SPACEBARWIDTH, KEY_ROW6, ALTWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21062"
+				key			"MENU"
+				KEY_PROPS
+				windowDef Menu_graphic {
+					rect		7, 3, 16, 16
+					background	"guis/assets/help/keyboard/menu.tga"
+				}
+			}
+			keyDef Key_RightControl {
+				rect		CONTROLWIDTH+ALTWIDTH*5+SPACEBARWIDTH, KEY_ROW6, CONTROLWIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_20512"
+				key			"CTRL"
+				KEY_PROPS
+			}
+
+			keyDef Key_LeftArrow {
+				rect		KEY_ARROWCOLUMN, KEY_ROW6, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		""
+				key			"LEFTARROW"
+				KEY_PROPS
+				windowDef Larrow_graphic {
+					rect		3, 2, 16, 16
+					background	"guis/assets/help/keyboard/leftarrow.tga"
+				}
+			}
+			keyDef Key_DownArrow {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH, KEY_ROW6, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		""
+				key			"DOWNARROW"
+				KEY_PROPS
+				windowDef Darrow_graphic {
+					rect		3, 2, 16, 16
+					background	"guis/assets/help/keyboard/downarrow.tga"
+				}
+			}
+			keyDef Key_RightArrow {
+				rect		KEY_ARROWCOLUMN+KEY_WIDTH*2, KEY_ROW6, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		""
+				key			"RIGHTARROW"
+				KEY_PROPS
+				windowDef Rarrow_graphic {
+					rect		3, 2, 16, 16
+					background	"guis/assets/help/keyboard/rightarrow.tga"
+				}
+			}
+
+			keyDef Key_PADINSERT {
+				rect		KEY_KPADCOLUMN, KEY_ROW6, KEY_WIDTH*2-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21063"
+				key			"KP_INS"
+				KEY_PROPS
+			}
+			keyDef Key_PADDEL {
+				rect		KEY_KPADCOLUMN+KEY_WIDTH*2, KEY_ROW6, KEY_WIDTH-MARGINX, KEY_HEIGHT-MARGINY
+				text		"#str_21064"
+				key			"KP_DEL"
+				KEY_PROPS
+			}
+		}
+	}
+
+	superWindowDef BindingsBG {
+		rect		20, 190, 600, 270
+		cornerMat	"guis/assets/menu/window_cornerUL"
+		topMat		"guis/assets/menu/window_top"
+		backcolor	0.29, 0.32, 0.39, 0
+		matcolor	1, 1, 1, 0.7
+		margins		40, 40, 8, 9	// left, right, top, bottom
+		cornerSize	38, 32
+		edgeSize	4, 4
+
+		tabContainerDef Bindings_TabContainer {
+			rect		45, 10, 510, 247
+			sepcolor	0.74, 0.81, 0.88, 1
+			activetab	0
+			tabMargins	0, 0
+
+			windowDef Bindings_TabContainer_bg {
+				rect		0, 21, 510, 225
+				backcolor	0.3, 0.55, 0.8, 0
+				sepcolor	0.74, 0.81, 0.88, 1
+				activetab	0
+				tabMargins	0, 0
+			}
+			tabDef Bindings_Movement {
+				rect					0, 20, 510, 227
+				backcolor				0.7, 0.1, 0.1, 0.3
+				background				"guis/assets/help/tab_red.tga"
+				forecolor				TABTOP_FORECOLOR_COMMA
+				hovercolor				TABTOP_HOVERCOLOR_COMMA
+				activeColor				TABTOP_ACTIVECOLOR_COMMA
+				hoverMatColor			TABTOP_HOVERMAT_COLOR_COMMA
+				buttonLeftMat			"guis/assets/help/tabedge_movement.tga"
+				buttonMiddleMat			"guis/assets/help/tabstrip_movement.tga"
+				buttonActiveLeftMat		"guis/assets/help/tabedgeactive_movement.tga"
+				buttonActiveMiddleMat	"guis/assets/help/tabstripactive_movement.tga"
+				text					"#str_20211"
+				seperatorLines			1, 1, 1, 1
+				seperatorMargin			0
+
+				onTabActivate {
+					set "cmd" "play guisounds_menu_tabflip" ;
+				}
+
+				windowDef Instructions1 {
+					rect		0, 0, 510, HEADER_HEIGHT
+					text		"#str_20515"
+					textalign	1
+					textscale	0.3
+					shadow		1
+				}
+
+				windowDef Column1 {
+					rect		BIND_MARGIN, HEADER_HEIGHT, 440, 227-HEADER_HEIGHT
+
+					buttonDef OCM_BindingForward {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*0, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Forward {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20214"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Forward {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_forward"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+
+					buttonDef OCM_BindingBackpedal {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*1, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Backpedal {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20215"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Backpedal {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_back"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+
+					buttonDef OCM_BindingMoveleft {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*2, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Moveleft {
+							rect		0, 0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20216"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Moveleft {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_moveLeft"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+
+					buttonDef OCM_BindingMoveright {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*3, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Moveright {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20217"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Moveright {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_moveRight"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+
+					buttonDef OCM_BindingJump {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*4, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Jump {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20218"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Jump {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_moveUp"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+
+					buttonDef OCM_BindingCrouch {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*5, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Crouch {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20219"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Crouch {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_moveDown"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+
+					buttonDef OCM_BindingStrafe {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*6, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Strafe {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20220"
+							TITLE_PROPS_MOVEMENT
+						}
+						bindKeyDef Binding_Strafe {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_strafe"
+							BIND_PROPS_MOVEMENT
+						}
+					}
+				}
+			}
+			tabDef Bindings_Combat {
+				rect					0, 20, 510, 227
+				backcolor				0.3, 0.3, 0.7, 0.25
+				background				"guis/assets/help/tab_blue.tga"
+				forecolor				TABTOP_FORECOLOR_COMMA
+				hovercolor				TABTOP_HOVERCOLOR_COMMA
+				activeColor				TABTOP_ACTIVECOLOR_COMMA
+				hoverMatColor			TABTOP_HOVERMAT_COLOR_COMMA
+				buttonLeftMat			"guis/assets/help/tabedge_combat.tga"
+				buttonMiddleMat			"guis/assets/help/tabstrip_combat.tga"
+				buttonActiveLeftMat		"guis/assets/help/tabedgeactive_combat.tga"
+				buttonActiveMiddleMat	"guis/assets/help/tabstripactive_combat.tga"
+				text					"#str_20229"
+				seperatorLines			1, 1, 1, 1
+				seperatorMargin			0
+
+				onTabActivate {
+					set "cmd" "play guisounds_menu_tabflip" ;
+				}
+
+				windowDef Instructions1 {
+					rect		0, 0, 510, HEADER_HEIGHT
+					text		"#str_20515"
+					textalign	1
+					textscale	0.3
+					shadow		1
+				}
+
+				windowDef Column3 {
+					rect		BIND_MARGIN, HEADER_HEIGHT, 440, 227-HEADER_HEIGHT
+
+					buttonDef OCC_BindingAttack {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*0, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Attack {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20230"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_Attack {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_attack"
+							BIND_PROPS_COMBAT
+						}
+					}
+
+					buttonDef OCC_BindingAltattack {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*1, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_AltAttack {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20231"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_AltAttack {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_attackAlt"
+							BIND_PROPS_COMBAT
+						}
+					}
+
+					buttonDef OCC_BindingPrevweapon {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*2, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_PrevWeapon {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20232"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_PrevWeapon {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse15"
+							BIND_PROPS_COMBAT
+						}
+					}
+
+					buttonDef OCC_BindingNextweapon {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*3, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_NextWeapon {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20233"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_NextWeapon {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse14"
+							BIND_PROPS_COMBAT
+						}
+					}
+
+					buttonDef OCW_BindingLight {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*4, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Light {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20234"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_Light {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse16"
+							BIND_PROPS_COMBAT
+						}
+					}
+
+					buttonDef OCW_BindingSpiritwalk {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*5, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_SpiritWalk {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20235"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_SpiritWalk {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse54"
+							BIND_PROPS_COMBAT
+						}
+					}
+
+					buttonDef OCW_BindingThrowGrenade {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*6, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_ThrowGrenade {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_41185"
+							TITLE_PROPS_COMBAT
+						}
+						bindKeyDef Binding_ThrowGrenade {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse25"
+							BIND_PROPS_COMBAT
+						}
+					}
+				}
+			}
+			tabDef Bindings_Weapons {
+				rect					0, 20, 510, 227
+				backcolor				0.3, 0.7, 0.3, 0.15
+				background				"guis/assets/help/tab_green.tga"
+				forecolor				TABTOP_FORECOLOR_COMMA
+				hovercolor				TABTOP_HOVERCOLOR_COMMA
+				activeColor				TABTOP_ACTIVECOLOR_COMMA
+				hoverMatColor			TABTOP_HOVERMAT_COLOR_COMMA
+				buttonLeftMat			"guis/assets/help/tabedge_weapons.tga"
+				buttonMiddleMat			"guis/assets/help/tabstrip_weapons.tga"
+				buttonActiveLeftMat		"guis/assets/help/tabedgeactive_weapons.tga"
+				buttonActiveMiddleMat	"guis/assets/help/tabstripactive_weapons.tga"
+				text					"#str_20221"
+				seperatorLines			1, 1, 1, 1
+				seperatorMargin			0
+
+				onTabActivate {
+					set "cmd" "play guisounds_menu_tabflip" ;
+				}
+
+				windowDef Instructions1 {
+					rect		0, 0, 510, HEADER_HEIGHT
+					text		"#str_20515"
+					textalign	1
+					textscale	0.3
+					shadow		1
+				}
+
+				windowDef Column2 {
+					rect		BIND_MARGIN, HEADER_HEIGHT, 440, 227-HEADER_HEIGHT
+
+					buttonDef OCW_BindingWeapon1 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*0, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon1 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20222"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon1 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse1"
+							BIND_PROPS_WEAPONS
+						}
+					}
+
+					buttonDef OCW_BindingWeapon2 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*1, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon2 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20223"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon2 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse2"
+							BIND_PROPS_WEAPONS
+						}
+					}
+
+					buttonDef OCW_BindingWeapon3 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*2, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon3 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20224"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon3 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse3"
+							BIND_PROPS_WEAPONS
+						}
+					}
+
+					buttonDef OCW_BindingWeapon4 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*3, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon4 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20228"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon4 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse4"
+							BIND_PROPS_WEAPONS
+						}
+					}
+
+					buttonDef OCW_BindingWeapon5 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*4, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon5 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20517"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon5 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse5"
+							BIND_PROPS_WEAPONS
+						}
+					}
+
+					buttonDef OCW_BindingWeapon6 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*5, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon6 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20226"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon6 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse6"
+							BIND_PROPS_WEAPONS
+						}
+					}
+
+					buttonDef OCW_BindingWeapon7 {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*6, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Weapon7 {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20227"
+							TITLE_PROPS_WEAPONS
+						}
+						bindKeyDef Binding_Weapon7 {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse7"
+							BIND_PROPS_WEAPONS
+						}
+					}
+				}
+			}
+			tabDef Bindings_Look {
+				rect					0, 20, 510, 227
+				backcolor				0.5, 0.4, 0, 0.35
+				background				"guis/assets/help/tab_yellow.tga"
+				forecolor				TABTOP_FORECOLOR_COMMA
+				hovercolor				TABTOP_HOVERCOLOR_COMMA
+				activeColor				TABTOP_ACTIVECOLOR_COMMA
+				hoverMatColor			TABTOP_HOVERMAT_COLOR_COMMA
+				buttonLeftMat			"guis/assets/help/tabedge_look.tga"
+				buttonMiddleMat			"guis/assets/help/tabstrip_look.tga"
+				buttonActiveLeftMat		"guis/assets/help/tabedgeactive_look.tga"
+				buttonActiveMiddleMat	"guis/assets/help/tabstripactive_look.tga"
+				text					"#str_20236"
+				seperatorLines			1, 1, 1, 1
+				seperatorMargin			0
+
+				onTabActivate {
+					set "cmd" "play guisounds_menu_tabflip" ;
+				}
+
+				windowDef Instructions1 {
+					rect		0, 0, 510, HEADER_HEIGHT
+					text		"#str_20515"
+					textalign	1
+					textscale	0.3
+					shadow		1
+				}
+
+				windowDef Column4 {
+					rect		BIND_MARGIN, HEADER_HEIGHT, 440, 227-HEADER_HEIGHT
+
+					buttonDef OCL_BindingTurnleft {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*0, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_TurnLeft {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20237"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_TurnLeft {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_left"
+							BIND_PROPS_LOOK
+						}
+					}
+
+					buttonDef OCL_BindingTurnright {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*1, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_TurnRight {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20238"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_TurnRight {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_right"
+							BIND_PROPS_LOOK
+						}
+					}
+
+					buttonDef OCL_BindingLookup {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*2, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_LookUp {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20239"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_LookUp {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_lookUp"
+							BIND_PROPS_LOOK
+						}
+					}
+
+					buttonDef OCL_BindingLookdown {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*3, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_LookDown {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20240"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_LookDown {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_lookDown"
+							BIND_PROPS_LOOK
+						}
+					}
+
+					buttonDef OCL_BindingMouselook {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*4, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_MouseLook {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20241"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_MouseLook {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_mlook"
+							BIND_PROPS_LOOK
+						}
+					}
+
+					buttonDef OCL_BindingCenterview {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*5, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_CenterView {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20242"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_CenterView {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse18"
+							BIND_PROPS_LOOK
+						}
+					}
+
+/*					windowDef OCL_BindingZoomview {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*6, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						backcolor	0, 0, 0, 0.5
+						bordercolor 0, 0, 0, 1
+						bordersize 	1
+
+						windowDef Title_Zoom {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20521"
+							TITLE_PROPS_LOOK
+						}
+						bindKeyDef Binding_Zoom {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_zoom"
+							BIND_PROPS_LOOK
+						}
+					}
+*/
+				}
+			}
+			tabDef Bindings_System {
+				rect					0, 20, 510, 227
+				backcolor				0.3, 0.5, 0.6, 0.25
+				background				"guis/assets/help/tab_aqua.tga"
+				forecolor				TABTOP_FORECOLOR_COMMA
+				hovercolor				TABTOP_HOVERCOLOR_COMMA
+				activeColor				TABTOP_ACTIVECOLOR_COMMA
+				hoverMatColor			TABTOP_HOVERMAT_COLOR_COMMA
+				buttonLeftMat			"guis/assets/help/tabedge_system.tga"
+				buttonMiddleMat			"guis/assets/help/tabstrip_system.tga"
+				buttonActiveLeftMat		"guis/assets/help/tabedgeactive_system.tga"
+				buttonActiveMiddleMat	"guis/assets/help/tabstripactive_system.tga"
+				text					"#str_20244"
+				seperatorLines			1, 1, 1, 1
+				seperatorMargin			0
+
+				onTabActivate {
+					set "cmd" "play guisounds_menu_tabflip" ;
+				}
+
+				windowDef Instructions1 {
+					rect		0, 0, 510, HEADER_HEIGHT
+					text		"#str_20515"
+					textalign	1
+					textscale	0.3
+					shadow		1
+				}
+
+				windowDef Column5 {
+					rect		BIND_MARGIN, HEADER_HEIGHT, 440, 227-HEADER_HEIGHT
+
+					buttonDef OCO_BindingQuicksave {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*0, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_QuickSave {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20522"
+							TITLE_PROPS_SYSTEM
+						}
+						bindKeyDef Binding_QuickSave {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"savegame quick"
+							BIND_PROPS_SYSTEM
+						}
+					}
+
+					buttonDef OCO_BindingQuickload {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*1, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_QuickLoad {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20523"
+							TITLE_PROPS_SYSTEM
+						}
+						bindKeyDef Binding_QuickLoad {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"loadgame quick"
+							BIND_PROPS_SYSTEM
+						}
+					}
+
+					buttonDef OCO_BindingScreenshot {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*2, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Screenshot {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20247"
+							TITLE_PROPS_SYSTEM
+						}
+						bindKeyDef Binding_Screenshot {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"screenshot"
+							BIND_PROPS_SYSTEM
+						}
+					}
+
+					buttonDef OCO_BindingHelp {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*3, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Help {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20248"
+							TITLE_PROPS_SYSTEM
+						}
+						bindKeyDef Binding_Help {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"togglehelp"
+							BIND_PROPS_SYSTEM
+						}
+					}
+				}
+			}
+			tabDef Bindings_MultiPrey {
+				rect					0, 20, 510, 227
+				backcolor				0.65, 0.4, 0.2, 0.3
+				background				"guis/assets/help/tab_orange.tga"
+				forecolor				TABTOP_FORECOLOR_COMMA
+				hovercolor				TABTOP_HOVERCOLOR_COMMA
+				activeColor				TABTOP_ACTIVECOLOR_COMMA
+				hoverMatColor			TABTOP_HOVERMAT_COLOR_COMMA
+				buttonLeftMat			"guis/assets/help/tabedge_multiplayer.tga"
+				buttonMiddleMat			"guis/assets/help/tabstrip_multiplayer.tga"
+				buttonActiveLeftMat		"guis/assets/help/tabedgeactive_multiplayer.tga"
+				buttonActiveMiddleMat	"guis/assets/help/tabstripactive_multiplayer.tga"
+				text					"#str_20135"
+				seperatorLines			1, 1, 1, 1
+				seperatorMargin			0
+
+				onTabActivate {
+					set "cmd" "play guisounds_menu_tabflip" ;
+				}
+
+				windowDef Instructions1 {
+					rect		0, 0, 510, HEADER_HEIGHT
+					text		"#str_20515"
+					textalign	1
+					textscale	0.3
+					shadow		1
+				}
+
+				windowDef Column6 {
+					rect		BIND_MARGIN, HEADER_HEIGHT, 440, 227-HEADER_HEIGHT
+
+					buttonDef OCD_BindingChat {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*0, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Chat {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20249"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_Chat {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"clientMessageMode"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingTeamchat {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*1, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_TeamChat {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20250"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_TeamChat {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"clientMessageMode 1"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingToggleTeam {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*2, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_ToggleTeam {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20524"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_ToggleTeam {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse20"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingSpectate {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*3, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Spectate {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20252"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_Spectate {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse22"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingReady {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*4, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Ready {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20253"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_Ready {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse17"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingVoteyes {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*5, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_VoteYes {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20254"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_VoteYes {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse28"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingVoteno {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*6, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_VoteNo {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20255"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_VoteNo {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse29"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+
+					buttonDef OCD_BindingScoreboard {
+						rect		0,	(BIND_HEIGHT+BIND_VMARGIN)*7, TITLE_WIDTH+BIND_WIDTH, BIND_HEIGHT
+						leftMat		"guis/assets/menu/textbar_corner.tga"
+						middleMat	"guis/assets/menu/textbarstrip.tga"
+						rightMat	"guis/assets/menu/textbar_invcorner.tga"
+
+						windowDef Title_Scoreboard {
+							rect		0,	0, TITLE_WIDTH, BIND_HEIGHT
+							text		"#str_20256"
+							TITLE_PROPS_MULTIPLAYER
+						}
+						bindKeyDef Binding_Scoreboard {
+							rect		TITLE_WIDTH, 0, BIND_WIDTH, BIND_HEIGHT
+							bind		"_impulse19"
+							BIND_PROPS_MULTIPLAYER
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	windowDef ExitHelp {
+		rect		0, 460, 640, 20
+		text		"#str_20525"
+		textscale	0.3
+		textalign	1
+		textaligny	-2
+		forecolor	1, 1, 1, 1
+	}
+}

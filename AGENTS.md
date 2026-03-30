@@ -16,7 +16,7 @@ This file describes project goals, rules, and workflow expectations for anyone w
 - Keep single-player and multiplayer behavior compatible with Prey’s unified game-library model.
 - Prefer Doom 3 lineage behavior over Quake 4-specific behavior where Prey requires it.
 - Restore missing Doom 3/Prey-era systems where required for compatibility (including particle-system behavior).
-- Keep a unified runtime game directory layout under `basepy/`.
+- Keep a unified runtime game directory layout under `basepr/`.
 
 **Rules**
 - Treat `E:\Repositories\OpenPrey-GameLibs` as part of the same working set for planning, edits, and validation.
@@ -48,7 +48,7 @@ This file describes project goals, rules, and workflow expectations for anyone w
 **.install Layout (Staging Target)**
 - `.install/` is the runtime package root used by local staging and `fs_cdpath` overlays.
 - Keep executables in `.install/`.
-- Keep game modules and staged content in `.install/basepy/`.
+- Keep game modules and staged content in `.install/basepr/`.
 - Avoid shipping build-only artifacts (for example import libs) in `.install/`.
 
 **Development Procedure (Current Direction)**

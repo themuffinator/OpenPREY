@@ -41,7 +41,7 @@
 #define	CD_BASEDIR						"OpenPrey"
 #define	BASE_GAMEDIR					"base"
 #define	BASE_MPGAMEDIR					"base"
-#define OPENPREY_GAMEDIR				"basepy"
+#define OPENPREY_GAMEDIR				"basepr"
 #define	DEMO_GAMEDIR					"demo"
 #define	GAME_PLAYERDEFNAME				"player_tommy"
 #define GAME_PLAYERDEFNAME_MP			"player_tommy_mp"
@@ -133,7 +133,7 @@
 #define	WIN32_FAKE_WINDOW_CLASS_NAME	"OPENPREY_WGL_FAKE"
 
 #ifdef __linux__
-	#define DEFAULT_BASE_PATH				"/usr/local/games/basepy"
+	#define DEFAULT_BASE_PATH				"/usr/local/games/basepr"
 #elif defined( MACOS_X )
 	#define DEFAULT_BASE_PATH				"/Applications/OpenPrey"
 #endif

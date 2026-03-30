@@ -1,0 +1,932 @@
+//fades.script
+//
+//created by Mike Flynn
+//
+//scripted fades for various entities and properties
+
+//============================================================================
+//Light_FadeColor (entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec)
+//
+//Fade in, out, and between colored lights:  
+//ent 		= light entity.									$*
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = rgb starting position							0 - 1 vectors
+//fadeDeg2 	= rgb ending position							0 - 1 vectors
+//cycPerSec = number of changes to the light per second		1 - 60
+//============================================================================
+void Light_FadeColor ( entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec ) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	vector cInc;//color adjustment increments
+	
+
+	//NLAMERGE 4 - Why does this have to be init'd here
+	cycTotal = 1;
+	cycInc = 1;	
+
+	//color input clamps
+	fadeDeg1 = VectorClamp_0ToInfinity( fadeDeg1 );
+	fadeDeg2 = VectorClamp_0ToInfinity( fadeDeg2 );
+	
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc_x = (fadeDeg2_x - fadeDeg1_x) / cycTotal;
+    cInc_y = (fadeDeg2_y - fadeDeg1_y) / cycTotal;
+    cInc_z = (fadeDeg2_z - fadeDeg1_z) / cycTotal;    
+
+	//for loop...fade
+//	sys.println( "light entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1_x += cInc_x;
+    	fadeDeg1_y += cInc_y;
+    	fadeDeg1_z += cInc_z;
+    	ent.setColor( fadeDeg1_x, fadeDeg1_y, fadeDeg1_z );
+    	sys.wait( cycInc );
+    }
+    ent.setColor( fadeDeg2_x, fadeDeg2_y, fadeDeg2_z );//snap it the last little bit
+//    sys.println( "final light color for " + ent.getName() + " should be = " + fadeDeg2_x +" "+ fadeDeg2_y +" "+ fadeDeg2_z );//debug
+}
+
+//============================================================================
+//Light_FadeLocal ( entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec )
+//
+//Fade in, out, and between a single local parm on a light:
+//ent 		= target light entity for parm fade.			$*
+//prm 		= parm to fade.									0-7
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = parm starting position						0 - 1 vectors
+//fadeDeg2 	= parm ending position							0 - 1 vectors
+//cycPerSec = number of changes to the parm per second		1 - 60
+//============================================================================
+void Light_FadeLocal ( entity ent, float prm, float tym, float fadeDeg1, float fadeDeg2, float cycPerSec ) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	float cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+	//parm input clamps
+	if (prm < 0.0) {
+        prm = 0.0;
+    }
+    else if (prm > 7.0) {
+        prm = 7.0;
+    }
+    prm = floor( prm );
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //color input clamps
+//    if ( prm > 0 && prm < 4 ) {//if the parm is part of the rgba, clamp its value between 0-1
+//		fadeDeg1 = FloatClamp_0To1 ( fadeDeg1 );//disabled to allow use with fog fades
+//		fadeDeg2 = FloatClamp_0To1 ( fadeDeg2 );
+//	}
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc = (fadeDeg2 - fadeDeg1) / cycTotal;
+    
+    //for loop...fade
+//	sys.println( "light entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1 += cInc;
+       	ent.setLightParm( prm, fadeDeg1 );
+//     	sys.println( "light color for " + ent.getName() + "'s " + prm + " should be = " + fadeDeg1 );//debug
+       	sys.wait( cycInc );
+    }
+    ent.setLightParm( prm, fadeDeg2 );//snap it the last little bit
+//	sys.println( "final light color for " + ent.getName() + " should be = " + fadeDeg2 );//debug
+}
+
+//============================================================================
+//Light_FadeRadius ( entity ent, float fadeDeg1, float fadeDeg2, float tym, float cycPerSec)
+//
+//light radius fades: in, out, and between
+//ent 		= target entity for parm fade.					$*
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = parm starting position						0 - 1 vectors
+//fadeDeg2 	= parm ending position							0 - 1 vectors
+//cycPerSec = number of changes to the parm per second		1 - 60
+//============================================================================
+void Light_FadeRadius ( entity ent, float fadeDeg1, float fadeDeg2, float tym, float cycPerSec) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	float cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination radius - starting radius = difference values
+    //difference values / cycTotal = radius adjustment incs
+    cInc = (fadeDeg2 - fadeDeg1) / cycTotal;
+    
+    //for loop...fade
+//	sys.println( "entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1 += cInc;
+       	ent.setRadius( fadeDeg1 );
+//     	sys.println( "radius setting for " + ent.getName() + " should be = " + fadeDeg1 );//debug
+       	sys.wait( cycInc );
+    }
+    ent.setRadius( fadeDeg2 );//snap it the last little bit
+//	sys.println( "final radius setting for " + ent.getName() + " should be = " + fadeDeg2 );//debug
+}
+
+//============================================================================
+//Light_FadeRadiusXYZ ( entity ent, vector fadeDeg1, vector fadeDeg2, float tym, float cycPerSec )
+//
+//light fade between one radius and another
+//ent 		= light entity.									$*
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = radius starting position							vector
+//fadeDeg2 	= radius ending position							vector
+//cycPerSec = number of changes to the light per second		1 - 60
+//============================================================================
+void Light_FadeRadiusXYZ ( entity ent, vector fadeDeg1, vector fadeDeg2, float tym, float cycPerSec ) {
+	float i;//for loop var
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	vector cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc_x = (fadeDeg2_x - fadeDeg1_x) / cycTotal;
+    cInc_y = (fadeDeg2_y - fadeDeg1_y) / cycTotal;
+    cInc_z = (fadeDeg2_z - fadeDeg1_z) / cycTotal;    
+
+	//for loop...fade
+//	sys.println( "light entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1_x += cInc_x;
+    	fadeDeg1_y += cInc_y;
+    	fadeDeg1_z += cInc_z;
+    	ent.setRadiusXYZ( fadeDeg1_x, fadeDeg1_y, fadeDeg1_z );
+    	sys.wait( cycInc );
+    }
+    ent.setRadiusXYZ( fadeDeg2_x, fadeDeg2_y, fadeDeg2_z );//snap it the last little bit
+//    sys.println( "final light radius for " + ent.getName() + " should be = " + fadeDeg2_x +" "+ fadeDeg2_y +" "+ fadeDeg2_z );//debug
+}
+
+//============================================================================
+//Parm_FadeGlobal ( float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec )
+//
+//Fade in, out, and between a single global parm:
+//prm 		= parm to fade.									0-7
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = parm starting position						0 - 1 vectors
+//fadeDeg2 	= parm ending position							0 - 1 vectors
+//cycPerSec = number of changes to the parm per second		1 - 60
+//============================================================================
+void Parm_FadeGlobal ( float prm, float tym, float fadeDeg1, float fadeDeg2, float cycPerSec ) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	float cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+	//parm input clamps
+	if (prm < 0.0) {
+        prm = 0.0;
+    }
+    else if (prm > 7.0) {
+        prm = 7.0;
+    }
+    prm = floor( prm );
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //color input clamps
+    if ( prm > 0 && prm < 4 ) {//if the parm is part of the rgba, clamp its value between 0-1
+		fadeDeg1 = FloatClamp_0To1 ( fadeDeg1 );
+		fadeDeg2 = FloatClamp_0To1 ( fadeDeg2 );
+	}
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc = (fadeDeg2 - fadeDeg1) / cycTotal;
+    
+    //for loop...fade
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1 += cInc;
+       	sys.setShaderParm( prm, fadeDeg1 );
+//     	sys.println( "parm setting for parm" + prm + " should be = " + fadeDeg1 );//debug
+       	sys.wait( cycInc );
+    }
+    sys.setShaderParm( prm, fadeDeg2 );//snap it the last little bit
+//	sys.println( "final parm setting for parm " + prm + " should be = " + fadeDeg2 );//debug
+}
+
+//============================================================================
+//Parm_FadeLocal (entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec)
+//
+//Fade in, out, and between a single local parm:
+//ent 		= target entity for parm fade.					$*
+//prm 		= parm to fade.									0-7
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = parm starting position						0 - 1 vectors
+//fadeDeg2 	= parm ending position							0 - 1 vectors
+//cycPerSec = number of changes to the parm per second		1 - 60
+//============================================================================
+void Parm_FadeLocal ( entity ent, float prm, float tym, float fadeDeg1, float fadeDeg2, float cycPerSec) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	float cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+	//parm input clamps
+	if (prm < 0.0) {
+        prm = 0.0;
+    }
+    else if (prm > 7.0) {
+        prm = 7.0;
+    }
+    prm = floor( prm );
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //color input clamps
+    if ( prm > 0 && prm < 4 ) {//if the parm is part of the rgba, clamp its value between 0-1
+		fadeDeg1 = FloatClamp_0To1 ( fadeDeg1 );
+		fadeDeg2 = FloatClamp_0To1 ( fadeDeg2 );
+	}
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc = (fadeDeg2 - fadeDeg1) / cycTotal;
+    
+    //for loop...fade
+//	sys.println( "entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1 += cInc;
+       	ent.setShaderParm( prm, fadeDeg1 );
+//     	sys.println( "parm setting for " + ent.getName() + "'s " + prm + " should be = " + fadeDeg1 );//debug
+       	sys.wait( cycInc );
+    }
+    ent.setShaderParm( prm, fadeDeg2 );//snap it the last little bit
+//	sys.println( "final parm setting for " + ent.getName() + " should be = " + fadeDeg2 );//debug
+}
+
+//============================================================================
+//Parm_FadeColorGlobal ( float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec)
+//
+//Fade in, out, and between global color parms:  
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = rgb starting position							0 - 1 vectors
+//fadeDeg2 	= rgb ending position							0 - 1 vectors
+//cycPerSec = number of changes to the parms per second		1 - 60
+//============================================================================
+void Parm_FadeColorGlobal ( float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	vector cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+	//color input clamps
+	fadeDeg1 = VectorClamp_0ToInfinity ( fadeDeg1 );
+	fadeDeg2 = VectorClamp_0ToInfinity ( fadeDeg2 );
+	
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc_x = (fadeDeg2_x - fadeDeg1_x) / cycTotal;
+    cInc_y = (fadeDeg2_y - fadeDeg1_y) / cycTotal;
+    cInc_z = (fadeDeg2_z - fadeDeg1_z) / cycTotal;    
+
+	//for loop...fade
+//	sys.println( "light entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1_x += cInc_x;
+    	fadeDeg1_y += cInc_y;
+    	fadeDeg1_z += cInc_z;
+    	sys.setShaderParm( 0, fadeDeg1_x );
+    	sys.setShaderParm( 1, fadeDeg1_y );
+    	sys.setShaderParm( 2, fadeDeg1_z );
+    	sys.wait( cycInc );
+    }
+    sys.setShaderParm( 0, fadeDeg2_x );//snap it the last little bit
+    sys.setShaderParm( 1, fadeDeg2_y );
+    sys.setShaderParm( 2, fadeDeg2_z );
+//  sys.println( "final light color for " + ent.getName() + " should be = " + fadeDeg2_x +" "+ fadeDeg2_y +" "+ fadeDeg2_z );//debug
+}
+
+//============================================================================
+//Parm_FadeColorLocal (entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec)
+//
+//Fade in, out, and between local color parms:  
+//ent 		= target entity for parm fade.					$*
+//tym 		= total time the fade takes. 					0.0 to 100.0
+//fadeDeg1  = rgb starting position							0 - 1 vectors
+//fadeDeg2 	= rgb ending position							0 - 1 vectors
+//cycPerSec = number of changes to the parm per second		1 - 60
+//============================================================================
+void Parm_FadeColorLocal ( entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	vector cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+	//color input clamps
+	fadeDeg1 = VectorClamp_0ToInfinity ( fadeDeg1 );
+	fadeDeg2 = VectorClamp_0ToInfinity ( fadeDeg2 );
+	
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc_x = (fadeDeg2_x - fadeDeg1_x) / cycTotal;
+    cInc_y = (fadeDeg2_y - fadeDeg1_y) / cycTotal;
+    cInc_z = (fadeDeg2_z - fadeDeg1_z) / cycTotal;    
+
+	//for loop...fade
+//	sys.println( "light entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1_x += cInc_x;
+    	fadeDeg1_y += cInc_y;
+    	fadeDeg1_z += cInc_z;
+    	ent.setShaderParm( 0, fadeDeg1_x );
+    	ent.setShaderParm( 1, fadeDeg1_y );
+    	ent.setShaderParm( 2, fadeDeg1_z );
+    	sys.wait( cycInc );
+    }
+    ent.setShaderParm( 0, fadeDeg2_x );//snap it the last little bit
+    ent.setShaderParm( 1, fadeDeg2_y );
+    ent.setShaderParm( 2, fadeDeg2_z );
+//  sys.println( "final light color for " + ent.getName() + " should be = " + fadeDeg2_x +" "+ fadeDeg2_y +" "+ fadeDeg2_z );//debug
+}
+
+//============================================================================
+//Sound_FadeParm ( entity ent, float tym, vector fadeDeg1, vector fadeDeg2, float cycPerSec )
+//
+//Fade in, out, and between a single local parm in a sound shader on a target entiry:
+//ent 		= target entity with the sound shader for parm fade.			$*
+//prm 		= parm to fade.													0-7
+//tym 		= total time the fade takes. 									0.0 to 100.0
+//fadeDeg1  = parm starting position										0 - 1 vectors
+//fadeDeg2 	= parm ending position											0 - 1 vectors
+//cycPerSec = number of changes to the parm per second						1 - 60
+//============================================================================
+void Sound_FadeParm ( entity ent, float prm, float tym, float fadeDeg1, float fadeDeg2, float cycPerSec ) {
+	float i;//integer fed into the lights rgb
+	float cycTotal;//number of cycles that the for loop runs.  preset since it has a possibility of not being declared
+	float cycInc;//cycPerSec turned to a decimal value.
+	float cInc;//color adjustment increments
+	
+	cycTotal = 1;
+	cycInc = 1;
+
+	//parm input clamps
+	if (prm < 0.0) {
+        prm = 0.0;
+    }
+    else if (prm > 7.0) {
+        prm = 7.0;
+    }
+    prm = floor( prm );
+    //tym clamps
+    if (tym < 0.0) {
+        tym = 0.0;
+    }
+    else if (tym > 100.0) {
+        tym = 100.0;
+    }
+    //cycPerSec clamps
+    if ( cycPerSec > 60 ) {
+    	cycPerSec = 60;
+    }
+    if ( cycPerSec <= 0 ) {
+    	cycPerSec = 0.01;
+    }
+    
+    //total cycles for the loop to run based on total time and cycPerSec
+    cycTotal = tym * cycPerSec;
+    if ( cycTotal < 1 ) {
+    	cycTotal = 1;//run at least once and prevent dividing by 0
+    }
+    
+    //get a value for the sys.wait
+    cycInc = 1 / cycPerSec;
+    
+    //destination colors - starting colors = difference values
+    //difference values / cycTotal = color adjustment incs
+    cInc = (fadeDeg2 - fadeDeg1) / cycTotal;
+    
+    //for loop...fade
+//	sys.println( "light entity faded = " + ent.getName() );//debug
+    for ( i = 1; i <= cycTotal; i += 1 ) {
+    	fadeDeg1 += cInc;
+		//SOUNDPARM_MERGE
+       	//ent.setSoundParm( prm, fadeDeg1 );
+//     	sys.println( "sound parm" + prm + " for " + ent.getName() + " should be = " + fadeDeg1 );//debug
+       	sys.wait( cycInc );
+    }
+	//SOUNDPARM_MERGE
+    //ent.setSoundParm( prm, fadeDeg2 );//snap it the last little bit
+//	sys.println( "final sound parm value for " + ent.getName() + " should be = " + fadeDeg2 );//debug
+}
+
+//============================================================================
+//FadeAll_Off( entity eTarget )
+//
+//Desciption: companion function that auto waits and then sets targets to an of state.  usefull for retriggered FadeAll's
+//============================================================================
+void FadeAll_Off( entity eTarget, float fFadeTime ) {
+//	eTarget.setKey( "isOff", TRUE );
+	sys.wait( fFadeTime );
+	sys.trigger( eTarget );//hides or turns off entities
+}
+
+//============================================================================
+//FadeAll( entity eSelf)
+//
+//Desciption: target and info null that targets multiple lights, func_statics, etc.  By default the entities will fade from
+//	their current color to the '_color' of the relay or to 0 0 0 if no color is set.  If start_off is set on a light it
+//	will fade from 0 0 0 to its set color by default.  This function, with no keys, can target multiple lights, fade them
+//	all simultaneously with different fade times, and trigger on those that are off.  Its best use is to accomplish 
+//	complex fades with few entities while avoiding the need to individually name and track each one in script.  Also,
+//	colors can be set and updated on the maps by the mappers without disturbing the fx system. note: also fully functional 
+//	with func_emitters.
+//Additional uses to document: cross fade toggle setup, triggering unneeded entities off
+//============================================================================
+void FadeAll( entity eSelf) {
+	entity eList, eTarget;
+	float fNumTargs, n, fGlobalFadeTime, fFadeTime, fFadeThreadNum;
+	vector vSourceVec, vDestVec;
+	
+	eList 		= sys.getEntity( eSelf.getKey( "target" ) );
+	fNumTargs 	= eList.numTargets();
+	
+	if ( fGlobalFadeTime = eSelf.getFloatKey( "fadeTime" ) > 0 ) {
+		fGlobalFadeTime = eSelf.getFloatKey( "fadeTime" );
+	}
+	else {
+		fGlobalFadeTime = 1;
+	}
+	
+	for ( n = 0; n < fNumTargs; n++ ) {
+		eTarget = GetTargetEntity( eList, n);
+//		PL( "Target receiving light mod = " + eTarget.getName() );
+		if ( fFadeTime = eTarget.getFloatKey( "fadeTime" ) > 0 ) {
+			fFadeTime = eTarget.getFloatKey( "fadeTime" );
+		}
+		else {
+			fFadeTime = fGlobalFadeTime;
+		}
+		if ( ( eTarget.getIntKey( "start_off" ) == TRUE ) || 
+			 ( eTarget.getIntKey( "hide" ) == TRUE ) || 
+			 ( eTarget.getIntKey( "isOff" ) == TRUE ) ) {//will auto fade in lights, func_statics and particle systems
+			if ( eSelf.getKey( "_color" ) == "" ) {//test and change to vector 0 0 0 check FIX
+				vSourceVec	= '0 0 0';//default to fading off
+				sys.trigger( eTarget );//do not trigger those entities that have an off color other than black
+			}
+			else {//set to custom color
+				vSourceVec	= eSelf.getVectorKey( "_color" );//set to '0 0 0' to avoid triggering
+			}
+//			vSourceVec 	= '0 0 0';
+			vDestVec	= eTarget.getVectorKey( "_color" );
+			eTarget.setColor( vSourceVec_x, vSourceVec_y, vSourceVec_z );
+			eTarget.setKey( "start_off", FALSE );
+			eTarget.setKey( "hide", FALSE );
+			eTarget.setKey( "isOff", FALSE );
+		}
+		else {
+			vSourceVec 	= eTarget.getVectorKey( "_color" );//will fade out or cross fade all entities
+			if ( eSelf.getKey( "_color" ) == "" ) {
+				vDestVec	= '0 0 0';//default to fading off
+			}
+			else {//set to custom color
+				vDestVec	= eSelf.getVectorKey( "_color" );//'0.5 1 0.75';
+			}
+			eTarget.setKey( "isOff", TRUE );
+			if ( ( eTarget.getIntKey( "triggerOff" ) == TRUE ) || ( eSelf.getIntKey( "triggerOff" ) == TRUE ) ) {//set this on systems or entities that you want to toggle back on.
+				thread FadeAll_Off( eTarget, fFadeTime );
+			}
+		}
+
+		if ( eTarget.getKey( "classname" ) == "light" ) {
+			fFadeThreadNum = thread Light_FadeColor( eTarget, fFadeTime, vSourceVec, vDestVec, 24 );
+		}
+		else {
+			fFadeThreadNum = thread Parm_FadeColorLocal( eTarget, fFadeTime, vSourceVec, vDestVec, 24 );
+		}
+		eTarget.setKey( "fadeThreadNum", fFadeThreadNum );
+//		PL( eTarget.getName() + " has stored thread # : " + fFadeThreadNum );//thread nums used to terminate fade threads early in other scripts
+	}
+}
+//============================================================================
+//FadeAll_Pulse( entity eSelf)
+//
+//fade pulses between states until set to isRunning;0
+//============================================================================
+void FadeAll_Pulse( entity eSelf) {
+	float fFadeTime, fOnTime, fOffTime;
+	
+	if ( eSelf.getIntKey( "isBusy" ) == FALSE ) {
+		eSelf.setKey( "isBusy", TRUE );//internal; stops the function from running multiple times
+		eSelf.setKey( "isRunning", TRUE );//override externally to stop function
+		fFadeTime = eSelf.getFloatKey( "fadeTime" );
+		if ( fFadeTime <= 0 ) {
+			fFadeTime = 2;
+		}
+		fOnTime = eSelf.getFloatKey( "onTime" );
+		fOffTime = eSelf.getFloatKey( "offTime" );
+		while ( eSelf.getIntKey( "isRunning" ) == TRUE ) {
+			if ( eSelf.getKey( "onTarget" ) != "" ) {
+				sys.trigger( sys.getEntity( eSelf.getKey( "onTarget" ) ) );//sync up events, such as sound, to the light pulse
+			}
+			FadeAll( eSelf );
+			sys.wait( fFadeTime + fOnTime );//= to global fade time
+			if ( eSelf.getKey( "offTarget" ) != "" ) {
+				sys.trigger( sys.getEntity( eSelf.getKey( "offTarget" ) ) );
+			}
+			FadeAll( eSelf );
+			sys.wait( fFadeTime + fOffTime );
+		}
+		eSelf.setKey( "isBusy", FALSE );
+	}
+}
+
+//============================================================================
+//FadeAll_PulseOff( entity eSelf)
+//
+//simple unCallRef companion
+//============================================================================
+void FadeAll_PulseOff( entity eSelf) {
+	eSelf.setKey( "isRunning", FALSE );
+}
+
+// Temporary diagnostics: trace test for energynode leech collision behavior.
+void OP_ProbeEnergyNode( string nodeName ) {
+	entity node;
+	entity hit;
+	vector opAng;
+	vector opFwd;
+	vector opRight;
+	vector opUp;
+	vector opLocalLeech;
+	vector opStart;
+	vector opEnd;
+	float shotMask;
+	float solidMask;
+	float allMask;
+	float fracSolid;
+	float fracShot;
+	float fracAll;
+	string hitSolid;
+	string hitShot;
+	string hitAll;
+
+	node = sys.getEntity( nodeName );
+	if ( !node ) {
+		sys.println( "OP_NODE_TRACE missing " + nodeName );
+		return;
+	}
+
+	opAng = node.getAngles();
+	opFwd = sys.angToForward( opAng );
+	opRight = sys.angToRight( opAng );
+	opUp = sys.angToUp( opAng );
+	opLocalLeech = node.getVectorKey( "leechPoint" );
+
+	opStart = node.getWorldOrigin() + opFwd * ( opLocalLeech_x + 200 ) + opRight * opLocalLeech_y + opUp * opLocalLeech_z;
+	opEnd = node.getWorldOrigin() + opFwd * ( opLocalLeech_x - 120 ) + opRight * opLocalLeech_y + opUp * opLocalLeech_z;
+
+	// 33556481 == MASK_SHOT_RENDERMODEL (2049) | CONTENTS_GAME_PORTAL (33554432)
+	shotMask = 33556481;
+	solidMask = CONTENTS_SOLID;
+	allMask = -1;
+
+	fracSolid = sys.tracePoint( opStart, opEnd, solidMask, $player1 );
+	hit = sys.getTraceEntity();
+	hitSolid = "<none>";
+	if ( hit ) {
+		hitSolid = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	fracShot = sys.tracePoint( opStart, opEnd, shotMask, $player1 );
+	hit = sys.getTraceEntity();
+	hitShot = "<none>";
+	if ( hit ) {
+		hitShot = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	fracAll = sys.tracePoint( opStart, opEnd, allMask, $player1 );
+	hit = sys.getTraceEntity();
+	hitAll = "<none>";
+	if ( hit ) {
+		hitAll = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	sys.println( "OP_NODE_COORD " + nodeName + " org=" + node.getWorldOrigin() + " ang=" + opAng + " start=" + opStart + " end=" + opEnd );
+	sys.println( "OP_NODE_BOUNDS " + nodeName + " mins=" + node.getMins() + " maxs=" + node.getMaxs() + " size=" + node.getSize() );
+	sys.println( "OP_NODE_TRACE_SOLID " + nodeName + " frac=" + fracSolid + " hit=" + hitSolid );
+	sys.println( "OP_NODE_TRACE_SHOTPORTAL " + nodeName + " frac=" + fracShot + " hit=" + hitShot );
+	sys.println( "OP_NODE_TRACE_ALL " + nodeName + " frac=" + fracAll + " hit=" + hitAll );
+}
+
+void OP_ProbeEnergyNodes_Biolabsa() {
+	sys.println( "OP_NODE_TRACE_BEGIN" );
+	OP_ProbeEnergyNode( "object_energynode_plasma_1" );
+	OP_ProbeEnergyNode( "object_energynode_plasma_2" );
+	OP_ProbeEnergyNode( "object_energynode_freeze_1" );
+	sys.println( "OP_NODE_TRACE_END" );
+}
+
+void OP_RunLeechProbe_Biolabsa() {
+	entity p;
+	entity w;
+	float i;
+	float r;
+
+	p = $player1;
+	if ( !p ) {
+		sys.println( "OP_LEECH no player1" );
+		return;
+	}
+
+	p.setOrigin( '-1200 -684 20' );
+	p.setAngles( '0 180 0' );
+	p.selectWeapon( "weaponobj_soulstripper" );
+	sys.wait( 0.2 );
+	p.selectWeapon( "weapon4" );
+	sys.wait( 0.2 );
+
+	w = p.getWeaponEntity();
+	if ( !w ) {
+		sys.println( "OP_LEECH no weapon entity" );
+		return;
+	}
+
+	sys.println( "OP_LEECH_WEAPON " + w.getName() + ":" + w.getKey( "classname" ) );
+
+	for ( i = 0; i < 12; i++ ) {
+		r = w.leech();
+		sys.println( "OP_LEECH_STEP i=" + i + " r=" + r );
+		sys.wait( 0.1 );
+	}
+
+	r = w.endLeech();
+	sys.println( "OP_LEECH_END r=" + r );
+}
+
+void OP_RunLeechProbe_Salvage() {
+	entity p;
+	entity w;
+	entity hit;
+	float i;
+	float r;
+	float fracSolid;
+	float fracShotPortal;
+	vector wAng;
+	vector wFwd;
+	vector wStart;
+	vector wEnd;
+	string hitSolid;
+	string hitShotPortal;
+
+	p = $player1;
+	if ( !p ) {
+		sys.println( "OP_SALVAGE_LEECH no player1" );
+		return;
+	}
+
+	// object_energynode_plasma_1 @ 608 -8264 -676 (yaw 0)
+	// Salvage map scripts force player view; place player so forced aim intersects node.
+	sys.println( "OP_SALVAGE_LEECH origin_before=" + p.getWorldOrigin() );
+	p.setWorldOrigin( '300 -8232 -647' );
+	sys.println( "OP_SALVAGE_LEECH origin_after_set=" + p.getWorldOrigin() );
+	p.setAngles( '0 180 0' );
+	sys.wait( 0.2 );
+	sys.println( "OP_SALVAGE_LEECH origin_after_wait=" + p.getWorldOrigin() );
+
+	sys.println( "OP_SALVAGE_LEECH current=" + p.getCurrentWeapon() );
+	w = p.getWeaponEntity();
+	if ( !w ) {
+		sys.println( "OP_SALVAGE_LEECH no weapon entity" );
+		return;
+	}
+
+	sys.println( "OP_SALVAGE_LEECH weapon=" + w.getName() + ":" + w.getKey( "classname" ) );
+
+	wAng = w.getAngles();
+	wFwd = sys.angToForward( wAng );
+	wStart = w.getWorldOrigin();
+	wEnd = wStart + wFwd * 1200;
+
+	fracSolid = sys.tracePoint( wStart, wEnd, CONTENTS_SOLID, $player1 );
+	hit = sys.getTraceEntity();
+	hitSolid = "<none>";
+	if ( hit ) {
+		hitSolid = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	fracShotPortal = sys.tracePoint( wStart, wEnd, 33556481, $player1 );
+	hit = sys.getTraceEntity();
+	hitShotPortal = "<none>";
+	if ( hit ) {
+		hitShotPortal = hit.getName() + ":" + hit.getKey( "classname" );
+	}
+
+	sys.println( "OP_SALVAGE_TRACE weaponStart=" + wStart + " ang=" + wAng + " end=" + wEnd );
+	sys.println( "OP_SALVAGE_TRACE_SOLID frac=" + fracSolid + " hit=" + hitSolid );
+	sys.println( "OP_SALVAGE_TRACE_SHOTPORTAL frac=" + fracShotPortal + " hit=" + hitShotPortal );
+
+	for ( i = 0; i < 12; i++ ) {
+		r = w.leech();
+		sys.println( "OP_SALVAGE_LEECH step=" + i + " r=" + r );
+		sys.wait( 0.1 );
+	}
+
+	r = w.endLeech();
+	sys.println( "OP_SALVAGE_LEECH end=" + r );
+}

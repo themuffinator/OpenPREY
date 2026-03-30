@@ -42,7 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 #ifndef LINUX_DEFAULT_PATH
-#define LINUX_DEFAULT_PATH "/usr/local/games/basepy"
+#define LINUX_DEFAULT_PATH "/usr/local/games/basepr"
 #endif
 
 static idStr	basepath;
@@ -124,9 +124,9 @@ const char *Sys_DefaultSavePath(void) {
 	const char *home = getenv( "HOME" );
 	if ( home && home[0] ) {
 #if defined( ID_DEMO_BUILD )
-		sprintf( savepath, "%s/.local/share/basepy-demo", home );
+		sprintf( savepath, "%s/.local/share/basepr-demo", home );
 #else
-		sprintf( savepath, "%s/.local/share/basepy", home );
+		sprintf( savepath, "%s/.local/share/basepr", home );
 #endif
 	} else {
 		savepath = Posix_Cwd();

@@ -1,0 +1,49 @@
+guis/assets/menu/background_center
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/menu/background.tga
+	}
+}
+
+guis/assets/menu/background_left
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/menu/background_left.tga
+	}
+}
+
+guis/assets/menu/background_right
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/menu/background_right.tga
+	}
+}
+
+guis/assets/menu/background_top
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/menu/background_top.tga
+	}
+}
+
+guis/assets/menu/background_bottom
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/menu/background_bottom.tga
+	}
+}

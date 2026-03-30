@@ -1,0 +1,99 @@
+guis/assets/loading/loading
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/loading.tga
+	}
+}
+
+guis/assets/loading/roadhouse
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/roadhouse.tga
+	}
+}
+
+guis/assets/loading/loading_left
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/loading_left.tga
+	}
+}
+
+guis/assets/loading/loading_right
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/loading_right.tga
+	}
+}
+
+guis/assets/loading/loading_top
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/loading_top.tga
+	}
+}
+
+guis/assets/loading/loading_bottom
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/loading_bottom.tga
+	}
+}
+
+guis/assets/loading/roadhouse_left
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/roadhouse_left.tga
+	}
+}
+
+guis/assets/loading/roadhouse_right
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/roadhouse_right.tga
+	}
+}
+
+guis/assets/loading/roadhouse_top
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/roadhouse_top.tga
+	}
+}
+
+guis/assets/loading/roadhouse_bottom
+{
+	sort			gui
+	clamp
+	{
+		blend blend
+		map guis/assets/loading/roadhouse_bottom.tga
+	}
+}
