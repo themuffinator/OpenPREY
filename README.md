@@ -98,6 +98,8 @@ Current follow-up work is tracked in [TODO.md](TODO.md), [docs-dev/release-compl
 - **macOS compiler/toolchain**: Apple Clang with Homebrew `glew`
 
 > [!NOTE]
+> Windows builds use Meson's `b_vscrt=static_from_buildtype` policy so OpenPrey itself does not require a separate Visual C++ redistributable install.
+> [!NOTE]
 > `tools/build/meson_setup.ps1` automatically syncs `../OpenPrey-GameLibs` on `setup`, `compile`, and `install`. Clone the companion repo alongside OpenPrey, or set `OPENPREY_SKIP_GAMELIBS_SYNC=1` if you intentionally want to build only from the in-repo mirror.
 
 ### Installation
@@ -159,6 +161,8 @@ For a short single-player smoke test, append `+set si_gameType singleplayer +map
 - **Linux toolchain**: GCC or Clang with system OpenGL/X11/OpenAL development packages
 - **macOS toolchain**: Apple Clang with Homebrew `glew`
 
+> [!NOTE]
+> Windows builds use Meson's `b_vscrt=static_from_buildtype` policy so OpenPrey itself does not require a separate Visual C++ redistributable install.
 ### Build Options
 ```text
 -Dbuild_engine=true|false         # Build OpenPrey-client_<arch> and OpenPrey-ded_<arch>
