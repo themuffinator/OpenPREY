@@ -121,9 +121,9 @@ function Get-DiscoveredGameModules {
 
     $results = New-Object System.Collections.ArrayList
     $explicitCandidates = @(
-        (Join-Path $BuildOutputDir "openprey\game_x64.dll"),
-        (Join-Path $BuildOutputDir "openprey\game_x86.dll"),
-        (Join-Path $BuildOutputDir "openprey\game_arm64.dll"),
+        (Join-Path $BuildOutputDir "basepy\game_x64.dll"),
+        (Join-Path $BuildOutputDir "basepy\game_x86.dll"),
+        (Join-Path $BuildOutputDir "basepy\game_arm64.dll"),
         (Join-Path $BuildOutputDir "gamex86.dll"),
         (Join-Path $BuildOutputDir "gamex64.dll"),
         (Join-Path $RepoRoot "src\ReleaseDLL\gamex86.dll"),
@@ -168,8 +168,8 @@ function Stage-GameLibModules {
     }
 
     $stageDirs = @(
-        (Join-Path $OpenPreyRoot "builddir\openprey"),
-        (Join-Path $OpenPreyRoot ".install\openprey")
+        (Join-Path $OpenPreyRoot "builddir\basepy"),
+        (Join-Path $OpenPreyRoot ".install\basepy")
     )
 
     foreach ($stageDir in $stageDirs) {

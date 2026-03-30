@@ -19,7 +19,7 @@ Process:
 - [x] Companion game-library tooling updated to support both Meson and legacy project layouts, with staged module output copying.
 - [x] Engine Session/Async `idGame` call sites aligned to current Prey game API signatures to unblock engine target compilation.
 - [x] Meson build graph updated so `-Dbuild_games=false` no longer compiles game-idlib targets, allowing clean engine-only validation builds.
-- [x] Nightly GitHub Actions packaging now keeps `openprey/game_<arch>` loose, writes staged overlay content to `openprey/pak0.pk4`, and publishes a versioned nightly release with generated notes.
+- [x] Nightly GitHub Actions packaging now keeps `basepy/game_<arch>` loose, writes staged overlay content to `basepy/pak0.pk4`, and publishes a versioned nightly release with generated notes.
 - [x] Meson source selection, dependency wiring, and nightly CI now build/package Windows, Linux, and macOS hosts from the same OpenPrey staging layout.
 
 ## Carry Forward

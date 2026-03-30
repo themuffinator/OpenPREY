@@ -22,4 +22,4 @@ This file tracks current known issues and upcoming tasks for the OpenPrey migrat
 
 - [ ] Reduce inherited Quake 4 assumptions in gameplay/asset compatibility paths where they conflict with Prey behavior.
 - [ ] Reinstate Doom 3/Prey particle-system behavior and validate effects parity.
-- [ ] Remove any remaining legacy game-directory naming from docs/scripts and keep `openprey` as the sole namespace.
+- [ ] Remove any remaining legacy game-directory naming from docs/scripts and keep `basepy` as the sole namespace.

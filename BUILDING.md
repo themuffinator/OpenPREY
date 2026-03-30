@@ -204,7 +204,7 @@ bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subproje
 |---|---|
 | `OpenPrey-client_x64[.exe]` | Main engine executable |
 | `OpenPrey-ded_x64[.exe]` | Dedicated server |
-| `openprey/game_x64[.dll/.so/.dylib]` | Unified game module |
+| `basepy/game_x64[.dll/.so/.dylib]` | Unified game module |
 
 - On Windows, import libraries (`.lib`), program databases (`.pdb`), and export files (`.exp`) may be present in debug builds; these are development-only artifacts.
 - The wrapper stages `OpenAL32.dll` next to the executables on Windows where a bundled runtime is available.
@@ -218,7 +218,7 @@ After running the install step, `.install/` is a self-contained distributable pa
 ├── OpenPrey-client_x64.exe     # Main executable
 ├── OpenPrey-ded_x64.exe        # Dedicated server
 ├── OpenAL32.dll                # (Windows) runtime dependency
-└── openprey/
+└── basepy/
     ├── game_x64.dll            # Unified game module
     ├── glprogs/
     ├── guis/
@@ -246,8 +246,8 @@ Nightly packages are structured as:
 - `openprey-<version-tag>-macos.tar.gz`
 
 Package contents:
-- `openprey/game_<arch>.(dll|so|dylib)` stays as a loose runtime module
-- Staged overlay content is bundled into `openprey/pak0.pk4`
+- `basepy/game_<arch>.(dll|so|dylib)` stays as a loose runtime module
+- Staged overlay content is bundled into `basepy/pak0.pk4`
 - Linux packages include `share/applications` and `share/icons` payloads
 - macOS packages include an `OpenPrey.app` launcher bundle
 - The CI workflow publishes or updates a `nightly-<version-tag>` GitHub release with generated notes

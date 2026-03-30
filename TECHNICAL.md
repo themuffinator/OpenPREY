@@ -26,7 +26,7 @@ This status reflects compatibility with official Prey (2006) assets, not binary 
 
 - ✅ **Project Rebrand Completed** — Meson project metadata, staged binaries, VS Code launch settings, and documentation use OpenPrey naming throughout
 - ✅ **Prey Install Discovery** — `fs_basepath` auto-detection targets Prey registry/App Paths/uninstall metadata and known legacy install roots; Steam/GOG assumptions removed
-- ✅ **Unified Game Module Loader** — Engine builds and stages a unified `game_<arch>` module under `openprey/` for both SP and MP paths
+- ✅ **Unified Game Module Loader** — Engine builds and stages a unified `game_<arch>` module under `basepy/` for both SP and MP paths
 - ✅ **Companion Repo Tooling** — Sync/build tooling targets `OpenPrey-GameLibs` and supports both Meson-wrapper and legacy VC-solution layouts
 - ✅ **Official PK4 Layout Validation** — Engine startup rejects missing or modified required base-pack layouts when `fs_validateOfficialPaks 1` is enabled
 - ✅ **Cross-host Meson Support** — Source selection, dependency wiring, and nightly packaging cover Windows, Linux, and macOS hosts
@@ -54,7 +54,7 @@ Current follow-up work is tracked in [TODO.md](TODO.md) and [docs-dev/release-co
 ├── OpenPrey-client_x64      # Main executable (.exe on Windows)
 ├── OpenPrey-ded_x64         # Dedicated server (.exe on Windows)
 ├── OpenAL32.dll             # (Windows) optional bundled runtime
-└── openprey/
+└── basepy/
     ├── game_x64             # Unified game module (.dll / .so / .dylib)
     ├── glprogs/
     ├── guis/
@@ -64,7 +64,7 @@ Current follow-up work is tracked in [TODO.md](TODO.md) and [docs-dev/release-co
     └── strings/
 ```
 
-- **Single-player**: loads `game_<arch>` from `openprey/`
+- **Single-player**: loads `game_<arch>` from `basepy/`
 - **Multiplayer**: loads the same unified `game_<arch>` module
 - **Legacy compatibility**: `gamex86` / `gamex64` aliases are still accepted during migration
 
@@ -123,7 +123,7 @@ See [docs-user/display-settings.md](docs-user/display-settings.md) for the full 
 - `fs_basepath` — detected Prey install root (auto-discovered)
 - `fs_homepath` — writable user path
 - `fs_savepath` — save/config/log path (defaults to `fs_homepath`)
-- `fs_game` — active game directory (`openprey`)
+- `fs_game` — active game directory (`basepy`)
 - `fs_cdpath` — locked runtime overlay path; use `.install/` as launch dir for testing
 
 #### Path Discovery Order
@@ -147,7 +147,7 @@ OpenPrey-client_x64 +set fs_basepath "C:\path\to\Prey"
 
 1. Launch from `.install/` in windowed mode:
    ```powershell
-   .\OpenPrey-client_x64.exe +set fs_game openprey +set fs_savepath ..\.home +set logFile 2 +set logFileName logs/openprey.log +set r_fullscreen 0
+   .\OpenPrey-client_x64.exe +set fs_game basepy +set fs_savepath ..\.home +set logFile 2 +set logFileName logs/openprey.log +set r_fullscreen 0
    ```
 2. Inspect `.home\logs\openprey.log` after each run
 3. Fix warnings and errors in engine/game/parser/loader code before resorting to content-side workarounds
@@ -172,7 +172,7 @@ The SDK is subject to the original Human Head Studios EULA, which permits non-co
 - `tools/build/meson_setup.ps1` syncs the companion repo before `setup`, `compile`, and `install`
 - `OPENPREY_BUILD_GAMELIBS=1` triggers an additional companion build-and-stage pass during `compile`
 - `tools/build/build_gamelibs.ps1` supports both Meson wrappers and the legacy `src/PREY.sln` layout
-- Stage targets: `builddir/openprey/` and `.install/openprey/`
+- Stage targets: `builddir/basepy/` and `.install/basepy/`
 
 ---
 

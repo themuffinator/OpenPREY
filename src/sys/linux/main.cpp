@@ -42,7 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 #ifndef LINUX_DEFAULT_PATH
-#define LINUX_DEFAULT_PATH "/usr/local/games/openprey"
+#define LINUX_DEFAULT_PATH "/usr/local/games/basepy"
 #endif
 
 static idStr	basepath;
@@ -124,9 +124,9 @@ const char *Sys_DefaultSavePath(void) {
 	const char *home = getenv( "HOME" );
 	if ( home && home[0] ) {
 #if defined( ID_DEMO_BUILD )
-		sprintf( savepath, "%s/.local/share/openprey-demo", home );
+		sprintf( savepath, "%s/.local/share/basepy-demo", home );
 #else
-		sprintf( savepath, "%s/.local/share/openprey", home );
+		sprintf( savepath, "%s/.local/share/basepy", home );
 #endif
 	} else {
 		savepath = Posix_Cwd();

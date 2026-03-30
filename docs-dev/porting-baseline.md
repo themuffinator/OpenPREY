@@ -19,9 +19,9 @@ This document defines the baseline assumptions for the OpenQ4 -> OpenPrey migrat
 
 ## Runtime Layout
 
-- Source-side runtime overlay: `openprey/`
+- Source-side runtime overlay: `basepy/`
 - Engine binaries: `.install/`
-- Game modules and staged overrides: `.install/openprey/`
+- Game modules and staged overrides: `.install/basepy/`
 - Working build artifacts: `builddir/`
 - Local save/config/log state for repo-based validation runs: `.home/`
 - Temporary task artifacts: `.tmp/`

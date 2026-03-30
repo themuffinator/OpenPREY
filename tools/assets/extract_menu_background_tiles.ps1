@@ -1,9 +1,9 @@
 param(
-    [string]$InputPath = ".install\openprey\guis\assets\menu\background_tiled.tga",
+    [string]$InputPath = ".install\basepy\guis\assets\menu\background_tiled.tga",
     [string]$TileStem = "background",
     [string[]]$OutputDirs = @(
-        "openprey\guis\assets\menu",
-        ".install\openprey\guis\assets\menu"
+        "basepy\guis\assets\menu",
+        ".install\basepy\guis\assets\menu"
     )
 )
 

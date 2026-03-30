@@ -75,8 +75,8 @@ Primary blocker groups:
 3. Companion Build + Stage Integration
 - Support both Meson-based and legacy VC-solution companion build paths.
 - Stage discovered companion module outputs into:
-  - `builddir/openprey/`
-  - `.install/openprey/`
+  - `builddir/basepy/`
+  - `.install/basepy/`
 - Normalize legacy module naming aliases (`gamex86.dll` -> `game_x86.dll`) for runtime loader compatibility.
 
 4. Filesystem + Install Discovery
