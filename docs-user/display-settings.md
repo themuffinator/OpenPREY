@@ -190,3 +190,7 @@ vid_restart
 - If UI appears too centered/boxed on wide displays, set `ui_aspectCorrection 0`.
 - If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; OpenPrey will also attempt to recover automatically.
 - If AA settings seem unchanged, check values with `r_multiSamples`, `r_postAA`, and `r_msaaAlphaToCoverage`, then run `vid_restart`.
+
+---
+
+[← Back to README](../README.md)
