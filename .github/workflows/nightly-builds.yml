@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
+    inputs:
+      force_release:
+        description: Force a nightly release even if no releasable code changes were detected
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -13,6 +19,8 @@ jobs:
     name: Nightly Metadata
     runs-on: ubuntu-latest
     outputs:
+      has_changes: ${{ steps.detect_changes.outputs.has_changes }}
+      previous_tag: ${{ steps.detect_changes.outputs.previous_tag }}
       base_version: ${{ steps.version.outputs.base_version }}
       version: ${{ steps.version.outputs.version }}
       version_tag: ${{ steps.version.outputs.version_tag }}
@@ -22,13 +30,44 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
+      - name: Detect releasable nightly changes
+        id: detect_changes
+        shell: bash
+        env:
+          FORCE_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_release }}
+        run: |
+          set -euo pipefail
+
+          args=(--output "$GITHUB_OUTPUT")
+          if [ "${FORCE_RELEASE}" = "true" ]; then
+            args+=(--force)
+          fi
+
+          python tools/build/detect_nightly_changes.py "${args[@]}"
+
+      - name: Skip nightly release when no releasable changes were detected
+        if: ${{ steps.detect_changes.outputs.has_changes != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "No releasable code changes were detected since the previous nightly release."
+
       - name: Compute nightly version
+        if: ${{ steps.detect_changes.outputs.has_changes == 'true' }}
         id: version
         shell: bash
         run: |
@@ -63,6 +102,7 @@ jobs:
   nightly:
     name: ${{ matrix.label }}
     needs: metadata
+    if: ${{ needs.metadata.outputs.has_changes == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -279,7 +319,7 @@ jobs:
   release:
     name: Publish Nightly Release
     needs: [metadata, nightly]
-    if: ${{ needs.nightly.result == 'success' }}
+    if: ${{ needs.metadata.outputs.has_changes == 'true' && needs.nightly.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -6,6 +6,7 @@ Process:
 1. Add completed work under "Ready For Changelog".
 2. When cutting a release, move shipped items into release notes.
 3. Keep remaining work in "Carry Forward".
+4. Nightly release notes preview checked "Ready For Changelog" items automatically, so keep each line concise and user-facing.
 
 ## Ready For Changelog
 
