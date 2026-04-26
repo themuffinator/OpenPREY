@@ -4,36 +4,15 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-
-NIGHTLY_TAG_PREFIX = "nightly-"
-
-
-def run_git(args: list[str]) -> str:
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(exc.stderr.strip() or exc.stdout.strip()) from exc
-    return result.stdout.strip()
+from nightly_release_common import find_previous_nightly_tag, run_git
 
 
-def find_previous_nightly_tag(current_release_tag: str) -> str | None:
-    tags = run_git(["tag", "--list", f"{NIGHTLY_TAG_PREFIX}*", "--sort=-creatordate"])
-    for raw_tag in tags.splitlines():
-        tag = raw_tag.strip()
-        if not tag or tag == current_release_tag:
-            continue
-        return tag
-    return None
+CHANGELOG_SOURCE = Path("docs-dev/release-completion.md")
 
 
 def collect_commits(range_spec: str | None, max_count: int) -> list[tuple[str, str, str, str]]:
@@ -68,6 +47,29 @@ def select_highlights(commits: list[tuple[str, str, str, str]], max_items: int) 
     return highlights
 
 
+def collect_curated_release_notes(source_path: Path) -> list[str]:
+    if not source_path.is_file():
+        return []
+
+    notes: list[str] = []
+    in_ready_section = False
+    for raw_line in source_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+
+        if line.startswith("## "):
+            in_ready_section = line == "## Ready For Changelog"
+            continue
+
+        if not in_ready_section or not line:
+            continue
+
+        checked_match = re.match(r"^- \[[xX]\]\s+(.*\S)\s*$", line)
+        if checked_match:
+            notes.append(checked_match.group(1))
+
+    return notes
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate OpenPrey nightly release notes.")
     parser.add_argument("--version", required=True, help="Human-readable nightly version.")
@@ -96,15 +98,17 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
 
     repo_url = f"https://github.com/{args.repo}"
+    changelog_source_url = f"{repo_url}/blob/HEAD/{CHANGELOG_SOURCE.as_posix()}"
     head_sha = run_git(["rev-parse", "HEAD"])
     short_sha = head_sha[:8]
     previous_tag = find_previous_nightly_tag(args.release_tag)
 
     commit_range = f"{previous_tag}..HEAD" if previous_tag else None
     commits = collect_commits(commit_range, args.max_commits)
-    if not commits:
+    if not commits and not previous_tag:
         commits = collect_commits(None, args.max_commits)
 
+    curated_notes = collect_curated_release_notes(CHANGELOG_SOURCE)
     highlights = select_highlights(commits, args.max_highlights)
 
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -129,11 +133,32 @@ def main(argv: list[str]) -> int:
         lines.append(f"| Since | {previous_tag_link} ({compare_link}) |")
     lines.append("")
 
-    lines.append("### Highlights")
+    lines.append("### Curated Release Notes")
+    lines.append("")
+    if curated_notes:
+        lines.append(
+            f"_Maintained in [`{CHANGELOG_SOURCE.as_posix()}`]({changelog_source_url})._"
+        )
+        lines.append("")
+        for note in curated_notes[: args.max_highlights]:
+            lines.append(f"- {note}")
+        remaining_notes = len(curated_notes) - args.max_highlights
+        if remaining_notes > 0:
+            lines.append(
+                f"- ... plus {remaining_notes} more queued release note"
+                f"{'s' if remaining_notes != 1 else ''}."
+            )
+    else:
+        lines.append("- No curated release notes are currently queued.")
+    lines.append("")
+
+    lines.append("### Commit Highlights")
     lines.append("")
     if highlights:
         for subject in highlights:
             lines.append(f"- {subject}")
+    elif previous_tag:
+        lines.append("- No releasable commits were detected since the previous nightly.")
     else:
         lines.append("- Maintenance and nightly integration updates.")
     lines.append("")
@@ -145,6 +170,8 @@ def main(argv: list[str]) -> int:
             lines.append(
                 f"- {subject} ([`{short}`]({repo_url}/commit/{full_sha}), {date})"
             )
+    elif previous_tag:
+        lines.append("- No releasable commits were detected since the previous nightly.")
     else:
         lines.append("- No commit metadata was available for this nightly.")
     lines.append("")
