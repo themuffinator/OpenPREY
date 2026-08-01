@@ -9,12 +9,12 @@
 
 // RAVEN BEGIN
 // rjohnson: this is the name of the game we are making
-#define PROJECT_NAME					"OpenPrey"
+#define PROJECT_NAME					"openPREY"
 #define PROJECT_AUTHOR					"themuffinator"
 #define PROJECT_COMPANY				"DarkMatter Productions"
 #define PROJECT_VERSION				"0.0.1"
 #define PROJECT_WEBSITE				"www.darkmatter-quake.com"
-#define PROJECT_REPO					"https://github.com/themuffinator/OpenPrey"
+#define PROJECT_REPO					"https://github.com/themuffinator/openPREY"
 
 #define GAME_NAME						PROJECT_NAME			// appears on window titles and errors
 #define GAME_ICON						"assets/icons/prey.ico"
@@ -38,7 +38,7 @@
 #endif
 
 // paths
-#define	CD_BASEDIR						"OpenPrey"
+#define	CD_BASEDIR						"openPREY"
 #define	BASE_GAMEDIR					"base"
 #define	BASE_MPGAMEDIR					"base"
 #define OPENPREY_GAMEDIR				"basepr"
@@ -58,10 +58,15 @@
 #endif
 #define	CD_EXE							PROJECT_NAME "-client_" OPENPREY_BINARY_ARCH ".exe"
 
+// Read-only compatibility names for settings written before the openPREY casing settled.
 #ifdef _XENON
-#define CONFIG_FILE						"save:/OpenPreyConfig.cfg"
+#define CONFIG_FILE						"save:/openPREYConfig.cfg"
+#define INTERIM_CONFIG_FILE				"save:/OpenPREYConfig.cfg"
+#define LEGACY_CONFIG_FILE				"save:/OpenPreyConfig.cfg"
 #else
-#define CONFIG_FILE						"OpenPreyConfig.cfg"
+#define CONFIG_FILE						"openPREYConfig.cfg"
+#define INTERIM_CONFIG_FILE				"OpenPREYConfig.cfg"
+#define LEGACY_CONFIG_FILE				"OpenPreyConfig.cfg"
 #endif
 
 // base folder where the source code lives
@@ -127,15 +132,15 @@
 #define EDITOR_WINDOWTEXT				"QuakeEdit"
 
 // win32 info
-#define WIN32_CONSOLE_CLASS				"OpenPrey WinConsole"
-#define WIN32_SPLASH_CLASS				"OpenPrey Splash"
-#define	WIN32_WINDOW_CLASS_NAME			"OpenPrey"
+#define WIN32_CONSOLE_CLASS				"openPREY WinConsole"
+#define WIN32_SPLASH_CLASS				"openPREY Splash"
+#define	WIN32_WINDOW_CLASS_NAME			"openPREY"
 #define	WIN32_FAKE_WINDOW_CLASS_NAME	"OPENPREY_WGL_FAKE"
 
 #ifdef __linux__
 	#define DEFAULT_BASE_PATH				"/usr/local/games/basepr"
 #elif defined( MACOS_X )
-	#define DEFAULT_BASE_PATH				"/Applications/OpenPrey"
+	#define DEFAULT_BASE_PATH				"/Applications/openPREY"
 #endif
 
 // CD Key file info

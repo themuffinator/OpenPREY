@@ -1,7 +1,7 @@
 # Retail Mirror Clip Parity Plan
 
 ## Objective
-Bring OpenPrey's mirror clip-plane behavior into direct parity with retail PREY.exe, using `references/PREY.exe_disassembly.txt` as the authoritative reference.
+Bring openPREY's mirror clip-plane behavior into direct parity with retail PREY.exe, using `references/PREY.exe_disassembly.txt` as the authoritative reference.
 
 ## Retail Findings (Disassembly)
 1. Mirror subview construction (`sub_4f0b30`, called from `sub_4f1100`/`sub_4f13ec`):
@@ -23,7 +23,7 @@ Bring OpenPrey's mirror clip-plane behavior into direct parity with retail PREY.
 - No runtime test of material flag `0x200` in mirror/depth clip path was identified.
 - Practical retail behavior: `skipClip` is parsed metadata, not an active mirror clip runtime toggle.
 
-## Gap vs Current OpenPrey
+## Gap vs Current openPREY
 1. Current renderer introduced non-retail clip bypass behavior (`MF_SKIPCLIP` + per-surface suppression checks in `RB_T_FillDepthBuffer`).
 2. Current clip-plane update runs every surface, not space-cached like retail.
 3. Current code forces subview viewID/effective viewID in extra places not present in retail's clip path design.
@@ -53,7 +53,7 @@ Bring OpenPrey's mirror clip-plane behavior into direct parity with retail PREY.
 
 ## Acceptance Criteria
 1. Mirror clip plane setup and depth-fill handling structurally match retail behavior above.
-2. `skipClip` no longer controls runtime mirror clipping in OpenPrey.
+2. `skipClip` no longer controls runtime mirror clipping in openPREY.
 3. `roadhouse_quick` mirror reflection includes Tommy without prior regressions.
 4. Clean compile and staged run verification completed.
 
@@ -69,5 +69,5 @@ Bring OpenPrey's mirror clip-plane behavior into direct parity with retail PREY.
 - Result: Tommy is reflected in the mirror in runtime validation captures.
 
 3. Remaining parity gap:
-- Retail `SC_MIRROR` path sets `numClipPlanes=1`; OpenPrey currently disables this clip plane as a stability workaround.
+- Retail `SC_MIRROR` path sets `numClipPlanes=1`; openPREY currently disables this clip plane as a stability workaround.
 - Follow-up work should reconstruct the exact retail clip-side math/sign conventions to re-enable mirror clip planes without clipping out the player model.

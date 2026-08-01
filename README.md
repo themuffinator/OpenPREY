@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="assets/img/banner.png" alt="OpenPrey banner">
+<img src="assets/img/banner.png" alt="openPREY banner">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-0.0.1-green.svg)](https://github.com/themuffinator/OpenPrey)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/themuffinator/OpenPrey)
-[![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20arm64-orange.svg)](https://github.com/themuffinator/OpenPrey)
+[![Version](https://img.shields.io/badge/version-0.0.1-green.svg)](https://github.com/themuffinator/openPREY)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/themuffinator/openPREY)
+[![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20arm64-orange.svg)](https://github.com/themuffinator/openPREY)
 [![Build System](https://img.shields.io/badge/build-Meson%20%2B%20Ninja-yellow.svg)](https://mesonbuild.com/)
 
 **Prey (2006) reborn — open-source, modern platform, classic feel.**
@@ -23,12 +23,12 @@
 
 ## About
 
-**OpenPrey** is a free, open-source engine and game-code replacement for Prey (2006). Built as a minimal, Prey-focused adaptation of the [OpenQ4](https://github.com/themuffinator/OpenQ4) codebase, it keeps the modernization work that makes current builds practical to develop and debug, while retargeting the engine, tooling, and game-library workflow around Prey's unified game-module model.
+**openPREY** is a free, open-source engine and game-code replacement for Prey (2006). Built as a minimal, Prey-focused adaptation of the [OpenQ4](https://github.com/themuffinator/OpenQ4) codebase, it keeps the modernization work that makes current builds practical to develop and debug, while retargeting the engine, tooling, and game-library workflow around Prey's unified game-module model.
 
 Run your existing copy of Prey on modern hardware across Windows, Linux, and macOS — without changing the game you remember.
 
 > [!NOTE]
-> **OpenPrey does not include game assets.** You must own a legitimate copy of Prey (2006) to play. On Windows, `fs_basepath` auto-discovery checks the current working directory, registry install entries (including App Paths and uninstall metadata), and known legacy install roots such as `Human Head Studios/Prey`, `2K Games/Prey`, and `Games/Prey`.
+> **openPREY does not include game assets.** You must own a legitimate copy of Prey (2006) to play. On Windows, `fs_basepath` auto-discovery checks the current working directory, registry install entries (including App Paths and uninstall metadata), and known legacy install roots such as `Human Head Studios/Prey`, `2K Games/Prey`, and `Games/Prey`.
 
 ---
 
@@ -57,11 +57,11 @@ Run your existing copy of Prey on modern hardware across Windows, Linux, and mac
 
 ### Step 1 — Get Prey (2006)
 
-You need a copy of **Prey (2006)** installed from original media or another legitimate distribution. OpenPrey supports CD-era install layouts and does not require Steam or GOG.
+You need a copy of **Prey (2006)** installed from original media or another legitimate distribution. openPREY supports CD-era install layouts and does not require Steam or GOG.
 
-### Step 2 — Download the latest OpenPrey release
+### Step 2 — Download the latest openPREY release
 
-Head to the **[Releases page](https://github.com/themuffinator/OpenPrey/releases)** and download the latest archive for your platform (Windows, Linux, or macOS).
+Head to the **[Releases page](https://github.com/themuffinator/openPREY/releases)** and download the latest archive for your platform (Windows, Linux, or macOS).
 
 ### Step 3 — Extract
 
@@ -69,16 +69,16 @@ Unzip or unpack the archive to any folder you like.
 
 ### Step 4 — Play
 
-Launch `OpenPrey-client_x64` (that's `OpenPrey-client_x64.exe` on Windows). OpenPrey will find your Prey (2006) installation automatically in most cases.
+Launch `openPREY-client_x64` (that's `openPREY-client_x64.exe` on Windows). openPREY will find your Prey (2006) installation automatically in most cases.
 
 > [!NOTE]
 > **Windows players:** The package is self-contained — no extra software needs to be installed.
 
 > [!NOTE]
-> **Linux players:** OpenPrey currently runs through XWayland on Wayland desktops. Make sure `DISPLAY` is set in your environment.
+> **Linux players:** openPREY currently runs through XWayland on Wayland desktops. Make sure `DISPLAY` is set in your environment.
 
 > [!TIP]
-> If OpenPrey can't find your Prey installation automatically, launch with `+set fs_basepath "C:\path\to\Prey"`. See the [manual path configuration](TECHNICAL.md#manual-path-configuration) section in the technical reference.
+> If openPREY can't find your Prey installation automatically, launch with `+set fs_basepath "C:\path\to\Prey"`. See the [manual path configuration](TECHNICAL.md#manual-path-configuration) section in the technical reference.
 
 ---
 
@@ -92,13 +92,13 @@ Launch `OpenPrey-client_x64` (that's `OpenPrey-client_x64.exe` on Windows). Open
 
 ## Building from Source
 
-Want to compile OpenPrey yourself? Full instructions, compiler requirements, and notes on the [OpenPrey-GameLibs](https://github.com/themuffinator/OpenPrey-GameLibs) companion repository live in **[BUILDING.md](BUILDING.md)**.
+Want to compile openPREY yourself? Full instructions, compiler requirements, and notes on the [OpenPrey-game](https://github.com/themuffinator/openPREY-GameLibs) companion repository live in **[BUILDING.md](BUILDING.md)**.
 
 ---
 
 ## Contributing
 
-OpenPrey is an open project and welcomes contributions of all kinds — bug reports, code fixes, documentation, and platform testing.
+openPREY is an open project and welcomes contributions of all kinds — bug reports, code fixes, documentation, and platform testing.
 
 1. Fork the repository
 2. Create a feature branch
@@ -113,7 +113,7 @@ Keep compatibility with official Prey assets in mind, follow the existing code s
 
 ### Project Lead
 
-- **themuffinator** — OpenPrey development and maintenance
+- **themuffinator** — openPREY development and maintenance
 
 ### Upstream Credit
 
@@ -137,24 +137,24 @@ Keep compatibility with official Prey assets in mind, follow the existing code s
 
 ## License
 
-OpenPrey is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0) (GPLv3). You are free to use, modify, and distribute the software under its terms.
+openPREY is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0) (GPLv3). You are free to use, modify, and distribute the software under its terms.
 
 See the [LICENSE](LICENSE) file for full details.
 
-**Note:** The GPLv3 license applies to OpenPrey's engine code only. Game library code in [OpenPrey-GameLibs](https://github.com/themuffinator/OpenPrey-GameLibs) is derived from the Prey SDK and subject to the original Human Head Studios SDK EULA. Prey game assets remain the property of Human Head Studios and 2K.
+**Note:** The GPLv3 license applies to openPREY's engine code only. Game library code in [OpenPrey-game](https://github.com/themuffinator/openPREY-GameLibs) is derived from the Prey SDK and subject to the original Human Head Studios SDK EULA. Prey game assets remain the property of Human Head Studios and 2K.
 
 ---
 
 ## Disclaimer
 
-OpenPrey is an independent project and is not affiliated with, endorsed by, or sponsored by Human Head Studios, 2K, Bethesda, ZeniMax, id Software, or Raven Software. Prey is a trademark of ZeniMax Media Inc.
+openPREY is an independent project and is not affiliated with, endorsed by, or sponsored by Human Head Studios, 2K, Bethesda, ZeniMax, id Software, or Raven Software. Prey is a trademark of ZeniMax Media Inc.
 
-You must own a legitimate copy of Prey (2006) to use this software. OpenPrey does not include any copyrighted game assets.
+You must own a legitimate copy of Prey (2006) to use this software. openPREY does not include any copyrighted game assets.
 
-**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.** OpenPrey is experimental software under active development. Use at your own risk.
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.** openPREY is experimental software under active development. Use at your own risk.
 
 ---
 
 ## Links
 
-[Repository](https://github.com/themuffinator/OpenPrey) • [Game Library](https://github.com/themuffinator/OpenPrey-GameLibs) • [Issue Tracker](https://github.com/themuffinator/OpenPrey/issues) • [Releases](https://github.com/themuffinator/OpenPrey/releases) • [OpenQ4](https://github.com/themuffinator/OpenQ4)
+[Repository](https://github.com/themuffinator/openPREY) • [Game Library](https://github.com/themuffinator/openPREY-GameLibs) • [Issue Tracker](https://github.com/themuffinator/openPREY/issues) • [Releases](https://github.com/themuffinator/openPREY/releases) • [OpenQ4](https://github.com/themuffinator/OpenQ4)

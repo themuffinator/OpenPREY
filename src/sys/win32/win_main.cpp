@@ -565,14 +565,14 @@ const char* Sys_DefaultSavePath(void) {
 
 	if ( localAppData && localAppData[0] ) {
 		savePath = localAppData;
-		savePath.AppendPath( "OpenPrey" );
+		savePath.AppendPath( "openPREY" );
 		return savePath.c_str();
 	}
 
 	if ( userProfile && userProfile[0] ) {
 		savePath = userProfile;
 		savePath.AppendPath( "Saved Games" );
-		savePath.AppendPath( "OpenPrey" );
+		savePath.AppendPath( "openPREY" );
 		return savePath.c_str();
 	}
 
@@ -1008,7 +1008,7 @@ returns true if there is a copy of D3 running already
 bool Sys_AlreadyRunning(void) {
 #ifndef DEBUG
 	if (!win32.win_allowMultipleInstances.GetBool()) {
-		HANDLE hMutexOneInstance = ::CreateMutex(NULL, FALSE, "DOOM3");
+		HANDLE hMutexOneInstance = ::CreateMutex(NULL, FALSE, "openPREY");
 		if (::GetLastError() == ERROR_ALREADY_EXISTS || ::GetLastError() == ERROR_ACCESS_DENIED) {
 			return true;
 		}

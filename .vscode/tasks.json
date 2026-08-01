@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Configure OpenPrey (Meson Debug)",
+      "label": "Configure openPREY (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -24,7 +24,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Compile OpenPrey (Meson Debug)",
+      "label": "Compile openPREY (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "label": "Stage OpenPrey Install Tree (Meson Debug)",
+      "label": "Stage openPREY Install Tree (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -60,11 +60,11 @@
       "problemMatcher": []
     },
     {
-      "label": "Build OpenPrey (Meson Debug)",
+      "label": "Build openPREY (Meson Debug)",
       "dependsOrder": "sequence",
       "dependsOn": [
-        "Compile OpenPrey (Meson Debug)",
-        "Stage OpenPrey Install Tree (Meson Debug)"
+        "Compile openPREY (Meson Debug)",
+        "Stage openPREY Install Tree (Meson Debug)"
       ],
       "group": {
         "kind": "build",

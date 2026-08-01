@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$openPreyRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
+$openPREYRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 
 $gameLibsRepoOverride = ""
 if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_GAMELIBS_REPO)) {
@@ -19,7 +19,7 @@ if ([string]::IsNullOrWhiteSpace($GameLibsRepo)) {
     if (-not [string]::IsNullOrWhiteSpace($gameLibsRepoOverride)) {
         $GameLibsRepo = $gameLibsRepoOverride
     } else {
-        $GameLibsRepo = Join-Path $openPreyRoot "..\OpenPrey-GameLibs"
+        $GameLibsRepo = Join-Path $openPREYRoot "..\OpenPrey-game"
     }
 }
 
@@ -28,26 +28,26 @@ $syncMappings = @(
     @{
         Name = "game sources"
         Source = Join-Path $gameLibsRoot "src\game"
-        Destination = Join-Path $openPreyRoot "src\game"
+        Destination = Join-Path $openPREYRoot "src\game"
         Excludes = @("Callbacks.cpp", "gamesys\Callbacks.cpp")
         Optional = $false
     },
     @{
         Name = "Prey gameplay sources"
         Source = Join-Path $gameLibsRoot "src\Prey"
-        Destination = Join-Path $openPreyRoot "src\Prey"
+        Destination = Join-Path $openPREYRoot "src\Prey"
         Optional = $true
     },
     @{
         Name = "preyengine shared headers"
         Source = Join-Path $gameLibsRoot "src\preyengine"
-        Destination = Join-Path $openPreyRoot "src\preyengine"
+        Destination = Join-Path $openPREYRoot "src\preyengine"
         Optional = $true
     }
 )
 
 if (-not (Test-Path $gameLibsRoot)) {
-    throw "OpenPrey-GameLibs repository not found at '$gameLibsRoot'. Set OPENPREY_GAMELIBS_REPO (or legacy OPENQ4_GAMELIBS_REPO) or pass -GameLibsRepo."
+    throw "OpenPrey-game repository not found at '$gameLibsRoot'. Set OPENPREY_GAMELIBS_REPO (or legacy OPENQ4_GAMELIBS_REPO) or pass -GameLibsRepo."
 }
 
 $hasChanges = $false
@@ -92,7 +92,7 @@ $singleFileMappings = @(
     @{
         Name = "declPreyBeam header"
         Source = Join-Path $gameLibsRoot "src\framework\declPreyBeam.h"
-        Destination = Join-Path $openPreyRoot "src\framework\declPreyBeam.h"
+        Destination = Join-Path $openPREYRoot "src\framework\declPreyBeam.h"
         Optional = $true
     }
 )

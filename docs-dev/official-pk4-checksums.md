@@ -1,17 +1,17 @@
 # Official Prey (2006) PK4 Checksums
 
-This document tracks the official PK4 checksum baseline used by OpenPrey startup validation.
+This document tracks the official PK4 checksum baseline used by openPREY startup validation.
 
 ## Status
 
-OpenPrey now tracks two known official Prey base pack layouts:
+openPREY now tracks two known official Prey base pack layouts:
 
 1. Classic retail CD/DVD naming (`pak000` ... `pak004`).
 2. Consolidated naming seen in legacy digital distributions (`pak_data`, `pak_sound`, `pak_en_v`, `pak_en_t`).
 
 ## Capture Method
 
-1. Launch OpenPrey against a clean Prey installation.
+1. Launch openPREY against a clean Prey installation.
 2. Enable startup logging (`logFile 2`) and inspect `logs/openprey.log` under `fs_savepath`.
 3. Record `Loaded pk4 ... with checksum ...` lines.
 4. Populate required and optional PK4 tables below.
@@ -51,6 +51,6 @@ OpenPrey now tracks two known official Prey base pack layouts:
 ## Notes
 
 - Checksum format is the engine PK4 checksum generated in `src/framework/FileSystem.cpp`.
-- The consolidated checksums were captured from an installed retail-media layout via OpenPrey runtime logging (`Loaded pk4 ... checksum ...`).
+- The consolidated checksums were captured from an installed retail-media layout via openPREY runtime logging (`Loaded pk4 ... checksum ...`).
 - Classic naming entries remain presence-only until canonical checksums are captured.
 - Keep this list synchronized with any strict validation policy changes.

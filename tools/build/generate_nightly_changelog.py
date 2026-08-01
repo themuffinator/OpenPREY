@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate release notes for OpenPrey nightly builds."""
+"""Generate release notes for openPREY nightly builds."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def select_highlights(commits: list[tuple[str, str, str, str]], max_items: int) 
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate OpenPrey nightly release notes.")
+    parser = argparse.ArgumentParser(description="Generate openPREY nightly release notes.")
     parser.add_argument("--version", required=True, help="Human-readable nightly version.")
     parser.add_argument("--version-tag", required=True, help="File-safe nightly version tag.")
     parser.add_argument("--release-tag", required=True, help="Release tag (for example nightly-...).")
@@ -115,7 +115,7 @@ def main(argv: list[str]) -> int:
         compare_link = f"[compare]({repo_url}/compare/{previous_tag}...{head_sha})"
 
     lines: list[str] = []
-    lines.append(f"## OpenPrey Nightly {args.version_tag}")
+    lines.append(f"## openPREY Nightly {args.version_tag}")
     lines.append("")
     lines.append("| Field | Value |")
     lines.append("| --- | --- |")

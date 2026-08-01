@@ -1,6 +1,6 @@
-# Building OpenPrey from Source
+# Building openPREY from Source
 
-This guide covers everything required to compile OpenPrey from source on Windows, Linux, and macOS.
+This guide covers everything required to compile openPREY from source on Windows, Linux, and macOS.
 
 ---
 
@@ -55,34 +55,34 @@ powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 <meson-comm
 Alternatively, open `tools/build/openprey_devcmd.cmd` first to initialise the Visual Studio environment, then call `meson` directly.
 
 > [!NOTE]
-> Windows builds use Meson's `b_vscrt=static_from_buildtype` policy so OpenPrey itself does not require a separate Visual C++ redistributable install.
+> Windows builds use Meson's `b_vscrt=static_from_buildtype` policy so openPREY itself does not require a separate Visual C++ redistributable install.
 
 ---
 
 ## GameLibs Companion Repository
 
-OpenPrey's game code lives in a separate companion repository — [OpenPrey-GameLibs](https://github.com/themuffinator/OpenPrey-GameLibs). This separation clearly identifies the SDK-licensed components derived from the Prey Software Development Kit.
+openPREY's game code lives in a separate companion repository — [OpenPrey-game](https://github.com/themuffinator/openPREY-GameLibs). This separation clearly identifies the SDK-licensed components derived from the Prey Software Development Kit.
 
 > [!IMPORTANT]
-> **The OpenPrey build expects OpenPrey-GameLibs to be checked out alongside OpenPrey**, at `../OpenPrey-GameLibs` relative to this repository. If the companion repository is missing or at a different path, game-module builds will fail.
+> **The openPREY build expects OpenPrey-game to be checked out alongside openPREY**, at `../OpenPrey-game` relative to this repository. If the companion repository is missing or at a different path, game-module builds will fail.
 
 ### Setting Up
 
 ```bash
 # Clone both repositories side-by-side:
-git clone https://github.com/themuffinator/OpenPrey.git
-git clone https://github.com/themuffinator/OpenPrey-GameLibs.git
+git clone https://github.com/themuffinator/openPREY.git
+git clone https://github.com/themuffinator/openPREY-GameLibs.git OpenPrey-game
 
 # Result:
-#   ./OpenPrey/            ← this repository
-#   ./OpenPrey-GameLibs/   ← game library source
+#   ./openPREY/            ← this repository
+#   ./OpenPrey-game/       ← game library source
 ```
 
 To use a custom location, set the environment variable before configuring:
 
 ```bash
-export OPENPREY_GAMELIBS_REPO=/path/to/OpenPrey-GameLibs   # Linux / macOS
-$env:OPENPREY_GAMELIBS_REPO = "C:\path\to\OpenPrey-GameLibs"  # PowerShell
+export OPENPREY_GAMELIBS_REPO=/path/to/OpenPrey-game   # Linux / macOS
+$env:OPENPREY_GAMELIBS_REPO = "C:\path\to\OpenPrey-game"  # PowerShell
 ```
 
 ### Companion Build Environment Variables
@@ -112,7 +112,7 @@ Pass any of these with `-D<option>=<value>` on the `meson setup` command line:
 
 | Option | Default | Description |
 |---|---|---|
-| `build_engine` | `true` | Build `OpenPrey-client_<arch>` and `OpenPrey-ded_<arch>` |
+| `build_engine` | `true` | Build `openPREY-client_<arch>` and `openPREY-ded_<arch>` |
 | `build_games` | `true` | Build the unified game module from the synchronized mirror |
 | `platform_backend` | `sdl3` | `sdl3`, `legacy_win32`, or `native` |
 | `use_pch` | `true` | Use precompiled headers |
@@ -135,7 +135,7 @@ powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wip
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
 
 # 3. Run directly from builddir
-builddir\OpenPrey-client_x64.exe +set r_fullscreen 0
+builddir\openPREY-client_x64.exe +set r_fullscreen 0
 ```
 
 ### Release Build
@@ -166,7 +166,7 @@ meson install -C builddir --no-rebuild --skip-subprojects
 ## Building on Linux / macOS
 
 > [!NOTE]
-> The Linux runtime currently uses an X11/GLX path. On Wayland desktops, run OpenPrey through XWayland (`DISPLAY` must be set).
+> The Linux runtime currently uses an X11/GLX path. On Wayland desktops, run openPREY through XWayland (`DISPLAY` must be set).
 
 ### Debug Build
 
@@ -178,7 +178,7 @@ bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildt
 bash tools/build/meson_setup.sh compile -C builddir
 
 # 3. Run directly from builddir
-./builddir/OpenPrey-client_x64 +set r_fullscreen 0
+./builddir/openPREY-client_x64 +set r_fullscreen 0
 ```
 
 ### Release Build
@@ -202,8 +202,8 @@ bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subproje
 
 | File | Description |
 |---|---|
-| `OpenPrey-client_x64[.exe]` | Main engine executable |
-| `OpenPrey-ded_x64[.exe]` | Dedicated server |
+| `openPREY-client_x64[.exe]` | Main engine executable |
+| `openPREY-ded_x64[.exe]` | Dedicated server |
 | `basepr/game_x64[.dll/.so/.dylib]` | Unified game module |
 
 - On Windows, import libraries (`.lib`), program databases (`.pdb`), and export files (`.exp`) may be present in debug builds; these are development-only artifacts.
@@ -215,8 +215,8 @@ After running the install step, `.install/` is a self-contained distributable pa
 
 ```
 .install/
-├── OpenPrey-client_x64.exe     # Main executable
-├── OpenPrey-ded_x64.exe        # Dedicated server
+├── openPREY-client_x64.exe     # Main executable
+├── openPREY-ded_x64.exe        # Dedicated server
 ├── OpenAL32.dll                # (Windows) runtime dependency
 └── basepr/
     ├── game_x64.dll            # Unified game module
@@ -249,7 +249,7 @@ Package contents:
 - `basepr/game_<arch>.(dll|so|dylib)` stays as a loose runtime module
 - Staged overlay content is bundled into `basepr/pak0.pk4`
 - Linux packages include `share/applications` and `share/icons` payloads
-- macOS packages include an `OpenPrey.app` launcher bundle
+- macOS packages include an `openPREY.app` launcher bundle
 - The CI workflow publishes or updates a `nightly-<version-tag>` GitHub release with generated notes
 
 ---

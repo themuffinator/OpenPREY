@@ -46,7 +46,7 @@ function Invoke-MesonGameLibsBuild {
     $coreData = Join-Path $BuildOutputDir "meson-private\coredata.dat"
     $buildNinja = Join-Path $BuildOutputDir "build.ninja"
 
-    Write-Host "Detected Meson wrapper in OpenPrey-GameLibs."
+    Write-Host "Detected Meson wrapper in OpenPrey-game."
     Write-Host "  Repo: $RepoRoot"
     Write-Host "  BuildDir: $BuildOutputDir"
 
@@ -79,10 +79,10 @@ function Invoke-LegacyGameLibsBuild {
 
     $legacySolution = Join-Path $RepoRoot "src\PREY.sln"
     if (-not (Test-Path $legacySolution)) {
-        throw "OpenPrey-GameLibs has no Meson wrapper and no legacy PREY.sln at '$legacySolution'."
+        throw "OpenPrey-game has no Meson wrapper and no legacy PREY.sln at '$legacySolution'."
     }
 
-    Write-Host "Detected legacy OpenPrey-GameLibs project layout (VC solution)."
+    Write-Host "Detected legacy OpenPrey-game project layout (VC solution)."
     Write-Host "  Solution: $legacySolution"
 
     if ($SetupOnlyMode) {
@@ -110,7 +110,7 @@ function Invoke-LegacyGameLibsBuild {
         return
     }
 
-    throw "Legacy OpenPrey-GameLibs build requires either devenv.com or msbuild in PATH."
+    throw "Legacy OpenPrey-game build requires either devenv.com or msbuild in PATH."
 }
 
 function Get-DiscoveredGameModules {
@@ -159,7 +159,7 @@ function Get-DiscoveredGameModules {
 function Stage-GameLibModules {
     param(
         [System.Collections.ArrayList]$ModulePaths,
-        [string]$OpenPreyRoot
+        [string]$openPREYRoot
     )
 
     if ($ModulePaths.Count -eq 0) {
@@ -168,8 +168,8 @@ function Stage-GameLibModules {
     }
 
     $stageDirs = @(
-        (Join-Path $OpenPreyRoot "builddir\basepr"),
-        (Join-Path $OpenPreyRoot ".install\basepr")
+        (Join-Path $openPREYRoot "builddir\basepr"),
+        (Join-Path $openPREYRoot ".install\basepr")
     )
 
     foreach ($stageDir in $stageDirs) {
@@ -199,7 +199,7 @@ function Stage-GameLibModules {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$openPreyRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
+$openPREYRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 
 $gameLibsRepoOverride = ""
 if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_GAMELIBS_REPO)) {
@@ -212,7 +212,7 @@ if ([string]::IsNullOrWhiteSpace($GameLibsRepo)) {
     if (-not [string]::IsNullOrWhiteSpace($gameLibsRepoOverride)) {
         $GameLibsRepo = $gameLibsRepoOverride
     } else {
-        $GameLibsRepo = Join-Path $openPreyRoot "..\OpenPrey-GameLibs"
+        $GameLibsRepo = Join-Path $openPREYRoot "..\OpenPrey-game"
     }
 }
 
@@ -225,10 +225,10 @@ $gameLibsBuildDir = [System.IO.Path]::GetFullPath($BuildDir)
 $gameLibsMesonSetup = Join-Path $gameLibsRoot "tools\build\meson_setup.ps1"
 
 if (-not (Test-Path $gameLibsRoot)) {
-    throw "OpenPrey-GameLibs repository not found at '$gameLibsRoot'. Set OPENPREY_GAMELIBS_REPO (or legacy OPENQ4_GAMELIBS_REPO) or pass -GameLibsRepo."
+    throw "OpenPrey-game repository not found at '$gameLibsRoot'. Set OPENPREY_GAMELIBS_REPO (or legacy OPENQ4_GAMELIBS_REPO) or pass -GameLibsRepo."
 }
 
-Write-Host "Building OpenPrey game libraries from:"
+Write-Host "Building openPREY game libraries from:"
 Write-Host "  Repo: $gameLibsRoot"
 Write-Host "  BuildDir: $gameLibsBuildDir"
 
@@ -240,7 +240,7 @@ if (Test-Path $gameLibsMesonSetup) {
 
 if (-not $SetupOnly -and -not $SkipStage) {
     $modules = Get-DiscoveredGameModules -RepoRoot $gameLibsRoot -BuildOutputDir $gameLibsBuildDir
-    Stage-GameLibModules -ModulePaths $modules -OpenPreyRoot $openPreyRoot
+    Stage-GameLibModules -ModulePaths $modules -openPREYRoot $openPREYRoot
 }
 
-Write-Host "OpenPrey-GameLibs build complete."
+Write-Host "OpenPrey-game build complete."

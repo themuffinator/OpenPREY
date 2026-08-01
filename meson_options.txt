@@ -9,7 +9,7 @@ option(
   'build_engine',
   type: 'boolean',
   value: true,
-  description: 'Build engine executables (OpenPrey-client_<arch>/OpenPrey-ded_<arch>).',
+  description: 'Build engine executables (openPREY-client_<arch>/openPREY-ded_<arch>).',
 )
 
 option(

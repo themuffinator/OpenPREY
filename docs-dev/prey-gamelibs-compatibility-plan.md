@@ -1,16 +1,16 @@
-# OpenPrey GameLibs Compatibility Plan
+# openPREY GameLibs Compatibility Plan
 
 This document captures the current compatibility research baseline and concrete workstreams required for full Prey (2006) game-library parity.
 
 ## Current Findings
 
-- Companion repo (`../OpenPrey-GameLibs`) currently uses legacy project layouts (`src/PREY.sln`, `src/2005game.vcproj`) and does not currently expose a Meson wrapper.
+- Companion repo (`../OpenPrey-game`) currently uses legacy project layouts (`src/PREY.sln`, `src/2005game.vcproj`) and does not currently expose a Meson wrapper.
 - Legacy game-library outputs are unified-module style (`gamex86.dll`) rather than hard split SP/MP outputs.
-- Companion sources include Prey-specific gameplay trees not yet fully integrated in OpenPrey runtime build flow:
+- Companion sources include Prey-specific gameplay trees not yet fully integrated in openPREY runtime build flow:
   - `src/Prey`
   - `src/preyengine`
   - shared header dependencies such as `src/framework/declPreyBeam.h`
-- OpenPrey runtime loader and filesystem still carried inherited Quake 4 assumptions before this pass (module naming and install discovery patterns).
+- openPREY runtime loader and filesystem still carried inherited Quake 4 assumptions before this pass (module naming and install discovery patterns).
 
 ## Observed Compile Blockers (2026-02-20)
 
@@ -105,7 +105,7 @@ Primary blocker groups:
 
 ## Immediate Next Milestones
 
-1. Integrate synced `src/Prey` sources into active OpenPrey game-module compilation path.
+1. Integrate synced `src/Prey` sources into active openPREY game-module compilation path.
 2. Verify unified-module runtime in SP and MP map start flows.
 3. Capture and publish official Prey PK4 checksums from known-good retail installs.
 4. Begin particle-system reinstatement and validate stock effects behavior in representative maps.

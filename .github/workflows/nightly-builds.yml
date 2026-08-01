@@ -52,7 +52,7 @@ jobs:
           version="${base_version}-nightly.${nightly_date}.${run_id}+${short_sha}"
           version_tag="${base_version}-nightly.${nightly_date}.${run_id}-${short_sha}"
           release_tag="nightly-${version_tag}"
-          release_name="OpenPrey Nightly ${version_tag}"
+          release_name="openPREY Nightly ${version_tag}"
 
           echo "base_version=${base_version}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
@@ -178,18 +178,18 @@ jobs:
 
           case "${{ matrix.platform }}" in
             windows)
-              client=".install/OpenPrey-client_${{ matrix.binary_arch }}.exe"
-              ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}.exe"
+              client=".install/openPREY-client_${{ matrix.binary_arch }}.exe"
+              ded=".install/openPREY-ded_${{ matrix.binary_arch }}.exe"
               game_module=".install/basepr/game_${{ matrix.binary_arch }}.dll"
               ;;
             linux)
-              client=".install/OpenPrey-client_${{ matrix.binary_arch }}"
-              ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}"
+              client=".install/openPREY-client_${{ matrix.binary_arch }}"
+              ded=".install/openPREY-ded_${{ matrix.binary_arch }}"
               game_module=".install/basepr/game_${{ matrix.binary_arch }}.so"
               ;;
             macos)
-              client=".install/OpenPrey-client_${{ matrix.binary_arch }}"
-              ded=".install/OpenPrey-ded_${{ matrix.binary_arch }}"
+              client=".install/openPREY-client_${{ matrix.binary_arch }}"
+              ded=".install/openPREY-ded_${{ matrix.binary_arch }}"
               game_module=".install/basepr/game_${{ matrix.binary_arch }}.dylib"
               ;;
           esac
@@ -251,10 +251,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          app_root="${{ steps.package.outputs.package_dir }}/OpenPrey.app"
+          app_root="${{ steps.package.outputs.package_dir }}/openPREY.app"
           app_plist="${app_root}/Contents/Info.plist"
-          app_exec="${app_root}/Contents/MacOS/OpenPrey"
-          app_icon="${app_root}/Contents/Resources/OpenPrey.icns"
+          app_exec="${app_root}/Contents/MacOS/openPREY"
+          app_icon="${app_root}/Contents/Resources/openPREY.icns"
 
           if [ ! -f "${app_plist}" ]; then
             echo "Missing macOS app Info.plist: ${app_plist}"

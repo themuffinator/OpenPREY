@@ -1,6 +1,6 @@
-# OpenPrey Platform And Architecture Roadmap
+# openPREY Platform And Architecture Roadmap
 
-This document defines platform direction for OpenPrey and how SDL3 + Meson are used during the Prey (2006) adaptation.
+This document defines platform direction for openPREY and how SDL3 + Meson are used during the Prey (2006) adaptation.
 
 ## Target End State
 
@@ -43,11 +43,11 @@ This document defines platform direction for OpenPrey and how SDL3 + Meson are u
 - `.install/` is the standard staged runtime package root.
 - `.home/` is the standard repo-local save/config/log root for validation runs launched from `.install/`.
 - Linux staging should install `share/applications/openprey.desktop` plus `share/icons/hicolor/.../openprey.png`.
-- macOS staging should install `OpenPrey.icns`, with nightly packaging generating an `OpenPrey.app` launcher bundle.
+- macOS staging should install `openPREY.icns`, with nightly packaging generating an `openPREY.app` launcher bundle.
 
 ## Bring-Up Staging
 
-1. Keep Windows x64 stable for OpenPrey engine/game workflows.
+1. Keep Windows x64 stable for openPREY engine/game workflows.
 2. Keep Linux x64 and macOS arm64 Meson/nightly packaging green.
 3. Expand non-Windows runtime and map-validation coverage.
 4. Promote non-Windows platforms from build parity to runtime parity once validation is repeatable.

@@ -1,5 +1,5 @@
 project(
-  'OpenPrey',
+  'openPREY',
   ['c', 'cpp'],
   version: '0.0.1',
   meson_version: '>=1.2.0',
@@ -9,7 +9,7 @@ project(
 host_system = host_machine.system()
 host_cpu_family = host_machine.cpu_family()
 if not ['windows', 'linux', 'darwin'].contains(host_system)
-  error('Unsupported host system for OpenPrey Meson build: ' + host_system)
+  error('Unsupported host system for openPREY Meson build: ' + host_system)
 endif
 
 binary_arch = host_cpu_family
@@ -26,7 +26,7 @@ engine_ded_binary_name = meson.project_name() + '-ded_' + binary_arch
 
 if host_cpu_family != 'x86_64'
   warning(
-    'OpenPrey currently targets x64 as the active compatibility baseline. '
+    'openPREY currently targets x64 as the active compatibility baseline. '
     + 'Non-x64 builds are considered experimental during platform bring-up.'
   )
 endif
@@ -77,7 +77,7 @@ game_module_defs_file = meson.project_source_root() / 'src' / 'game' / 'Game.def
 if legacy_build_game_sp or legacy_build_game_mp
   warning(
     'build_game_sp/build_game_mp are legacy no-op options. '
-    + 'OpenPrey now builds a unified game module (game_<arch>) when build_games=true.'
+    + 'openPREY now builds a unified game module (game_<arch>) when build_games=true.'
   )
 endif
 
@@ -159,7 +159,7 @@ resource_compiler = find_program('rc', 'windres', required: false)
 if host_system == 'windows' and resource_compiler.found()
   windows_mod = import('windows')
   engine_sources += windows_mod.compile_resources(
-    'src/sys/win32/rc/OpenPreyVersion.rc',
+    'src/sys/win32/rc/openprey_version.rc',
     include_directories: [root_include_dir],
   )
 endif
@@ -468,13 +468,13 @@ endif
 install_data(
   'assets/icons/prey.ico',
   install_dir: install_root_dir,
-  rename: 'OpenPrey.ico',
+  rename: 'openPREY.ico',
 )
 
 install_data(
   'assets/icons/prey.icns',
   install_dir: install_root_dir,
-  rename: 'OpenPrey.icns',
+  rename: 'openPREY.icns',
 )
 
 if host_system == 'linux'

@@ -105,10 +105,22 @@ const char *Sys_DefaultSavePath( void ) {
 	const char *home = [NSHomeDirectory() fileSystemRepresentation];
 	if ( home != NULL && home[0] != '\0' ) {
 #if defined( ID_DEMO_BUILD )
-		savepath = va( "%s/Library/Application Support/OpenPrey Demo", home );
+		const char *saveDir = "openPREY Demo";
+		const char *legacySaveDirs[] = { "OpenPREY Demo", "OpenPrey Demo" };
 #else
-		savepath = va( "%s/Library/Application Support/OpenPrey", home );
+		const char *saveDir = "openPREY";
+		const char *legacySaveDirs[] = { "OpenPREY", "OpenPrey" };
 #endif
+		savepath = va( "%s/Library/Application Support/%s", home, saveDir );
+		if ( access( savepath.c_str(), F_OK ) != 0 ) {
+			for ( int i = 0; i < 2; ++i ) {
+				const idStr legacySavePath = va( "%s/Library/Application Support/%s", home, legacySaveDirs[i] );
+				if ( access( legacySavePath.c_str(), F_OK ) == 0 ) {
+					savepath = legacySavePath;
+					break;
+				}
+			}
+		}
 	} else {
 		savepath = Posix_Cwd();
 	}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create curated nightly distributable archives for OpenPrey."""
+"""Create curated nightly distributable archives for openPREY."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
-PRODUCT_NAME = "OpenPrey"
+PRODUCT_NAME = "openPREY"
 PACKAGE_STEM_NAME = "openprey"
 GAME_DIR_NAME = "basepr"
 SUPPORTED_ARCHES = ("x64", "x86", "arm64")
@@ -55,7 +55,7 @@ OPENPREY_PK4_EXCLUDED_SUFFIXES = {
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Package OpenPrey nightly artifacts into a release archive."
+        description="Package openPREY nightly artifacts into a release archive."
     )
     parser.add_argument(
         "--platform",
@@ -82,7 +82,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--source-root",
         default=".",
-        help="OpenPrey repository root.",
+        help="openPREY repository root.",
     )
     parser.add_argument(
         "--install-dir",
@@ -406,7 +406,7 @@ def main(argv: list[str]) -> int:
     archive_path = output_dir / f"{package_stem}{archive_suffix}"
     create_release_archive(package_root, archive_path, archive_format)
 
-    print(f"Packaged OpenPrey nightly {args.version} for {args.platform}")
+    print(f"Packaged openPREY nightly {args.version} for {args.platform}")
     print(f"Package directory: {package_root}")
     print(f"Release archive: {archive_path}")
     print(f"Archive format: {archive_format}")

@@ -47,30 +47,9 @@ install_subdir(
   exclude_directories: ['assets'],
 )
 
-install_data(
-  [
-    'guis/assets/menu/background_left.tga',
-    'guis/assets/menu/background_right.tga',
-    'guis/assets/menu/background_top.tga',
-    'guis/assets/menu/background_bottom.tga',
-  ],
-  install_dir: install_gamedir_dir / 'guis' / 'assets' / 'menu',
-)
-
-install_data(
-  [
-    'guis/assets/loading/loading.tga',
-    'guis/assets/loading/roadhouse.tga',
-    'guis/assets/loading/loading_left.tga',
-    'guis/assets/loading/loading_right.tga',
-    'guis/assets/loading/loading_top.tga',
-    'guis/assets/loading/loading_bottom.tga',
-    'guis/assets/loading/roadhouse_left.tga',
-    'guis/assets/loading/roadhouse_right.tga',
-    'guis/assets/loading/roadhouse_top.tga',
-    'guis/assets/loading/roadhouse_bottom.tga',
-  ],
-  install_dir: install_gamedir_dir / 'guis' / 'assets' / 'loading',
+install_subdir(
+  'guis/assets',
+  install_dir: install_gamedir_dir / 'guis',
 )
 
 install_subdir(

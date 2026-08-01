@@ -68,7 +68,7 @@ int main(int argc, const char *argv[]) {
 
 const char *macosx_scanForLibraryDirectory(void)
 {
-    return "/Library/OpenPrey";
+    return "/Library/openPREY";
 }
 
 //===========================================================================
@@ -174,7 +174,7 @@ void Sys_Error(const char *error, ...)
     va_end(argptr);
 
     NSLog(@"Sys_Error: %@", formattedString);
-    NSRunAlertPanel(@"OpenPrey Error", formattedString, nil, nil, nil);
+    NSRunAlertPanel(@"openPREY Error", formattedString, nil, nil, nil);
 
     Sys_Quit();
 }

@@ -356,7 +356,7 @@ static void Sys_WriteCrashLog(
 	Sys_StringPrintf(
 		logBuffer,
 		ARRAYSIZE(logBuffer),
-		"OpenPrey debug crash report\r\n"
+		"openPREY debug crash report\r\n"
 		"Timestamp: %04u-%02u-%02u %02u:%02u:%02u.%03u\r\n"
 		"ProcessId: %lu\r\n"
 		"ThreadId: %lu\r\n"
@@ -479,7 +479,7 @@ static LONG WINAPI Sys_DebugUnhandledExceptionFilter(LPEXCEPTION_POINTERS except
 		Sys_StringPrintf(
 			message,
 			ARRAYSIZE(message),
-			"OpenPrey encountered an unhandled exception.\n\n"
+			"openPREY encountered an unhandled exception.\n\n"
 			"Crash log:\n%s\n\n"
 			"Crash dump:\n%s\n\n"
 			"Please attach both files when reporting this issue.",
@@ -491,7 +491,7 @@ static LONG WINAPI Sys_DebugUnhandledExceptionFilter(LPEXCEPTION_POINTERS except
 		Sys_StringPrintf(
 			message,
 			ARRAYSIZE(message),
-			"OpenPrey encountered an unhandled exception.\n\n"
+			"openPREY encountered an unhandled exception.\n\n"
 			"Crash log:\n%s\n\n"
 			"Failed to create crash dump (error 0x%08lX).",
 			logPath,
@@ -499,7 +499,7 @@ static LONG WINAPI Sys_DebugUnhandledExceptionFilter(LPEXCEPTION_POINTERS except
 		);
 	}
 
-	MessageBoxA(NULL, message, "OpenPrey Debug Crash", MB_ICONERROR | MB_OK | MB_SYSTEMMODAL);
+	MessageBoxA(NULL, message, "openPREY Debug Crash", MB_ICONERROR | MB_OK | MB_SYSTEMMODAL);
 
 	return EXCEPTION_EXECUTE_HANDLER;
 }

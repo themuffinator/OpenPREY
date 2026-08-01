@@ -1,6 +1,6 @@
-# OpenPrey Porting Baseline
+# openPREY Porting Baseline
 
-This document defines the baseline assumptions for the OpenQ4 -> OpenPrey migration phase.
+This document defines the baseline assumptions for the OpenQ4 -> openPREY migration phase.
 
 ## Current Intent
 
@@ -11,7 +11,7 @@ This document defines the baseline assumptions for the OpenQ4 -> OpenPrey migrat
 
 ## Companion Repo Workflow
 
-- Canonical game-library source lives in `../OpenPrey-GameLibs`.
+- Canonical game-library source lives in `../OpenPrey-game`.
 - Sync into `src/game` through `tools/build/sync_gamelibs.ps1`.
 - Sync Prey-specific companion trees as needed (`src/Prey`, `src/preyengine`, and required shared headers).
 - Optional companion build step can be enabled during compile via `OPENPREY_BUILD_GAMELIBS=1`.
@@ -29,7 +29,7 @@ This document defines the baseline assumptions for the OpenQ4 -> OpenPrey migrat
 ## Runtime Module Model
 
 - Prey compatibility expects a unified game module model.
-- OpenPrey loader now prefers unified module names (`game_<arch>`, legacy `gamex86`/`gamex64`).
+- openPREY loader now prefers unified module names (`game_<arch>`, legacy `gamex86`/`gamex64`).
 - Split migration modules (`game_sp`, `game_mp`) remain temporary fallback compatibility targets.
 
 ## Install Detection Baseline
@@ -51,5 +51,5 @@ This document defines the baseline assumptions for the OpenQ4 -> OpenPrey migrat
 ## Migration Guardrails
 
 - Keep documentation synchronized with tooling/naming changes.
-- Prefer OpenPrey naming in new files, scripts, and output artifacts.
+- Prefer openPREY naming in new files, scripts, and output artifacts.
 - Keep temporary OpenQ4 compatibility aliases only where needed to avoid breaking active developer environments.

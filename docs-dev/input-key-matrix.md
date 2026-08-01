@@ -1,4 +1,4 @@
-# OpenPrey SDL3 Input Key Matrix Audit (2026-02-20)
+# openPREY SDL3 Input Key Matrix Audit (2026-02-20)
 
 This checklist audits SDL3 input parity against the legacy Win32 path for:
 

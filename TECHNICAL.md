@@ -1,4 +1,4 @@
-# OpenPrey Technical Reference
+# openPREY Technical Reference
 
 This document covers technical details for advanced users and developers: compatibility status, file layout, configuration cvars, asset validation, build dependencies, versioning, and the SDK/game library structure.
 
@@ -12,6 +12,7 @@ For installation and a feature overview, see the [README](README.md). For buildi
 - [Game Directory Structure](#game-directory-structure)
 - [Asset Validation](#asset-validation)
 - [Advanced Configuration](#advanced-configuration)
+- [Light Grids](#light-grids)
 - [SDK and Game Library](#sdk-and-game-library)
 - [Dependencies](#dependencies)
 - [Versioning](#versioning)
@@ -24,12 +25,13 @@ This status reflects compatibility with official Prey (2006) assets, not binary 
 
 ### Landed
 
-- ✅ **Project Rebrand Completed** — Meson project metadata, staged binaries, VS Code launch settings, and documentation use OpenPrey naming throughout
+- ✅ **Project Rebrand Completed** — Meson project metadata, staged binaries, VS Code launch settings, and documentation use openPREY naming throughout
 - ✅ **Prey Install Discovery** — `fs_basepath` auto-detection targets Prey registry/App Paths/uninstall metadata and known legacy install roots; Steam/GOG assumptions removed
 - ✅ **Unified Game Module Loader** — Engine builds and stages a unified `game_<arch>` module under `basepr/` for both SP and MP paths
-- ✅ **Companion Repo Tooling** — Sync/build tooling targets `OpenPrey-GameLibs` and supports both Meson-wrapper and legacy VC-solution layouts
+- ✅ **Companion Repo Tooling** — Sync/build tooling targets `OpenPrey-game` and supports both Meson-wrapper and legacy VC-solution layouts
 - ✅ **Official PK4 Layout Validation** — Engine startup rejects missing or modified required base-pack layouts when `fs_validateOfficialPaks 1` is enabled
 - ✅ **Cross-host Meson Support** — Source selection, dependency wiring, and nightly packaging cover Windows, Linux, and macOS hosts
+- ✅ **Precomputed Light-Grid Irradiance** — Portal-area light grids can be loaded, baked, visualized, and applied as an indirect-diffuse pass in the renderer
 
 ### In Progress
 
@@ -51,8 +53,8 @@ Current follow-up work is tracked in [TODO.md](TODO.md) and [docs-dev/release-co
 
 ```
 .install/
-├── OpenPrey-client_x64      # Main executable (.exe on Windows)
-├── OpenPrey-ded_x64         # Dedicated server (.exe on Windows)
+├── openPREY-client_x64      # Main executable (.exe on Windows)
+├── openPREY-ded_x64         # Dedicated server (.exe on Windows)
 ├── OpenAL32.dll             # (Windows) optional bundled runtime
 └── basepr/
     ├── game_x64             # Unified game module (.dll / .so / .dylib)
@@ -72,7 +74,7 @@ Current follow-up work is tracked in [TODO.md](TODO.md) and [docs-dev/release-co
 
 ## Asset Validation
 
-OpenPrey automatically validates your Prey installation at startup to confirm the required official base packs are present and unmodified.
+openPREY automatically validates your Prey installation at startup to confirm the required official base packs are present and unmodified.
 
 **How it works:**
 
@@ -138,7 +140,7 @@ See [docs-user/display-settings.md](docs-user/display-settings.md) for the full 
 If your Prey installation is not auto-detected, launch with:
 
 ```
-OpenPrey-client_x64 +set fs_basepath "C:\path\to\Prey"
+openPREY-client_x64 +set fs_basepath "C:\path\to\Prey"
 ```
 
 ### Debugging and Local Validation
@@ -147,7 +149,7 @@ OpenPrey-client_x64 +set fs_basepath "C:\path\to\Prey"
 
 1. Launch from `.install/` in windowed mode:
    ```powershell
-   .\OpenPrey-client_x64.exe +set fs_game basepr +set fs_savepath ..\.home +set logFile 2 +set logFileName logs/openprey.log +set r_fullscreen 0
+   .\openPREY-client_x64.exe +set fs_game basepr +set fs_savepath ..\.home +set logFile 2 +set logFileName logs/openprey.log +set r_fullscreen 0
    ```
 2. Inspect `.home\logs\openprey.log` after each run
 3. Fix warnings and errors in engine/game/parser/loader code before resorting to content-side workarounds
@@ -160,15 +162,64 @@ OpenPrey-client_x64 +set fs_basepath "C:\path\to\Prey"
 
 ---
 
+## Light Grids
+
+openPREY supports Quake 4-style precomputed irradiance volumes for indirect diffuse lighting. Runtime data is stored in two parts:
+
+- `maps/<map>.lightgrid` — probe layout, atlas metadata, and per-area light-grid parameters
+- `env/maps/<map>/area*_lightgrid_amb.tga` — baked irradiance atlas images, typically one per populated portal area
+
+### Baking
+
+Run baking from a staged `.install/` launch against a valid Prey asset install and always force windowed mode:
+
+```powershell
+.\openPREY-client_x64.exe +set fs_game basepr +set fs_savepath ..\.home +set r_fullscreen 0 +bakeLightGrids game/roadhouse force
+```
+
+Command form:
+
+```text
+bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<num>] [size<num>] [blends<num>] [samples<num>] [separateAreas] [grid ( x y z )]
+```
+
+Important options:
+
+- `all` — bake every discovered map, single-player first and then multiplayer
+- `all-mp` — bake only multiplayer maps
+- `force` — remove existing `.lightgrid` and atlas outputs before rebaking
+- `-quit` — exit automatically after the bake batch completes
+- `limit<num>` — cap the number of generated probes for a bake pass
+- `bounce<num>` — number of diffuse bounces to integrate
+- `size<num>` — per-probe capture resolution
+- `blends<num>` — atlas blend samples per probe
+- `samples<num>` — supersample count per capture
+- `separateAreas` — regenerate per-area layouts during baking to reduce peak memory use
+- `grid ( x y z )` — override probe spacing in world units
+
+### Runtime and Debugging
+
+- `r_useLightGrid 1` — enable the indirect-diffuse light-grid pass
+- `r_showLightGrid 0..3` — visualize probe placement by area
+- `r_forceAmbient <value>` — lift the final scene toward a minimum brightness floor
+- `r_lightGridBakeWorkers` — control CPU worker count during baking
+- `r_lightGridBakeAsyncReadback 0|1` — enable async GPU readback when supported
+- `r_lightGridBakeMemoryMB` — cap transient bake memory usage
+- `r_lightGridBakeReadbackSlots` — control async readback buffer count
+
+Use `r_showLightGrid 1` to inspect only the current portal area, `2` to draw valid probes in all areas, and `3` to include invalid probe locations as well.
+
+---
+
 ## SDK and Game Library
 
-OpenPrey's game code is derived from the Prey Software Development Kit and maintained in the companion [OpenPrey-GameLibs](https://github.com/themuffinator/OpenPrey-GameLibs) repository. Canonical edits for SDK/game-library work belong there first; `src/game` in this repository is a synchronized mirror used by the Meson build, with additional `src/Prey` and `src/preyengine` sync paths brought in as needed for compatibility work.
+openPREY's game code is derived from the Prey Software Development Kit and maintained in the companion [OpenPrey-game](https://github.com/themuffinator/openPREY-GameLibs) repository. Canonical edits for SDK/game-library work belong there first; `src/game` in this repository is a synchronized mirror used by the Meson build, with additional `src/Prey` and `src/preyengine` sync paths brought in as needed for compatibility work.
 
-The SDK is subject to the original Human Head Studios EULA, which permits non-commercial modification for use with a legitimate copy of Prey, but prohibits commercial exploitation and standalone redistribution of the SDK-derived code. For complete terms, see `EULA.Development Kit.rtf` in the OpenPrey-GameLibs repository.
+The SDK is subject to the original Human Head Studios EULA, which permits non-commercial modification for use with a legitimate copy of Prey, but prohibits commercial exploitation and standalone redistribution of the SDK-derived code. For complete terms, see `EULA.Development Kit.rtf` in the OpenPrey-game repository.
 
 ### Companion Workflow
 
-- Default companion repo location: `../OpenPrey-GameLibs`
+- Default companion repo location: `../OpenPrey-game`
 - `tools/build/meson_setup.ps1` syncs the companion repo before `setup`, `compile`, and `install`
 - `OPENPREY_BUILD_GAMELIBS=1` triggers an additional companion build-and-stage pass during `compile`
 - `tools/build/build_gamelibs.ps1` supports both Meson wrappers and the legacy `src/PREY.sln` layout
@@ -191,7 +242,7 @@ All dependencies are resolved through Meson subprojects and wraps. No manual dep
 
 ## Versioning
 
-OpenPrey uses semantic base versions from `meson.build` and appends an explicit build track:
+openPREY uses semantic base versions from `meson.build` and appends an explicit build track:
 
 - `stable` — release builds, e.g. `X.Y.Z`
 - `dev` — default local builds, e.g. `X.Y.Z-dev+gabcdef12`
