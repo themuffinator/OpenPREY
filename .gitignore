@@ -49,9 +49,11 @@ __pycache__/
 _tmp_*
 /.tmp/
 /.home/
+/.home_*/
 *.pdb
 .voice_eng/
 /$outDir
+/references/PREY.exe_disassembly.txt
 
 # Local diagnostic transcripts and runtime logs
 *.log
