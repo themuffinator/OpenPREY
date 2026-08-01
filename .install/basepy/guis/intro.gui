@@ -1,9 +1,0 @@
-windowDef Desktop
-{
-	rect		0, 0, 640, 480
-	nocursor	1
-	menugui		1
-
-	onActivate {
-	}
-}

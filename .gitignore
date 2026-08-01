@@ -44,6 +44,7 @@ __pycache__/
 /build_meson_msvc/
 /build_meson_clangcl/
 /_save/
+/.install/
 /.tmp/meson_extref_test*/
 /subprojects/.wraplock
 /subprojects/packagecache/

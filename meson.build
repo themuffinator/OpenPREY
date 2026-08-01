@@ -462,7 +462,7 @@ if build_games
 endif
 
 if build_engine or build_games
-  subdir('basepy')
+  subdir('basepr')
 endif
 
 install_data(
