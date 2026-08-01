@@ -136,6 +136,25 @@ static void R_RGBA8Image( idImage *image ) {
 	image->GenerateImage( (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
 }
 
+static void R_RGBA16FImage( idImage *image ) {
+	idImageOpts opts;
+	opts.textureType = TT_2D;
+	opts.format = FMT_RGBA16F;
+	opts.width = DEFAULT_SIZE;
+	opts.height = DEFAULT_SIZE;
+	opts.numLevels = 1;
+
+	image->AllocImage( opts, TF_LINEAR, TR_CLAMP );
+
+	if ( !tr.IsOpenGLRunning() ) {
+		return;
+	}
+
+	unsigned short data[DEFAULT_SIZE][DEFAULT_SIZE][4];
+	memset( data, 0, sizeof( data ) );
+	image->SubImageUpload( 0, 0, 0, 0, DEFAULT_SIZE, DEFAULT_SIZE, data );
+}
+
 static void R_ThresholdImage( idImage *image ) {
 	static const int THRESHOLD_SIZE = 64;
 	byte data[THRESHOLD_SIZE][THRESHOLD_SIZE][4];
@@ -667,13 +686,13 @@ void idImageManager::CreateIntrinsicImages() {
 	glowCompositeImage = ImageFromFunction("_glowComposite", R_RGBA8Image);
 	//scratchCubeMapImage = ImageFromFunction("_scratchCubeMap", makeNormalizeVectorCubeMap);
 
-	currentRenderImage = ImageFromFunction("_currentRender", R_RGBA8Image);
+	currentRenderImage = ImageFromFunction("_currentRender", R_RGBA16FImage);
 	currentDepthImage = ImageFromFunction("_currentDepth", R_DepthImage);
 
 	// placeholders for runtime render targets referenced by materials
-	ImageFromFunction("_forwardRenderResolvedAlbedo", R_RGBA8Image);
-	ImageFromFunction("_postProcessAlbedo0", R_RGBA8Image);
-	ImageFromFunction("_postProcessAlbedo1", R_RGBA8Image);
+	ImageFromFunction("_forwardRenderResolvedAlbedo", R_RGBA16FImage);
+	ImageFromFunction("_postProcessAlbedo0", R_RGBA16FImage);
+	ImageFromFunction("_postProcessAlbedo1", R_RGBA16FImage);
 	ImageFromFunction("_threshold", R_ThresholdImage);
 	ImageFromFunction("_replay", R_RGBA8Image);
 

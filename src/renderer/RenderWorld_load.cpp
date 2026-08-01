@@ -49,6 +49,7 @@ void idRenderWorldLocal::FreeWorld() {
 		portal_t		*portal, *nextPortal;
 
 		area = &portalAreas[i];
+		area->lightGrid.Clear();
 		for ( portal = area->portals ; portal ; portal = nextPortal ) {
 			nextPortal = portal->next;
 			delete portal->w;
@@ -159,38 +160,38 @@ idRenderModel *idRenderWorldLocal::ParseModel( idLexer *src ) {
 		R_AllocStaticTriSurfVerts( tri, tri->numVerts );
 		for ( j = 0 ; j < tri->numVerts ; j++ ) {
 // jmarshall - quake 4 proc format
-			//float	vec[8];
-			//src->Parse1DMatrix( 8, vec );
-
-			src->ExpectTokenString("(");
-
-			tri->verts[j].xyz[0] = src->ParseFloat();
-			tri->verts[j].xyz[1] = src->ParseFloat();
-			tri->verts[j].xyz[2] = src->ParseFloat();
-			tri->verts[j].st[0] = src->ParseFloat();
-			tri->verts[j].st[1] = src->ParseFloat();
-			tri->verts[j].normal[0] = src->ParseFloat();
-			tri->verts[j].normal[1] = src->ParseFloat();
-			tri->verts[j].normal[2] = src->ParseFloat();
-			tri->verts[j].color[0] = 255;
-			tri->verts[j].color[1] = 255;
-			tri->verts[j].color[2] = 255;
-			tri->verts[j].color[3] = 255;
-			tri->verts[j].color2[0] = 255;
-			tri->verts[j].color2[1] = 255;
-			tri->verts[j].color2[2] = 255;
-			tri->verts[j].color2[3] = 255;
-
-			if (src->PeekTokenString(")")) {
-				src->ExpectTokenString(")");
+			float vec[12];
+			const int numFloats = src->Parse1DMatrixOpenEnded( 12, vec );
+			if ( numFloats != 8 && numFloats != 12 ) {
+				src->Error( "R_ParseModel: bad vertex read" );
 			}
-			else {
-				while (!src->PeekTokenString(")")) {
-					src->ParseFloat(); // jmarshall: not sure what the extra values here are for.
-				}
 
-				src->ExpectTokenString(")");
+			tri->verts[j].xyz[0] = vec[0];
+			tri->verts[j].xyz[1] = vec[1];
+			tri->verts[j].xyz[2] = vec[2];
+			tri->verts[j].st[0] = vec[3];
+			tri->verts[j].st[1] = vec[4];
+			tri->verts[j].normal[0] = vec[5];
+			tri->verts[j].normal[1] = vec[6];
+			tri->verts[j].normal[2] = vec[7];
+
+			if ( numFloats == 12 ) {
+				tri->verts[j].color[0] = idMath::Ftob( vec[8] );
+				tri->verts[j].color[1] = idMath::Ftob( vec[9] );
+				tri->verts[j].color[2] = idMath::Ftob( vec[10] );
+				tri->verts[j].color[3] = idMath::Ftob( vec[11] );
+			} else {
+				// Legacy proc surfaces omit vertex colors and should behave as fully lit white.
+				tri->verts[j].color[0] = 255;
+				tri->verts[j].color[1] = 255;
+				tri->verts[j].color[2] = 255;
+				tri->verts[j].color[3] = 255;
 			}
+
+			tri->verts[j].color2[0] = tri->verts[j].color[0];
+			tri->verts[j].color2[1] = tri->verts[j].color[1];
+			tri->verts[j].color2[2] = tri->verts[j].color[2];
+			tri->verts[j].color2[3] = tri->verts[j].color[3];
 // jmarshall end
 		}
 
@@ -283,6 +284,9 @@ void idRenderWorldLocal::SetupAreaRefs() {
 	connectedAreaNum = 0;
 	for ( i = 0 ; i < numPortalAreas ; i++ ) {
 		portalAreas[i].areaNum = i;
+		portalAreas[i].globalBounds.Clear();
+		portalAreas[i].lightGrid.Clear();
+		portalAreas[i].lightGrid.area = i;
 		portalAreas[i].lightRefs.areaNext =
 		portalAreas[i].lightRefs.areaPrev =
 			&portalAreas[i].lightRefs;
@@ -566,6 +570,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 			FreeDefs();
 			TouchWorldModels();
 			AddWorldModelEntities();
+			SetupLightGrid();
 			ClearPortalStates();
 			return true;
 		}
@@ -669,6 +674,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	CommonChildrenArea_r( &areaNodes[0] );
 
 	AddWorldModelEntities();
+	SetupLightGrid();
 	ClearPortalStates();
 
 	// done!
@@ -731,6 +737,7 @@ void idRenderWorldLocal::AddWorldModelEntities() {
 		}
 
 		idRenderModel *hModel = def->parms.hModel;
+		portalAreas[i].globalBounds = hModel->Bounds();
 
 		for ( int j = 0; j < hModel->NumSurfaces(); j++ ) {
 			const modelSurface_t *surf = hModel->Surface( j );

@@ -52,7 +52,7 @@ static void R_NormalizeInternalImageName( idStr& name ) {
 	}
 }
 
-static void OpenPrey_RemapLegacyImageName( idStr& name ) {
+static void openPREY_RemapLegacyImageName( idStr& name ) {
 	struct legacyImageRemap_t {
 		const char *legacyName;
 		const char *replacementName;
@@ -97,12 +97,12 @@ static void OpenPrey_RemapLegacyImageName( idStr& name ) {
 	}
 }
 
-static void OpenPrey_NormalizeAndRemapImageName( idStr& name ) {
+static void openPREY_NormalizeAndRemapImageName( idStr& name ) {
 	// strip any .tga file extensions from anywhere in the name, including image program parameters
 	name.Replace( ".tga", "" );
 	name.BackSlashesToSlashes();
 	R_NormalizeInternalImageName( name );
-	OpenPrey_RemapLegacyImageName( name );
+	openPREY_RemapLegacyImageName( name );
 }
 
 /*
@@ -381,7 +381,7 @@ idImage	*idImageManager::GetImageWithParameters( const char *_name, textureFilte
 	}
 
 	idStr name = _name;
-	OpenPrey_NormalizeAndRemapImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 	if ( idStr::Icmpn( name.c_str(), "fonts", 5 ) == 0 || idStr::Icmpn( name.c_str(), "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
@@ -431,7 +431,7 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 	}
 
 	idStr name = _name;
-	OpenPrey_NormalizeAndRemapImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 	if ( idStr::Icmpn( name.c_str(), "fonts", 5 ) == 0 || idStr::Icmpn( name.c_str(), "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
@@ -501,6 +501,59 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 }
 
 /*
+===============
+ImageHandleDeferred
+
+Returns an image handle without forcing file IO or level-load residency.
+The texture can then be streamed in lazily on first bind.
+===============
+*/
+idImage *idImageManager::ImageHandleDeferred( const char *_name, textureFilter_t filter,
+						 textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap ) {
+
+	if ( !_name || !_name[0] || idStr::Icmp( _name, "default" ) == 0 || idStr::Icmp( _name, "_default" ) == 0 ) {
+		declManager->MediaPrint( "DEFAULTED\n" );
+		return globalImages->defaultImage;
+	}
+
+	idStr name = _name;
+	openPREY_NormalizeAndRemapImageName( name );
+	if ( idStr::Icmpn( name.c_str(), "fonts", 5 ) == 0 || idStr::Icmpn( name.c_str(), "newfonts", 8 ) == 0 ) {
+		usage = TD_FONT;
+	}
+	if ( idStr::Icmpn( name.c_str(), "lights", 6 ) == 0 ) {
+		usage = TD_LIGHT;
+	}
+
+	int hash = name.FileNameHash();
+	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
+		idImage *image = images[i];
+		if ( name.Icmp( image->GetName() ) == 0 ) {
+			if ( name[0] == '_' ) {
+				return image;
+			}
+			if ( image->cubeFiles != cubeMap ) {
+				common->Error( "Image '%s' has been referenced with conflicting cube map states", _name );
+			}
+			if ( image->filter != filter || image->repeat != repeat ) {
+				continue;
+			}
+			if ( image->usage != usage ) {
+				continue;
+			}
+			return image;
+		}
+	}
+
+	idImage *image = AllocImage( name );
+	image->cubeFiles = cubeMap;
+	image->usage = usage;
+	image->filter = filter;
+	image->repeat = repeat;
+	return image;
+}
+
+/*
 ========================
 idImageManager::ScratchImage
 ========================
@@ -526,24 +579,13 @@ idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts,
 	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
 		idImage	* image = images[i];
 		if ( name.Icmp( image->GetName() ) == 0 ) {
-			// the built in's, like _white and _flat always match the other options
-			if ( name[0] == '_' ) {
-				return image;
-			}
-
-			if ( image->filter != filter || image->repeat != repeat ) {
-				// we might want to have the system reset these parameters on every bind and
-				// share the image data
-				continue;
-			}
-			if ( image->usage != usage ) {
-				// If an image is used differently then we need 2 copies of it because usage affects the way it's compressed and swizzled
-				continue;
-			}
-
 			image->usage = usage;
 			image->levelLoadReferenced = true;
 			image->referencedOutsideLevelLoad = true;
+
+			if ( image->GetFilter() != filter || image->GetRepeat() != repeat || !( image->GetOpts() == *imgOpts ) || !image->IsLoaded() ) {
+				image->AllocImage( *imgOpts, filter, repeat );
+			}
 			return image;
 		}
 	}
@@ -558,7 +600,10 @@ idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts,
 	// create a new image
 	//
 	idImage* newImage = AllocImage( name );
-	if ( newImage != NULL ) {	
+	if ( newImage != NULL ) {
+		newImage->usage = usage;
+		newImage->levelLoadReferenced = true;
+		newImage->referencedOutsideLevelLoad = true;
 		newImage->AllocImage( *imgOpts, filter, repeat );
 	}
 	return newImage;
@@ -577,7 +622,7 @@ idImage *idImageManager::GetImage( const char *_name ) const {
 	}
 
 	idStr name = _name;
-	OpenPrey_NormalizeAndRemapImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 
 	//
 	// look in loaded images
@@ -784,7 +829,7 @@ void idImageManager::BeginLevelLoad() {
 		idImage	*image = images[ i ];
 
 		// generator function images are always kept around
-		if ( image->generatorFunction ) {
+		if ( image->generatorFunction || image->GetOpts().isPersistant ) {
 			continue;
 		}
 

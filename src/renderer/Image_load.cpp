@@ -40,6 +40,7 @@ int BitsForFormat( textureFormat_t format ) {
 		case FMT_NONE:		return 0;
 		case FMT_RGBA8:		return 32;
 		case FMT_XRGB8:		return 32;
+		case FMT_RGBA16F:	return 64;
 		case FMT_RGB565:	return 16;
 		case FMT_L8A8:		return 16;
 		case FMT_ALPHA:		return 8;
@@ -103,6 +104,11 @@ ID_INLINE void idImage::DeriveOpts() {
 		case TD_LIGHT:
 			opts.format = FMT_RGB565;
 			opts.gammaMips = true;
+			break;
+		case TD_LIGHTGRID:
+			opts.gammaMips = false;
+			opts.colorFormat = CFM_DEFAULT;
+			opts.format = glConfig.textureCompressionAvailable ? FMT_DXT1 : FMT_RGB565;
 			break;
 		case TD_LOOKUP_TABLE_MONO:
 			opts.format = FMT_INT8;

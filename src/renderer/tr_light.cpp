@@ -708,6 +708,7 @@ void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const 
 	drawSurf->space = space;
 	drawSurf->material = shader;
 	drawSurf->scissorRect = scissor;
+	drawSurf->area = NULL;
 	drawSurf->dsFlags = 0;
 	if ( viewInsideShadow ) {
 		drawSurf->dsFlags |= DSF_VIEW_INSIDE_SHADOW;
@@ -742,6 +743,32 @@ void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const 
 	// actually link it in
 	drawSurf->nextOnLight = *link;
 	*link = drawSurf;
+}
+
+static const portalArea_t *R_FallbackDrawSurfArea( const viewEntity_t *space ) {
+	if ( space == NULL || space->entityDef == NULL || space->entityDef->entityRefs == NULL ) {
+		return NULL;
+	}
+
+	return space->entityDef->entityRefs->area;
+}
+
+static const portalArea_t *R_ResolveDrawSurfArea( const srfTriangles_t *tri, const viewEntity_t *space ) {
+	if ( tri == NULL || space == NULL || tr.viewDef == NULL || tr.viewDef->renderWorld == NULL ) {
+		return NULL;
+	}
+
+	if ( !tri->bounds.IsCleared() ) {
+		idVec3 globalCenter;
+		R_LocalPointToGlobal( space->modelMatrix, tri->bounds.GetCenter(), globalCenter );
+
+		const int areaNum = tr.viewDef->renderWorld->PointInArea( globalCenter );
+		if ( areaNum >= 0 && areaNum < tr.viewDef->renderWorld->NumAreas() ) {
+			return &tr.viewDef->renderWorld->portalAreas[ areaNum ];
+		}
+	}
+
+	return R_FallbackDrawSurfArea( space );
 }
 
 /*
@@ -1234,6 +1261,7 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 	drawSurf->material = shader;
 	drawSurf->scissorRect = scissor;
 	drawSurf->sort = shader->GetSort() + tr.sortOffset;
+	drawSurf->area = NULL;
 	drawSurf->dsFlags = 0;
 	drawSurf->dynamicTexCoords = NULL;
 	drawSurf->decalColorCache = NULL;
@@ -1312,6 +1340,8 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 			tr.viewDef->renderView.time = oldTime;
 		}
 	}
+
+	drawSurf->area = R_ResolveDrawSurfArea( tri, space );
 
 	// check for deformations
 	R_DeformDrawSurf( drawSurf );

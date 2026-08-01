@@ -33,6 +33,64 @@ If you have questions concerning this license or the applicable additional terms
 #include "Window.h"
 #include "UserInterfaceLocal.h"
 #include "RenderWindow.h"
+#include "../renderer/tr_local.h"
+
+namespace {
+
+static bool RenderWindowResolveViewport( idDeviceContext *dc, const idRectangle &drawRect, int &x, int &y, int &width, int &height, float &fovY ) {
+	float viewportX = drawRect.x;
+	float viewportY = drawRect.y;
+	float viewportW = drawRect.w;
+	float viewportH = drawRect.h;
+
+	if ( viewportW <= 0.0f || viewportH <= 0.0f ) {
+		return false;
+	}
+
+	// Match normal GUI drawing so renderDef windows line up with the corrected
+	// virtual viewport instead of rendering against raw 640x480 coordinates.
+	if ( dc != NULL && dc->ClippedCoords( &viewportX, &viewportY, &viewportW, &viewportH, NULL, NULL, NULL, NULL ) ) {
+		return false;
+	}
+
+	if ( viewportW <= 0.0f || viewportH <= 0.0f ) {
+		return false;
+	}
+
+	fovY = 2.0f * atan( viewportH / viewportW ) * idMath::M_RAD2DEG;
+
+	if ( dc != NULL ) {
+		dc->AdjustCoords( &viewportX, &viewportY, &viewportW, &viewportH );
+
+		const float uiViewportWidth = static_cast<float>( glConfig.uiViewportWidth );
+		const float uiViewportHeight = static_cast<float>( glConfig.uiViewportHeight );
+		const float framebufferWidth = static_cast<float>( glConfig.vidWidth );
+		const float framebufferHeight = static_cast<float>( glConfig.vidHeight );
+		if ( uiViewportWidth > 0.0f && uiViewportHeight > 0.0f &&
+			framebufferWidth > 0.0f && framebufferHeight > 0.0f ) {
+			const float uiScaleX = uiViewportWidth / static_cast<float>( VIRTUAL_WIDTH );
+			const float uiScaleY = uiViewportHeight / static_cast<float>( VIRTUAL_HEIGHT );
+
+			const float physicalX = static_cast<float>( glConfig.uiViewportX ) + viewportX * uiScaleX;
+			const float physicalY = static_cast<float>( glConfig.uiViewportY ) + viewportY * uiScaleY;
+			const float physicalW = viewportW * uiScaleX;
+			const float physicalH = viewportH * uiScaleY;
+
+			viewportX = physicalX * ( static_cast<float>( VIRTUAL_WIDTH ) / framebufferWidth );
+			viewportY = physicalY * ( static_cast<float>( VIRTUAL_HEIGHT ) / framebufferHeight );
+			viewportW = physicalW * ( static_cast<float>( VIRTUAL_WIDTH ) / framebufferWidth );
+			viewportH = physicalH * ( static_cast<float>( VIRTUAL_HEIGHT ) / framebufferHeight );
+		}
+	}
+
+	width = Max( 1, idMath::Ftoi( viewportW + 0.5f ) );
+	height = Max( 1, idMath::Ftoi( viewportH + 0.5f ) );
+	x = idMath::Ftoi( viewportX );
+	y = idMath::Ftoi( viewportY );
+	return true;
+}
+
+}
 
 idRenderWindow::idRenderWindow(idDeviceContext *d, idUserInterfaceLocal *g) : idWindow(d, g) {
 	dc = d;
@@ -153,12 +211,10 @@ void idRenderWindow::Draw(int time, float x, float y) {
 	refdef.shaderParms[2] = 1;
 	refdef.shaderParms[3] = 1;
 
-	refdef.x = drawRect.x;
-	refdef.y = drawRect.y;
-	refdef.width = drawRect.w;
-	refdef.height = drawRect.h;
 	refdef.fov_x = 90;
-	refdef.fov_y = 2 * atan((float)drawRect.h / drawRect.w) * idMath::M_RAD2DEG;
+	if ( !RenderWindowResolveViewport( dc, drawRect, refdef.x, refdef.y, refdef.width, refdef.height, refdef.fov_y ) ) {
+		return;
+	}
 
 	refdef.time = time;
 	world->RenderScene(&refdef);

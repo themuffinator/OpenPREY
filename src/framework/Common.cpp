@@ -480,7 +480,7 @@ void idCommonLocal::VPrintf( const char *fmt, va_list args ) {
 			ID_TIME_T aclock;
 			idStr fileName = com_logFileName.GetString()[0] ? com_logFileName.GetString() : "qconsole.log";
 			if ( fileName.Icmp( "auto" ) == 0 ) {
-				fileName = "logs/OpenPrey_%Y%m%d_%H%M%S.log";
+				fileName = "logs/openPREY_%Y%m%d_%H%M%S.log";
 			}
 
 			char resolvedFileName[MAX_OSPATH];
@@ -887,6 +887,9 @@ void idCommonLocal::Quit( void ) {
 
 	// don't try to shutdown if we are in a recursive error
 	if ( !com_errorEntered ) {
+		// Menu actions and other late-frame commands can modify archived cvars
+		// after the regular per-frame config write has already run.
+		WriteConfiguration();
 		Shutdown();
 	}
 
@@ -1199,6 +1202,21 @@ void idCommonLocal::WriteConfigToFile( const char *filename ) {
 	idKeyInput::WriteBindings( f );
 	cvarSystem->WriteFlaggedVariables( CVAR_ARCHIVE, "seta", f );
 	fileSystem->CloseFile( f );
+}
+
+static bool openPREY_ExecConfigFromSavePath( const char *relativeFilename ) {
+	if ( relativeFilename == NULL || relativeFilename[0] == '\0' ) {
+		return false;
+	}
+
+	const idStr osPath = fileSystem->RelativePathToOSPath( relativeFilename, "fs_savepath" );
+	idFile *file = fileSystem->OpenExplicitFileRead( osPath.c_str() );
+	if ( file == NULL ) {
+		return false;
+	}
+	fileSystem->CloseFile( file );
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "exec_savepath %s\n", relativeFilename ) );
+	return true;
 }
 
 /*
@@ -3079,16 +3097,16 @@ void idCommonLocal::Async( void ) {
 	}
 }
 
-static bool OpenPrey_IsValidGameModuleName( const char *moduleName ) {
+static bool openPREY_IsValidGameModuleName( const char *moduleName ) {
 	return moduleName
 		&& ( idStr::Icmp( moduleName, "game" ) == 0
 			|| idStr::Icmp( moduleName, "game_sp" ) == 0
 			|| idStr::Icmp( moduleName, "game_mp" ) == 0 );
 }
 
-static const char *OpenPrey_SelectGameModuleBaseName( void ) {
+static const char *openPREY_SelectGameModuleBaseName( void ) {
 	const char *nextModule = cvarSystem->GetCVarString( "com_nextGameModule" );
-	if ( OpenPrey_IsValidGameModuleName( nextModule ) ) {
+	if ( openPREY_IsValidGameModuleName( nextModule ) ) {
 		// Legacy split-module requests are mapped to the unified module.
 		return "game";
 	}
@@ -3106,11 +3124,11 @@ static const char *OpenPrey_SelectGameModuleBaseName( void ) {
 	#define OPENPREY_MODULE_ARCH_TAG "unknown"
 #endif
 
-static void OpenPrey_BuildUnifiedGameModuleBinaryName( char outName[ MAX_OSPATH ] ) {
+static void openPREY_BuildUnifiedGameModuleBinaryName( char outName[ MAX_OSPATH ] ) {
 	idStr::snPrintf( outName, MAX_OSPATH, "game_%s", OPENPREY_MODULE_ARCH_TAG );
 }
 
-static void OpenPrey_AddUniqueModuleCandidate( idStrList &candidates, const char *moduleName ) {
+static void openPREY_AddUniqueModuleCandidate( idStrList &candidates, const char *moduleName ) {
 	if ( !moduleName || !moduleName[ 0 ] ) {
 		return;
 	}
@@ -3124,24 +3142,24 @@ static void OpenPrey_AddUniqueModuleCandidate( idStrList &candidates, const char
 	candidates.Append( moduleName );
 }
 
-static void OpenPrey_BuildGameModuleCandidateList( const char *moduleName, idStrList &candidates ) {
+static void openPREY_BuildGameModuleCandidateList( const char *moduleName, idStrList &candidates ) {
 	char unifiedModuleBinary[ MAX_OSPATH ];
 
 	candidates.Clear();
-	OpenPrey_BuildUnifiedGameModuleBinaryName( unifiedModuleBinary );
-	OpenPrey_AddUniqueModuleCandidate( candidates, unifiedModuleBinary );
+	openPREY_BuildUnifiedGameModuleBinaryName( unifiedModuleBinary );
+	openPREY_AddUniqueModuleCandidate( candidates, unifiedModuleBinary );
 
 #if defined( _M_IX86 ) || defined( __i386__ )
-	OpenPrey_AddUniqueModuleCandidate( candidates, "gamex86" );
+	openPREY_AddUniqueModuleCandidate( candidates, "gamex86" );
 #elif defined( _M_X64 ) || defined( __x86_64__ )
-	OpenPrey_AddUniqueModuleCandidate( candidates, "gamex64" );
+	openPREY_AddUniqueModuleCandidate( candidates, "gamex64" );
 #endif
 
 	// Compatibility aliases for legacy installs.
-	OpenPrey_AddUniqueModuleCandidate( candidates, "game" );
+	openPREY_AddUniqueModuleCandidate( candidates, "game" );
 }
 
-static void OpenPrey_DisableBSEWithWarning( const char *reason ) {
+static void openPREY_DisableBSEWithWarning( const char *reason ) {
 	static bool warnedConsole = false;
 	if ( !warnedConsole ) {
 		warnedConsole = true;
@@ -3163,7 +3181,7 @@ static void OpenPrey_DisableBSEWithWarning( const char *reason ) {
 			"Could not load BSE runtime library (libbse-q4).\n\nReason: %s\n\nRaven BSE effects will be disabled.\nDoom 3 FX/particle decl effects remain available.",
 			reason ? reason : "unknown reason"
 		);
-		::MessageBoxA( NULL, message, "OpenPrey Warning", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL );
+		::MessageBoxA( NULL, message, "openPREY Warning", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL );
 	}
 #endif
 
@@ -3213,7 +3231,7 @@ void idCommonLocal::LoadBSEDLL( void ) {
 	common->DPrintf( "Loading BSE DLL: '%s'\n", dllPath );
 	bseDLL = sys->DLL_Load( dllPath );
 	if ( !bseDLL ) {
-		OpenPrey_DisableBSEWithWarning( "couldn't load dynamic library 'libbse-q4'" );
+		openPREY_DisableBSEWithWarning( "couldn't load dynamic library 'libbse-q4'" );
 		return;
 	}
 
@@ -3221,7 +3239,7 @@ void idCommonLocal::LoadBSEDLL( void ) {
 	if ( !GetBSEAPI ) {
 		Sys_DLL_Unload( bseDLL );
 		bseDLL = NULL;
-		OpenPrey_DisableBSEWithWarning( "couldn't find BSE DLL API entry point" );
+		openPREY_DisableBSEWithWarning( "couldn't find BSE DLL API entry point" );
 		return;
 	}
 
@@ -3247,14 +3265,14 @@ void idCommonLocal::LoadBSEDLL( void ) {
 	if ( !bseExportPtr ) {
 		Sys_DLL_Unload( bseDLL );
 		bseDLL = NULL;
-		OpenPrey_DisableBSEWithWarning( "BSE DLL API handshake failed" );
+		openPREY_DisableBSEWithWarning( "BSE DLL API handshake failed" );
 		return;
 	}
 	bseExport = *bseExportPtr;
 	if ( bseExport.version != BSE_API_VERSION || !bseExport.bse || !bseExport.AllocDeclEffect ) {
 		Sys_DLL_Unload( bseDLL );
 		bseDLL = NULL;
-		OpenPrey_DisableBSEWithWarning( "BSE DLL API version mismatch" );
+		openPREY_DisableBSEWithWarning( "BSE DLL API version mismatch" );
 		return;
 	}
 
@@ -3300,10 +3318,10 @@ void idCommonLocal::LoadGameDLL( void ) {
 	gameExport_t	gameExport;
 	GetGameAPI_t	GetGameAPI;
 
-	const char *gameModuleBaseName = OpenPrey_SelectGameModuleBaseName();
+	const char *gameModuleBaseName = openPREY_SelectGameModuleBaseName();
 	dllPath[ 0 ] = '\0';
 	selectedModuleBinary = NULL;
-	OpenPrey_BuildGameModuleCandidateList( gameModuleBaseName, gameModuleCandidates );
+	openPREY_BuildGameModuleCandidateList( gameModuleBaseName, gameModuleCandidates );
 	for ( int i = 0; i < gameModuleCandidates.Num(); i++ ) {
 		fileSystem->FindDLL( gameModuleCandidates[ i ].c_str(), dllPath, true );
 		if ( dllPath[ 0 ] ) {
@@ -3681,8 +3699,10 @@ void idCommonLocal::InitGame( void ) {
 
 	// skip the config file if "safe" is on the command line
 	if ( !SafeMode() ) {
-		if ( fileSystem->ReadFile( CONFIG_FILE, NULL ) >= 0 ) {
-			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "exec " CONFIG_FILE "\n" );
+		// Preserve settings written under both earlier project-name casings.
+		if ( !openPREY_ExecConfigFromSavePath( CONFIG_FILE ) &&
+			 !openPREY_ExecConfigFromSavePath( INTERIM_CONFIG_FILE ) ) {
+			openPREY_ExecConfigFromSavePath( LEGACY_CONFIG_FILE );
 		}
 	}
 	if ( fileSystem->ReadFile( "autoexec.cfg", NULL ) >= 0 ) {
@@ -3738,7 +3758,7 @@ void idCommonLocal::InitGame( void ) {
 
 	// initialize the BSE system before the game DLL starts creating effects
 	if ( bse && !bse->Init() ) {
-		OpenPrey_DisableBSEWithWarning( "BSE initialization failed" );
+		openPREY_DisableBSEWithWarning( "BSE initialization failed" );
 	}
 
 	// startup the script debugger

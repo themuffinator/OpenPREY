@@ -2193,6 +2193,42 @@ void idWindow::DrawBackground(const idRectangle &drawRect) {
 	}
 
 	if ( background && matColor.w() && backgroundRect.w > 0.0f && backgroundRect.h > 0.0f ) {
+		if ( flags & WIN_MATCANVASFILL ) {
+			const float imageWidth = background->GetImageWidth();
+			const float imageHeight = background->GetImageHeight();
+			if ( imageWidth > 0.0f && imageHeight > 0.0f ) {
+				float s0 = 0.0f;
+				float s1 = 1.0f;
+				float t0 = 0.0f;
+				float t1 = 1.0f;
+
+				const float imageAspect = imageWidth / imageHeight;
+				const float canvasAspect = backgroundRect.w / backgroundRect.h;
+				if ( imageAspect > canvasAspect ) {
+					const float keptWidth = canvasAspect / imageAspect;
+					s0 = ( 1.0f - keptWidth ) * 0.5f;
+					s1 = s0 + keptWidth;
+				} else if ( imageAspect < canvasAspect ) {
+					const float keptHeight = imageAspect / canvasAspect;
+					t0 = ( 1.0f - keptHeight ) * 0.5f;
+					t1 = t0 + keptHeight;
+				}
+
+				float drawX = backgroundRect.x;
+				float drawY = backgroundRect.y;
+				float drawW = backgroundRect.w;
+				float drawH = backgroundRect.h;
+				if ( dc->ClippedCoords( &drawX, &drawY, &drawW, &drawH, &s0, &t0, &s1, &t1 ) ) {
+					return;
+				}
+				dc->AdjustCoords( &drawX, &drawY, &drawW, &drawH );
+
+				renderSystem->SetColor( matColor );
+				dc->DrawStretchPic( drawX, drawY, drawW, drawH, s0, t0, s1, t1, background );
+				return;
+			}
+		}
+
 		float scalex, scaley;
 		if ( flags & WIN_NATURALMAT ) {
 			scalex = backgroundRect.w / background->GetImageWidth();
@@ -3588,6 +3624,14 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 	if (idStr::Icmp(_name, "naturalmatscale") == 0) {
 		if ( src->ParseBool() ) {
 			flags |= WIN_NATURALMAT;
+		}
+		return true;
+	}
+	if (idStr::Icmp(_name, "matcanvasfill") == 0) {
+		if ( src->ParseBool() ) {
+			flags |= WIN_MATCANVASFILL;
+		} else {
+			flags &= ~WIN_MATCANVASFILL;
 		}
 		return true;
 	}

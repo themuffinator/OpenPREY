@@ -205,6 +205,13 @@ static viewDef_t *R_PortalSkyboxSubviewBySurface( drawSurf_t *drawSurf ) {
 	if ( !remoteRenderView ) {
 		return NULL;
 	}
+	if ( tr.SkyboxRenderedInFrame() || tr.viewDef->isSubview ) {
+		return NULL;
+	}
+
+	// Portal-sky renders are single-pass per frame in retail PREY to avoid
+	// recursive subviews and the resulting hall-of-mirrors artifacts.
+	tr.RenderSkyboxInFrame();
 
 	viewDef_t *parms = (viewDef_t *)R_FrameAlloc( sizeof( *parms ) );
 	if ( !parms ) {
@@ -772,7 +779,7 @@ bool	R_GenerateSurfaceSubview( drawSurf_t *drawSurf ) {
 			if ( !parms ) {
 				return false;
 			}
-			parms->scissor = tr.viewDef->scissor;
+			parms->scissor = scissor;
 
 			parms->superView = tr.viewDef;
 			parms->subviewSurface = drawSurf;

@@ -290,15 +290,13 @@ windowDef desktop {
 			rect		0, 0, 640, 480
 			backcolor	0, 0, 0, 0
 			matcolor	1, 1, 1, 1
-			background	"guis/assets/menu/background_center"
-			backgroundLeft	"guis/assets/menu/background_left"
-			backgroundRight	"guis/assets/menu/background_right"
-			backgroundTop	"guis/assets/menu/background_top"
-			backgroundBottom "guis/assets/menu/background_bottom"
-#if 0
+
 			windowDef Stars {
 				rect		0, -80, 640, 640
 				background	"guis/assets/menu/preymenu/stars"
+				naturalmatscale 1
+				matscalex 1
+				matscaley 1
 			}
 			windowDef SphereBack {
 				rect		165, 30, 384, 388
@@ -315,8 +313,9 @@ windowDef desktop {
 			windowDef Earth {
 				rect		0, 330, 640, 150
 				background	"guis/assets/menu/preymenu/earth"
+				matscalex 1
+				matscaley 1
 			}
-#endif
 		}
 		
 		renderDef PortalModelFront {

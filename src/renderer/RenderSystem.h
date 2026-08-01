@@ -66,6 +66,7 @@ typedef struct glconfig_s {
 	bool				floatBufferAvailable;
 // RAVEN END
 	bool				ARBVertexBufferObjectAvailable;
+	bool				pixelBufferObjectAvailable;
 	bool				ARBVertexProgramAvailable;
 	bool				ARBFragmentProgramAvailable;
 	bool				twoSidedStencilAvailable;

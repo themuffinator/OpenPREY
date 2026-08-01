@@ -35,6 +35,19 @@ If you have questions concerning this license or the applicable additional terms
 
 class idRenderWorldLocal;
 
+typedef struct lightGridBakeOptions_s {
+	int					maxProbes;
+	int					bounces;
+	int					captureSize;
+	int					blends;
+	int					samples;
+	bool				separateAreas;
+	idVec3				gridSize;
+} lightGridBakeOptions_t;
+
+void					R_SetDefaultLightGridBakeOptions( lightGridBakeOptions_t &options );
+bool					R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char *jobName = NULL );
+
 // everything that is needed by the backend needs
 // to be double buffered to allow it to run in
 // parallel on a dual cpu machine
@@ -117,6 +130,7 @@ typedef struct drawSurf_s {
 	const float				*shaderRegisters;	// evaluated and adjusted for referenceShaders
 	const struct drawSurf_s	*nextOnLight;	// viewLight chains
 	idScreenRect			scissorRect;	// for scissor clipping, local inside renderView viewport
+	const struct portalArea_s *area;	// portal area used for light-grid lookup, if available
 	int						dsFlags;			// DSF_VIEW_INSIDE_SHADOW, etc
 	struct vertCache_s		*dynamicTexCoords;	// float * in vertex cache memory
 	struct vertCache_s		*decalColorCache;	// optional per-stage color blocks for decals
@@ -695,6 +709,7 @@ typedef struct {
 											// A high dynamic range card will have this set to 1.0.
 
 	bool				currentRenderCopied;	// true if any material has already referenced _currentRender
+	bool				currentDepthCopied;	// true if any material has already referenced _currentDepth
 
 	// our OpenGL state deltas
 	glstate_t			glState;
@@ -865,6 +880,8 @@ public:
 	bool					shuttleViewEnabled;
 	int						lastRenderSkybox;
 	idRenderTexture *		activeRenderTexture;
+	bool					suppressLevelshotViewModels;
+	bool					disableLevelshotEntityCulling;
 
 	ID_INLINE bool SkyboxRenderedInFrame() const { return frameCount == lastRenderSkybox; }
 	ID_INLINE void RenderSkyboxInFrame() { lastRenderSkybox = frameCount; }
@@ -893,10 +910,11 @@ extern idCVar r_windowHeight;				// windowed mode height
 extern idCVar r_multiSamples;			// number of antialiasing samples
 extern idCVar r_postAA;					// post AA mode: 0 = off, 1 = SMAA 1x
 extern idCVar r_bloom;					// enable bloom post-process
-extern idCVar r_bloomThreshold;		// bloom bright-pass threshold
-extern idCVar r_bloomSoftKnee;			// bloom soft threshold knee
-extern idCVar r_bloomIntensity;		// bloom contribution scale
+extern idCVar r_bloomThreshold;			// bloom bright-pass threshold
+extern idCVar r_bloomSoftKnee;			// relative bloom soft threshold knee
+extern idCVar r_bloomIntensity;			// bloom contribution scale
 extern idCVar r_bloomRadius;			// bloom sample radius scale
+extern idCVar r_bloomMipCount;			// number of bloom pyramid levels
 extern idCVar r_ssao;					// enable SSAO post-process
 extern idCVar r_ssaoRadius;			// SSAO sampling radius in view-space units
 extern idCVar r_ssaoBias;				// SSAO horizon bias in view-space units
@@ -909,15 +927,27 @@ extern idCVar r_glowAlpha;				// starting blur alpha for retail glow
 extern idCVar r_glowAlphaChange;		// per-step glow blur alpha change
 extern idCVar r_glowSteps;				// number of glow blur steps
 extern idCVar r_glowStrength;			// final retail glow overlay strength
-extern idCVar r_hdrToneMap;			// enable HDR tonemapping and color correction
-extern idCVar r_hdrExposure;			// HDR tonemap exposure
-extern idCVar r_hdrWhitePoint;			// filmic white point for HDR tonemapping
-extern idCVar r_hdrLift;				// post-process shadow lift
-extern idCVar r_hdrPostGamma;			// post-process gamma curve
-extern idCVar r_hdrGain;				// post-process gain
-extern idCVar r_hdrVibrance;			// post-process vibrance
-extern idCVar r_hdrSaturation;			// post-process saturation
-extern idCVar r_hdrContrast;			// post-process contrast
+extern idCVar r_hdrSceneTarget;			// render the main scene into an HDR scene target before post-processing
+extern idCVar r_hdrToneMap;				// enable filmic tone mapping and color correction
+extern idCVar r_hdrExposure;			// tone-mapping exposure
+extern idCVar r_hdrWhitePoint;			// filmic white point for tone mapping
+extern idCVar r_hdrLift;				// post-process shadow lift when tone mapping is enabled
+extern idCVar r_hdrPostGamma;			// post-process gamma curve when tone mapping is enabled
+extern idCVar r_hdrGain;				// post-process gain when tone mapping is enabled
+extern idCVar r_hdrVibrance;			// post-process vibrance when tone mapping is enabled
+extern idCVar r_hdrSaturation;			// post-process saturation when tone mapping is enabled
+extern idCVar r_hdrContrast;			// post-process contrast when tone mapping is enabled
+extern idCVar r_hdrAutoExposure;		// automatically derive exposure from scene luminance
+extern idCVar r_hdrKeyValue;			// exposure key value used by auto exposure
+extern idCVar r_hdrMinExposure;			// minimum auto-exposure multiplier
+extern idCVar r_hdrMaxExposure;			// maximum auto-exposure multiplier
+extern idCVar r_hdrAdaptUpSpeed;		// adaptation speed when moving toward a brighter exposure
+extern idCVar r_hdrAdaptDownSpeed;		// adaptation speed when moving toward a darker exposure
+extern idCVar r_hdrHighlightDesaturation;	// desaturate highlights before the final clamp
+extern idCVar r_hdrGamutCompression;	// compress saturated highlights before the final clamp
+extern idCVar r_hdrSRGBTextures;		// store diffuse material textures in sRGB formats when available
+extern idCVar r_hdrSRGB;				// enable final framebuffer sRGB conversion when available
+extern idCVar r_hdrDebugView;			// 0 = off, 1 = pre-tonemap heatmap, 2 = log-luminance view
 extern idCVar r_crt;					// enable CRT monitor post-process
 extern idCVar r_crtAmount;				// overall CRT blend amount
 extern idCVar r_crtScanlineStrength;	// scanline intensity
@@ -1010,6 +1040,12 @@ extern idCVar r_skipRenderContext;		// NULL the rendering context during backend
 extern idCVar r_skipTranslucent;		// skip the translucent interaction rendering
 extern idCVar r_skipAmbient;			// bypasses all non-interaction drawing
 extern idCVar r_skipNewAmbient;			// bypasses all vertex/fragment program ambients
+extern idCVar r_forceAmbient;			// lifts the final scene toward a minimum brightness
+extern idCVar r_useLightGrid;			// enable indirect diffuse from precomputed irradiance volumes
+extern idCVar r_lightGridBakeWorkers;	// worker thread count for CPU probe integration (-1 = disabled, 0 = auto)
+extern idCVar r_lightGridBakeAsyncReadback;	// use async readback during light-grid baking when supported
+extern idCVar r_lightGridBakeMemoryMB;	// transient memory budget for in-flight light-grid bake jobs
+extern idCVar r_lightGridBakeReadbackSlots;	// async readback slot count for light-grid baking (0 = auto)
 extern idCVar r_skipBlendLights;		// skip all blend lights
 extern idCVar r_skipFogLights;			// skip all fog lights
 extern idCVar r_skipSubviews;			// 1 = don't render any mirrors / cameras / etc
@@ -1055,6 +1091,7 @@ extern idCVar r_showDominantTri;		// draw lines from vertexes to center of domin
 extern idCVar r_showTextureVectors;		// draw each triangles texture (tangent) vectors
 extern idCVar r_showLights;				// 1 = print light info, 2 = also draw volumes
 extern idCVar r_showLightCount;			// colors surfaces based on light count
+extern idCVar r_showLightGrid;			// visualize portal-area light-grid probes
 extern idCVar r_showShadows;			// visualize the stencil shadow volumes
 extern idCVar r_showShadowCount;		// colors screen based on shadow volume depth complexity
 extern idCVar r_showLightScissors;		// show light scissor rectangles
@@ -1725,6 +1762,7 @@ void RB_SetGL2D( void );
 void RB_LogComment( const char *comment, ... ) id_attribute((format(printf,1,2)));
 
 void RB_ShowImages( void );
+void RB_SimpleSurfaceSetup( const drawSurf_t *drawSurf );
 
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds );
 

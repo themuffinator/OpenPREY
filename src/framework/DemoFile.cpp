@@ -33,7 +33,11 @@ idCVar idDemoFile::com_logDemos( "com_logDemos", "0", CVAR_SYSTEM | CVAR_BOOL, "
 idCVar idDemoFile::com_compressDemos( "com_compressDemos", "1", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE, "Compression scheme for demo files\n0: None    (Fast, large files)\n1: LZW     (Fast to compress, Fast to decompress, medium/small files)\n2: LZSS    (Slow to compress, Fast to decompress, small files)\n3: Huffman (Fast to compress, Slow to decompress, medium files)\nSee also: The 'CompressDemo' command" );
 idCVar idDemoFile::com_preloadDemos( "com_preloadDemos", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_ARCHIVE, "Load the whole demo in to RAM before running it" );
 
-#define DEMO_MAGIC GAME_NAME " RDEMO"
+static const char DEMO_MAGIC[] = GAME_NAME " RDEMO";
+static const char INTERIM_DEMO_MAGIC[] = "OpenPREY RDEMO";
+static const char LEGACY_DEMO_MAGIC[] = "OpenPrey RDEMO";
+static_assert( sizeof( DEMO_MAGIC ) == sizeof( INTERIM_DEMO_MAGIC ), "render-demo magic length changed" );
+static_assert( sizeof( DEMO_MAGIC ) == sizeof( LEGACY_DEMO_MAGIC ), "render-demo magic length changed" );
 
 /*
 ================
@@ -107,7 +111,9 @@ bool idDemoFile::OpenForReading( const char *fileName ) {
 	writing = false;
 
 	f->Read(magicBuffer, magicLen);
-	if ( memcmp(magicBuffer, DEMO_MAGIC, magicLen) == 0 ) {
+	if ( memcmp( magicBuffer, DEMO_MAGIC, magicLen ) == 0 ||
+		 memcmp( magicBuffer, INTERIM_DEMO_MAGIC, magicLen ) == 0 ||
+		 memcmp( magicBuffer, LEGACY_DEMO_MAGIC, magicLen ) == 0 ) {
 		f->ReadInt( compression );
 	} else {
 		// Ideally we would error out if the magic string isn't there,

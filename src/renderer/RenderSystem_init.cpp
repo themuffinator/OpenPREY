@@ -58,10 +58,11 @@ idCVar r_useLightPortalFlow( "r_useLightPortalFlow", "1", CVAR_RENDERER | CVAR_B
 idCVar r_multiSamples( "r_multiSamples", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of antialiasing samples" );
 idCVar r_postAA( "r_postAA", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "post AA mode: 0 = off, 1 = SMAA 1x", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
 idCVar r_bloom( "r_bloom", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable bloom post-process" );
-idCVar r_bloomThreshold( "r_bloomThreshold", "0.72", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom bright-pass threshold", 0.0f, 2.0f );
-idCVar r_bloomSoftKnee( "r_bloomSoftKnee", "0.15", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom soft threshold knee", 0.0f, 1.0f );
+idCVar r_bloomThreshold( "r_bloomThreshold", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom bright-pass threshold in scene-referred units", 0.0f, 16.0f );
+idCVar r_bloomSoftKnee( "r_bloomSoftKnee", "0.25", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "relative bloom soft-threshold knee", 0.0f, 1.0f );
 idCVar r_bloomIntensity( "r_bloomIntensity", "0.45", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom contribution scale", 0.0f, 4.0f );
 idCVar r_bloomRadius( "r_bloomRadius", "1.35", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom sample radius scale", 0.1f, 8.0f );
+idCVar r_bloomMipCount( "r_bloomMipCount", "5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of bloom pyramid levels", 1, 5, idCmdSystem::ArgCompletion_Integer<1,5> );
 idCVar r_ssao( "r_ssao", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable screen-space ambient occlusion" );
 idCVar r_ssaoRadius( "r_ssaoRadius", "36.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "SSAO sampling radius in view-space units", 4.0f, 256.0f );
 idCVar r_ssaoBias( "r_ssaoBias", "2.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "SSAO horizon bias in view-space units", 0.0f, 32.0f );
@@ -74,15 +75,27 @@ idCVar r_glowAlpha( "r_glowAlpha", "0.55", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_F
 idCVar r_glowAlphaChange( "r_glowAlphaChange", "0.85", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "alpha change used when blurring the glow texture", 0.0f, 4.0f );
 idCVar r_glowSteps( "r_glowSteps", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "steps used when blurring the glow texture", 0, 256 );
 idCVar r_glowStrength( "r_glowStrength", "0.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "strength when drawing the final glow texture on screen", 0.0f, 4.0f );
-idCVar r_hdrToneMap( "r_hdrToneMap", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable HDR tonemapping and color correction pass" );
-idCVar r_hdrExposure( "r_hdrExposure", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "HDR tone mapping exposure", 0.1f, 8.0f );
-idCVar r_hdrWhitePoint( "r_hdrWhitePoint", "6.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "filmic white point used by HDR tonemapping", 1.0f, 16.0f );
-idCVar r_hdrLift( "r_hdrLift", "0.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process shadow lift applied after HDR tonemapping", -0.25f, 0.25f );
-idCVar r_hdrPostGamma( "r_hdrPostGamma", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process gamma curve applied after HDR tonemapping", 0.5f, 2.5f );
-idCVar r_hdrGain( "r_hdrGain", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process gain applied after HDR tonemapping", 0.5f, 2.0f );
-idCVar r_hdrVibrance( "r_hdrVibrance", "0.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process vibrance that favors muted colors", -1.0f, 1.0f );
-idCVar r_hdrSaturation( "r_hdrSaturation", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process saturation", 0.0f, 2.0f );
-idCVar r_hdrContrast( "r_hdrContrast", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process contrast", 0.1f, 3.0f );
+idCVar r_hdrSceneTarget( "r_hdrSceneTarget", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "render the main scene into an HDR scene target before post-processing" );
+idCVar r_hdrToneMap( "r_hdrToneMap", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable filmic tone mapping and color correction pass" );
+idCVar r_hdrExposure( "r_hdrExposure", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "manual exposure multiplier applied after auto exposure", 0.1f, 16.0f );
+idCVar r_hdrWhitePoint( "r_hdrWhitePoint", "6.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "filmic white point used by tone mapping", 1.0f, 16.0f );
+idCVar r_hdrLift( "r_hdrLift", "0.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process shadow lift when tone mapping is enabled", -0.25f, 0.25f );
+idCVar r_hdrPostGamma( "r_hdrPostGamma", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process gamma curve when tone mapping is enabled", 0.5f, 2.5f );
+idCVar r_hdrGain( "r_hdrGain", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process gain when tone mapping is enabled", 0.5f, 2.0f );
+idCVar r_hdrVibrance( "r_hdrVibrance", "0.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process vibrance when tone mapping is enabled", -1.0f, 1.0f );
+idCVar r_hdrSaturation( "r_hdrSaturation", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process saturation when tone mapping is enabled", 0.0f, 2.0f );
+idCVar r_hdrContrast( "r_hdrContrast", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "post-process contrast when tone mapping is enabled", 0.1f, 3.0f );
+idCVar r_hdrAutoExposure( "r_hdrAutoExposure", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "derive exposure from a log-average scene luminance pyramid" );
+idCVar r_hdrKeyValue( "r_hdrKeyValue", "0.18", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "middle-gray key value used by HDR auto exposure", 0.01f, 1.0f );
+idCVar r_hdrMinExposure( "r_hdrMinExposure", "0.25", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "minimum auto-exposure multiplier", 0.01f, 16.0f );
+idCVar r_hdrMaxExposure( "r_hdrMaxExposure", "8.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "maximum auto-exposure multiplier", 0.01f, 32.0f );
+idCVar r_hdrAdaptUpSpeed( "r_hdrAdaptUpSpeed", "3.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "adaptation speed when exposure needs to brighten", 0.01f, 16.0f );
+idCVar r_hdrAdaptDownSpeed( "r_hdrAdaptDownSpeed", "1.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "adaptation speed when exposure needs to darken", 0.01f, 16.0f );
+idCVar r_hdrHighlightDesaturation( "r_hdrHighlightDesaturation", "0.35", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "desaturate tone-mapped highlights before the final clamp", 0.0f, 1.0f );
+idCVar r_hdrGamutCompression( "r_hdrGamutCompression", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "compress saturated highlights before the final clamp", 0.0f, 4.0f );
+idCVar r_hdrSRGBTextures( "r_hdrSRGBTextures", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "experimental strict sRGB texture decode path; disabled by default until the full renderer is linearized" );
+idCVar r_hdrSRGB( "r_hdrSRGB", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "experimental final framebuffer sRGB conversion path; disabled by default until the full renderer is linearized" );
+idCVar r_hdrDebugView( "r_hdrDebugView", "0", CVAR_RENDERER | CVAR_INTEGER, "HDR debug view: 0 = off, 1 = pre-tonemap heatmap, 2 = log-luminance grayscale", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_crt( "r_crt", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable CRT monitor post-process" );
 idCVar r_crtAmount( "r_crtAmount", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "overall blend amount for the CRT monitor post-process", 0.0f, 1.0f );
 idCVar r_crtScanlineStrength( "r_crtScanlineStrength", "0.55", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "scanline intensity for the CRT monitor post-process", 0.0f, 1.0f );
@@ -158,6 +171,11 @@ idCVar r_skipAmbient( "r_skipAmbient", "0", CVAR_RENDERER | CVAR_BOOL, "bypasses
 idCVar r_skipNewAmbient( "r_skipNewAmbient", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "bypasses all vertex/fragment program ambient drawing" );
 idCVar r_shaderLevel( "r_shaderLevel", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "level of shaders to use", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_forceAmbient( "r_forceAmbient", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "force ambient lighting level" );
+idCVar r_useLightGrid( "r_useLightGrid", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable indirect diffuse from precomputed irradiance volumes" );
+idCVar r_lightGridBakeWorkers( "r_lightGridBakeWorkers", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "worker thread count for light-grid baking (-1 = disabled, 0 = auto)", -1, 8 );
+idCVar r_lightGridBakeAsyncReadback( "r_lightGridBakeAsyncReadback", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use async pixel-pack-buffer readback during light-grid baking when supported" );
+idCVar r_lightGridBakeMemoryMB( "r_lightGridBakeMemoryMB", "256", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "transient memory budget for light-grid baking", 64, 2048 );
+idCVar r_lightGridBakeReadbackSlots( "r_lightGridBakeReadbackSlots", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "async readback slot count for light-grid baking (0 = auto)", 0, 16 );
 idCVar r_skipBlendLights( "r_skipBlendLights", "0", CVAR_RENDERER | CVAR_BOOL, "skip all blend lights" );
 idCVar r_skipFogLights( "r_skipFogLights", "0", CVAR_RENDERER | CVAR_BOOL, "skip all fog lights" );
 idCVar r_skipDeforms( "r_skipDeforms", "0", CVAR_RENDERER | CVAR_BOOL, "leave all deform materials in their original state" );
@@ -243,6 +261,7 @@ idCVar r_showEntityScissors( "r_showEntityScissors", "0", CVAR_RENDERER | CVAR_B
 idCVar r_showInteractionFrustums( "r_showInteractionFrustums", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = show a frustum for each interaction, 2 = also draw lines to light origin, 3 = also draw entity bbox", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_showInteractionScissors( "r_showInteractionScissors", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = show screen rectangle which contains the interaction frustum, 2 = also draw construction lines", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_showLightCount( "r_showLightCount", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = colors surfaces based on light count, 2 = also count everything through walls, 3 = also print overdraw", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
+idCVar r_showLightGrid( "r_showLightGrid", "0", CVAR_RENDERER | CVAR_INTEGER, "visualize portal-area light-grid probes: 0 = off, 1 = current area, 2 = all valid, 3 = include invalid probes", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_showViewEntitys( "r_showViewEntitys", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = displays the bounding boxes of all view models, 2 = print index numbers" );
 idCVar r_showTris( "r_showTris", "0", CVAR_RENDERER | CVAR_INTEGER, "enables wireframe rendering of the world, 1 = only draw visible ones, 2 = draw all front facing, 3 = draw all", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_showSurfaceInfo( "r_showSurfaceInfo", "0", CVAR_RENDERER | CVAR_BOOL, "show surface material name under crosshair" );
@@ -434,6 +453,8 @@ static void R_CheckPortableExtensions( void ) {
 
 	// ARB_vertex_buffer_object
 	glConfig.ARBVertexBufferObjectAvailable = R_CheckExtension( "GL_ARB_vertex_buffer_object" );
+	glConfig.pixelBufferObjectAvailable =
+		( GLEW_ARB_pixel_buffer_object || GLEW_EXT_pixel_buffer_object || GLEW_VERSION_2_1 );
 
 	// ARB_vertex_program
 	glConfig.ARBVertexProgramAvailable = R_CheckExtension( "GL_ARB_vertex_program" );
@@ -1248,9 +1269,22 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 			if ( ref ) {
 				tr.BeginFrame( oldWidth, oldHeight );
 				tr.primaryWorld->RenderScene( ref );
-				tr.EndFrame( NULL, NULL );
+
+				// Match the direct back-buffer readback path used by runtime bake captures.
+				tr.guiModel->EmitFullScreen();
+				tr.guiModel->Clear();
+
+				if ( frameData->cmdHead->commandId != RC_NOP || frameData->cmdHead->next != NULL ) {
+					if ( !r_skipBackEnd.GetBool() ) {
+						RB_ExecuteBackEndCommands( frameData->cmdHead );
+					}
+					R_ClearCommandChain();
+				}
+
+				glReadBuffer( GL_BACK );
 			} else {
 				session->UpdateScreen();
+				glReadBuffer( GL_FRONT );
 			}
 
 			int w = oldWidth;
@@ -1262,7 +1296,6 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 				h = height - yo;
 			}
 
-			glReadBuffer( GL_FRONT );
 			glReadPixels( 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, temp ); 
 
 			int	row = ( w * 3 + 3 ) & ~3;		// OpenGL pads to dword boundaries
@@ -2223,6 +2256,8 @@ void idRenderSystemLocal::Clear( void ) {
 	spiritWalkViewEnabled = false;
 	shuttleViewEnabled = false;
 	activeRenderTexture = NULL;
+	suppressLevelshotViewModels = false;
+	disableLevelshotEntityCulling = false;
 	memset( gammaTable, 0, sizeof( gammaTable ) );
 	takingScreenshot = false;
 }

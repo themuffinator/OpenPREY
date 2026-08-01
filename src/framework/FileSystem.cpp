@@ -69,8 +69,8 @@ usually the executable. It defaults to the current directory, but can be overrid
 with "+set fs_basepath c:\doom" on the command line. The base path cannot be modified
 at all after startup.
 
-The "home path" is the user-writable root path for OpenPrey data. It can be overridden
-with "+set fs_homepath c:\users\you\saved games\OpenPrey" on the command line.
+The "home path" is the user-writable root path for openPREY data. It can be overridden
+with "+set fs_homepath c:\users\you\saved games\openPREY" on the command line.
 
 The "save path" is the path to the directory where game files will be saved. It defaults
 to the home path, but can be overridden with a "+set fs_savepath c:\doom" on the
@@ -172,7 +172,7 @@ for instance to base a mod of D3 + D3XP assets, fs_game mymod, fs_game_base d3xp
 
 
 // define to fix special-cases for GetPackStatus so that files that shipped in 
-// the wrong place for OpenPrey don't break pure servers.
+// the wrong place for openPREY don't break pure servers.
 #define DOOM3_PURE_SPECIAL_CASES	
 
 typedef bool (*pureExclusionFunc_t)( const struct pureExclusion_s &excl, int l, const idStr &name );
@@ -2377,7 +2377,7 @@ idModList *idFileSystemLocal::ListMods( void ) {
 	}
 
 	list->mods.Insert( "" );
-	list->descriptions.Insert( "OpenPrey" );
+	list->descriptions.Insert( "openPREY" );
 
 	assert( list->mods.Num() == list->descriptions.Num() );
 
@@ -4983,7 +4983,7 @@ void idFileSystemLocal::FindMapScreenshot( const char *path, char *buf, int len 
 		mapCandidates[ mapCandidateCount++ ] = mapLeaf;
 	}
 
-	// Preserve the OpenPrey-authored roadhouse loading art, but use individual
+	// Preserve the openPREY-authored roadhouse loading art, but use individual
 	// legacy map loadscreens for every other map when available.
 	const bool isRoadhouseMap =
 		( idStr::Icmp( mapPath.c_str(), "game/roadhouse" ) == 0 ) ||
@@ -4997,7 +4997,7 @@ void idFileSystemLocal::FindMapScreenshot( const char *path, char *buf, int len 
 
 	for ( int mapIndex = 0; mapIndex < mapCandidateCount; mapIndex++ ) {
 		for ( int i = 0; i < (int)( sizeof( runtimeCandidates ) / sizeof( runtimeCandidates[ 0 ] ) ); i++ ) {
-			// game/roadhouse should keep its OpenPrey-specific loadscreen.
+			// game/roadhouse should keep its openPREY-specific loadscreen.
 			if ( isRoadhouseMap && i == 2 ) {
 				continue;
 			}

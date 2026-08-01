@@ -926,6 +926,7 @@ void RB_DrawView( const void *data ) {
 	// we will need to do a new copyTexSubImage of the screen
 	// when a SS_POST_PROCESS material is used
 	backEnd.currentRenderCopied = false;
+	backEnd.currentDepthCopied = false;
 
 	// if there aren't any drawsurfs, do nothing
 	if ( !backEnd.viewDef->numDrawSurfs ) {

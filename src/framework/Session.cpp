@@ -30,6 +30,10 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "../renderer/tr_local.h"
+
+void *R_StaticAlloc( int bytes );
+void R_StaticFree( void *data );
 
 #define RENDERDEMO_VERSION 1 
 #define USERCMD_MSEC common->GetUserCmdMSec()
@@ -239,6 +243,429 @@ static int Session_CountVisibleSmallChars( const char *string ) {
 		s++;
 	}
 	return count;
+}
+
+static bool Session_FileExistsInSearchPaths( const char *path ) {
+	if ( path == NULL || path[0] == '\0' ) {
+		return false;
+	}
+
+	return ( fileSystem->ReadFile( path, NULL, NULL ) != -1 );
+}
+
+static bool Session_ResolveImageFilePath( const idStr &imagePath, idStr &resolvedPath ) {
+	if ( imagePath.Length() <= 0 ) {
+		return false;
+	}
+
+	idStr canonicalPath = imagePath;
+	canonicalPath.BackSlashesToSlashes();
+
+	idStr basePath = canonicalPath;
+	idStr requestedExtension;
+	basePath.ExtractFileExtension( requestedExtension );
+	requestedExtension.ToLower();
+
+	if ( requestedExtension.Length() > 0 ) {
+		if ( Session_FileExistsInSearchPaths( canonicalPath.c_str() ) ) {
+			resolvedPath = canonicalPath;
+			return true;
+		}
+		basePath.StripFileExtension();
+	}
+
+	static const char *supportedExtensions[] = { "tga", "dds", "jpg", NULL };
+
+	if ( requestedExtension.Length() > 0 ) {
+		idStr requestedCandidate = basePath;
+		requestedCandidate += ".";
+		requestedCandidate += requestedExtension;
+		if ( Session_FileExistsInSearchPaths( requestedCandidate.c_str() ) ) {
+			resolvedPath = requestedCandidate;
+			return true;
+		}
+	}
+
+	for ( int i = 0; supportedExtensions[ i ] != NULL; i++ ) {
+		if ( requestedExtension.Length() > 0 && requestedExtension == supportedExtensions[ i ] ) {
+			continue;
+		}
+
+		idStr candidate = basePath;
+		candidate += ".";
+		candidate += supportedExtensions[ i ];
+		if ( Session_FileExistsInSearchPaths( candidate.c_str() ) ) {
+			resolvedPath = candidate;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool Session_ResolveSiblingImageFilePath( const idStr &resolvedBasePath, const char *suffix, idStr &resolvedPath ) {
+	if ( resolvedBasePath.Length() <= 0 || suffix == NULL || suffix[ 0 ] == '\0' ) {
+		return false;
+	}
+
+	idStr baseNoExt = resolvedBasePath;
+	idStr preferredExtension;
+	baseNoExt.ExtractFileExtension( preferredExtension );
+	preferredExtension.ToLower();
+	baseNoExt.StripFileExtension();
+	baseNoExt += suffix;
+
+	if ( preferredExtension.Length() > 0 ) {
+		idStr preferredCandidate = baseNoExt;
+		preferredCandidate += ".";
+		preferredCandidate += preferredExtension;
+		if ( Session_FileExistsInSearchPaths( preferredCandidate.c_str() ) ) {
+			resolvedPath = preferredCandidate;
+			return true;
+		}
+	}
+
+	static const char *supportedExtensions[] = { "tga", "dds", "jpg", NULL };
+	for ( int i = 0; supportedExtensions[ i ] != NULL; i++ ) {
+		if ( preferredExtension.Length() > 0 && preferredExtension == supportedExtensions[ i ] ) {
+			continue;
+		}
+
+		idStr candidate = baseNoExt;
+		candidate += ".";
+		candidate += supportedExtensions[ i ];
+		if ( Session_FileExistsInSearchPaths( candidate.c_str() ) ) {
+			resolvedPath = candidate;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool Session_LoadResolvedImageRGBA( const idStr &resolvedPath, byte *&pic, int &width, int &height ) {
+	pic = NULL;
+	width = 0;
+	height = 0;
+
+	R_LoadImage( resolvedPath.c_str(), &pic, &width, &height, NULL, false );
+	return ( pic != NULL && width > 0 && height > 0 );
+}
+
+static byte *Session_CreateResampledImageRegion( const byte *src, int srcWidth, int srcHeight,
+	int srcX, int srcY, int regionWidth, int regionHeight, int destWidth, int destHeight ) {
+	if ( src == NULL || srcWidth <= 0 || srcHeight <= 0 || destWidth <= 0 || destHeight <= 0 ) {
+		return NULL;
+	}
+
+	srcX = idMath::ClampInt( 0, srcWidth - 1, srcX );
+	srcY = idMath::ClampInt( 0, srcHeight - 1, srcY );
+	regionWidth = idMath::ClampInt( 1, srcWidth - srcX, regionWidth );
+	regionHeight = idMath::ClampInt( 1, srcHeight - srcY, regionHeight );
+
+	byte *cropped = (byte *)R_StaticAlloc( regionWidth * regionHeight * 4 );
+	for ( int y = 0; y < regionHeight; y++ ) {
+		const byte *srcRow = src + ( ( srcY + y ) * srcWidth + srcX ) * 4;
+		byte *dstRow = cropped + y * regionWidth * 4;
+		memcpy( dstRow, srcRow, regionWidth * 4 );
+	}
+
+	if ( regionWidth == destWidth && regionHeight == destHeight ) {
+		return cropped;
+	}
+
+	byte *resampled = R_ResampleTexture( cropped, regionWidth, regionHeight, destWidth, destHeight );
+	R_StaticFree( cropped );
+	return resampled;
+}
+
+static void Session_BlitRGBA( byte *dest, int destWidth, int destHeight, int destX, int destY,
+	const byte *src, int srcWidth, int srcHeight ) {
+	if ( dest == NULL || src == NULL || destWidth <= 0 || destHeight <= 0 || srcWidth <= 0 || srcHeight <= 0 ) {
+		return;
+	}
+
+	if ( destX < 0 || destY < 0 || destX + srcWidth > destWidth || destY + srcHeight > destHeight ) {
+		return;
+	}
+
+	for ( int y = 0; y < srcHeight; y++ ) {
+		byte *destRow = dest + ( ( destY + y ) * destWidth + destX ) * 4;
+		const byte *srcRow = src + y * srcWidth * 4;
+		memcpy( destRow, srcRow, srcWidth * 4 );
+	}
+}
+
+static void Session_ReplicateColumnIntoRect( byte *dest, int destWidth, int destHeight,
+	int sourceX, int rectX, int rectY, int rectWidth, int rectHeight ) {
+	if ( dest == NULL || destWidth <= 0 || destHeight <= 0 || rectWidth <= 0 || rectHeight <= 0 ) {
+		return;
+	}
+
+	sourceX = idMath::ClampInt( 0, destWidth - 1, sourceX );
+	rectX = idMath::ClampInt( 0, destWidth, rectX );
+	rectY = idMath::ClampInt( 0, destHeight, rectY );
+	rectWidth = idMath::ClampInt( 0, destWidth - rectX, rectWidth );
+	rectHeight = idMath::ClampInt( 0, destHeight - rectY, rectHeight );
+
+	for ( int y = 0; y < rectHeight; y++ ) {
+		const byte *sourcePixel = dest + ( ( rectY + y ) * destWidth + sourceX ) * 4;
+		byte *destPixel = dest + ( ( rectY + y ) * destWidth + rectX ) * 4;
+		for ( int x = 0; x < rectWidth; x++, destPixel += 4 ) {
+			destPixel[ 0 ] = sourcePixel[ 0 ];
+			destPixel[ 1 ] = sourcePixel[ 1 ];
+			destPixel[ 2 ] = sourcePixel[ 2 ];
+			destPixel[ 3 ] = sourcePixel[ 3 ];
+		}
+	}
+}
+
+static void Session_ReplicateRowIntoRect( byte *dest, int destWidth, int destHeight,
+	int sourceY, int rectX, int rectY, int rectWidth, int rectHeight ) {
+	if ( dest == NULL || destWidth <= 0 || destHeight <= 0 || rectWidth <= 0 || rectHeight <= 0 ) {
+		return;
+	}
+
+	sourceY = idMath::ClampInt( 0, destHeight - 1, sourceY );
+	rectX = idMath::ClampInt( 0, destWidth, rectX );
+	rectY = idMath::ClampInt( 0, destHeight, rectY );
+	rectWidth = idMath::ClampInt( 0, destWidth - rectX, rectWidth );
+	rectHeight = idMath::ClampInt( 0, destHeight - rectY, rectHeight );
+
+	for ( int y = 0; y < rectHeight; y++ ) {
+		byte *destRow = dest + ( ( rectY + y ) * destWidth + rectX ) * 4;
+		const byte *sourceRow = dest + ( sourceY * destWidth + rectX ) * 4;
+		memcpy( destRow, sourceRow, rectWidth * 4 );
+	}
+}
+
+static bool Session_GetLoadingCanvasExpansion( float &windowAspect, bool &expandHorizontally, bool &expandVertically ) {
+	windowAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
+	expandHorizontally = false;
+	expandVertically = false;
+
+	if ( !cvarSystem->GetCVarBool( "ui_aspectCorrection" ) ) {
+		return false;
+	}
+
+	float viewportWidth = static_cast<float>( glConfig.uiViewportWidth );
+	float viewportHeight = static_cast<float>( glConfig.uiViewportHeight );
+	if ( viewportWidth <= 0.0f || viewportHeight <= 0.0f ) {
+		viewportWidth = static_cast<float>( glConfig.vidWidth );
+		viewportHeight = static_cast<float>( glConfig.vidHeight );
+	}
+
+	if ( viewportWidth <= 0.0f || viewportHeight <= 0.0f ) {
+		return false;
+	}
+
+	const float targetAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
+	const float aspectEpsilon = 0.0001f;
+
+	windowAspect = viewportWidth / viewportHeight;
+	if ( windowAspect > targetAspect + aspectEpsilon ) {
+		expandHorizontally = true;
+	} else if ( windowAspect + aspectEpsilon < targetAspect ) {
+		expandVertically = true;
+	}
+
+	return expandHorizontally || expandVertically;
+}
+
+static idStr Session_MakeExpandedLoadingBackgroundPath( const char *mapName, int width, int height ) {
+	idStr safeName = mapName;
+	safeName.BackSlashesToSlashes();
+	safeName.StripPath();
+	safeName.StripFileExtension();
+	if ( safeName.Length() <= 0 ) {
+		safeName = "generated";
+	}
+
+	return va( "guis/assets/generated/loadscreens/%s_%dx%d.tga", safeName.c_str(), width, height );
+}
+
+static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPath, const char *mapName, idStr &generatedPath ) {
+	float windowAspect = 0.0f;
+	bool expandHorizontally = false;
+	bool expandVertically = false;
+	if ( !Session_GetLoadingCanvasExpansion( windowAspect, expandHorizontally, expandVertically ) ) {
+		return false;
+	}
+
+	idStr resolvedCenterPath;
+	if ( !Session_ResolveImageFilePath( backgroundPath, resolvedCenterPath ) ) {
+		return false;
+	}
+
+	idStr resolvedLeftPath;
+	idStr resolvedRightPath;
+	idStr resolvedTopPath;
+	idStr resolvedBottomPath;
+
+	bool hasLeft = false;
+	bool hasRight = false;
+	bool hasTop = false;
+	bool hasBottom = false;
+	if ( expandHorizontally ) {
+		hasLeft = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_left", resolvedLeftPath );
+		hasRight = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_right", resolvedRightPath );
+	}
+	if ( expandVertically ) {
+		hasTop = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_top", resolvedTopPath );
+		hasBottom = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_bottom", resolvedBottomPath );
+	}
+
+	byte *centerPic = NULL;
+	int centerWidth = 0;
+	int centerHeight = 0;
+	if ( !Session_LoadResolvedImageRGBA( resolvedCenterPath, centerPic, centerWidth, centerHeight ) ) {
+		return false;
+	}
+
+	byte *leftPic = NULL;
+	byte *rightPic = NULL;
+	byte *topPic = NULL;
+	byte *bottomPic = NULL;
+	int leftWidth = 0, leftHeight = 0;
+	int rightWidth = 0, rightHeight = 0;
+	int topWidth = 0, topHeight = 0;
+	int bottomWidth = 0, bottomHeight = 0;
+
+	if ( hasLeft && !Session_LoadResolvedImageRGBA( resolvedLeftPath, leftPic, leftWidth, leftHeight ) ) {
+		hasLeft = false;
+	}
+	if ( hasRight && !Session_LoadResolvedImageRGBA( resolvedRightPath, rightPic, rightWidth, rightHeight ) ) {
+		hasRight = false;
+	}
+	if ( hasTop && !Session_LoadResolvedImageRGBA( resolvedTopPath, topPic, topWidth, topHeight ) ) {
+		hasTop = false;
+	}
+	if ( hasBottom && !Session_LoadResolvedImageRGBA( resolvedBottomPath, bottomPic, bottomWidth, bottomHeight ) ) {
+		hasBottom = false;
+	}
+
+	const int centerDisplayHeight = centerHeight;
+	const int centerDisplayWidth = Max( 1, idMath::Ftoi( centerDisplayHeight * ( static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT ) ) + 0.5f ) );
+
+	int outputWidth = centerDisplayWidth;
+	int outputHeight = centerDisplayHeight;
+	int centerX = 0;
+	int centerY = 0;
+
+	if ( expandHorizontally ) {
+		outputWidth = Max( centerDisplayWidth, idMath::Ftoi( windowAspect * centerDisplayHeight + 0.5f ) );
+		centerX = ( outputWidth - centerDisplayWidth ) / 2;
+	} else {
+		outputHeight = Max( centerDisplayHeight, idMath::Ftoi( centerDisplayWidth / windowAspect + 0.5f ) );
+		centerY = ( outputHeight - centerDisplayHeight ) / 2;
+	}
+
+	idTempArray<byte> composite( outputWidth * outputHeight * 4 );
+	memset( composite.Ptr(), 0, outputWidth * outputHeight * 4 );
+
+	byte *centerResampled = Session_CreateResampledImageRegion( centerPic, centerWidth, centerHeight, 0, 0, centerWidth, centerHeight, centerDisplayWidth, centerDisplayHeight );
+	if ( centerResampled == NULL ) {
+		R_StaticFree( centerPic );
+		if ( leftPic ) {
+			R_StaticFree( leftPic );
+		}
+		if ( rightPic ) {
+			R_StaticFree( rightPic );
+		}
+		if ( topPic ) {
+			R_StaticFree( topPic );
+		}
+		if ( bottomPic ) {
+			R_StaticFree( bottomPic );
+		}
+		return false;
+	}
+
+	Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, centerX, centerY, centerResampled, centerDisplayWidth, centerDisplayHeight );
+	R_StaticFree( centerResampled );
+
+	if ( expandHorizontally ) {
+		const int leftWidthPixels = centerX;
+		const int rightWidthPixels = outputWidth - centerX - centerDisplayWidth;
+
+		if ( leftWidthPixels > 0 ) {
+			Session_ReplicateColumnIntoRect( composite.Ptr(), outputWidth, outputHeight, centerX, 0, 0, leftWidthPixels, outputHeight );
+			if ( hasLeft && leftPic != NULL ) {
+				const int cropWidth = Max( 1, idMath::Ftoi( leftWidth * ( static_cast<float>( leftWidthPixels ) / static_cast<float>( centerDisplayWidth ) ) + 0.5f ) );
+				byte *leftResampled = Session_CreateResampledImageRegion( leftPic, leftWidth, leftHeight,
+					Max( 0, leftWidth - cropWidth ), 0, cropWidth, leftHeight, leftWidthPixels, outputHeight );
+				if ( leftResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, 0, 0, leftResampled, leftWidthPixels, outputHeight );
+					R_StaticFree( leftResampled );
+				}
+			}
+		}
+
+		if ( rightWidthPixels > 0 ) {
+			Session_ReplicateColumnIntoRect( composite.Ptr(), outputWidth, outputHeight, centerX + centerDisplayWidth - 1,
+				centerX + centerDisplayWidth, 0, rightWidthPixels, outputHeight );
+			if ( hasRight && rightPic != NULL ) {
+				const int cropWidth = Max( 1, idMath::Ftoi( rightWidth * ( static_cast<float>( rightWidthPixels ) / static_cast<float>( centerDisplayWidth ) ) + 0.5f ) );
+				byte *rightResampled = Session_CreateResampledImageRegion( rightPic, rightWidth, rightHeight,
+					0, 0, cropWidth, rightHeight, rightWidthPixels, outputHeight );
+				if ( rightResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, centerX + centerDisplayWidth, 0,
+						rightResampled, rightWidthPixels, outputHeight );
+					R_StaticFree( rightResampled );
+				}
+			}
+		}
+	} else {
+		const int topHeightPixels = centerY;
+		const int bottomHeightPixels = outputHeight - centerY - centerDisplayHeight;
+
+		if ( topHeightPixels > 0 ) {
+			Session_ReplicateRowIntoRect( composite.Ptr(), outputWidth, outputHeight, centerY, 0, 0, outputWidth, topHeightPixels );
+			if ( hasTop && topPic != NULL ) {
+				const int cropHeight = Max( 1, idMath::Ftoi( topHeight * ( static_cast<float>( topHeightPixels ) / static_cast<float>( centerDisplayHeight ) ) + 0.5f ) );
+				byte *topResampled = Session_CreateResampledImageRegion( topPic, topWidth, topHeight,
+					0, Max( 0, topHeight - cropHeight ), topWidth, cropHeight, outputWidth, topHeightPixels );
+				if ( topResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, 0, 0, topResampled, outputWidth, topHeightPixels );
+					R_StaticFree( topResampled );
+				}
+			}
+		}
+
+		if ( bottomHeightPixels > 0 ) {
+			Session_ReplicateRowIntoRect( composite.Ptr(), outputWidth, outputHeight, centerY + centerDisplayHeight - 1,
+				0, centerY + centerDisplayHeight, outputWidth, bottomHeightPixels );
+			if ( hasBottom && bottomPic != NULL ) {
+				const int cropHeight = Max( 1, idMath::Ftoi( bottomHeight * ( static_cast<float>( bottomHeightPixels ) / static_cast<float>( centerDisplayHeight ) ) + 0.5f ) );
+				byte *bottomResampled = Session_CreateResampledImageRegion( bottomPic, bottomWidth, bottomHeight,
+					0, 0, bottomWidth, cropHeight, outputWidth, bottomHeightPixels );
+				if ( bottomResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, 0, centerY + centerDisplayHeight,
+						bottomResampled, outputWidth, bottomHeightPixels );
+					R_StaticFree( bottomResampled );
+				}
+			}
+		}
+	}
+
+	generatedPath = Session_MakeExpandedLoadingBackgroundPath( mapName, outputWidth, outputHeight );
+	R_WriteTGA( generatedPath.c_str(), composite.Ptr(), outputWidth, outputHeight );
+
+	R_StaticFree( centerPic );
+	if ( leftPic ) {
+		R_StaticFree( leftPic );
+	}
+	if ( rightPic ) {
+		R_StaticFree( rightPic );
+	}
+	if ( topPic ) {
+		R_StaticFree( topPic );
+	}
+	if ( bottomPic ) {
+		R_StaticFree( bottomPic );
+	}
+
+	return true;
 }
 
 static void Session_DrawScaledSmallString( float x, float y, float charWidth, float charHeight,
@@ -509,6 +936,523 @@ void Session_RescanSI_f( const idCmdArgs &args ) {
 	}
 }
 
+static bool Session_IsLightGridBakeMultiplayerMap( const idStr &mapName ) {
+	return idStr::Icmpn( mapName.c_str(), "mp/", 3 ) == 0;
+}
+
+static void Session_NormalizeLightGridMapName( idStr &mapName ) {
+	mapName.BackSlashesToSlashes();
+	mapName.StripLeading( "maps/" );
+	mapName.StripFileExtension();
+}
+
+static bool Session_LightGridMapListContains( const idList<idStr> &mapTargets, const idStr &mapName ) {
+	for ( int i = 0; i < mapTargets.Num(); i++ ) {
+		if ( mapTargets[ i ].Icmp( mapName ) == 0 ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool Session_LightGridMapExists( const idStr &mapName ) {
+	idStr mapFile = "maps/";
+	mapFile += mapName;
+	mapFile.SetFileExtension( ".map" );
+	return fileSystem->FindFile( mapFile, true ) != FIND_NO;
+}
+
+static void Session_AppendAllLightGridMaps( idList<idStr> &mapTargets ) {
+	idList<idStr> singleplayerMaps;
+	idList<idStr> multiplayerMaps;
+
+	const int numMaps = fileSystem->GetNumMaps();
+	for ( int i = 0; i < numMaps; i++ ) {
+		const idDict *mapDecl = fileSystem->GetMapDecl( i );
+		if ( mapDecl == NULL ) {
+			continue;
+		}
+
+		idStr mapName = mapDecl->GetString( "path" );
+		Session_NormalizeLightGridMapName( mapName );
+		if ( mapName.Length() <= 0 ) {
+			continue;
+		}
+
+		idList<idStr> &targetList = Session_IsLightGridBakeMultiplayerMap( mapName ) ? multiplayerMaps : singleplayerMaps;
+		if ( !Session_LightGridMapListContains( targetList, mapName ) ) {
+			targetList.Append( mapName );
+		}
+	}
+
+	for ( int i = 0; i < singleplayerMaps.Num(); i++ ) {
+		mapTargets.Append( singleplayerMaps[ i ] );
+	}
+	for ( int i = 0; i < multiplayerMaps.Num(); i++ ) {
+		mapTargets.Append( multiplayerMaps[ i ] );
+	}
+}
+
+static void Session_AppendAllMultiplayerLightGridMaps( idList<idStr> &mapTargets ) {
+	idList<idStr> multiplayerMaps;
+
+	const int numMaps = fileSystem->GetNumMaps();
+	for ( int i = 0; i < numMaps; i++ ) {
+		const idDict *mapDecl = fileSystem->GetMapDecl( i );
+		if ( mapDecl == NULL ) {
+			continue;
+		}
+
+		idStr mapName = mapDecl->GetString( "path" );
+		Session_NormalizeLightGridMapName( mapName );
+		if ( mapName.Length() <= 0 || !Session_IsLightGridBakeMultiplayerMap( mapName ) ) {
+			continue;
+		}
+
+		if ( !Session_LightGridMapListContains( multiplayerMaps, mapName ) ) {
+			multiplayerMaps.Append( mapName );
+		}
+	}
+
+	for ( int i = 0; i < multiplayerMaps.Num(); i++ ) {
+		mapTargets.Append( multiplayerMaps[ i ] );
+	}
+}
+
+static void Session_BuildLightGridOutputPaths( const idStr &mapName, idStr &lightGridPath, idStr &atlasDir ) {
+	lightGridPath = "maps/";
+	lightGridPath += mapName;
+	lightGridPath.SetFileExtension( ".lightgrid" );
+
+	atlasDir = "env/maps/";
+	atlasDir += mapName;
+}
+
+static bool Session_IsLightGridAtlasArtifact( const idStr &relativePath ) {
+	idStr fileName = relativePath;
+	fileName.StripPath();
+	if ( fileName.Icmpn( "area", 4 ) != 0 ) {
+		return false;
+	}
+	return idStr::FindText( fileName.c_str(), "_lightgrid_amb" ) >= 0;
+}
+
+static void Session_RemoveLightGridAtlasArtifacts( const idStr &atlasDir, const char *extension ) {
+	idFileList *fileList = fileSystem->ListFiles( atlasDir.c_str(), extension, true, true );
+	if ( fileList == NULL ) {
+		return;
+	}
+
+	for ( int i = 0; i < fileList->GetNumFiles(); i++ ) {
+		idStr relativePath = fileList->GetFile( i );
+		if ( !Session_IsLightGridAtlasArtifact( relativePath ) ) {
+			continue;
+		}
+
+		fileSystem->RemoveFile( relativePath.c_str() );
+	}
+
+	fileSystem->FreeFileList( fileList );
+}
+
+static void Session_RemoveLightGridBakeOutputsForMap( const idStr &mapName ) {
+	idStr lightGridPath;
+	idStr atlasDir;
+	Session_BuildLightGridOutputPaths( mapName, lightGridPath, atlasDir );
+
+	fileSystem->RemoveFile( lightGridPath.c_str() );
+	fileSystem->RemoveFile( va( "%s.prev", lightGridPath.c_str() ) );
+	fileSystem->RemoveFile( va( "%s.baking", lightGridPath.c_str() ) );
+	Session_RemoveLightGridAtlasArtifacts( atlasDir, ".tga" );
+	Session_RemoveLightGridAtlasArtifacts( atlasDir, ".prev" );
+}
+
+static bool Session_CurrentLightGridOutputsComplete( const lightGridBakeOptions_t &options, idStr &mapName, int &requiredAtlasCount ) {
+	requiredAtlasCount = 0;
+
+	if ( tr.primaryWorld == NULL ) {
+		return false;
+	}
+
+	idRenderWorldLocal *world = tr.primaryWorld;
+	mapName = world->mapName;
+	Session_NormalizeLightGridMapName( mapName );
+	if ( mapName.Length() <= 0 ) {
+		return false;
+	}
+
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		world->portalAreas[ areaIndex ].lightGrid.SetupGrid(
+			world->portalAreas[ areaIndex ].globalBounds,
+			world,
+			options.gridSize,
+			areaIndex,
+			world->numPortalAreas,
+			options.maxProbes,
+			true );
+		if ( world->portalAreas[ areaIndex ].lightGrid.CountValidGridPoints() > 0 ) {
+			requiredAtlasCount++;
+		}
+	}
+
+	idStr lightGridPath;
+	idStr atlasDir;
+	Session_BuildLightGridOutputPaths( mapName, lightGridPath, atlasDir );
+	if ( fileSystem->FindFile( lightGridPath.c_str(), true ) == FIND_NO ) {
+		return false;
+	}
+
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		const LightGrid &lightGrid = world->portalAreas[ areaIndex ].lightGrid;
+		if ( lightGrid.CountValidGridPoints() <= 0 ) {
+			continue;
+		}
+
+		idStr atlasPath = va( "%s/area%i_lightgrid_amb.tga", atlasDir.c_str(), areaIndex );
+		if ( fileSystem->FindFile( atlasPath.c_str(), true ) == FIND_NO ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void Session_PrintLightGridBakeUsage() {
+	common->Printf( "usage: bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<num>] [size<num>] [blends<num>] [samples<num>] [separateAreas] [grid ( x y z )]\n" );
+	common->Printf( "If no map names are given, the currently loaded map is baked.\n" );
+	common->Printf( "Without 'force', maps whose required .lightgrid metadata and area*_lightgrid_amb.tga atlases already exist are skipped.\n" );
+	common->Printf( "When map names, 'all', or 'all-mp' are given, openPREY loads each map automatically, prints live progress to the console/log, and writes .lightgrid metadata plus area*_lightgrid_amb.tga atlases to fs_savepath.\n" );
+	common->Printf( "'separateAreas' rebuilds one portal-area probe layout at a time and streams .lightgrid metadata during the bake to reduce peak CPU memory usage.\n" );
+	common->Printf( "Multiplayer targets are cheat-protected; enable cheats first with 'sv_cheats 1' or 'net_allowCheats 1'.\n" );
+	common->Printf( "This bake is diffuse-only and LDR. It does not output the BFG EXR/PBR light-grid data path.\n" );
+}
+
+static bool Session_ParseLightGridBakeArgs( const idCmdArgs &args, lightGridBakeOptions_t &options,
+	idList<idStr> &mapTargets, bool &bakeAll, bool &bakeAllMultiplayer, bool &forceBake, bool &autoQuit, bool &helpRequested, bool &requestedTargets ) {
+	R_SetDefaultLightGridBakeOptions( options );
+	bakeAll = false;
+	bakeAllMultiplayer = false;
+	forceBake = false;
+	autoQuit = false;
+	helpRequested = false;
+	requestedTargets = false;
+	mapTargets.Clear();
+
+	for ( int i = 1; i < args.Argc(); i++ ) {
+		idStr rawToken = args.Argv( i );
+		idStr option = rawToken;
+		option.StripLeading( "-" );
+
+		if ( option.Icmp( "h" ) == 0 || option.Icmp( "help" ) == 0 ) {
+			helpRequested = true;
+			return true;
+		}
+
+		if ( option.Icmp( "all" ) == 0 ) {
+			bakeAll = true;
+			requestedTargets = true;
+			continue;
+		}
+		if ( option.Icmp( "all-mp" ) == 0 || option.Icmp( "allmp" ) == 0 ) {
+			bakeAllMultiplayer = true;
+			requestedTargets = true;
+			continue;
+		}
+		if ( option.Icmp( "force" ) == 0 ) {
+			forceBake = true;
+			continue;
+		}
+		if ( option.Icmp( "quit" ) == 0 || option.Icmp( "autoquit" ) == 0 ) {
+			autoQuit = true;
+			continue;
+		}
+		if ( option.Icmp( "separateAreas" ) == 0 || option.Icmp( "separate" ) == 0 || option.Icmp( "streamAreas" ) == 0 ) {
+			options.separateAreas = true;
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "limit" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "limit" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.maxProbes = idMath::ClampInt( 1, 16384, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "bounce" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "bounce" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.bounces = Max( 1, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "size" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "size" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.captureSize = idMath::ClampInt( 16, 1024, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "blends" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "blends" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.blends = idMath::ClampInt( 1, 32, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "samples" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "samples" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.samples = idMath::ClampInt( 1, 4096, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "grid" ) == 0 ) {
+			if ( i + 5 < args.Argc() && idStr::Icmp( args.Argv( i + 1 ), "(" ) == 0 && idStr::Icmp( args.Argv( i + 5 ), ")" ) == 0 ) {
+				options.gridSize.x = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 2 ) ) ) );
+				options.gridSize.y = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 3 ) ) ) );
+				options.gridSize.z = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 4 ) ) ) );
+				i += 5;
+				continue;
+			}
+			if ( i + 3 < args.Argc() ) {
+				options.gridSize.x = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 1 ) ) ) );
+				options.gridSize.y = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 2 ) ) ) );
+				options.gridSize.z = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 3 ) ) ) );
+				i += 3;
+				continue;
+			}
+
+			common->Printf( "bakeLightGrids: expected 'grid x y z' or 'grid ( x y z )'\n" );
+			return false;
+		}
+
+		if ( rawToken.Length() > 0 && rawToken[ 0 ] == '-' ) {
+			common->Printf( "bakeLightGrids: unknown option '%s'\n", rawToken.c_str() );
+			return false;
+		}
+
+		idStr mapName = rawToken;
+		Session_NormalizeLightGridMapName( mapName );
+		if ( mapName.Length() > 0 && !Session_LightGridMapListContains( mapTargets, mapName ) ) {
+			requestedTargets = true;
+			mapTargets.Append( mapName );
+		}
+	}
+
+	if ( bakeAll && bakeAllMultiplayer ) {
+		common->Printf( "bakeLightGrids: ignoring 'all-mp' because 'all' was requested\n" );
+		bakeAllMultiplayer = false;
+	}
+
+	if ( bakeAll || bakeAllMultiplayer ) {
+		if ( mapTargets.Num() > 0 ) {
+			common->Printf( "bakeLightGrids: ignoring explicit map names because '%s' was requested\n", bakeAll ? "all" : "all-mp" );
+		}
+		mapTargets.Clear();
+		if ( bakeAll ) {
+			Session_AppendAllLightGridMaps( mapTargets );
+		} else {
+			Session_AppendAllMultiplayerLightGridMaps( mapTargets );
+		}
+	} else {
+		idList<idStr> validatedTargets;
+		for ( int i = 0; i < mapTargets.Num(); i++ ) {
+			if ( !Session_LightGridMapExists( mapTargets[ i ] ) ) {
+				common->Printf( "bakeLightGrids: skipping missing map '%s'\n", mapTargets[ i ].c_str() );
+				continue;
+			}
+			validatedTargets.Append( mapTargets[ i ] );
+		}
+		mapTargets = validatedTargets;
+	}
+
+	return true;
+}
+
+static bool Session_LoadLightGridBakeMap( const idStr &mapName ) {
+	sessLocal.Stop();
+
+	if ( Session_IsLightGridBakeMultiplayerMap( mapName ) ) {
+		if ( cvarSystem->GetCVarInteger( "net_serverDedicated" ) != 0 ) {
+			common->Printf( "bakeLightGrids: forcing net_serverDedicated 0 so multiplayer maps can render during baking\n" );
+			cvarSystem->SetCVarInteger( "net_serverDedicated", 0 );
+		}
+
+		cvarSystem->SetCVarString( "si_gameType", "dm" );
+		cvarSystem->SetCVarString( "si_map", mapName.c_str() );
+
+		idCmdArgs spawnArgs;
+		spawnArgs.AppendArg( "spawnServer" );
+		spawnArgs.AppendArg( mapName.c_str() );
+		cmdSystem->BufferCommandArgs( CMD_EXEC_NOW, spawnArgs );
+	} else {
+		sessLocal.StartNewGame( mapName.c_str(), true );
+	}
+
+	if ( !sessLocal.mapSpawned ) {
+		common->Printf( "bakeLightGrids: failed to load map '%s'\n", mapName.c_str() );
+		return false;
+	}
+
+	sessLocal.UpdateScreen();
+	return true;
+}
+
+static bool Session_CanBakeLightGridMap( const idStr &mapName ) {
+	if ( !Session_IsLightGridBakeMultiplayerMap( mapName ) || idAsyncNetwork::AreCheatsEnabled() ) {
+		return true;
+	}
+
+	common->Printf(
+		"bakeLightGrids: multiplayer target '%s' is cheat-protected. Set sv_cheats 1 or net_allowCheats 1 before baking.\n",
+		mapName.c_str() );
+	return false;
+}
+
+static bool Session_BakeLightGridCurrentMap( const lightGridBakeOptions_t &options, bool forceBake, bool *wasSkipped = NULL ) {
+	if ( wasSkipped != NULL ) {
+		*wasSkipped = false;
+	}
+
+	if ( sessLocal.IsMultiplayer() && !idAsyncNetwork::AreCheatsEnabled() ) {
+		common->Printf( "bakeLightGrids: the current multiplayer map is cheat-protected. Set sv_cheats 1 or net_allowCheats 1 before baking.\n" );
+		return false;
+	}
+
+	if ( sessLocal.mapSpawned && ( !tr.primaryWorld || !tr.primaryView ) ) {
+		sessLocal.UpdateScreen();
+	}
+
+	idStr mapName;
+	int requiredAtlasCount = 0;
+	const bool outputsComplete = Session_CurrentLightGridOutputsComplete( options, mapName, requiredAtlasCount );
+	if ( outputsComplete ) {
+		if ( forceBake ) {
+			common->Printf( "bakeLightGrids: force requested; cleaning existing outputs for %s\n", mapName.c_str() );
+			Session_RemoveLightGridBakeOutputsForMap( mapName );
+		} else {
+			common->Printf( "bakeLightGrids: skipping %s because %i required atlas file(s) and the .lightgrid metadata already exist\n", mapName.c_str(), requiredAtlasCount );
+			if ( wasSkipped != NULL ) {
+				*wasSkipped = true;
+			}
+			return true;
+		}
+	} else if ( forceBake && mapName.Length() > 0 ) {
+		common->Printf( "bakeLightGrids: force requested; removing any stale outputs for %s before baking\n", mapName.c_str() );
+		Session_RemoveLightGridBakeOutputsForMap( mapName );
+	}
+
+	const char *jobName = cvarSystem->GetCVarString( "si_map" );
+	return R_BakeCurrentLightGrids( options, ( jobName != NULL && jobName[ 0 ] != '\0' ) ? jobName : NULL );
+}
+
+static void Session_RunLightGridBake( const idCmdArgs &args ) {
+	lightGridBakeOptions_t options;
+	idList<idStr> mapTargets;
+	bool bakeAll = false;
+	bool bakeAllMultiplayer = false;
+	bool forceBake = false;
+	bool autoQuit = false;
+	bool helpRequested = false;
+	bool requestedTargets = false;
+
+	if ( !Session_ParseLightGridBakeArgs( args, options, mapTargets, bakeAll, bakeAllMultiplayer, forceBake, autoQuit, helpRequested, requestedTargets ) ) {
+		Session_PrintLightGridBakeUsage();
+		return;
+	}
+
+	if ( helpRequested ) {
+		Session_PrintLightGridBakeUsage();
+		return;
+	}
+
+	Sys_ShowConsole( 1, false );
+
+	if ( mapTargets.Num() <= 0 ) {
+		if ( requestedTargets ) {
+			common->Printf( "bakeLightGrids: no valid map targets were found.\n" );
+			return;
+		}
+
+		if ( !Session_BakeLightGridCurrentMap( options, forceBake ) ) {
+			if ( !sessLocal.mapSpawned ) {
+				common->Printf( "bakeLightGrids: no map target was provided and no current map is loaded.\n" );
+				Session_PrintLightGridBakeUsage();
+			}
+			return;
+		}
+
+		if ( autoQuit ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
+		}
+		return;
+	}
+
+	common->Printf( "bakeLightGrids: batch mode with %i map(s)\n", mapTargets.Num() );
+
+	for ( int mapIndex = 0; mapIndex < mapTargets.Num(); mapIndex++ ) {
+		const idStr &mapName = mapTargets[ mapIndex ];
+
+		if ( !Session_CanBakeLightGridMap( mapName ) ) {
+			return;
+		}
+
+		common->Printf( "bakeLightGrids: [%i/%i] loading %s\n", mapIndex + 1, mapTargets.Num(), mapName.c_str() );
+		if ( !Session_LoadLightGridBakeMap( mapName ) ) {
+			return;
+		}
+
+		if ( !Session_BakeLightGridCurrentMap( options, forceBake ) ) {
+			return;
+		}
+	}
+
+	common->Printf( "bakeLightGrids: batch completed for %i map(s)\n", mapTargets.Num() );
+	if ( autoQuit ) {
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
+	}
+}
+
+static void Session_BakeLightGrids_f( const idCmdArgs &args ) {
+	Session_RunLightGridBake( args );
+}
+
 /*
 ==================
 Session_Map_f
@@ -624,10 +1568,10 @@ static void Session_TestMap_f( const idCmdArgs &args ) {
 
 /*
 ==================
-Session_OpenPreyStartSingleplayer_f
+Session_openPREYStartSingleplayer_f
 ==================
 */
-static void Session_OpenPreyStartSingleplayer_f( const idCmdArgs &args ) {
+static void Session_openPREYStartSingleplayer_f( const idCmdArgs &args ) {
 	if ( args.Argc() < 2 ) {
 		common->Printf( "USAGE: openprey_startSingleplayer <map> [devmap]\n" );
 		return;
@@ -1935,13 +2879,8 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadingLevelName = mapName;
 	const char *loadingObjectives = "";
 	const char *loadingAuthor = "";
-	char loadingBackgroundPath[ MAX_STRING_CHARS ];
-	fileSystem->FindMapScreenshot( mapName, loadingBackgroundPath, sizeof( loadingBackgroundPath ) );
-	idStr loadingBackground = loadingBackgroundPath;
-	loadingBackground.StripFileExtension();
-	if ( !loadingBackground.Length() ) {
-		loadingBackground = "guis/assets/loading/loading";
-	}
+	idStr loadingBackground = "guis/assets/loading/loading";
+	bool loadingBackgroundCanvasFill = false;
 	const char *loadGuiOverride = "";
 	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
 	const char *spawnMapPath = mapSpawnData.serverInfo.GetString( "si_map", mapName );
@@ -1957,9 +2896,23 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		const char *loadImage = mapDef->dict.GetString( "loadimage", "" );
 		if ( loadImage[0] ) {
 			loadingBackground = loadImage;
+		} else {
+			char screenshot[ MAX_STRING_CHARS ];
+			fileSystem->FindMapScreenshot( spawnMapPath, screenshot, MAX_STRING_CHARS );
+			loadingBackground = screenshot;
 		}
 
 		loadGuiOverride = mapDef->dict.GetString( "loadgui", "" );
+	} else {
+		char screenshot[ MAX_STRING_CHARS ];
+		fileSystem->FindMapScreenshot( spawnMapPath, screenshot, MAX_STRING_CHARS );
+		loadingBackground = screenshot;
+	}
+
+	idStr expandedLoadingBackground;
+	if ( Session_PrepareExpandedLoadingBackground( loadingBackground, stripped.c_str(), expandedLoadingBackground ) ) {
+		loadingBackground = expandedLoadingBackground;
+		loadingBackgroundCanvasFill = true;
 	}
 
 	char guiMap[ MAX_STRING_CHARS ];
@@ -1982,6 +2935,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	if ( guiLoading ) {
 		guiLoading->SetStateFloat( "map_loading", 0.0f );
 		guiLoading->SetStateString( "loading_bkgnd", loadingBackground.c_str() );
+		guiLoading->SetStateInt( "loading_bkgnd_canvasfill", loadingBackgroundCanvasFill ? 1 : 0 );
 		guiLoading->SetStateString( "image", loadingBackground.c_str() );
 		Session_SetLoadingBackgroundExpansionStates( guiLoading, loadingBackground.c_str() );
 		guiLoading->SetStateString( "loading_levelname", loadingLevelName );
@@ -3716,7 +4670,8 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "writePrecache", Sess_WritePrecache_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "writes precache commands" );
 
 #ifndef	ID_DEDICATED
-	cmdSystem->AddCommand( "openprey_startSingleplayer", Session_OpenPreyStartSingleplayer_f, CMD_FL_SYSTEM, "internal helper to start singleplayer after game-module switches" );
+	cmdSystem->AddCommand( "openprey_startSingleplayer", Session_openPREYStartSingleplayer_f, CMD_FL_SYSTEM, "internal helper to start singleplayer after game-module switches" );
+	cmdSystem->AddCommand( "bakeLightGrids", Session_BakeLightGrids_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "bakes openPREY-compatible lightgrid metadata and irradiance atlases for the current map or a batch of maps" );
 	cmdSystem->AddCommand( "map", Session_Map_f, CMD_FL_SYSTEM, "loads a map", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "devmap", Session_DevMap_f, CMD_FL_SYSTEM, "loads a map in developer mode", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "testmap", Session_TestMap_f, CMD_FL_SYSTEM, "tests a map", idCmdSystem::ArgCompletion_MapName );
