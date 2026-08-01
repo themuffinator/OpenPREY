@@ -9,25 +9,25 @@ body:
   - type: markdown
     attributes:
       value: |
-        Windows ARM64 is the least validated openQ4 target. Packages are produced by a manual release job on a
-        native `windows-11-arm` runner, but **no openQ4 Windows ARM64 binary has been started by automation**,
+        Windows ARM64 is the least validated openPREY target. Packages are produced by a manual release job on a
+        native `windows-11-arm` runner, but **no openPREY Windows ARM64 binary has been started by automation**,
         and there is no per-push or per-PR Windows ARM64 CI lane. Every report from real hardware is valuable.
 
         Known rough edges to check before filing, so your report is not a duplicate:
 
-        - **Renderer.** openQ4 defaults to OpenGL, and stock Windows on ARM ships only Microsoft's generic
-          GL 1.1 software driver, which is below openQ4's GL 3.3 baseline. If the client fails to start a
+        - **Renderer.** openPREY defaults to OpenGL, and stock Windows on ARM ships only Microsoft's generic
+          GL 1.1 software driver, which is below openPREY's GL 3.3 baseline. If the client fails to start a
           renderer, try `+set r_renderApi vulkan`, and say in the report whether that changed anything.
         - **Audio.** The ARM64 OpenAL runtime is prepared separately from the x64 bundled payload. If you have
           no sound, or a missing-DLL error naming `OpenAL32.dll` or a VC++ runtime DLL, say so explicitly.
 
-        Please paste terminal output and `openq4.log` as text rather than screenshots.
+        Please paste terminal output and `openprey.log` as text rather than screenshots.
   - type: input
     id: version
     attributes:
-      label: openQ4 version
+      label: openPREY version
       description: The version string printed at startup, or the release tag you downloaded.
-      placeholder: "0.8.1"
+      placeholder: "0.0.1"
     validations:
       required: true
   - type: input
@@ -35,7 +35,7 @@ body:
     attributes:
       label: Package artifact name
       description: Paste the exact downloaded file name, or say "built from source" and give the commit SHA.
-      placeholder: "openq4-0.8.1-windows-arm64.zip"
+      placeholder: "local source build at 0.0.1"
     validations:
       required: true
   - type: dropdown
@@ -71,8 +71,8 @@ body:
         Windows on ARM transparently emulates x64. Confirm you are running the arm64 build — the file name
         carries the suffix, and Task Manager's Details tab has an "Architecture" column.
       options:
-        - Native ARM64 build (openQ4-client_arm64.exe)
-        - x64 build under emulation (openQ4-client_x64.exe)
+        - Native ARM64 build (openPREY-client_arm64.exe)
+        - x64 build under emulation (openPREY-client_x64.exe)
         - Not sure
     validations:
       required: true
@@ -92,7 +92,7 @@ body:
     attributes:
       label: OpenGL provider
       description: >-
-        If you got as far as a GL context, paste the GL_RENDERER string openQ4 logs at startup. This
+        If you got as far as a GL context, paste the GL_RENDERER string openPREY logs at startup. This
         distinguishes the generic Microsoft software driver from the OpenGL Compatibility Pack's D3D12 layer
         from a real vendor driver.
       placeholder: "D3D12 (Qualcomm Adreno X1-85 GPU) / GDI Generic"
@@ -120,10 +120,10 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Terminal output and openq4.log
+      label: Terminal output and openprey.log
       description: >-
         Paste as text. Include the startup banner — it carries the version, architecture, and CPU line. If the
-        client crashed, also attach the crash log and minidump from the openQ4 save directory.
+        client crashed, also attach the crash log and minidump from the openPREY save directory.
       render: text
     validations:
       required: true

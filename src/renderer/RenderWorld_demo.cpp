@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "../sound/sound.h"
 
 //#define WRITE_GUIS
 
@@ -44,6 +45,14 @@ typedef struct {
 const int DEMO_MAX_ENTITY_JOINTS = 65536;
 
 namespace {
+
+idSoundEmitter *R_DemoSoundEmitterForIndex( int index ) {
+	if ( index <= 0 || session == NULL || session->sw == NULL ) {
+		return NULL;
+	}
+
+	return session->sw->EmitterForIndex( index );
+}
 
 void R_FreeRenderDemoDecalChain( idRenderModelDecal *decal ) {
 	while ( decal != NULL ) {
@@ -761,7 +770,7 @@ void	idRenderWorldLocal::WriteRenderLight( qhandle_t handle, const renderLight_t
 	for ( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++)
 		session->writeDemo->WriteFloat( light->shaderParms[i] );
 	session->writeDemo->WriteInt( light->referenceSoundHandle );
-	session->writeDemo->WriteInt( light->referenceSound );
+	session->writeDemo->WriteInt( light->referenceSound != NULL ? light->referenceSound->Index() : 0 );
 
 	if ( prelightModel ) {
 		session->writeDemo->WriteHashString( prelightModel->Name() );
@@ -769,11 +778,6 @@ void	idRenderWorldLocal::WriteRenderLight( qhandle_t handle, const renderLight_t
 	if ( light->shader ) {
 		session->writeDemo->WriteHashString( light->shader->GetName() );
 	}
-	if ( light->referenceSound ) {
-		//int	index = light->referenceSound->Index();
-		//session->writeDemo->WriteInt( index );
-	}
-
 	// Preserve Quake 4-era light flags without disturbing the older serialized prefix.
 	session->writeDemo->WriteBool( light->noDynamicShadows );
 	session->writeDemo->WriteBool( light->globalLight );
@@ -792,6 +796,7 @@ ReadRenderLight
 bool	idRenderWorldLocal::ReadRenderLight( ) {
 	renderLight_t	light = {};
 	int				index;
+	int				referenceSoundIndex = 0;
 	bool			hasPrelightModel = false;
 	bool			hasShader = false;
 
@@ -856,9 +861,10 @@ bool	idRenderWorldLocal::ReadRenderLight( ) {
 			return false;
 		}
 	}
-	if ( !R_DemoReadInt( session->readDemo, light.referenceSound ) ) {
+	if ( !R_DemoReadInt( session->readDemo, referenceSoundIndex ) ) {
 		return false;
 	}
+	light.referenceSound = R_DemoSoundEmitterForIndex( referenceSoundIndex );
 	if ( hasPrelightModel ) {
 		light.prelightModel = renderModelManager->FindModel( session->readDemo->ReadHashString() );
 		if ( !session->readDemo->IsOpen() ) {
@@ -981,7 +987,7 @@ void	idRenderWorldLocal::WriteRenderEntity( qhandle_t handle, const renderEntity
 	session->writeDemo->WriteBool( ent->customShader != NULL );
 	session->writeDemo->WriteBool( ent->referenceShader != NULL );
 	session->writeDemo->WriteBool( ent->customSkin != NULL );
-	session->writeDemo->WriteInt( ent->referenceSound );
+	session->writeDemo->WriteInt( ent->referenceSound != NULL ? ent->referenceSound->Index() : 0 );
 	for ( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ )
 		session->writeDemo->WriteFloat( ent->shaderParms[i] );
 	session->writeDemo->WriteVec4( ent->outlineColor );
@@ -1083,6 +1089,7 @@ bool	idRenderWorldLocal::ReadRenderEntity() {
 	bool				hasCustomSkin = false;
 	bool				hasGui[ MAX_RENDERENTITY_GUI ] = { false };
 	int					index, i;
+	int					referenceSoundIndex = 0;
 
 	if ( !R_DemoReadInt( session->readDemo, index ) ) {
 		return false;
@@ -1151,9 +1158,10 @@ bool	idRenderWorldLocal::ReadRenderEntity() {
 		hasReferenceShader = ( legacyReferenceShader != 0 );
 		hasCustomSkin = ( legacyCustomSkin != 0 );
 	}
-	if ( !R_DemoReadInt( session->readDemo, ent.referenceSound ) ) {
+	if ( !R_DemoReadInt( session->readDemo, referenceSoundIndex ) ) {
 		return false;
 	}
+	ent.referenceSound = R_DemoSoundEmitterForIndex( referenceSoundIndex );
 	for ( i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ ) {
 		if ( !R_DemoReadFloat( session->readDemo, ent.shaderParms[i] ) ) {
 			return false;

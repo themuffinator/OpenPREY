@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Helpers for validating Windows CRT linkage and staging non-CRT runtime payloads for openQ4."""
+"""Helpers for validating and staging openPREY's Windows runtime payload."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from pathlib import Path
 from openq4_pak import copy_file_if_changed
 
 
-PRODUCT_NAME = "openQ4"
-GAME_DIR_NAME = "baseoq4"
+PRODUCT_NAME = "openPREY"
+GAME_DIR_NAME = "basepr"
 OPENAL_RUNTIME_OVERRIDES = {
     "x64": [Path("src/external/openal-soft/bin/win64/OpenAL32.dll")],
     "x86": [Path("src/external/openal-soft/bin/win32/OpenAL32.dll")],
@@ -30,8 +30,7 @@ RUNTIME_BINARY_PATTERNS = (
     # renderer-gl_x64.dll can sit next to an arm64 client and pass every check.
     "renderer-gl_*.dll",
     "renderer-vk_*.dll",
-    f"{GAME_DIR_NAME}/game-sp_*.dll",
-    f"{GAME_DIR_NAME}/game-mp_*.dll",
+    f"{GAME_DIR_NAME}/game_*.dll",
 )
 BUILD_GAME_GENERATED_IGNORE_PATTERNS = (
     "*.dll.p",
@@ -194,7 +193,7 @@ def infer_runtime_flavor(root_dir: Path) -> str:
     if has_release and has_debug:
         raise RuntimeError(
             f"Mixed MSVC CRT flavors detected under '{root_dir}'. "
-            "openQ4 runtime binaries must all use the same CRT flavor."
+            "openPREY runtime binaries must all use the same CRT flavor."
         )
     if has_debug:
         return RuntimeFlavor.DEBUG
@@ -222,11 +221,11 @@ def detect_binary_arch(root_dir: Path) -> str:
     )
     if len(arches) > 1:
         raise RuntimeError(
-            f"Mixed openQ4 binary architectures detected under '{root_dir}': {', '.join(arches)}"
+            f"Mixed openPREY binary architectures detected under '{root_dir}': {', '.join(arches)}"
         )
     if arches:
         return arches[0]
-    raise RuntimeError(f"Could not determine openQ4 binary architecture from '{root_dir}'.")
+    raise RuntimeError(f"Could not determine openPREY binary architecture from '{root_dir}'.")
 
 
 def has_engine_binary(paths: list[Path]) -> bool:
@@ -302,7 +301,7 @@ def validate_runtime_directory(path: Path, label: str, *, must_exist: bool) -> P
 
 
 def stage_build_game_directory(source_root: Path, build_root: Path) -> dict[str, object]:
-    """Prepare builddir/baseoq4 so the client can run directly from builddir."""
+    """Prepare builddir/basepr so the client can run directly from builddir."""
 
     source_root = validate_runtime_directory(source_root, "source root", must_exist=False)
     build_root = validate_runtime_directory(build_root, "build root", must_exist=True)
@@ -353,7 +352,10 @@ def _copy_file_if_changed(source_path: Path, target_dir: Path) -> Path | None:
 
 
 def resolve_openal_runtime_path(source_root: Path, arch: str) -> Path | None:
-    override_root_raw = os.environ.get("OPENQ4_OPENAL_ROOT", "").strip()
+    override_root_raw = (
+        os.environ.get("OPENPREY_OPENAL_ROOT", "").strip()
+        or os.environ.get("OPENQ4_OPENAL_ROOT", "").strip()
+    )
     if override_root_raw:
         override_root = validate_runtime_directory(
             Path(override_root_raw),
@@ -409,7 +411,7 @@ def stage_runtime_payloads(
         for binary_name, imports in sorted(violations.items()):
             violation_lines.append(f"{binary_name}: {', '.join(imports)}")
         raise RuntimeError(
-            "openQ4 Windows binaries still import the MSVC/UCRT runtime. "
+            "openPREY Windows binaries still import the MSVC/UCRT runtime. "
             "Expected static CRT linkage for all builds.\n"
             + "\n".join(violation_lines)
         )
@@ -419,7 +421,7 @@ def stage_runtime_payloads(
     if openal_runtime is None and has_engine_binary(binaries):
         raise RuntimeError(
             f"OpenAL32.dll runtime not found for Windows {arch}. "
-            "Set OPENQ4_OPENAL_ROOT to a prepared OpenAL Soft package or add the bundled runtime."
+            "Set OPENPREY_OPENAL_ROOT to a prepared OpenAL Soft package or add the bundled runtime."
         )
     for target in targets:
         target.mkdir(parents=True, exist_ok=True)

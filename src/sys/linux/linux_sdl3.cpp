@@ -185,7 +185,7 @@ static bool Sys_PreferDrmSysfsBeforeX11VideoRam(void) {
 	}
 
 	const bool waylandSession = SDL3_EnvHasValue("WAYLAND_DISPLAY");
-	const bool explicitX11Fallback = SDL3_EnvFlagEnabled("OPENQ4_FORCE_X11") ||
+	const bool explicitX11Fallback = SDL3_EnvFlagEnabledWithLegacyAlias("OPENPREY_FORCE_X11", "OPENQ4_FORCE_X11") ||
 		SDL3_StringEquals(getenv("SDL_VIDEO_DRIVER"), "x11") ||
 		SDL3_StringEquals(getenv("SDL_VIDEODRIVER"), "x11");
 	return (waylandSession && !explicitX11Fallback) ||

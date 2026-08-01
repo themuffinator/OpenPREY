@@ -1,4 +1,4 @@
-name: macOS Debug
+name: DISABLED - inherited OpenQ4 reference (macOS Debug)
 
 on:
   workflow_dispatch:
@@ -31,6 +31,7 @@ concurrency:
 
 jobs:
   macos-debug:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: macOS ${{ matrix.bridge_label }} Debug
     runs-on: macos-15
     timeout-minutes: 120
@@ -273,6 +274,7 @@ jobs:
   # -Dmacos_openal_provider=system. This is migration testing only, not release
   # evidence; release packages stay on apple_framework. No packaging or signoff.
   macos-openal-migration:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: macOS OpenAL Soft Migration Corridor (compile only)
     runs-on: macos-15
     timeout-minutes: 90

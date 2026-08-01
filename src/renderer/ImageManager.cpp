@@ -283,6 +283,54 @@ static void R_NormalizeInternalImageName( idStr& name ) {
 	}
 }
 
+static void openPREY_RemapLegacyImageName( idStr &name ) {
+	struct legacyImageRemap_t {
+		const char *legacyName;
+		const char *replacementName;
+	};
+	static const legacyImageRemap_t remaps[] = {
+		{ "_menushot", "_currentRender" },
+		{ "gfx/guis/loadscreens/generic", "guis/assets/loading/loading" },
+		{ "gfx/splashscreen", "guis/assets/loading/loading" },
+		{ "gfx/guis/white", "guis/assets/white" },
+		{ "gfx/guis/guicursor_arrow", "guis/assets/guicursor_arrow" },
+		{ "gfx/guis/guicursor_hand", "guis/assets/guicursor_hand" },
+		{ "gfx/guis/guicursor_menu", "guis/assets/guicursor_menu" },
+		{ "gfx/guis/scrollbarh", "guis/assets/scrollbarv" },
+		{ "gfx/guis/scrollbarv", "guis/assets/scrollbarv" },
+		{ "gfx/guis/scrollbar_thumb", "guis/assets/scrollbar_thumb" },
+		{ "gfx/guis/scrollbar_right", "guis/assets/scrollbarv_cap" },
+		{ "gfx/guis/scrollbar_left", "guis/assets/scrollbarv_cap" },
+		{ "gfx/guis/scrollbar_up", "guis/assets/scrollbarv_cap" },
+		{ "gfx/guis/scrollbar_down", "guis/assets/scrollbarv_cap" }
+	};
+
+	for ( int i = 0; i < (int)( sizeof( remaps ) / sizeof( remaps[0] ) ); i++ ) {
+		if ( idStr::Icmp( name.c_str(), remaps[i].legacyName ) == 0 ) {
+			name = remaps[i].replacementName;
+			return;
+		}
+	}
+
+	static const char legacyLoadscreenPrefix[] = "gfx/guis/loadscreens/";
+	const int prefixLength = (int)strlen( legacyLoadscreenPrefix );
+	if ( idStr::Icmpn( name.c_str(), legacyLoadscreenPrefix, prefixLength ) == 0 ) {
+		idStr mapName = name.c_str() + prefixLength;
+		if ( mapName.Icmp( "generic" ) == 0 ) {
+			name = "guis/assets/loading/loading";
+		} else if ( mapName.Icmp( "roadhouse" ) == 0 || mapName.Icmp( "game/roadhouse" ) == 0 ) {
+			name = "guis/assets/loading/roadhouse";
+		}
+	}
+}
+
+static void openPREY_NormalizeAndRemapImageName( idStr &name ) {
+	name.Replace( ".tga", "" );
+	name.BackSlashesToSlashes();
+	R_NormalizeInternalImageName( name );
+	openPREY_RemapLegacyImageName( name );
+}
+
 static bool R_IsQ4LightImageNamespace( const char *name ) {
 	return name != NULL
 		&& ( idStr::Icmpn( name, "lights/", 7 ) == 0
@@ -555,9 +603,7 @@ idImage *idImageManager::ImageFromFunction( const char *_name, void (*generatorF
 
 	// strip any .tga file extensions from anywhere in the _name
 	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 
 	// see if the image already exists
 	int hash = name.FileNameHash();
@@ -604,9 +650,7 @@ idImage	*idImageManager::GetImageWithParameters( const char *_name, textureFilte
 	}
 	// strip any .tga file extensions from anywhere in the _name, including image program parameters
 	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 	allowDownSize = R_AllowImageDownSizeForName( name.c_str(), allowDownSize );
 	int hash = name.FileNameHash();
 	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
@@ -657,9 +701,7 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 
 	// strip any .tga file extensions from anywhere in the _name, including image program parameters
 	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 	allowDownSize = R_AllowImageDownSizeForName( name.c_str(), allowDownSize );
 
 	//
@@ -755,9 +797,7 @@ idImage *idImageManager::ImageHandleDeferred( const char *_name, textureFilter_t
 	}
 
 	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 	allowDownSize = R_AllowImageDownSizeForName( name.c_str(), allowDownSize );
 
 	int hash = name.FileNameHash();
@@ -806,8 +846,7 @@ idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts,
 	}
 
 	idStr name = _name;
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 
 	//
 	// see if the image is already loaded, unless we
@@ -861,9 +900,7 @@ idImage *idImageManager::GetImage( const char *_name ) const {
 
 	// strip any .tga file extensions from anywhere in the _name, including image program parameters
 	idStr name = _name;
-	name.Replace( ".tga", "" );
-	name.BackSlashesToSlashes();
-	R_NormalizeInternalImageName( name );
+	openPREY_NormalizeAndRemapImageName( name );
 
 	//
 	// look in loaded images

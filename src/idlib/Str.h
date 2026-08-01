@@ -181,6 +181,7 @@ public:
 	int					IcmpPrefix( const char *text ) const;
 
 						// case insensitive compare ignoring color
+	int					IcmpNoColor( const char *text ) const;
 // RAVEN BEGIN
 // bdube: changed to escapes
 	int					IcmpNoEscape( const char *text ) const;
@@ -314,6 +315,7 @@ public:
 	static int			Cmpn( const char *s1, const char *s2, int n );
 	static int			Icmp( const char *s1, const char *s2 );
 	static int			Icmpn( const char *s1, const char *s2, int n );
+	static int			IcmpNoColor( const char *s1, const char *s2 );
 // RAVEN BEGIN
 // bdube: escapes
 	static int			IcmpNoEscape( const char *s1, const char *s2 );
@@ -774,6 +776,47 @@ ID_INLINE int idStr::Icmpn( const char *text, int n ) const {
 ID_INLINE int idStr::IcmpPrefix( const char *text ) const {
 	assert( text );
 	return idStr::Icmpn( data, text, strlen( text ) );
+}
+
+ID_INLINE int idStr::IcmpNoColor( const char *text ) const {
+	assert( text );
+	return idStr::IcmpNoColor( data, text );
+}
+
+ID_INLINE int idStr::IcmpNoColor( const char *s1, const char *s2 ) {
+	int c1, c2, d;
+
+	do {
+		int escapeLength;
+		while ( ( escapeLength = idStr::ColorEscapeLength( s1 ) ) > 0 ) {
+			s1 += escapeLength;
+		}
+		while ( ( escapeLength = idStr::ColorEscapeLength( s2 ) ) > 0 ) {
+			s2 += escapeLength;
+		}
+
+		c1 = static_cast<byte>( *s1++ );
+		c2 = static_cast<byte>( *s2++ );
+
+		d = c1 - c2;
+		while ( d ) {
+			if ( c1 <= 'Z' && c1 >= 'A' ) {
+				d += ( 'a' - 'A' );
+				if ( !d ) {
+					break;
+				}
+			}
+			if ( c2 <= 'Z' && c2 >= 'A' ) {
+				d -= ( 'a' - 'A' );
+				if ( !d ) {
+					break;
+				}
+			}
+			return ( INTSIGNBITNOTSET( d ) << 1 ) - 1;
+		}
+	} while ( c1 );
+
+	return 0;
 }
 
 // RAVEN BEGIN

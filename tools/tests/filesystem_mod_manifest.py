@@ -125,6 +125,48 @@ def validate_json_parser_contract() -> None:
     require(manifest_parser, "unexpected data after manifest object", "mod.json trailing data rejection")
 
 
+def validate_openprey_version_key_contract() -> None:
+    source = read("src/framework/FileSystem.cpp")
+    header = read("src/framework/FileSystem.h")
+    manifest_template = read("content/basepr/mod.json.in")
+    package_tool = read("tools/build/package_nightly.py")
+    known_keys = cpp_function_body(source, "static bool FS_ModManifestKeyIsKnown(")
+    manifest_parser = cpp_function_body(source, "static bool FS_ParseModManifest(")
+    manifest_reader = cpp_function_body(
+        source,
+        "modManifestStatus_t idFileSystemLocal::ReadModManifestFile(",
+    )
+
+    require(known_keys, '"requiredopenPREYVersion"', "primary openPREY manifest key")
+    require(known_keys, '"requiredopenQ4Version"', "legacy manifest key migration alias")
+    require_before(
+        manifest_parser,
+        '!key.Icmp( "requiredopenPREYVersion" )',
+        '!key.Icmp( "requiredopenQ4Version" )',
+        "primary manifest key before migration alias",
+    )
+    require(
+        manifest_parser,
+        "!sawRequiredopenPREYVersion && !legacyRequiredVersion.IsEmpty()",
+        "legacy key fallback only when the primary key is absent",
+    )
+    require(
+        manifest_parser,
+        "missing required field 'requiredopenPREYVersion'",
+        "primary manifest-key diagnostic",
+    )
+    require(manifest_reader, "invalid required openPREY version", "openPREY version parse diagnostic")
+    require(manifest_reader, "requires openPREY %s or newer", "openPREY compatibility diagnostic")
+    require(header, "GetRequiredopenPREYVersion", "primary openPREY manifest accessor")
+    require(manifest_template, '"requiredopenPREYVersion"', "staged basepr manifest template")
+    reject(manifest_template, '"requiredopenQ4Version"', "staged manifest legacy key")
+    require(
+        package_tool,
+        'manifest.get("requiredopenPREYVersion")',
+        "release package manifest validation",
+    )
+
+
 def validate_manifest_only_contract() -> None:
     source = read("src/framework/FileSystem.cpp")
     list_mods = cpp_function_body(source, "idModList *idFileSystemLocal::ListMods(")
@@ -186,6 +228,7 @@ def validate_validation_coverage() -> None:
 def main() -> None:
     validate_manifest_status_contract()
     validate_json_parser_contract()
+    validate_openprey_version_key_contract()
     validate_manifest_only_contract()
     validate_game_module_fallback_contract()
     validate_validation_coverage()

@@ -327,7 +327,7 @@ void idAsyncServer::ExecuteMapChange( void ) {
 	if ( sessLocal.mapSpawnData.serverInfo.GetInt( "si_pure" ) ) {
 		sessLocal.mapSpawnData.serverInfo.SetInt( "si_pure", 0 );
 		cvarSystem->SetCVarBool( "si_pure", false );
-		common->Printf( "openQ4: forcing si_pure 0 for local server startup\n" );
+		common->Printf( "openPREY: forcing si_pure 0 for local server startup\n" );
 	}
 
 	// initialize game id and time
@@ -343,9 +343,9 @@ void idAsyncServer::ExecuteMapChange( void ) {
 		localClientNum = -1;
 	}
 
-	// openQ4: a bot has no remote end to announce itself on the new map, and
-	// InitClient below wipes the user info that carries its name, so both are
-	// remembered here and restored once the map is up.
+#if OPENPREY_ENABLE_BOTS
+	// OPENPREY-GATED(D9): the upstream bot lifecycle carries metadata through
+	// callbacks that do not exist in Prey's v7 game contract.
 	bool	botClient[MAX_ASYNC_CLIENTS];
 	idStr	botClientName[MAX_ASYNC_CLIENTS];
 
@@ -356,6 +356,7 @@ void idAsyncServer::ExecuteMapChange( void ) {
 			botClientName[i] = sessLocal.mapSpawnData.userInfo[i].GetString( "ui_name" );
 		}
 	}
+#endif
 
 	// re-initialize all connected clients for the new map
 	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
@@ -390,8 +391,8 @@ void idAsyncServer::ExecuteMapChange( void ) {
 		game->SetLocalClient( -1 );
 	}
 
-	// openQ4: put the bots back into the game.  A remote client does this for
-	// itself with CLIENT_RELIABLE_MESSAGE_INGAME once it has the new map.
+#if OPENPREY_ENABLE_BOTS
+	// OPENPREY-GATED(D9): restore engine-owned bot slots after a map change.
 	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
 		if ( !botClient[i] ) {
 			continue;
@@ -402,9 +403,10 @@ void idAsyncServer::ExecuteMapChange( void ) {
 		clients[i].clientState = SCS_INGAME;
 		botSpawnArgs.Set( "ui_name", botClientName[i].c_str() );
 
-		game->ServerClientBegin( i, true, botClientName[i].c_str() );
 		SendUserInfoBroadcast( i, botSpawnArgs, true );
+		game->ServerClientBegin( i );
 	}
+#endif
 
 	if ( sessLocal.mapSpawnData.serverInfo.GetInt( "si_pure" ) ) {
 		// lock down the pak list
@@ -745,7 +747,7 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	}
 
 	// let the game know a player connected
-	game->ServerClientConnect( clientNum, client.guid );
+	game->ServerClientConnect( clientNum );
 }
 
 /*
@@ -781,8 +783,8 @@ idAsyncServer::BeginLocalClient
 */
 void idAsyncServer::BeginLocalClient( void ) {
 	game->SetLocalClient( localClientNum );
-	game->SetUserInfo( localClientNum, sessLocal.mapSpawnData.userInfo[localClientNum], false );
-	game->ServerClientBegin( localClientNum, false, NULL );
+	game->SetUserInfo( localClientNum, sessLocal.mapSpawnData.userInfo[localClientNum], false, false );
+	game->ServerClientBegin( localClientNum );
 }
 
 /*
@@ -973,7 +975,7 @@ void idAsyncServer::SendUserInfoBroadcast( int userInfoNum, const idDict &info, 
 	const idDict	*gameInfo;
 	bool			gameModifiedInfo;
 
-	gameInfo = game->SetUserInfo( userInfoNum, info, false );
+	gameInfo = game->SetUserInfo( userInfoNum, info, false, true );
 	if ( gameInfo ) {
 		gameModifiedInfo = true;
 	} else {
@@ -1231,7 +1233,7 @@ bool idAsyncServer::SendSnapshotToClient( int clientNum ) {
 	idBitMsg	msg;
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 	usercmd_t *	last;
-	dword		clientInPVS[MAX_ASYNC_CLIENTS >> 3];
+	byte		clientInPVS[MAX_ASYNC_CLIENTS >> 3] = {};
 
 	serverClient_t &client = clients[clientNum];
 
@@ -1270,7 +1272,7 @@ bool idAsyncServer::SendSnapshotToClient( int clientNum ) {
 	msg.WriteShort( idMath::ClampShort( client.clientAheadTime ) );
 
 	// write the game snapshot
-	game->ServerWriteSnapshot( clientNum, client.snapshotSequence, msg, clientInPVS, MAX_ASYNC_CLIENTS, 0 );
+	game->ServerWriteSnapshot( clientNum, client.snapshotSequence, msg, clientInPVS, MAX_ASYNC_CLIENTS );
 
 	// write the latest user commands from the other clients in the PVS to the snapshot
 	for ( last = NULL, i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
@@ -1381,7 +1383,7 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 		SendEnterGameToClient( clientNum );
 
 		// get the client running in the game
-		game->ServerClientBegin( clientNum, false, NULL );
+		game->ServerClientBegin( clientNum );
 
 		// write any reliable messages to initialize the client game state
 		game->ServerWriteInitialReliableMessages( clientNum );
@@ -1821,8 +1823,8 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 	// if authState == CDK_PUREOK, the check was already performed once before entering pure checks
 	// but meanwhile, the max players may have been reached
 	msg.ReadString( password, sizeof( password ) );
-	char reason[MAX_STRING_CHARS];
-	allowReply_t reply = game->ServerAllowClient(clientId, numClients, Sys_NetAdrToString( from ), guid, password, password, reason );
+	char reason[MAX_STRING_CHARS] = {};
+	allowReply_t reply = game->ServerAllowClient( numClients, Sys_NetAdrToString( from ), guid, password, reason );
 	if ( reply != ALLOW_YES ) {
 		common->DPrintf( "game denied connection for %s\n", Sys_NetAdrToString( from ) );
 
@@ -2312,10 +2314,16 @@ void idAsyncServer::SendReliableGameMessage( int clientNum, const idBitMsg &msg,
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 
+	// OPENPREY-GATED(D9): the route constants and recorder are part of the
+	// extended Q4 game/MVD contract, not Prey's game API v7.
+#if OPENPREY_ENABLE_MVD
 	if ( captureDemo && idAsyncNetwork::multiViewDemo.IsRecording() ) {
 		const int routeClient = clientNum >= MAX_ASYNC_CLIENTS ? -1 : clientNum;
 		idAsyncNetwork::multiViewDemo.CaptureReliableMessage( msg, DEMO_RECORD_CLIENTNUM, routeClient );
 	}
+#else
+	(void)captureDemo;
+#endif
 
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.WriteByte( SERVER_RELIABLE_MESSAGE_GAME );
@@ -2354,9 +2362,14 @@ void idAsyncServer::SendReliableGameMessageExcluding( int clientNum, const idBit
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 
+	// OPENPREY-GATED(D9): see SendReliableGameMessage above.
+#if OPENPREY_ENABLE_MVD
 	if ( captureDemo && idAsyncNetwork::multiViewDemo.IsRecording() ) {
 		idAsyncNetwork::multiViewDemo.CaptureReliableMessage( msg, DEMO_RECORD_EXCLUDE, clientNum );
 	}
+#else
+	(void)captureDemo;
+#endif
 
 	//assert( clientNum >= 0 && clientNum < MAX_ASYNC_CLIENTS );
 
@@ -2535,7 +2548,7 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 		DuplicateUsercmds( gameFrame, gameTime );
 
 		// advance game
-		gameReturn_t ret = game->RunFrame( userCmds[gameFrame & ( MAX_USERCMD_BACKUP - 1 ) ], 0, true, gameFrame );
+		gameReturn_t ret = game->RunFrame( userCmds[gameFrame & ( MAX_USERCMD_BACKUP - 1 ) ] );
 
 		idAsyncNetwork::ExecuteSessionCommand( ret.sessionCommand );
 
@@ -2913,7 +2926,9 @@ void idAsyncServer::ProcessDownloadRequestMessage( const netadr_t from, const id
 	}
 }
 
-// jmarshall
+#if OPENPREY_ENABLE_BOTS
+// OPENPREY-GATED(D9): no Prey v7 idNetworkSystem entry point exposes these
+// helpers. They remain isolated for a future bot-contract design.
 /*
 ===============
 idAsyncServer::ServerSetBotUserCommand
@@ -2982,11 +2997,11 @@ int idAsyncServer::AllocOpenClientSlotForAI(const char* botName, int maxPlayersO
 	spawnArgs.Set("ui_name", botName);
 
 	// Init the new client, and broadcast it to the rest of the players.
-	game->ServerClientBegin(botClientId, true, botName);
 	idAsyncServer::SendUserInfoBroadcast(botClientId, spawnArgs, true);
+	game->ServerClientBegin(botClientId);
 
 	// openQ4: hand back the slot that was actually allocated.  The game side
 	// needs it to drive this bot's user commands, and it used to get a bare 1.
 	return botClientId;
 }
-// jmarshall end
+#endif

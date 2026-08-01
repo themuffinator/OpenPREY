@@ -497,8 +497,8 @@ static bool VK_Bringup_RunProbeInternal( bool verbose, char *outSummary, int sum
 	VkApplicationInfo appInfo;
 	memset( &appInfo, 0, sizeof( appInfo ) );
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "openQ4";
-	appInfo.pEngineName = "openQ4";
+	appInfo.pApplicationName = "openPREY";
+	appInfo.pEngineName = "openPREY";
 	appInfo.apiVersion = VK_BRINGUP_REQUIRED_API_VERSION;
 
 	const char *enabledLayers[ 1 ];

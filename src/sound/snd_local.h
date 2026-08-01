@@ -82,6 +82,10 @@ ID_INLINE_EXTERN float DBtoLinear( float db )
 {
 	return idMath::Pow( 2.0f, db * ( 1.0f / 6.0f ) );
 }
+ID_INLINE_EXTERN float DBtoLinearClamped( float db )
+{
+	return db <= DB_SILENCE ? 0.0f : Max( 0.0f, DBtoLinear( db ) );
+}
 ID_INLINE_EXTERN float LinearToDB( float linear )
 {
 	return ( linear > 0.0f ) ? ( idMath::Log( linear ) * ( 6.0f / 0.693147181f ) ) : -999.0f;
@@ -208,6 +212,7 @@ public:
 	int		fadeEndTime;
 	float	fadeStartVolume;
 	float	fadeEndVolume;
+	bool	fadeHold;
 
 
 public:
@@ -219,6 +224,7 @@ public:
 	void	Clear();
 	void	SetVolume( float to );
 	void	Fade( float to, int length, int soundTime );
+	void	FadeFrom( float to, int delay, int length, int soundTime );
 	void	FadeDB( float toDB, float overSeconds, int soundTime );
 	void	Sanitize();
 
@@ -311,16 +317,20 @@ public:
 
 	// query data from all emitters in the world
 	virtual float			CurrentShakeAmplitude();
+	virtual float			CurrentShakeAmplitudeForPosition( const int time, const idVec3& listenerPosition );
 	float					CurrentRumbleAmplitude() const { return rumbleAmp; }
 
 	// where is the camera
 	virtual void			PlaceListener( const idVec3& origin, const idMat3& axis, const int listenerId );
+	virtual void			PlaceListener( const idVec3& origin, const idMat3& axis, const int listenerId, const int gameTime, const idStr& areaName );
 
 	virtual void			WriteSoundShaderLoad( const idSoundShader* snd );
 
 	// fade all sounds in the world with a given shader soundClass
 	// to is in Db, over is in seconds
 	virtual void			FadeSoundClasses( const int soundClass, const float to, const float over );
+	virtual void			RegisterLocation( int area, const char* locationName );
+	virtual void			ClearAreaLocations();
 
 	// dumps the current state and begins archiving commands
 	virtual void			StartWritingDemo( idDemoFile* demo );
@@ -386,6 +396,8 @@ public:
 
 	listener_t			listener;
 	idList<idSoundEmitterLocal*>	emitters;
+	idStrList			areaLocations;
+	idStr				listenerAreaName;
 
 	idSoundEmitter* 	localSound;			// for PlayShaderDirectly()
 
@@ -429,6 +441,8 @@ public:
 	virtual int		StartSound( const idSoundShader* shader, const s_channelType channel, float diversity = 0, int shaderFlags = 0, bool allowSlow = true );
 
 	virtual void	ModifySound( const s_channelType channel, const soundShaderParms_t* parms );
+	virtual void	ModifySound( idSoundShader* shader, const s_channelType channel, const hhSoundShaderParmsModifier& modifier );
+	virtual soundShaderParms_t* GetSoundParms( idSoundShader* shader, const s_channelType channel );
 	virtual void	StopSound( const s_channelType channel );
 
 	virtual void	FadeSound( const s_channelType channel, float to, float over );
@@ -436,6 +450,8 @@ public:
 	virtual bool	CurrentlyPlaying( const s_channelType channel = SCHANNEL_ANY ) const;
 
 	virtual	float	CurrentAmplitude();
+	virtual float	CurrentAmplitude( const s_channelType channel );
+	virtual float	CurrentVoiceAmplitude( const s_channelType channel );
 
 	virtual	int		Index() const;
 
@@ -527,6 +543,18 @@ public:
 	}
 	virtual bool			IsMuted()
 	{
+		return muted || focusMuted;
+	}
+	virtual void			SetMuteForFocus( bool mute )
+	{
+		focusMuted = mute;
+	}
+	virtual bool			IsMutedForFocus()
+	{
+		return focusMuted;
+	}
+	virtual bool			IsMutedExplicitly()
+	{
 		return muted;
 	}
 
@@ -555,6 +583,11 @@ public:
 
 	// prints memory info
 	virtual void			PrintMemInfo( MemInfo_t* mi );
+
+	virtual int				GetSubtitleIndex( const char* soundName );
+	virtual void			SetSubtitleData( int subIndex, int subNum, const char* subText, float subTime, int subChannel );
+	virtual soundSub_t*		GetSubtitle( int subIndex, int subNum );
+	virtual soundSubtitleList_t* GetSubtitleList( int subIndex );
 
 	//-------------------------
 
@@ -624,10 +657,35 @@ public:
 
 	int							soundTime;
 	bool						muted;
+	bool						focusMuted;
 	bool						musicMuted;
 	bool						needsRestart;
 
 	bool						insideLevelLoad;
+
+	//-------------------------
+	struct queuedSubtitle_t
+	{
+		int						subIndex;
+		int						subNum;
+		const soundSub_t*		subtitle;
+		int						endTime;
+	};
+
+	bool					SubtitleQueueContains( const soundSub_t* subtitle ) const;
+	bool					AppendSubtitleForChannel( const idSoundChannel* channel );
+	void					CollectActiveSubtitles();
+	void					PruneExpiredSubtitles();
+	bool					SyncSubtitleQueues();
+	void					PresentSubtitles();
+	void					ClearSubtitleRuntimeQueue();
+
+	idList<queuedSubtitle_t>	sb_subtitleQueue;
+	bool						subtitleQueueChanged;
+	idList<const soundSub_t*>	sf_subtitleQueue;
+
+public:
+	idList<soundSubtitleList_t> soundSubtitleList;
 
 	//-------------------------
 
@@ -635,8 +693,10 @@ public:
 		currentSoundWorld( NULL ),
 		soundTime( 0 ),
 		muted( false ),
+		focusMuted( false ),
 		musicMuted( false ),
-		needsRestart( false )
+		needsRestart( false ),
+		subtitleQueueChanged( false )
 	{}
 };
 

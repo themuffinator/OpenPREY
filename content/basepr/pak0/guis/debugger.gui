@@ -1,0 +1,1169 @@
+// debugger.gui
+
+/*
+	TODO:
+	Help for all tools
+	Color Keys for help
+	Make sure filters are working correctly
+*/
+
+
+#define DEBUGMODE_NONE		0
+#define DEBUGMODE_STATS		1
+#define DEBUGMODE_SPAWNARGS	2
+#define DEBUGMODE_GAMEINFO1	3
+#define DEBUGMODE_GAMEINFO2	4
+#define DEBUGMODE_GAMEINFO3	5
+
+
+windowDef Desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+	forecolor		1, 1, 1, 1
+	vscroll			1
+	hscroll			1
+	notime			1
+	nowrap			1
+	menugui			1
+
+	//=======================================
+	// Mode
+	//=======================================
+	windowDef Tool_ModeFrame {
+		rect		0, 40, 75, 50
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		bordercolor	0.4, 0.6, 0.8, 0.5
+		bordersize	1
+		text		"MODE:"
+		textaligny	-5
+		textscale	0.3
+
+		onMouseEnter {
+			set "Tool_ModeFrame::backcolor" "1 1 1 0.5";
+		}
+		onMouseExit {
+			set "Tool_ModeFrame::backcolor" "0 0 0 0";
+		}
+		onAction {
+			set "cmd" "guicmd_cyclemode" ;
+		}
+
+		windowDef Tool_Mode {
+			rect			5, 12, 65, 25
+			backcolor		0, 0, 0, 0
+			forecolor		1, 1, 0, 1
+			textscale		0.4
+			text			"Stats"
+			onNamedEvent SetMode {
+				if ("gui::mode" == DEBUGMODE_NONE) {
+					set "Tool_Mode::text" "None";
+				}
+				if ("gui::mode" == DEBUGMODE_STATS) {
+					set "Tool_Mode::text" "Stats";
+				}
+				if ("gui::mode" == DEBUGMODE_SPAWNARGS) {
+					set "Tool_Mode::text" "Args";
+				}
+				if ("gui::mode" == DEBUGMODE_GAMEINFO1) {
+					set "Tool_Mode::text" "Game1";
+				}
+				if ("gui::mode" == DEBUGMODE_GAMEINFO2) {
+					set "Tool_Mode::text" "Game2";
+				}
+				if ("gui::mode" == DEBUGMODE_GAMEINFO3) {
+					set "Tool_Mode::text" "Game3";
+				}
+			}
+		}
+	}
+
+	//=======================================
+	// Options
+	//=======================================
+	windowDef OptionFrame {
+		rect		0, 90, 75, 80
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		bordercolor	0.4, 0.6, 0.8, 0.5
+		bordersize	1
+
+		windowDef Option_Title {
+			rect		0, 0, 75, 15
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			text		"Options:"
+			textaligny	-5
+			textscale	0.3
+			onMouseEnter {
+				set "Option_Title::forecolor" "1 1 0.6 1";
+			}
+			onMouseExit {
+				set "Option_Title::forecolor" "1 1 1 1";
+			}
+			onAction {
+				resetTime "Help_Options_Open" "0";
+			}
+		}
+		
+		windowDef Option_DrawEntities {
+			rect		0, 20, 75, 15
+			forecolor	0.5, 0.5, 0.5, 1
+			text		"Draw Entities"
+			textscale	0.3
+			textaligny	-5
+			onMouseEnter {
+				set "Option_DrawEntities::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "Option_DrawEntities::backcolor" "0 0 0 0.1";
+			}
+			onAction {
+				set "cmd" "guicmd_drawentities" ;
+			}
+			onNamedEvent SetDrawEntities {
+				if ("gui::drawEntities" == 1) {
+					set "Option_DrawEntities::forecolor" "1 1 0 1" ;
+				}
+				else {
+					set "Option_DrawEntities::forecolor" "0.5 0.5 0.5 1" ;
+				}
+			}
+		}
+
+		windowDef Option_ClassCollapse {
+			rect		0, 35, 75, 15
+			forecolor	1, 1, 0, 1
+			text		"Class Collapse"
+			textscale	0.3
+			textaligny	-5
+			onMouseEnter {
+				set "Option_ClassCollapse::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "Option_ClassCollapse::backcolor" "0 0 0 0.1";
+			}
+			onAction {
+				set "cmd" "guicmd_classcollapse" ;
+			}
+			onNamedEvent SetClassCollapse {
+				if ("gui::classcollapse" == 1) {
+					set "Option_ClassCollapse::forecolor" "1 1 0 1" ;
+				}
+				else {
+					set "Option_ClassCollapse::forecolor" "0.5 0.5 0.5 1" ;
+				}
+			}
+		}
+
+		windowDef Option_Pointer {
+			rect		0, 50, 75, 15
+			forecolor	1, 1, 0, 1
+			text		"Pointer"
+			textscale	0.3
+			textaligny	-5
+			onMouseEnter {
+				set "Option_Pointer::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "Option_Pointer::backcolor" "0 0 0 0.1";
+			}
+			onAction {
+				set "cmd" "guicmd_pointer" ;
+			}
+			onNamedEvent SetPointer {
+				if ("gui::pointer" == 1) {
+					set "Option_Pointer::forecolor" "1 1 0 1" ;
+				}
+				else {
+					set "Option_Pointer::forecolor" "0.5 0.5 0.5 1" ;
+				}
+			}
+		}
+	}
+
+	//=======================================
+	// Filters
+	//=======================================
+	windowDef FilterFrame {
+		rect		0, 170, 75, 230
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		bordercolor	0.4, 0.6, 0.8, 0.5
+		bordersize	1
+		text		"Filters:"
+		textaligny	-5
+		textscale	0.3
+
+		windowDef FilterClass {
+			rect 		0, 20, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Class"	//TODO: Use gui::variable to put actual classname in here
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterClass::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterClass::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter1" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter1" == 0) {		// Ignore
+					set "FilterClass::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterClass::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterClass_Include {		// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter1" == 1)
+			}
+			windowDef FilterClass_Exclude {		// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter1" == 2)
+			}
+		}
+
+		windowDef FilterActive {
+			rect 		0, 35, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Active"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterActive::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterActive::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter2" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter2" == 0) {		// Ignore
+					set "FilterActive::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterActive::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterActive_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter2" == 1)
+			}
+			windowDef FilterActive_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter2" == 2)
+			}
+		}
+
+		windowDef FilterDistant {
+			rect 		0, 50, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Distant"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterDistant::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterDistant::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter3" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter3" == 0) {		// Ignore
+					set "FilterDistant::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterDistant::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterDistant_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter3" == 1)
+			}
+			windowDef FilterDistant_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter3" == 2)
+			}
+		}
+
+		windowDef FilterMonster {
+			rect 		0, 65, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Monster"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterMonster::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterMonster::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter4" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter4" == 0) {		// Ignore
+					set "FilterMonster::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterMonster::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterMonster_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter4" == 1)
+			}
+			windowDef FilterMonster_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter4" == 2)
+			}
+		}
+
+		windowDef FilterSound {
+			rect 		0, 80, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Sound"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterSound::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterSound::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter5" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter5" == 0) {		// Ignore
+					set "FilterSound::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterSound::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterSound_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter5" == 1)
+			}
+			windowDef FilterSound_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter5" == 2)
+			}
+		}
+
+		windowDef FilterModel {
+			rect 		0, 95, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Model"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterModel::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterModel::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter6" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter6" == 0) {		// Ignore
+					set "FilterModel::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterModel::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterModel_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter6" == 1)
+			}
+			windowDef FilterModel_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter6" == 2)
+			}
+		}
+
+		windowDef FilterAnimating {
+			rect 		0, 110, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Animating"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterAnimating::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterAnimating::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter7" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter7" == 0) {		// Ignore
+					set "FilterAnimating::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterAnimating::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterAnimating_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter7" == 1)
+			}
+			windowDef FilterAnimating_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter7" == 2)
+			}
+		}
+
+		windowDef FilterExpensive {
+			rect 		0, 125, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Expensive > 1 MS"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterExpensive::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterExpensive::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter8" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter8" == 0) {		// Ignore
+					set "FilterExpensive::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterExpensive::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterExpensive_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter8" == 1)
+			}
+			windowDef FilterExpensive_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter8" == 2)
+			}
+		}
+
+		windowDef FilterVisible {
+			rect 		0, 140, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Visible"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterVisible::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterVisible::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter9" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter9" == 0) {		// Ignore
+					set "FilterVisible::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterVisible::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterVisible_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter9" == 1)
+			}
+			windowDef FilterVisible_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter9" == 2)
+			}
+		}
+
+		windowDef FilterClose {
+			rect 		0, 155, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Close"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterClose::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterClose::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter10" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter10" == 0) {		// Ignore
+					set "FilterClose::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterClose::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterClose_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter10" == 1)
+			}
+			windowDef FilterClose_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter10" == 2)
+			}
+		}
+
+		windowDef FilterPVS {
+			rect 		0, 170, 75, 15
+			backcolor 	0, 0, 0, 0
+			forecolor 	1, 1, 1, 1
+			text		"Dormant"
+			textaligny	-5
+			textscale 	0.3
+			onMouseEnter {
+				set "FilterPVS::backcolor" "1 1 1 0.5";
+			}
+			onMouseExit {
+				set "FilterPVS::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_filter11" ;
+			}
+			onNamedEvent SetFilter {
+				if ("gui::filter11" == 0) {		// Ignore
+					set "FilterPVS::forecolor" "1 1 1 1" ;
+				}
+				else {							// Included or Excluded
+					set "FilterPVS::forecolor" "1 1 0 1" ;
+				}
+			}
+			windowDef FilterPVS_Include {	// Green outline
+				rect		0, 0, 75, 15
+				backcolor	0, 0, 0, 0
+				bordercolor	0, 1, 0, 1
+				bordersize	1
+				visible		("gui::filter11" == 1)
+			}
+			windowDef FilterPVS_Exclude {	// Red strikethrough
+				rect		0, 7, 75, 2
+				backcolor	1, 0, 0, 1
+				bordercolor	1, 0, 0, 1
+				bordersize	1
+				visible		("gui::filter11" == 2)
+			}
+		}
+		
+		
+	}
+
+	
+	//-------------------------------------------------
+	// STATS mode
+	//-------------------------------------------------
+	windowDef statsFrame {
+		rect			75, 0, 565, 400
+		bordersize		1
+		bordercolor		0.7, 1, 1, 0.2
+		backcolor		0.7, 1, 1, 0.05
+		textscale		0.25
+		visible			("gui::mode" == DEBUGMODE_STATS)
+
+		windowDef statsTab0 {
+			rect			0, 40, 300, 400
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+
+		windowDef statsTitle0 {
+			rect			0, 40, 300, 20
+			text			"Entity"
+			textscale		0.3
+			textaligny		-2
+			forecolor		1, 1, 0, 1
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			onMouseEnter {
+				set "statsTitle0::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle0::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c0";
+			}
+		}
+
+		windowDef statsTab1 {
+			rect			300, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle1 {
+			rect			300, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText1a {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"EntNum"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+				visible			("gui::classcollapse" == 0)
+			}
+			windowDef statsTitleText1b {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Count"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+				visible			("gui::classcollapse" == 1)
+			}
+
+			onMouseEnter {
+				set "statsTitle1::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle1::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c1";
+			}
+		}
+
+		windowDef statsTab2 {
+			rect			332, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle2 {
+			rect			332, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText2 {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Dormant"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+			}
+			onMouseEnter {
+				set "statsTitle2::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle2::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c2";
+			}
+		}
+
+		windowDef statsTab3 {
+			rect			364, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle3 {
+			rect			364, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText3 {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Unused"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+			}
+			onMouseEnter {
+				set "statsTitle3::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle3::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c3";
+			}
+		}
+
+		windowDef statsTab4 {
+			rect			396, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle4 {
+			rect			396, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText4 {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Active"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+			}
+			onMouseEnter {
+				set "statsTitle4::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle4::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c4";
+			}
+		}
+
+		windowDef statsTab5 {
+			rect			428, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle5 {
+			rect			428, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText5 {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Time ms"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+			}
+			onMouseEnter {
+				set "statsTitle5::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle5::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c5";
+			}
+		}
+
+		windowDef statsTab6 {
+			rect			460, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle6 {
+			rect			460, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText6 {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Time%"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+			}
+			onMouseEnter {
+				set "statsTitle6::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle6::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c6";
+			}
+		}
+
+		windowDef statsTab7 {
+			rect			492, 0, 32, 440
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+		
+		windowDef statsTitle7 {
+			rect			492, 0, 32, 60
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			noclip			1
+			
+			windowDef statsTitleText7 {
+				rect			-5, 25, 40, 25
+				backcolor		0, 0, 0, 0
+				forecolor		1, 1, 0, 1
+				text			"Events"
+				textscale		0.3
+				textaligny		0
+				rotate			60
+			}
+			onMouseEnter {
+				set "statsTitle7::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "statsTitle7::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c7";
+			}
+		}
+
+		listDef stats {
+			rect			0, 60, 562, 340
+			backcolor		0, 0, 0, 0.1
+			forecolor		1, 1, 1, 1
+			matcolor		1, 1, 1, 1
+			bordersize 		1
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			textscale		0.25
+			listName		"listStats"
+			tabstops		"2, 300, 332, 364, 396, 428, 460, 492"
+			tabaligns		"0, 1, 1, 1, 0, 0, 0, 0"
+			OnAction {
+				set "cmd" "guicmd_select" ;
+			}
+		}
+	}
+
+
+	//-------------------------------------------------
+	// SPAWNARGS mode
+	//-------------------------------------------------
+	windowDef spawnargsFrame {
+		rect			75, 0, 565, 400
+		bordersize		1
+		bordercolor		0.7, 1, 1, 0.2
+		backcolor		0.7, 1, 1, 0.05
+		textscale		0.25
+		visible			("gui::mode" == DEBUGMODE_SPAWNARGS)
+
+		windowDef spawnargsTab0 {
+			rect			0, 40, 300, 400
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+
+		windowDef spawnargsTitle0 {
+			rect			0, 40, 300, 20
+			text			"Key"
+			textscale		0.3
+			textaligny		-2
+			forecolor		1, 1, 0, 1
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			onMouseEnter {
+				set "spawnargsTitle0::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "spawnargsTitle0::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c0";
+			}
+		}
+
+		windowDef spawnargsTab1 {
+			rect			300, 40, 300, 400
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+
+		windowDef spawnargsTitle1 {
+			rect			300, 40, 300, 20
+			text			"Value"
+			textscale		0.3
+			textaligny		-2
+			forecolor		1, 1, 0, 1
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			onMouseEnter {
+				set "spawnargsTitle1::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "spawnargsTitle1::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c1";
+			}
+		}
+
+		listDef spawnargs {
+			rect			0, 60, 565, 340
+			backcolor		0, 0, 0, 0.1
+			forecolor		1, 1, 1, 1
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize 		0
+			textscale		0.25
+			listName		"listStats"
+			tabstops		"2, 300"
+			tabaligns		"0, 0"
+			OnAction {
+				set "cmd" "guicmd_select" ;
+			}
+		}
+	}
+
+
+	//-------------------------------------------------
+	// GAMEINFO mode
+	//-------------------------------------------------
+	windowDef gameinfoFrame {
+		rect			75, 0, 565, 400
+		bordersize		1
+		bordercolor		0.7, 1, 1, 0.2
+		backcolor		0.7, 1, 1, 0.05
+		textscale		0.25
+		visible			("gui::mode" == DEBUGMODE_GAMEINFO1 || "gui::mode" == DEBUGMODE_GAMEINFO2 || "gui::mode" == DEBUGMODE_GAMEINFO3)
+
+		windowDef gameinfoTab0 {
+			rect			0, 40, 300, 400
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+
+		windowDef gameinfoTitle0 {
+			rect			0, 40, 300, 20
+			text			"Variable"
+			textscale		0.3
+			textaligny		-2
+			forecolor		1, 1, 0, 1
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			onMouseEnter {
+				set "gameinfoTitle0::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "gameinfoTitle0::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c0";
+			}
+		}
+
+		windowDef gameinfoTab1 {
+			rect			300, 40, 300, 400
+			backcolor		0, 0, 0, 0.1
+			bordercolor		0.7, 1, 1, 0.2
+			bordersize 		1
+		}
+
+		windowDef gameinfoTitle1 {
+			rect			300, 40, 300, 20
+			text			"Value"
+			textscale		0.3
+			textaligny		-2
+			forecolor		1, 1, 0, 1
+			backcolor		0, 0, 0, 0
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize		1
+			onMouseEnter {
+				set "gameinfoTitle1::backcolor" "1 1 1 0.4";
+			}
+			onMouseExit {
+				set "gameinfoTitle1::backcolor" "0 0 0 0";
+			}
+			onAction {
+				set "cmd" "guicmd_title_c1";
+			}
+		}
+
+		listDef gameinfo {
+			rect			0, 60, 565, 340
+			backcolor		0, 0, 0, 0.1
+			forecolor		1, 1, 1, 1
+			bordercolor		0.4, 0.6, 0.8, 0.5
+			bordersize 		0
+			textscale		0.25
+			listName		"listStats"
+			tabstops		"2, 300"
+			tabaligns		"0, 0"
+			OnAction {
+				set "cmd" "guicmd_select" ;
+			}
+		}
+	}
+
+	//=======================================
+	// Help
+	//=======================================
+
+	windowDef Help_Mode {
+	}
+
+	windowDef Help_Options_Open {
+		noTime		1
+		
+		onTime 0 {
+			transition "Help_Options::rect" "0 90 75 15" "0 0 640 480" "400" ;
+			set "Help_Options::visible" "1" ;
+		}
+		onTime 400 {
+			set "Help_OptionsText::visible" "1" ;
+		}
+	}
+	windowDef Help_Options_Close {
+		noTime		1
+		
+		onTime 0 {
+			transition "Help_Options::rect" "0 0 640 480" "0 90 75 15" "400";
+			set "Help_OptionsText::visible" "0" ;
+		}
+		onTime 400 {
+			set "Help_Options::visible" "0" ;
+		}
+		
+	}
+	windowDef Help_Options {
+		rect		0, 90, 75, 15
+		backcolor	0, 0, 0, 0.5
+		textscale	0.4
+		visible		0
+		noTime		1
+
+		onAction {
+			resetTime "Help_Options_Close" "0";
+		}
+		
+		windowDef ho_key {
+			// show colors and what they mean
+		}
+		
+		windowDef Help_OptionsText {
+			rect		80, 100, 550, 280
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			text		"Help - Options\nDraw Entities: Draws a crosshair at each entity defined by filters\nClass Collapse:  Collapses the entities into their respective classes\nPointer:             Allows you to point at the entity you want to select"
+			textscale	0.4
+			nowrap		1
+			visible		0
+		}
+	}
+	
+	windowDef Help_Filters {
+	}
+}

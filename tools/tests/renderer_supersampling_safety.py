@@ -11,14 +11,13 @@ def read_repo_file(relative_path):
     return (Path(__file__).resolve().parents[2] / relative_path).read_text(encoding="utf-8")
 
 
-def test_cvar_and_menu_expose_safe_supersampling_range():
+def test_cvar_exposes_safe_supersampling_range():
     init_cpp = read_repo_file(Path("src") / "renderer" / "RenderSystem_init.cpp")
-    system_gui = read_repo_file(Path("content") / "baseoq4" / "pak0" / "guis" / "menu" / "settings" / "system.gui")
+    display_settings = read_repo_file(Path("docs") / "user" / "display-settings.md")
 
     assert_true('"r_screenFraction", "100"' in init_cpp, "r_screenFraction should keep native resolution as the default")
     assert_true("10, 200" in init_cpp, "r_screenFraction should expose the guarded 10..200 range")
-    assert_true('"10%;25%;50%;75%;85%;100%;125%;150%;200%"' in system_gui, "video menu should expose performance and supersampling presets")
-    assert_true('"10;25;50;75;85;100;125;150;200"' in system_gui, "video menu preset values should match the displayed resolution scale choices")
+    assert_true("Main-scene resolution scale percentage (`10..200`)" in display_settings, "display guide should document the guarded supersampling range")
 
 
 def test_legacy_crop_does_not_run_above_native():
@@ -44,7 +43,7 @@ def test_scene_target_supersampling_is_guarded_and_scales_clipping():
 
 
 def main():
-    test_cvar_and_menu_expose_safe_supersampling_range()
+    test_cvar_exposes_safe_supersampling_range()
     test_legacy_crop_does_not_run_above_native()
     test_scene_target_supersampling_is_guarded_and_scales_clipping()
     print("renderer_supersampling_safety: ok")

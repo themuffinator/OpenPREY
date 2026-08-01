@@ -182,6 +182,10 @@ typedef struct {
 	float				t;				// y offset in image where glyph starts
 	float				s2;
 	float				t2;
+	// Doom 3/Prey bitmap fonts can span several atlas materials at one point
+	// size.  Quake 4 and generated TrueType fonts leave this NULL and use the
+	// font-wide material below.
+	const idMaterial *	material;
 } glyphInfo_t;
 
 typedef struct {
@@ -391,6 +395,20 @@ public:
 	virtual void			DrawSmallStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material ) = 0;
 	virtual void			DrawBigChar( int x, int y, int ch, const idMaterial *material ) = 0;
 	virtual void			DrawBigStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material ) = 0;
+
+	// Prey view-state and diagnostics compatibility surface. Renderer backends
+	// override stateful methods where supported; conservative defaults are valid
+	// for Vulkan and other backends while parity work remains deferred.
+	virtual void			SetEntireSceneMaterial( idMaterial *material ) { (void)material; }
+	virtual bool			IsScopeView( void ) { return false; }
+	virtual void			SetScopeView( bool view ) { (void)view; }
+	virtual bool			IsSpiritWalkView( void ) { return false; }
+	virtual void			SetSpiritWalkView( bool view ) { (void)view; }
+	virtual bool			IsShuttleView( void ) { return false; }
+	virtual void			SetShuttleView( bool view ) { (void)view; }
+	virtual bool			SupportsFragmentPrograms( void ) { return true; }
+	virtual int				VideoCardNumber( void ) { return 0; }
+	virtual void			LogViewRender( const struct renderView_s *view ) { (void)view; }
 
 	// dump all 2D drawing so far this frame to the demo file
 	virtual void			WriteDemoPics() = 0;

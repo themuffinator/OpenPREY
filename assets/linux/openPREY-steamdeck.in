@@ -1,0 +1,11 @@
+#!/bin/sh
+
+export OPENPREY_STEAMDECK="${OPENPREY_STEAMDECK:-1}"
+
+if [ "${OPENPREY_FORCE_X11:-${OPENQ4_FORCE_X11:-0}}" = "1" ]; then
+	export SDL_VIDEO_DRIVER=x11
+	export SDL_VIDEODRIVER=x11
+fi
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec "$SCRIPT_DIR/@OPENPREY_CLIENT_BINARY@" +set com_platformProfile steamdeck +set r_fullscreen 0 "$@"

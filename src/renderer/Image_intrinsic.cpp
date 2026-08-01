@@ -117,8 +117,34 @@ static void R_BlackImage( idImage *image ) {
 
 	// solid black texture
 	memset( data, 0, sizeof( data ) );
+	for ( int y = 0; y < DEFAULT_SIZE; y++ ) {
+		for ( int x = 0; x < DEFAULT_SIZE; x++ ) {
+			data[y][x][3] = 255;
+		}
+	}
 	image->GenerateImage( (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, 
 		TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
+}
+
+static void R_ThresholdImage( idImage *image ) {
+	static const int THRESHOLD_SIZE = 64;
+	byte data[THRESHOLD_SIZE][THRESHOLD_SIZE][4];
+
+	for ( int y = 0; y < THRESHOLD_SIZE; y++ ) {
+		for ( int x = 0; x < THRESHOLD_SIZE; x++ ) {
+			// Stable noise used by retail invisibility/dissolve materials.
+			unsigned int n = (unsigned int)( x * 73856093u ) ^ (unsigned int)( y * 19349663u );
+			n = ( n << 13 ) ^ n;
+			const byte alpha = (byte)( ( n * ( n * n * 15731u + 789221u ) + 1376312589u ) >> 24 );
+			data[y][x][0] = 255;
+			data[y][x][1] = 255;
+			data[y][x][2] = 255;
+			data[y][x][3] = alpha;
+		}
+	}
+
+	image->GenerateImage( (byte *)data, THRESHOLD_SIZE, THRESHOLD_SIZE,
+		TF_LINEAR, TR_REPEAT, TD_LOOKUP_TABLE_ALPHA );
 }
 
 static void R_RGBA8Image( idImage *image ) {
@@ -696,6 +722,8 @@ void idImageManager::CreateIntrinsicImages() {
 	scratchImage = ImageFromFunction("_scratch", R_RGBA8Image);
 	scratchImage2 = ImageFromFunction("_scratch2", R_RGBA8Image);
 	accumImage = ImageFromFunction("_accum", R_RGBA8Image);
+	glowScreenImage = ImageFromFunction("_glowScreen", R_RGBA8Image);
+	glowCompositeImage = ImageFromFunction("_glowComposite", R_RGBA8Image);
 	ImageFromFunction("_reflectionRender", R_RGBA8Image);
 	ImageFromFunction("_refractionRender", R_RGBA8Image);
 	//scratchCubeMapImage = ImageFromFunction("_scratchCubeMap", makeNormalizeVectorCubeMap);
@@ -711,6 +739,8 @@ void idImageManager::CreateIntrinsicImages() {
 	ImageFromFunction("_postProcessAlbedo0", R_RGBA16FImage);
 	ImageFromFunction("_postProcessAlbedo1", R_RGBA16FImage);
 	ImageFromFunction("_postProcessAlbedo2", R_RGBA16FImage);
+	ImageFromFunction("_threshold", R_ThresholdImage);
+	ImageFromFunction("_replay", R_RGBA8Image);
 
 
 	// save a copy of this for material comparison, because currentRenderImage may get

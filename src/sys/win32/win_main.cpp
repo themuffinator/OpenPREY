@@ -422,12 +422,12 @@ static bool Sys_TryTranslateopenQ4ProtocolCommandLine( const char *rawCmdLine, i
 		return false;
 	}
 
-	if ( idStr::Icmpn( args.Argv( 0 ), "openq4://", 9 ) != 0 ) {
+	if ( idStr::Icmpn( args.Argv( 0 ), "openprey://", 11 ) != 0 ) {
 		return false;
 	}
 
 	uriPayload = args.Argv( 0 );
-	uriPayload = uriPayload.Mid( 9, uriPayload.Length() - 9 );
+	uriPayload = uriPayload.Mid( 11, uriPayload.Length() - 11 );
 	uriPayload.StripLeading( '/' );
 
 	if ( uriPayload.Length() == 0 ) {
@@ -770,6 +770,10 @@ Sys_IsGameWindowFocused
 ================
 */
 bool Sys_IsGameWindowFocused(void) {
+	if ( !win32.activeApp || win32.hWnd == NULL ) {
+		return false;
+	}
+
 	if (!IsWindowVisible(win32.hWnd))
 		return false;
 
@@ -1137,14 +1141,14 @@ const char* Sys_DefaultSavePath(void) {
 
 	if ( localAppData && localAppData[0] ) {
 		savePath = localAppData;
-		savePath.AppendPath( "openQ4" );
+		savePath.AppendPath( "openPREY" );
 		return savePath.c_str();
 	}
 
 	if ( userProfile && userProfile[0] ) {
 		savePath = userProfile;
 		savePath.AppendPath( "Saved Games" );
-		savePath.AppendPath( "openQ4" );
+		savePath.AppendPath( "openPREY" );
 		return savePath.c_str();
 	}
 
@@ -1630,13 +1634,13 @@ void Sys_StartAsyncThread(void) {
 ================
 Sys_AlreadyRunning
 
-returns true if there is a copy of openQ4 running already
+returns true if there is a copy of openPREY running already
 ================
 */
 bool Sys_AlreadyRunning(void) {
 #ifndef DEBUG
 	if (!win32.win_allowMultipleInstances.GetBool()) {
-		HANDLE hMutexOneInstance = ::CreateMutex(NULL, FALSE, "openQ4");
+		HANDLE hMutexOneInstance = ::CreateMutex(NULL, FALSE, "openPREY");
 		if (::GetLastError() == ERROR_ALREADY_EXISTS || ::GetLastError() == ERROR_ACCESS_DENIED) {
 			return true;
 		}
@@ -1690,7 +1694,7 @@ void Sys_Init(void) {
 	win32.sys_arch.SetString( Sys_FormatWindowsVersion( win32.osversion ) );
 	if ( !Sys_IsWindowsVersionOrGreater( win32.osversion, OPENQ4_VALIDATED_WINDOWS_MAJOR_VERSION, OPENQ4_VALIDATED_WINDOWS_MINOR_VERSION ) ) {
 		common->Printf(
-			"WARNING: %s is outside openQ4's actively validated Windows support matrix.\n",
+			"WARNING: %s is outside openPREY's actively validated Windows support matrix.\n",
 			win32.sys_arch.GetString() );
 	}
 

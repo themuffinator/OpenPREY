@@ -35,16 +35,17 @@ resolve_meson_cmd() {
     local candidate=""
     local python_cmd=""
 
-    if [[ -n "${OPENQ4_MESON:-}" ]]; then
-        if [[ ! -x "${OPENQ4_MESON}" ]]; then
-            echo "OPENQ4_MESON points to a missing or non-executable Meson: '${OPENQ4_MESON}'." >&2
+    local configured_meson="${OPENPREY_MESON:-${OPENQ4_MESON:-}}"
+    if [[ -n "${configured_meson}" ]]; then
+        if [[ ! -x "${configured_meson}" ]]; then
+            echo "OPENPREY_MESON points to a missing or non-executable Meson: '${configured_meson}'." >&2
             exit 1
         fi
 
         for candidate in python python3; do
             if python_cmd="$(command -v "${candidate}" 2>/dev/null)"; then
                 PYTHON_CMD="${python_cmd}"
-                MESON_CMD=("${OPENQ4_MESON}")
+                MESON_CMD=("${configured_meson}")
                 return
             fi
         done
@@ -185,13 +186,13 @@ PY
 }
 
 resolve_gamelibs_repo_path() {
-    "${PYTHON_CMD}" - "${repo_root}" "${OPENQ4_GAMELIBS_REPO:-}" <<'PY'
+    "${PYTHON_CMD}" - "${repo_root}" "${OPENPREY_GAMELIBS_REPO:-${OPENQ4_GAMELIBS_REPO:-}}" <<'PY'
 import pathlib
 import sys
 
 root = pathlib.Path(sys.argv[1])
 raw = sys.argv[2].strip()
-repo = pathlib.Path(raw) if raw else root.parent / "openQ4-game"
+repo = pathlib.Path(raw) if raw else root.parent / "OpenPrey-game"
 print(repo.resolve().as_posix())
 PY
 }
@@ -210,13 +211,16 @@ test_gamelibs_stage_refresh_needed() {
 
     local gamelibs_repo=""
     gamelibs_repo="$(resolve_gamelibs_repo_path)"
+    local stage_root="${build_dir}/.tmp/openprey_gamelibs_stage"
     local source_game_dirs=(
         "${gamelibs_repo}/src/game"
-        "${gamelibs_repo}/src/mpgame"
+        "${gamelibs_repo}/src/Prey"
+        "${gamelibs_repo}/src/preyengine"
     )
     local staged_game_dirs=(
-        "${repo_root}/.tmp/gamelibs_stage/src/game"
-        "${repo_root}/.tmp/gamelibs_stage/src/mpgame"
+        "${stage_root}/src/game"
+        "${stage_root}/src/Prey"
+        "${stage_root}/src/preyengine"
     )
 
     local directory_path=""
@@ -227,7 +231,7 @@ test_gamelibs_stage_refresh_needed() {
         [[ -d "${directory_path}" ]] || return 0
     done
 
-    if "${PYTHON_CMD}" - "${gamelibs_repo}" "${repo_root}/.tmp/gamelibs_stage" "${source_game_dirs[@]}" -- "${staged_game_dirs[@]}" <<'PY'
+    if "${PYTHON_CMD}" - "${gamelibs_repo}" "${stage_root}" "${source_game_dirs[@]}" -- "${staged_game_dirs[@]}" <<'PY'
 import hashlib
 import json
 import os
@@ -278,12 +282,12 @@ if source_latest <= staged_latest:
 
 try:
     manifest = json.loads(
-        (stage_root / "openq4_gamelibs_stage_manifest.json").read_text(encoding="utf-8")
+        (stage_root / "openprey_gamelibs_stage_manifest.json").read_text(encoding="utf-8")
     )
     manifest_hashes = {
         entry["path"]: entry["sha256"]
         for entry in manifest["files"]
-        if entry["path"].startswith(("src/game/", "src/mpgame/"))
+        if entry["path"].startswith(("src/game/", "src/Prey/", "src/preyengine/"))
     }
 except (KeyError, OSError, TypeError, json.JSONDecodeError):
     raise SystemExit(0)
@@ -404,7 +408,7 @@ remove_non_runtime_install_artifacts() {
             rm -f -- "${match}"
         done
 
-    local install_game_dir="${install_root}/baseoq4"
+    local install_game_dir="${install_root}/basepr"
     [[ -d "${install_game_dir}" ]] || return 0
 
     find "${install_game_dir}" -maxdepth 1 -type f \
@@ -427,7 +431,7 @@ if [[ -z "${command_name}" ]]; then
     exit 1
 fi
 
-if [[ ( "${command_name}" == "setup" || "${command_name}" == "compile" || "${command_name}" == "install" ) && "${OPENQ4_SKIP_ICON_SYNC:-0}" != "1" ]]; then
+if [[ ( "${command_name}" == "setup" || "${command_name}" == "compile" || "${command_name}" == "install" ) && "${OPENPREY_SKIP_ICON_SYNC:-${OPENQ4_SKIP_ICON_SYNC:-0}}" != "1" ]]; then
     if [[ ! -f "${sync_icons_script}" ]]; then
         echo "Icon sync script not found: '${sync_icons_script}'." >&2
         exit 1
@@ -497,7 +501,7 @@ if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
     fi
 
     if test_gamelibs_stage_refresh_needed "${BUILD_DIR}"; then
-        echo "openQ4-game SP/MP sources changed since the last staged snapshot. Reconfiguring '${BUILD_DIR}'..."
+        echo "OpenPrey-game sources changed since the last staged snapshot. Reconfiguring '${BUILD_DIR}'..."
         run_meson setup --reconfigure "${BUILD_DIR}" "${repo_root}"
     fi
 

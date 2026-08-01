@@ -380,9 +380,38 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 		while( src.ReadToken( &token ) ) {
 			if ( idStr::Icmp( token, "windowDef" ) == 0 ) {
 				desktop->SetDC( &uiManagerLocal.dc );
+				desktop->SetWindowDefType( token.c_str() );
 				if ( desktop->Parse( &src, rebuild ) ) {
 					desktop->SetFlag( WIN_DESKTOP );
 					desktop->FixupParms();
+				}
+				continue;
+			}
+			else if ( idStr::Icmp( token, "animationDef" ) == 0 ||
+					  idStr::Icmp( token, "buttonDef" ) == 0 ||
+					  idStr::Icmp( token, "superWindowDef" ) == 0 ||
+					  idStr::Icmp( token, "tabContainerDef" ) == 0 ||
+					  idStr::Icmp( token, "tabDef" ) == 0 ||
+					  idStr::Icmp( token, "keyDef" ) == 0 ||
+					  idStr::Icmp( token, "creditDef" ) == 0 ||
+					  idStr::Icmp( token, "splineDef" ) == 0 ||
+					  idStr::Icmp( token, "bindDef" ) == 0 ||
+					  idStr::Icmp( token, "bindKeyDef" ) == 0 ) {
+				const idStr childDefType = token;
+				idToken childName;
+				desktop->SetDC( &uiManagerLocal.dc );
+				if ( !src.ExpectTokenType( TT_NAME, 0, &childName ) ) {
+					continue;
+				}
+				src.UnreadToken( &childName );
+				idWindow *child = new idWindow( &uiManagerLocal.dc, this );
+				child->SetWindowDefType( childDefType.c_str() );
+				if ( child->Parse( &src, rebuild ) ) {
+					desktop->SetFlag( WIN_DESKTOP );
+					desktop->AddChildWindow( child );
+					child->FixupParms();
+				} else {
+					delete child;
 				}
 				continue;
 			}
@@ -530,7 +559,7 @@ void idUserInterfaceLocal::Redraw( int _time, bool useAspectCorrection ) {
 
 void idUserInterfaceLocal::DrawCursor() {
 	if ( !desktop || desktop->GetFlags() & WIN_MENUGUI ) {
-		uiManagerLocal.dc.DrawCursor(&cursorX, &cursorY, 32.0f );
+		uiManagerLocal.dc.DrawCursor(&cursorX, &cursorY, 15.0f );
 	} else {
 		uiManagerLocal.dc.DrawCursor(&cursorX, &cursorY, 64.0f );
 	}
@@ -641,6 +670,17 @@ void idUserInterfaceLocal::Trigger(int _time) {
 	if ( desktop ) {
 		desktop->Trigger();
 	}
+}
+
+void idUserInterfaceLocal::CallStartup() {
+	if ( desktop ) {
+		desktop->RunScript( idWindow::ON_STARTUP );
+		desktop->RunNamedEvent( "onStartup" );
+	}
+}
+
+const char* idUserInterfaceLocal::Translate( const char* text ) {
+	return common->GetLanguageDict()->GetString( text != NULL ? text : "" );
 }
 
 void idUserInterfaceLocal::ReadFromDemoFile( class idDemoFile *f ) {

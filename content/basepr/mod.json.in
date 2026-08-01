@@ -1,0 +1,8 @@
+{
+  "name": "openPREY",
+  "version": "@OPENPREY_VERSION_BASE@",
+  "releaseDate": "2026-08-01",
+  "website": "https://www.darkmatter-quake.com",
+  "author": "DarkMatter Productions",
+  "requiredopenPREYVersion": "@OPENPREY_VERSION_BASE@"
+}

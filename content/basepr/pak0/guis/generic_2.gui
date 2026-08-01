@@ -1,0 +1,369 @@
+// generic_2 gui
+//
+//
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+	forecolor		0, 1, 1, 1
+	float turnedon	0
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+
+	windowDef TurnOnSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 10 {
+			set "onseq::visible" "0";
+		//	transition "OnButton::matcolor" "1 1 1 1" "1 1 1 0.7" "1000" ;	
+	
+		}
+		onTime 110 {
+			set "effect::visible" "1" ;
+			set "effect2::visible" "1" ;
+			set "effect3::visible" "1" ;
+			set "effect4::visible" "1" ;
+		}
+		onTime 500 {
+			transition "glow::matcolor" "1 1 1 0" "1 1 1 1" "500" ;
+		}
+		onTime 1000 {
+			transition "glow::matcolor" "1 1 1 1" "1 1 1 0" "500" ;
+		}
+		onTime 1500 {
+			transition "glow::matcolor" "1 1 1 0" "1 1 1 1" "500" ;
+		}
+		onTime 2000 {
+			transition "glow::matcolor" "1 1 1 1" "1 1 1 0" "500" ;
+
+		}
+		onTime 2500 {
+			transition "glow::matcolor" "1 1 1 0" "1 1 1 1" "500" ;
+			set "effect::visible" "0" ;
+			set "effect2::visible" "0" ;
+			set "effect3::visible" "0" ;
+			set "effect4::visible" "0" ;
+			
+		}
+		onTime 3000 {
+			transition "offmain::matcolor" "1 0.8 0.6 1" "0.3 1 0.8 1" "400" ;	
+			transition "bg::matcolor" "1 0.5 0.2 1" "0.4 1 0.8 1" "560";
+			transition "OnButton::matcolor" "1 1 1 0.4" "1 1 1 0.1" "350" ;
+			transition "OnButton::rect" "470 59 155 245" "475 65 20 1" "350" ;
+		}
+		onTime 3100 {
+			transition "OffButton::rect" "400 430 1 1" "420 265 194 180" "350" ;
+			transition "OffButton::matcolor" "1 1 1 0.1" "1 1 1 0.4" "350" ;
+		}
+		onTime 3300 {
+			set "offseq::visible" "1";
+		}
+	}
+
+	windowDef TurnOffSequence {
+		rect		0, 0, 0, 0
+		visible		0
+		notime		1
+		
+		onTime 10 {
+			transition "OffButton::matcolor" "1 1 1 1" "1 1 1 0.7" "1000" ;	
+			set "offseq::visible" "0";
+		}
+		onTime 100 {
+			set "effect::visible" "1" ;
+			set "effect2::visible" "1" ;
+			set "effect3::visible" "1" ;
+			set "effect4::visible" "1" ;
+		}
+		onTime 500 {
+			transition "glow::matcolor" "1 1 1 1" "1 1 1 0" "500" ;
+		}
+		onTime 1000 {
+			transition "glow::matcolor" "1 1 1 0" "1 1 1 1" "500" ;
+		}
+		onTime 1500 {
+			transition "glow::matcolor" "1 1 1 1" "1 1 1 0" "500" ;
+		}
+		onTime 2000 {
+			transition "glow::matcolor" "1 1 1 0" "1 1 1 1" "500" ;
+		}
+		onTime 2300 {
+			transition "bg::matcolor" "0.3 1 0.7 1" "1 0.5 0.2 1" "600";
+		}
+		onTime 2500 {
+			transition "glow::matcolor" "1 1 1 1" "1 1 1 0" "500" ;
+			set "effect::visible" "0" ;
+			set "effect2::visible" "0" ;
+			set "effect3::visible" "0" ;
+			set "effect4::visible" "0" ;
+		}
+		onTime 2800 {
+			transition "offmain::matcolor" "0.3 1 0.8 1" "1 0.8 0.6 1" "400" ;		
+		}
+		onTime 2950 {
+			transition "OnButton::matcolor" "1 1 1 0.1" "1 1 1 0.4" "350" ;
+			transition "OnButton::rect" "470 59 20 1" "470 59 145 235" "350" ;
+			transition "OffButton::rect" "420 265 194 180" "400 430 1 1" "350" ;
+			transition "OffButton::matcolor" "1 1 1 0.4" "1 1 1 0.1" "350" ;
+		}
+		onTime 3150 {
+			set "onseq::visible" "1";
+		}
+	}
+
+
+
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+
+	windowDef bg {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.6, 0.3, 1
+		background	"guis/assets/wallwalk/bg"
+	}
+	windowDef glow {
+		rect		25, 30, 460, 400
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/wallwalk/glow"
+	}
+	windowDef offmain {
+		rect		25, 30, 460, 400
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 0.9, 0.7, 1
+		background	"guis/assets/wallwalk/mainoff"
+	}
+	windowDef OffButton {
+		rect		400, 430, 1, 1
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.1
+		visible		1
+		background	"guis/assets/wallwalk/offbutton"
+	}
+	windowDef OnButton {
+		rect		470, 59, 145, 235
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.4
+		visible		1
+		background	"guis/assets/wallwalk/onbutton"
+	}
+	windowDef effect {
+		rect		191, 224, 74, 185
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		0
+		background	"guis/assets/wallwalk/veffect"
+	}
+	windowDef effect2 {
+		rect		191, 42, 74, -182
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		0
+		background	"guis/assets/wallwalk/veffect"
+	}
+	windowDef effectalp {
+		rect		191, 385, 74, 28
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		1
+		background	"guis/assets/wallwalk/alp"
+	}
+	windowDef effectalp2 {
+		rect		191, 38, 74, -28
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		1
+		background	"guis/assets/wallwalk/alp"
+	}
+	windowDef effect3 {
+		rect		250, 188, 185, 74
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		0
+		background	"guis/assets/wallwalk/heffect"
+	}
+	windowDef effect4 {
+		rect		20, 188, -185, 74
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		0
+		background	"guis/assets/wallwalk/heffect"
+	}
+	
+	windowDef effectalp3 {
+		rect		20, 188, -74, 74
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		1
+		background	"guis/assets/wallwalk/alp2"
+	}
+	windowDef effectalp4 {
+		rect		380, 188, 74, 74
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		visible		1
+		background	"guis/assets/wallwalk/alp2"
+	}
+	windowDef textblock {
+		rect		465, 29, 152, 52
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.7
+		background	"guis/assets/wallwalk/textblock"
+	}
+	windowDef scan {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/wallwalk/scanline"
+	}
+	windowDef scan2 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan3 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.0012]
+	}
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.02
+		background	"textures/sfx/static"
+	}
+	
+	
+//--------------------------	
+//	buttons
+//--------------------------	
+	
+	
+	windowDef Onseq {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		visible		1
+		onMouseEnter {
+			set "cmd" "play console_wallwalk_mouseenter" ;
+			transition "OnButton::matcolor" "1 1 1 0.4" "1 1 1 0.9" "200" ;
+			transition "OnButton::rect" "470 59 145 235" "460 53 155 245" "200" ;
+		}
+		onMouseExit {
+			set "cmd" "play console_wallwalk_mouseexit" ;
+			transition "OnButton::matcolor" "1 1 1 0.9" "1 1 1 0.4" "300" ;
+			transition "OnButton::rect" "460 53 155 245" "470 59 145 235" "200" ;
+		}
+		onAction {
+			set "Alientextenabled::visible" "1" ;
+			set "Alientextdisabled::visible" "0" ;
+			resetTime "TurnOnSequence" "1" ;
+			if ("desktop::turnedon" == 0) {	 
+				set "cmd" "activate ; play console_generic_activate" ;
+				set "desktop::turnedon" "1";
+			}
+			else {
+				set "cmd" "activate ; play console_generic_activate" ;
+				set "desktop::turnedon" "0";
+			}
+		} 
+	}
+
+	windowDef Offseq {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		visible		0
+		onMouseEnter {
+			transition "Offbutton::matcolor" "1 1 1 0.4" "1 1 1 0.9" "200" ;
+			transition "OffButton::rect" "420 265 194 180" "405 265 210 185" "200" ;
+		}
+		onMouseExit {
+			transition "Offbutton::matcolor" "1 1 1 0.9" "1 1 1 0.4" "300" ;
+			transition "OffButton::rect" "405 265 210 185" "420 265 194 180" "200" ;
+		}
+		onAction {
+			set "Alientextenabled::visible" "0" ;
+			set "Alientextdisabled::visible" "1" ;
+			resetTime "TurnOffSequence" "1" ;
+			if ("desktop::turnedon" == 1) {
+				set "cmd" "activate ; play console_generic_activate" ;
+				set "desktop::turnedon" "0";
+			}
+			else {
+				set "cmd" "activate ; play console_generic_activate" ;
+				set "desktop::turnedon" "1";
+			}
+		} 
+	}
+	
+	
+//------------------	
+//  Text	
+//------------------	
+	
+	windowDef AlienTextenabled {
+		rect		480, 33, 170, 50
+		text		"#str_20480"
+		font		"fonts/alien"
+		textscale	0.6
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.8, 0.6, 0.6
+		nowrap		1
+		visible		0
+
+		onTime 0 {
+			transition "AlienTextenabled::rect" "480 33 1 50" "480 33 170 50" "1500" ;
+		}
+		onTime 3000 {
+			resetTime "AlienTextenabled" "0" ;
+		}
+	}
+	windowDef AlienTextdisabled {
+		rect		480, 33, 170, 50
+		text		"#str_20481"
+		font		"fonts/alien"
+		textscale	0.6
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.95, 0.85, 0.6
+		nowrap		1
+		visible		1
+
+		onTime 0 {
+			transition "AlienTextdisabled::rect" "480 33 1 50" "480 33 170 50" "1500" ;
+		}
+		onTime 3000 {
+			resetTime "AlienTextdisabled" "0" ;
+		}
+	}
+}

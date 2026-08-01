@@ -426,11 +426,27 @@ void idSessionLocal::InitDemoSystem() {
 	demoLibraryFilter = DEMO_FILTER_ALL;
 
 #ifndef ID_DEDICATED
+#if defined(HUMANHEAD)
+	// Retail Prey ships no demo library GUI.  Direct demo playback commands
+	// remain available; a mod-authored replacement is still loaded and parsed
+	// normally, so a real GUI failure is not hidden.
+	if ( fileSystem->ReadFile( "guis/demo_menu.gui", NULL, NULL ) >= 0 ) {
+		guiDemoMenu = uiManager->FindGui( "guis/demo_menu.gui", true, false, true );
+		guiDemoList = uiManager->AllocListGUI();
+		if ( guiDemoList != NULL && guiDemoMenu != NULL ) {
+			guiDemoList->Config( guiDemoMenu, "demoList" );
+		}
+	} else {
+		guiDemoMenu = NULL;
+		guiDemoList = NULL;
+	}
+#else
 	guiDemoMenu = uiManager->FindGui( "guis/demo_menu.gui", true, false, true );
 	guiDemoList = uiManager->AllocListGUI();
 	if ( guiDemoList != NULL && guiDemoMenu != NULL ) {
 		guiDemoList->Config( guiDemoMenu, "demoList" );
 	}
+#endif
 
 	cmdSystem->AddCommand( "demoMenu", Session_DemoMenu_f, CMD_FL_SYSTEM, "opens the demo library or playback controls" );
 	cmdSystem->AddCommand( "demoPause", Session_DemoPause_f, CMD_FL_SYSTEM, "toggles unified demo playback pause" );

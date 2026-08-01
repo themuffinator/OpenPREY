@@ -96,6 +96,8 @@ typedef struct trace_s {
 
 class idRenderModel;
 class MemInfo;
+class idCollisionModel;
+typedef idCollisionModel *cmHandle_t;
 
 // collision model
 class idCollisionModel {
@@ -133,11 +135,15 @@ public:
 
 	// Loads collision models from a map file.
 	virtual void			LoadMap( const idMapFile *mapFile, bool forceCreateMap = false ) = 0;
+	virtual void			AppendMap( const idMapFile *mapFile ) { (void)mapFile; }
+	virtual bool			WillUseAlreadyLoadedCollisionMap( const idMapFile *mapFile ) { (void)mapFile; return false; }
 	// Frees all the collision models.
 	virtual void			FreeMap(const char* mapName) = 0;
+	virtual void			FreeMap( void ) = 0;
 
 	// Gets the clip handle for a model.
 	virtual idCollisionModel *LoadModel(const char* mapName, const char *modelName, const bool precache = false ) = 0;
+	virtual idCollisionModel *LoadModel( const char *modelName, const bool precache = false ) = 0;
 
 	// Generates a collision model from an already-loaded render model.
 	virtual idCollisionModel *ExtractCollisionModel( idRenderModel *renderModel, const char *modelName ) = 0;
@@ -153,9 +159,44 @@ public:
 	
 	// Sets up a trace model for collision with other trace models.
 	virtual idCollisionModel *ModelFromTrm(const char* mapName, const char* modelName, const idTraceModel &trm, const idMaterial *material ) = 0;
+	idCollisionModel *SetupTrmModel( const idTraceModel &trm, const idMaterial *material ) {
+		return ModelFromTrm( NULL, "_legacy_trm_model_", trm, material );
+	}
+
+	const char *GetModelName( idCollisionModel *model ) const {
+		return model != NULL ? model->GetName() : "";
+	}
+	void GetModelBounds( idCollisionModel *model, idBounds &bounds ) const {
+		if ( model == NULL || !model->GetBounds( bounds ) ) {
+			bounds.Zero();
+		}
+	}
+	void GetModelContents( idCollisionModel *model, int &contents ) const {
+		if ( model == NULL || !model->GetContents( contents ) ) {
+			contents = 0;
+		}
+	}
+	void GetModelVertex( idCollisionModel *model, int vertexNum, idVec3 &vertex ) const {
+		if ( model == NULL || !model->GetVertex( vertexNum, vertex ) ) {
+			vertex.Zero();
+		}
+	}
+	void GetModelEdge( idCollisionModel *model, int edgeNum, idVec3 &start, idVec3 &end ) const {
+		if ( model == NULL || !model->GetEdge( edgeNum, start, end ) ) {
+			start.Zero();
+			end.Zero();
+		}
+	}
+	void GetModelPolygon( idCollisionModel *model, int polygonNum, idFixedWinding &winding ) const {
+		winding.Clear();
+		if ( model != NULL ) {
+			model->GetPolygon( polygonNum, winding );
+		}
+	}
 
 	// Creates a trace model from a collision model, returns true if succesfull.
 	virtual bool			TrmFromModel(const char* mapName, const char *modelName, idTraceModel &trm ) = 0;
+	virtual bool			TrmFromModel( const char *modelName, idTraceModel &trm ) = 0;
 
 	// Creates one trace model per source primitive, returns the number created.
 	virtual int				CompoundTrmFromModel( const char *mapName, const char *modelName, idTraceModel *trms, int maxTrms ) = 0;
@@ -177,8 +218,10 @@ public:
 									const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
 									idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) = 0;
 
-	// Tests collision detection.
-	virtual void			DebugOutput( const idVec3 &viewOrigin, const idMat3 &viewAxis ) = 0;
+	// Tests collision detection. Keep the original Prey one-argument contract in
+	// this vtable slot; retail game code calls it through idCollisionModelManager.
+	virtual void			DebugOutput( const idVec3 &viewOrigin ) = 0;
+	virtual const char *	ContentsName( const int contents ) const = 0;
 
 	// Lists all loaded models.
 	virtual void			ListModels( void ) = 0;
@@ -190,6 +233,11 @@ public:
 	virtual bool			WriteCollisionModelForMapEntity( const idMapEntity *mapEnt, const char *filename, const bool testTraceModel = true ) = 0;
 
 	virtual void				DrawModel(idCollisionModel* model, const idVec3& modelOrigin, const idMat3& modelAxis,const idVec3& viewOrigin, const idMat3& viewAxis, const float radius) = 0;
+	void					DrawModel( idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis, const idVec3 &viewOrigin, const float radius ) {
+		idMat3 viewAxis;
+		viewAxis.Identity();
+		DrawModel( model, modelOrigin, modelAxis, viewOrigin, viewAxis, radius );
+	}
 
 // jmarshall
 	virtual int				GetNumInlinedProcClipModels(void) = 0;

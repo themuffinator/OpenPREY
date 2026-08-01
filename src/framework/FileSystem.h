@@ -46,8 +46,11 @@ If you have questions concerning this license or the applicable additional terms
 	"fs_homepath"		user-writable home path root
 	"fs_savepath"		path to config, save game, etc. files, read & write
 	"fs_cdpath"			locked path to the executable current working directory
+	"fs_devpath"		optional development overlay root, read & write
 
-	The base path for file saving can be set to "fs_savepath" or "fs_cdpath".
+	The base path for file saving can be set to "fs_savepath", "fs_cdpath", or
+	"fs_devpath". When set, fs_devpath is the highest-priority loose-file search
+	root and must contain the selected game directory (for example basepr/).
 
 ===============================================================================
 */
@@ -155,7 +158,9 @@ public:
 	const char *			GetReleaseDate( int index ) const { return mods[index].releaseDate.c_str(); }
 	const char *			GetWebsite( int index ) const { return mods[index].website.c_str(); }
 	const char *			GetAuthor( int index ) const { return mods[index].author.c_str(); }
-	const char *			GetRequiredopenQ4Version( int index ) const { return mods[index].requiredopenQ4Version.c_str(); }
+	const char *			GetRequiredopenPREYVersion( int index ) const { return mods[index].requiredopenQ4Version.c_str(); }
+	// Temporary source-compatibility alias for callers using the inherited API.
+	const char *			GetRequiredopenQ4Version( int index ) const { return GetRequiredopenPREYVersion( index ); }
 	const idModInfo &		GetInfo( int index ) const { return mods[index]; }
 
 private:
@@ -195,7 +200,7 @@ public:
 	virtual idFileList *	ListFilesTree( const char *relativePath, const char *extension, bool sort = false, const char* gamedir = NULL ) = 0;
 							// Frees the given file list.
 	virtual void			FreeFileList( idFileList *fileList ) = 0;
-							// Lists retail zpak_<language>.pk4 language packs that are available from q4base search paths.
+							// Lists retail Prey language packs available from base search paths.
 	virtual void			ListAvailableLanguagePacks( idStrList &languages ) = 0;
 							// Converts a relative path to a full OS path.
 	virtual const char *	OSPathToRelativePath( const char *OSPath ) = 0;
@@ -272,6 +277,8 @@ public:
 	virtual idFile *		OpenExplicitFileRead( const char *OSPath ) = 0;
 							// Opens a file for writing to a full OS path.
 	virtual idFile *		OpenExplicitFileWrite( const char *OSPath ) = 0;
+							// Opens a file for appending to a full OS path.
+	virtual idFile *		OpenExplicitFileAppend( const char *OSPath, bool sync = false ) = 0;
 							// Closes a file.
 	virtual void			CloseFile( idFile *f ) = 0;
 							// Returns immediately, performing the read from a background thread.

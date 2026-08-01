@@ -108,6 +108,7 @@ private:
 	static void				GameList_f( const idCmdArgs &args );
 	static void				ToolList_f( const idCmdArgs &args );
 	static void				Exec_f( const idCmdArgs &args );
+	static void				ExecSavePath_f( const idCmdArgs &args );
 	static void				Vstr_f( const idCmdArgs &args );
 	static void				Echo_f( const idCmdArgs &args );
 	static void				Parse_f( const idCmdArgs &args );
@@ -251,6 +252,40 @@ void idCmdSystemLocal::Exec_f( const idCmdArgs &args ) {
 
 /*
 ===============
+idCmdSystemLocal::ExecSavePath_f
+===============
+*/
+void idCmdSystemLocal::ExecSavePath_f( const idCmdArgs &args ) {
+	idStr filename;
+
+	if ( args.Argc() != 2 ) {
+		common->Printf( "exec_savepath <filename> : execute a config file from fs_savepath\n" );
+		return;
+	}
+
+	filename = args.Argv( 1 );
+	filename.DefaultFileExtension( ".cfg" );
+
+	const idStr osPath = fileSystem->RelativePathToOSPath( filename, "fs_savepath" );
+	idFile *file = fileSystem->OpenExplicitFileRead( osPath.c_str() );
+	if ( file == NULL ) {
+		common->Printf( "couldn't exec %s from fs_savepath\n", args.Argv( 1 ) );
+		return;
+	}
+
+	const int length = Max( file->Length(), 0 );
+	char *buffer = reinterpret_cast<char *>( Mem_Alloc( length + 1 ) );
+	const int readLength = Max( file->Read( buffer, length ), 0 );
+	fileSystem->CloseFile( file );
+	buffer[ Min( readLength, length ) ] = '\0';
+
+	common->Printf( "execing %s from fs_savepath\n", args.Argv( 1 ) );
+	cmdSystemLocal.BufferCommandText( CMD_EXEC_INSERT, buffer );
+	Mem_Free( buffer );
+}
+
+/*
+===============
 idCmdSystemLocal::Vstr_f
 
 Inserts the current value of a cvar as command text
@@ -382,6 +417,7 @@ void idCmdSystemLocal::Init( void ) {
 	AddCommand( "listGameCmds", GameList_f, CMD_FL_SYSTEM, "lists game commands" );
 	AddCommand( "listToolCmds", ToolList_f, CMD_FL_SYSTEM, "lists tool commands" );
 	AddCommand( "exec", Exec_f, CMD_FL_SYSTEM, "executes a config file", ArgCompletion_ConfigName );
+	AddCommand( "exec_savepath", ExecSavePath_f, CMD_FL_SYSTEM, "executes a config file from fs_savepath", ArgCompletion_ConfigName );
 	AddCommand( "vstr", Vstr_f, CMD_FL_SYSTEM, "inserts the current value of a cvar as command text", ArgCompletion_VstrCvarName );
 	AddCommand( "echo", Echo_f, CMD_FL_SYSTEM, "prints text" );
 	AddCommand( "parse", Parse_f, CMD_FL_SYSTEM, "prints tokenized string" );

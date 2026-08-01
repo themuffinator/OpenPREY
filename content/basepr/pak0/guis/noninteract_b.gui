@@ -1,0 +1,258 @@
+// noninteract_b
+//--------------------------------------------------
+
+
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+	forecolor	1, 1, 1, 1
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+	windowDef ActivationSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		0
+
+		onTime 100 {
+			transition "B3::rect" "0 140 0 0" "0 140 286 34" "600" ;
+			transition "AlienTextBot::rect" "30 140 0 40" "30 140 250 40" "1000" ;
+		}
+		onTime 200 {
+			set "AlienTextBot::visible" "1" ;
+		}
+		onTime 3450 {
+			set "AlienTextBot::visible" "0"
+		}
+		onTime 3500 {
+			transition "B3::rect" "0 140 186 34" "0 140 0 0" "500" ;
+		}
+		
+		onTime 6500 {
+			resetTime "ActivationSequence" "0" ;
+		}
+	}
+	windowDef ActivationSequence2 {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		0
+
+		onTime 100 {
+			transition "B4::rect" "360 0 250 9" "360 190 250 9" "600" ;
+		}
+		
+		onTime 601 {
+			transition "B4::rect" "360 190 250 9" "360 190 250 74" "500" ;
+		}
+		onTime 1150 {
+			set "AlienTextBot1::visible" "1";
+		}
+		onTime 4400{
+			set "AlienTextBot1::visible" "0"
+		}
+		onTime 4500{
+			transition "B4::rect" "360 190 250 34" "360 190 250 9" "600" ;
+		}
+		
+		onTime 5101 {
+			transition "B4::rect" "360 190 250 9" "360 0 250 9" "500" ;
+		}
+		
+		onTime 7800 {
+			resetTime "ActivationSequence2" "0" ;
+		}
+	}
+	windowDef ActivationSequence3 {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		0
+
+		onTime 100 {
+			set "b1_1::visible" "0" ;
+		}
+		onTime 105 {
+			set "b1_1::visible" "1" ;
+		}
+		onTime 110 {
+			set "b1_1::visible" "0" ;
+		}
+		onTime 115 {
+			set "b1_1::visible" "1" ;
+		}
+		onTime 120 {
+			transition "b1_1::rect" "35 280 280 127" "40 280 280 127" "52" ;
+		}
+		
+		onTime 200 {
+			resetTime "ActivationSequence3" "0" ;
+		}
+	}
+		
+		
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	
+	windowDef bg {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	0.7, 0.6, 0.1, .9
+		background	"guis/assets/non_interact/b/bg"
+	}
+
+	windowDef b1 {
+		rect		0, 190, 350, 257
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1-powersurge2[time*0.002]
+		background	"guis/assets/non_interact/b/b1"
+	}
+	windowDef b2 {
+		rect		0, 50, 640, 58
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1-powersurge2[time*0.002]
+		background	"guis/assets/non_interact/b/b2"
+		visible		1
+	}
+	windowDef b3 {
+		rect		0, 140, 186, 34
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1-powersurge2[time*0.002]
+		background	"guis/assets/non_interact/b/b3"
+		visible		1
+	}
+	windowDef b4 {
+		rect		450, 200, 189, 34
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1-powersurge2[time*0.002]
+		background	"guis/assets/non_interact/b/b4"
+		visible		1
+	}
+	windowDef b1_1 {
+		rect		35, 280, 280, 127
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.8
+		background	"guis/assets/non_interact/b/b1_1"
+		visible		1
+	}
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.05
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.002]
+
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.002]
+
+	}
+
+	
+
+	// -------------------------------------------------------------------------------
+	// Text
+	// -------------------------------------------------------------------------------
+
+	windowDef AlienTextTop {
+		rect		10, 63, 300, 0
+		text		"#str_20604"
+		font		"fonts/alien"
+		textscale	0.7
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 0.9, 0.45, .7
+		nowrap		1
+
+		onTime 100 {
+			transition "AlienTextTop::rect" "10 63 1 50" "10 63 300 50" "1200" ;
+		}
+		onTime 2000 {
+			resetTime "AlienTextTop" "0" ;
+		}
+	}
+	windowDef AlienTextRight {
+		rect		450, 52, 0, 0
+		text		"#str_20605"
+		font		"fonts/alien"
+		textscale	0.4
+		textaligny	4
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 0.9, 0.45, .7
+		nowrap		1
+
+		onTime 100 {
+			transition "AlienTextRight::rect" "450 52 1 30" "450 51 180 30" "1000" ;
+		}
+		onTime 2200 {
+			resetTime "AlienTextRight" "0" ;
+		}
+	}
+	windowDef AlienTextBox {
+		rect		440, 57, 0, 0
+		text		"#str_20606"
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 0.9, 0.45, .7
+		nowrap		1
+
+		onTime 100 {
+			transition "AlienTextBox::rect" "80 230 1 40" "80 230 240 40" "1000" ;
+		}
+		onTime 2200 {
+			resetTime "AlienTextBox" "0" ;
+		}
+	}
+	windowDef AlienTextBot {
+		rect		10, 140, 350, 40
+		text		"#str_20607"
+		font		"fonts/alien"
+		textscale	0.4
+		backcolor	0, 0, 0, 0
+		forecolor	1, 0.9, 0.45, .7
+		nowrap		1
+		visible		0
+	}
+	windowDef AlienTextBot1 {
+		rect		390, 210, 220, 60
+		text		"#str_20608"
+		font		"fonts/alien"
+		textscale	0.4
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 0.9, 0.45, .7
+		nowrap		1
+		visible		0
+	}
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

@@ -660,10 +660,44 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 					sourceFileTime = FILE_NOT_FOUND_TIMESTAMP;
 					R_LoadImageProgram( GetName(), &pic, &width, &height, &sourceFileTime, &usage );
 				}
-				sourceFileTimeKnown = true;
+					sourceFileTimeKnown = true;
 
-				if ( pic == NULL ) {
-					if ( !R_ShouldSuppressMissingImageWarning( GetName() ) ) {
+					if ( pic == NULL ) {
+						// Known retail-asset naming variants. Retry a nearby shipped texture
+						// before creating the renderer's default image.
+						idStr fallbackProgram = GetName();
+						if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_d", false ) >= 0 ) {
+							fallbackProgram.Replace( "barside_cap_d", "barside1_d" );
+						} else if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_s", false ) >= 0 ) {
+							fallbackProgram.Replace( "barside_cap_s", "barside1_s" );
+						} else if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_local", false ) >= 0 ) {
+							fallbackProgram.Replace( "barside_cap_local", "barside1_local" );
+						} else if ( fallbackProgram.Find( "textures/organic_wall/g_bonewall_001", false ) >= 0 ) {
+							fallbackProgram.Replace( "g_bonewall_001_d", "g_bonewall_001b_d" );
+							fallbackProgram.Replace( "g_bonewall_001_s", "g_bonewall_001b_s" );
+							fallbackProgram.Replace( "g_bonewall_001_local", "g_bonewall_001b_local" );
+							fallbackProgram.Replace( "g_bonewall_001_h", "g_bonewall_001b_h" );
+						} else if ( fallbackProgram.Find( "textures/organic_wall/hybridwall2", false ) >= 0 ) {
+							fallbackProgram.Replace( "hybridwall2_d", "bio_organic_005_d" );
+							fallbackProgram.Replace( "hybridwall2_s", "bio_organic_005_s" );
+							fallbackProgram.Replace( "hybridwall2_local", "bio_organic_005_local" );
+							fallbackProgram.Replace( "hybridwall2_h", "bio_organic_005_h" );
+						} else if ( fallbackProgram.Find( "textures/organic_wall/bio_organic_004", false ) >= 0 ) {
+							fallbackProgram.Replace( "bio_organic_004_d", "bio_organic_005_d" );
+							fallbackProgram.Replace( "bio_organic_004_s", "bio_organic_005_s" );
+							fallbackProgram.Replace( "bio_organic_004_local", "bio_organic_005_local" );
+						} else if ( fallbackProgram.Find( "textures/organic_wall/bio_organic_001_d", false ) >= 0 ||
+								fallbackProgram.Find( "textures/organic_wall/bio_organic_001_s", false ) >= 0 ) {
+							fallbackProgram.Replace( "bio_organic_001_d", "bio_organic_001_plain_d" );
+							fallbackProgram.Replace( "bio_organic_001_s", "bio_organic_001_plain_s" );
+						}
+						if ( fallbackProgram != GetName() ) {
+							R_LoadImageProgram( fallbackProgram.c_str(), &pic, &width, &height, &sourceFileTime, &usage );
+						}
+					}
+
+					if ( pic == NULL ) {
+						if ( !R_ShouldSuppressMissingImageWarning( GetName() ) ) {
 						idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
 					}
 					// create a default so it doesn't get continuously reloaded
@@ -1028,6 +1062,12 @@ CopyFramebuffer
 */
 void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 	R_BindTextureForDirectAccess( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+	const int sourceWidth = imageWidth;
+	const int sourceHeight = imageHeight;
+	if ( cvarSystem->GetCVarBool( "g_lowresFullscreenFX" ) ) {
+		imageWidth = Min( imageWidth, 512 );
+		imageHeight = Min( imageHeight, 512 );
+	}
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
@@ -1076,7 +1116,7 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glDisable( GL_SCISSOR_TEST );
 		}
 
-		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+		glBlitFramebuffer( x, y, x + sourceWidth, y + sourceHeight, 0, 0, imageWidth, imageHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR );
 		if ( scissorWasEnabled ) {
 			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
 			glEnable( GL_SCISSOR_TEST );
@@ -1141,6 +1181,12 @@ CopyDepthbuffer
 */
 void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 	R_BindTextureForDirectAccess( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+	const int sourceWidth = imageWidth;
+	const int sourceHeight = imageHeight;
+	if ( cvarSystem->GetCVarBool( "g_lowresFullscreenFX" ) ) {
+		imageWidth = Min( imageWidth, 512 );
+		imageHeight = Min( imageHeight, 512 );
+	}
 
 	// The destination must hold depth-renderable storage: it gets attached to
 	// GL_DEPTH_ATTACHMENT for the blit path and receives GL_DEPTH_COMPONENT
@@ -1219,7 +1265,7 @@ void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glDisable( GL_SCISSOR_TEST );
 		}
 
-		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
+		glBlitFramebuffer( x, y, x + sourceWidth, y + sourceHeight, 0, 0, imageWidth, imageHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
 
 		if ( scissorWasEnabled ) {
 			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );

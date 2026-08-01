@@ -987,7 +987,7 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 	staticModel->bounds.Clear();
 
 	if ( r_showSkel.GetInteger() ) {
-		if ( ( view != NULL ) && ( !r_skipSuppress.GetBool() || !ent->suppressSurfaceInViewID || ( ent->suppressSurfaceInViewID != view->renderView.viewID ) ) ) {
+		if ( ( view != NULL ) && ( !r_skipSuppress.GetBool() || !ent->suppressSurfaceInViewID || ( ent->suppressSurfaceInViewID != R_EffectiveViewIDForSubview( view ) ) ) ) {
 			// only draw the skeleton
 			DrawJoints( ent, view );
 		}

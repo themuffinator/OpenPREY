@@ -63,7 +63,7 @@ def validate_session_assertion_command() -> None:
     require(body, 'Session_NormalizeEntityFilterToken( sessLocal.mapSpawnData.serverInfo.GetString( "si_entityFilter", "" ), actualEntityFilter );', "actual entity-filter normalization")
     require(body, "fileSystem->FilenameCompare( actualMap.c_str(), expectedMap.c_str() ) == 0", "case-insensitive map comparison")
     require(body, "idStr::Icmp( actualEntityFilter.c_str(), expectedEntityFilter.c_str() ) == 0", "entity-filter comparison")
-    require(body, "common->Error( \"openQ4 map state mismatch:", "hard-fail mismatch")
+    require(body, "common->Error( \"openPREY map state mismatch:", "hard-fail mismatch")
     reject(body, "Session_NormalizeMapPathAndEntityFilter( sessLocal.mapSpawnData.serverInfo", "actual state must not default missing filters to first")
     require(move_body, "Session_NormalizeMapPathAndEntityFilter( mapName, \"\", normalizedMapName, embeddedEntityFilter, false );", "MoveToNewMap must not synthesize first over an explicit transition filter")
 
@@ -74,7 +74,7 @@ def validate_benchmark_profile() -> None:
     require(source, '"sp-campaign-mcc2-to-tram1"', "campaign transition scene")
     require(source, '"campaign-split-state-transition"', "campaign transition profile")
     require(source, '"execCommands": CAMPAIGN_MCC2_TO_TRAM1_COMMANDS', "profile command binding")
-    require(source, '"mapStateMismatch": re.compile(r"ERROR:\\s+openQ4 map state mismatch|openQ4 map state assertion"', "map-state mismatch warning pattern")
+    require(source, '"mapStateMismatch": re.compile(r"ERROR:\\s+openPREY map state mismatch|openPREY map state assertion"', "map-state mismatch warning pattern")
 
     expected_sequence = (
         "openq4_assertMapState game/mcc_2",

@@ -73,7 +73,7 @@ int main(int argc, const char *argv[]) {
 
 const char *macosx_scanForLibraryDirectory(void)
 {
-    return "/Library/openQ4";
+    return "/Library/openPREY";
 }
 
 //===========================================================================
@@ -219,7 +219,7 @@ void Sys_Error(const char *error, ...)
 
     NSLog(@"Sys_Error: %@", formattedString);
     NSAlert *alert = [[NSAlert alloc] init];
-    [alert setMessageText:@"openQ4 Error"];
+    [alert setMessageText:@"openPREY Error"];
     [alert setInformativeText:formattedString];
     [alert setAlertStyle:NSAlertStyleCritical];
     [alert runModal];

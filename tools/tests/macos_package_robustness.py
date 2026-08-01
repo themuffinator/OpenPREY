@@ -49,9 +49,9 @@ def validate_runtime_startup_error() -> None:
         "Sys_ErrorIfMacOSAppBundlePackageRootIncomplete",
         "Sys_SelectMacOSAppBundleRuntimeRoots",
         "Sys_GetSiblingSelfContainedAppRuntimeRoots",
-        "OpenQ4BundleRuntimeMissingTitle",
-        "OpenQ4BundleRuntimeMissingBody",
-        "Expected self-contained app contract: data in Contents/Resources/baseoq4 and signed game modules in Contents/Frameworks",
+        "OpenPREYBundleRuntimeMissingTitle",
+        "OpenPREYBundleRuntimeMissingBody",
+        "Expected self-contained app contract: data in Contents/Resources/basepr and a signed game module in Contents/Frameworks",
         'resourceDirectory.AppendPath( "Resources" )',
         'frameworkDirectory.AppendPath( "Frameworks" )',
         "Sys_GetAppBundlePackageRootFromExecutableDirectory",
@@ -60,27 +60,26 @@ def validate_runtime_startup_error() -> None:
         "idStr::Icmp( suffixStart, appBundleSuffix )",
         "Sys_LocalizedMacOSPackageRootString",
         "localizedStringForKey",
-        'table:@"OpenQ4PackageRoot"',
-        "OpenQ4PackageRootMissingTitle",
-        "OpenQ4PackageRootMissingBody",
-        "openQ4.app adjacent package root is incomplete",
-        "This legacy package layout needs openQ4.app, baseoq4/, openQ4-client_<arch>, and openQ4-ded_<arch> together",
-        "Current self-contained packages support moving only openQ4.app to /Applications",
-        "Expected adjacent package-root contract: openQ4.app, loose binaries, and baseoq4/ together",
+        'table:@"OpenPREYPackageRoot"',
+        "OpenPREYPackageRootMissingTitle",
+        "OpenPREYPackageRootMissingBody",
+        "openPREY.app adjacent package root is incomplete",
+        "This legacy package layout needs openPREY.app, basepr/, openPREY-client_<arch>, and openPREY-ded_<arch> together",
+        "Current self-contained packages support moving only openPREY.app to /Applications",
+        "Expected adjacent package-root contract: openPREY.app, loose binaries, and basepr/ together",
         "Package root: %s",
         "App path: %s",
         "Missing or unusable entries: %s",
         "Expected runtime architecture: %s",
         "Existing mismatched runtime entries: %s",
         "none detected",
-        "openQ4.app",
+        "openPREY.app",
         "BASE_GAMEDIR",
-        "openQ4-client_%s",
-        "openQ4-ded_%s",
-        "%s/game-sp_%s.dylib",
-        "%s/game-mp_%s.dylib",
-        "%s/game-sp_%s.dll",
-        "%s/game-mp_%s.so",
+        "openPREY-client_%s",
+        "openPREY-ded_%s",
+        "%s/game_%s.dylib",
+        "%s/game_%s.dll",
+        "%s/game_%s.so",
         "Sys_AppendMacOSPackageRootIssue",
         "Sys_AppendAlternateMacOSPackageRootEntries",
         "Sys_ExecutableFileExists",
@@ -91,11 +90,14 @@ def validate_runtime_startup_error() -> None:
         '"not a regular file"',
     ):
         require(compat, token, "macOS adjacent package-root startup diagnostic")
-    reject(
-        compat,
-        'appName.Icmp( "openQ4.app" )',
-        "macOS app-bundle runtime detection should tolerate renamed .app bundles",
-    )
+    for token in (
+        'appName.Icmp( "openPREY.app" )',
+        "openQ4.app",
+        "baseoq4",
+        "game-sp_",
+        "game-mp_",
+    ):
+        reject(compat, token, "macOS runtime must use the renamed unified-package contract")
 
 
 def validate_game_module_package_root_probe() -> None:
@@ -150,10 +152,11 @@ def validate_package_metadata_and_archive_guards() -> None:
 
     for token in (
         "MACOS_PACKAGE_ROOT_ERROR_STRINGS_NAME",
-        "OpenQ4PackageRoot.strings",
+        "OpenPREYPackageRoot.strings",
         "MACOS_PACKAGE_ROOT_ERROR_STRINGS",
         "English",
         "French",
+        "Its game data and signed game module must remain inside the application bundle.",
         "write_macos_package_root_error_strings",
         "validate_macos_package_root_error_bytes",
         "macOS archive missing {locale} localized package-root error strings",
@@ -219,11 +222,11 @@ def validate_package_metadata_and_archive_guards() -> None:
         "Support output directory must not contain control characters",
         ".XXXXXX.tar.gz.tmp",
         "except (FileNotFoundError, RuntimeError) as exc",
-        "does not launch openQ4",
-        "does not copy retail q4base PK4 assets",
+        "does not launch openPREY",
+        "does not copy retail Prey assets",
         "truncated copy failed; source was not copied",
-        "openQ4-client_x64 >",
-        "openQ4-ded_x64 >",
+        "openPREY-client_x64 >",
+        "openPREY-ded_x64 >",
         "|| cat",
         'tail -c "${max_bytes}" < "${source_path}" 2>/dev/null || cat',
         "validate_macos_package_root_engine_binaries",
@@ -234,8 +237,16 @@ def validate_package_metadata_and_archive_guards() -> None:
         "MAX_MACOS_SYMBOL_ARCHIVE_TOTAL_BYTES",
         "macOS symbol archive total expanded size is too large",
         "macOS symbol archive is not a valid xz-compressed tar archive",
+        'PRODUCT_NAME = "openPREY"',
+        'GAME_DIR_NAME = "basepr"',
+        'package_root / "openPREY.app"',
+        'f"game_{arch}.dylib"',
+        "macOS embedded unified game module",
     ):
         require(package, token, "macOS archive hygiene guards")
+
+    for token in ("openQ4.app", "baseoq4", "game-sp_", "game-mp_", "signed game modules"):
+        reject(package, token, "macOS packager must use the renamed unified-package contract")
 
 
 def validate_release_path_policy() -> None:
@@ -245,21 +256,29 @@ def validate_release_path_policy() -> None:
     platform_support = read("docs/dev/platform-support.md")
 
     for token in (
-        "First-class macOS releases require signed/notarized DMGs",
+        "name: DISABLED - inherited OpenQ4 reference (Manual Releases)",
+        "if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract",
         "macos_support_tier",
-        "first-class",
-        "Experimental macOS unsigned/unnotarized tar.gz release artifacts enabled as fallback output",
     ):
-        require(manual_release, token, "manual release first-class macOS DMG gate")
+        require(manual_release, token, "disabled inherited manual-release reference")
 
-    for source, context in (
-        (package_policy, "macOS package layout and release policy"),
-        (building, "build documentation"),
-        (platform_support, "platform support documentation"),
+    for token in ("signed and notarized DMGs", "`-unsigned.tar.gz`", "experimental"):
+        require(package_policy, token, "macOS package layout and release policy")
+
+    for token in (
+        "inherited nightly/manual publishing workflows are disabled",
+        "`OpenPrey-game`, `basepr`, and the unified module",
+        "macOS packages include an `openPREY.app` launcher bundle",
     ):
-        require(source, "signed/notarized DMGs", context)
-        require(source, "`-unsigned.tar.gz`", context)
-        require(source, "experimental", context)
+        require(building, token, "build documentation macOS boundary")
+
+    for token in (
+        "macOS code and packaging helpers are retained from upstream",
+        "no signed-package or first-class runtime claim",
+        "One unified game module",
+        "Experimental and gated",
+    ):
+        require(platform_support, token, "platform support documentation macOS boundary")
 
 
 def validate_support_info_path_resolution() -> None:
@@ -269,6 +288,8 @@ def validate_support_info_path_resolution() -> None:
     for token in (
         'case "$0" in',
         'SCRIPT_DIR=$(CDPATH= cd "${script_dir}" && pwd -P)',
+        "OPENPREY_PACKAGE_ROOT",
+        "OPENQ4_PACKAGE_ROOT",
         "runtime_arch_token()",
         "Detected runtime architecture token: %s",
         "prepare_package_root()",
@@ -290,8 +311,8 @@ def validate_support_info_path_resolution() -> None:
         "write_bounded_report()",
         "Source file was larger than",
         "write_openq4_log_candidate_paths()",
-        "HOME was not set; home-scoped openq4.log paths were skipped.",
-        "HOME was not set; home-scoped openq4.log files were skipped.",
+        "HOME was not set; home-scoped openprey.log paths were skipped.",
+        "HOME was not set; home-scoped openprey.log files were skipped.",
         "HOME was not set; the macOS DiagnosticReports directory could not be located.",
         "path_exists_for_inspection()",
         "Skipped symlinked source:",
@@ -313,10 +334,13 @@ def validate_support_info_path_resolution() -> None:
         "Expected loose dedicated-server path: %s",
         "Expected embedded game-data path: %s",
         "Expected embedded game-module path: %s",
+        "openPREY.app",
+        "basepr",
+        "game_${RUNTIME_ARCH}.dylib",
         "Expected log keys: fs_basepath, fs_cdpath, fs_savepath",
         "grep -E 'fs_(basepath|cdpath|savepath)",
-        "No openq4.log files were found. fs_basepath, fs_cdpath, and fs_savepath values could not be copied without launching openQ4.",
-        "does not launch openQ4",
+        "No openprey.log files were found. fs_basepath, fs_cdpath, and fs_savepath values could not be copied without launching openPREY.",
+        "does not launch openPREY",
     ):
         require(collector, token, "macOS support collector path-resolution report")
     reject(collector, "dirname --", "macOS support collector portable script directory resolution")
@@ -324,18 +348,22 @@ def validate_support_info_path_resolution() -> None:
 
     for token in (
         "`package/path-resolution.txt`",
-        "package root, app path, expected loose runtime paths",
+        "package root, app path",
+        "expected loose openPREY runtime paths",
         "`fs_basepath`, `fs_cdpath`, and `fs_savepath`",
-        "without launching openQ4",
+        "without launching openPREY",
     ):
         require(support_doc, token, "macOS support data path-resolution documentation")
 
+    for token in ("openQ4.app", "baseoq4", "game-sp_", "game-mp_"):
+        reject(collector, token, "macOS support collector must use the unified openPREY package contract")
 
-def validate_docs_plan_and_release_notes() -> None:
+
+def validate_docs_plan_and_release_status() -> None:
     plan = read("docs/dev/plans/2026-06-30-apple-support-no-macos-access.md")
     package_policy = read("docs/dev/macos-package-layout-and-release-policy.md")
     release_completion = read("docs/dev/release-completion.md")
-    release_notes = read("docs/dev/releases/v0.6.5.md")
+    release_notes = read("docs/dev/releases/v0.0.1.md")
 
     for token in (
         "- [x] Add a localized, clear startup error when adjacent runtime files are",
@@ -352,43 +380,53 @@ def validate_docs_plan_and_release_notes() -> None:
         require(plan, token, "Phase 5 macOS no-platform-test implementation plan")
 
     for token in (
-        "openQ4.app adjacent package root is incomplete",
-        "Expected adjacent package-root contract: `openQ4.app`, loose binaries, and `baseoq4/` together",
+        "openPREY.app adjacent package root is incomplete",
+        "Expected adjacent package-root contract: `openPREY.app`, loose binaries, and `basepr/` together",
         "Legacy adjacent packages need the app, loose binaries, and data together",
-        "Current self-contained packages support moving only `openQ4.app` to `/Applications`",
+        "Current self-contained packages support moving only `openPREY.app` to `/Applications`",
+        "`game_<arch>.dylib` module used by both single-player and multiplayer",
         "`package/path-resolution.txt`",
     ):
         require(package_policy, token, "macOS package layout policy startup error and support path report")
 
-    for source, context in (
-        (release_completion, "release completion notes"),
-        (release_notes, "curated release notes"),
+    for token in (
+        "unified Prey module (`game_<arch>`)",
+        "basepr/game_<arch>",
+        "inherited split-module workflow fixtures are manual-only and unconditionally disabled",
     ):
-        require(source, "localized macOS startup error", context)
-        require(source, "renamed `.app`", context)
-        require(source, "package/path-resolution.txt", context)
+        require(release_completion, token, "release completion notes")
+
+    for token in (
+        "one `basepr/game_<arch>` module",
+        "Split `game-sp` and `game-mp` build artifacts have been replaced",
+        "macOS and additional architecture release workflows remain gated",
+    ):
+        require(release_notes, token, "openPREY 0.0.1 release notes")
 
 
 def validate_ci_wiring() -> None:
     local_runner = read("tools/validation/openq4_validate.py")
+    active = read(".github/workflows/openprey-validation.yml")
     commit = read(".github/workflows/commit-validation.yml")
     push = read(".github/workflows/push-verification.yml")
     macos_debug = read(".github/workflows/macos-debug.yml")
 
+    require(local_runner, "macos_package_robustness.py", "local validation runner")
+
+    for token in (
+        "name: openPREY Validation",
+        'test -f ".install/basepr/${{ matrix.module }}"',
+        "Split GameLib artifacts must not be staged; openPREY ships one game_<arch> module.",
+    ):
+        require(active, token, "active openPREY validation workflow")
+
     for source, context in (
-        (local_runner, "local validation runner"),
         (commit, "commit validation workflow"),
         (push, "push verification workflow"),
         (macos_debug, "macOS debug workflow"),
     ):
         require(source, "macos_package_robustness.py", context)
-
-    for source, context in (
-        (commit, "commit validation workflow"),
-        (push, "push verification workflow"),
-        (macos_debug, "macOS debug workflow"),
-    ):
-        require(source, "python tools/tests/macos_package_robustness.py", context)
+        require(source, "if: ${{ false }}", context)
 
 
 def main() -> None:
@@ -398,7 +436,7 @@ def main() -> None:
     validate_package_metadata_and_archive_guards()
     validate_release_path_policy()
     validate_support_info_path_resolution()
-    validate_docs_plan_and_release_notes()
+    validate_docs_plan_and_release_status()
     validate_ci_wiring()
     print("macos_package_robustness: ok")
 

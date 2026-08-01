@@ -1,5 +1,9 @@
 # Gameplay Settings and Runtime Toggles
 
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
 This guide covers a small set of gameplay and audio cvars that are useful for testing, accessibility, and personal preference.
 
 The auto-skip cinematics, corpse cleanup, and corpse sink controls are also available in the in-game menu at `Settings -> Game Options`.
@@ -18,7 +22,7 @@ The auto-skip cinematics, corpse cleanup, and corpse sink controls are also avai
 | `hud_damageNumberScale` | `1` | Multiplayer client | Damage number size multiplier, `0.25` to `4`. |
 | `hud_hitMarker` | `1` | SP and MP client | Crosshair hit marker on hits you land. On by default. |
 | `hud_hitMarkerScale` | `1` | SP and MP client | Hit marker size multiplier, `0.25` to `4`, on top of `g_crosshairSize`. |
-| `hud_crosshairHitFlash` | `0` | SP and MP client | Recolours the crosshair on a hit, as stock Quake 4 does. Implied when `hud_hitMarker` is off. |
+| `hud_crosshairHitFlash` | `0` | SP and MP client | Recolours the crosshair on a hit, as stock Prey (2006) does. Implied when `hud_hitMarker` is off. |
 | `g_hitFeedback` | `2` | Multiplayer server | Whether the server tells attackers about their hits at all. `0` none, `1` without the amount, `2` with the amount. |
 
 ## Cinematics
@@ -43,7 +47,7 @@ seta g_autoSkipCinematics 1
 
 ## Corpse Cleanup
 
-openQ4 now exposes separate corpse-removal timing controls for single-player and multiplayer.
+openPREY now exposes separate corpse-removal timing controls for single-player and multiplayer.
 
 ### Single-player
 
@@ -112,7 +116,7 @@ Behavior:
 
 Notes:
 - This is separate from the master sound volume.
-- It applies to music shaders authored under the stock Quake 4 music paths, including both `sound/musical/` and `sound/ambience/musical/`.
+- It applies to music shaders authored under the stock Prey (2006) music paths, including both `sound/musical/` and `sound/ambience/musical/`.
 - The setting is live and can be adjusted while the game is running.
 
 Examples:
@@ -149,7 +153,7 @@ hit landing behind a lighter one keeps the heavier look for the rest of the puls
 `4`; it already follows `g_crosshairSize`, so the marks frame whatever crosshair
 you use.
 
-Stock Quake 4 recolours the crosshair red for a moment when you hit something. The
+Stock Prey (2006) recolours the crosshair red for a moment when you hit something. The
 marker replaces that cue, so the recolour is off while the marker is on. Turning
 the marker off brings the recolour back on its own, and
 `hud_crosshairHitFlash 1` asks for both at once.
@@ -161,7 +165,7 @@ telling you what the hit was worth.
 
 ## Damage Numbers
 
-In multiplayer, openQ4 can float the damage you deal above the player you hit, the
+In multiplayer, openPREY can float the damage you deal above the player you hit, the
 way Quake Live's damage plums do. The numbers are projected from the point of
 impact and then drift along a short arc before fading, so they stay readable
 during a fight without ever sitting on top of your crosshair.

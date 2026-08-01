@@ -9,28 +9,28 @@ option(
   'build_engine',
   type: 'boolean',
   value: true,
-  description: 'Build engine executables (openQ4-client_<arch>/openQ4-ded_<arch>).',
+  description: 'Build engine executables (openPREY-client_<arch>/openPREY-ded_<arch>).',
 )
 
 option(
   'build_games',
   type: 'boolean',
   value: true,
-  description: 'Build game modules (game-sp_<arch>/game-mp_<arch>) from the companion openQ4-game repository.',
+  description: 'Build the unified game_<arch> module from the companion OpenPrey-game repository.',
 )
 
 option(
   'build_game_sp',
   type: 'boolean',
   value: true,
-  description: 'Build the single-player game module (game-sp_<arch>).',
+  description: 'Legacy compatibility option; accepted but the unified Prey game module always provides SP and MP.',
 )
 
 option(
   'build_game_mp',
   type: 'boolean',
   value: true,
-  description: 'Build the multiplayer game module (game-mp_<arch>).',
+  description: 'Legacy compatibility option; accepted but the unified Prey game module always provides SP and MP.',
 )
 
 option(
@@ -117,5 +117,5 @@ option(
   'idlib_asserts',
   type: 'boolean',
   value: false,
-  description: 'Compile idlib assert()/verify() into live checks on GCC/Clang. src/idlib/Lib.h keys them off _DEBUG, which no GCC/Clang openQ4 build defines, so every ownership and alignment assert is otherwise a no-op there. Enabled by the sanitizer lanes; note that AssertFailed raises SIGTRAP/SIGINT, so a firing assert stops the process.',
+  description: 'Compile idlib assert()/verify() into live checks on GCC/Clang. src/idlib/Lib.h keys them off _DEBUG, which no GCC/Clang openPREY build defines, so every ownership and alignment assert is otherwise a no-op there. Enabled by the sanitizer lanes; note that AssertFailed raises SIGTRAP/SIGINT, so a firing assert stops the process.',
 )

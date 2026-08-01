@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contract checks for openQ4 cel shading.
+"""Contract checks for openPREY cel shading.
 
 Two things are pinned here. First, the band ladder: the CPU helper, the three
 interaction shaders and this file all have to agree on where a band boundary
@@ -17,7 +17,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 RENDERER = ROOT / "src" / "renderer"
-GLPROGS = ROOT / "content" / "baseoq4" / "pak0" / "glprogs"
+GLPROGS = ROOT / "content" / "basepr" / "pak0" / "glprogs"
 
 CEL_MIN_BANDS = 2
 CEL_MAX_BANDS = 8
@@ -605,7 +605,7 @@ def test_cvars_are_archived_and_ranged():
         "r_celShadingWorldDebug should stay an unarchived diagnostic",
     )
 
-    # Cel shading must ship off, so stock Quake 4 still looks like Quake 4.
+    # Cel shading must ship off, so stock Prey still looks like Prey.
     assert_true(expected["r_celShading"] == "0", "cel shading must default off")
     assert_true(expected["r_celShadingWorld"] == "0", "world cel shading must default off")
 

@@ -1,0 +1,188 @@
+// Clock.gui
+//
+
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+	nocursor	1
+	float hour	1	// When changing the initial time, make sure to change it in the text blocks below also
+	float dig1	4
+	float dig2	8
+
+	onTime 0 {
+		resetTime "Minute2" "0" ;
+	}
+	onTime 60000 {
+		resettime "desktop" "0" ;
+	}
+
+	windowDef hour {
+		rect		0, 0, 320, 480
+		backcolor	0, 0, 0, 0
+		forecolor	0.7, 0, 0, 1
+		text		"1"
+		textscale	6.5
+		textalign	1
+		textaligny	50
+		noTime		1
+
+		onTime 0 {
+			if ("desktop::hour" == 1) {
+				set "desktop::hour" "2";
+				set "hour::text" "2" ;
+			}
+			else if ("desktop::hour" == 2) {
+				set "desktop::hour" "3";
+				set "hour::text" "3" ;
+			}
+			else if ("desktop::hour" == 3) {
+				set "desktop::hour" "4";
+				set "hour::text" "4" ;
+			}
+			else if ("desktop::hour" == 4) {
+				set "desktop::hour" "5";
+				set "hour::text" "5" ;
+			}
+			else if ("desktop::hour" == 5) {
+				set "desktop::hour" "6";
+				set "hour::text" "6" ;
+			}
+			else if ("desktop::hour" == 6) {
+				set "desktop::hour" "7";
+				set "hour::text" "7" ;
+			}
+			else if ("desktop::hour" == 7) {
+				set "desktop::hour" "8";
+				set "hour::text" "8" ;
+			}
+			else if ("desktop::hour" == 8) {
+				set "desktop::hour" "9";
+				set "hour::text" "9" ;
+			}
+			else if ("desktop::hour" == 9) {
+				set "desktop::hour" "10";
+				set "hour::text" "10" ;
+			}
+			else if ("desktop::hour" == 10) {
+				set "desktop::hour" "11";
+				set "hour::text" "11" ;
+			}
+			else if ("desktop::hour" == 11) {
+				set "desktop::hour" "12";
+				set "hour::text" "12" ;
+			}
+			else if ("desktop::hour" == 12) {
+				set "desktop::hour" "1";
+				set "hour::text" "1" ;
+			}
+		}
+	}
+	
+	windowDef minute1 {
+		rect		350, 0, 290, 480
+		backcolor	0, 0, 0, 0
+		forecolor	0.7, 0, 0, 1
+		text		"4"
+		textscale	6.5
+		textalign	0
+		textaligny	50
+		noTime		1
+
+		onTime 0 {
+			if ("desktop::dig1" == 0) {
+				set "desktop::dig1" "1";
+				set "minute1::text" "1";
+			}
+			else if ("desktop::dig1" == 1) {
+				set "desktop::dig1" "2";
+				set "minute1::text" "2";
+			}
+			else if ("desktop::dig1" == 2) {
+				set "desktop::dig1" "3";
+				set "minute1::text" "3";
+			}
+			else if ("desktop::dig1" == 3) {
+				set "desktop::dig1" "4";
+				set "minute1::text" "4";
+			}
+			else if ("desktop::dig1" == 4) {
+				set "desktop::dig1" "5";
+				set "minute1::text" "5";
+			}
+			else if ("desktop::dig1" == 5) {
+				set "desktop::dig1" "0";
+				set "minute1::text" "0";
+				
+				resetTime "hour" "0";
+			}
+		}
+	}
+
+	windowDef minute2 {
+		rect		500, 0, 140, 480
+		backcolor	0, 0, 0, 0
+		forecolor	0.7, 0, 0, 1
+		text		"8"
+		textscale	6.5
+		textalign	0
+		textaligny	50
+		noTime		1
+
+		onTime 0 {
+			if ("desktop::dig2" == 0) {
+				set "desktop::dig2" "1";
+				set "minute2::text" "1";
+			}
+			else if ("desktop::dig2" == 1) {
+				set "desktop::dig2" "2";
+				set "minute2::text" "2";
+			}
+			else if ("desktop::dig2" == 2) {
+				set "desktop::dig2" "3";
+				set "minute2::text" "3";
+			}
+			else if ("desktop::dig2" == 3) {
+				set "desktop::dig2" "4";
+				set "minute2::text" "4";
+			}
+			else if ("desktop::dig2" == 4) {
+				set "desktop::dig2" "5";
+				set "minute2::text" "5";
+			}
+			else if ("desktop::dig2" == 5) {
+				set "desktop::dig2" "6";
+				set "minute2::text" "6";
+			}
+			else if ("desktop::dig2" == 6) {
+				set "desktop::dig2" "7";
+				set "minute2::text" "7";
+			}
+			else if ("desktop::dig2" == 7) {
+				set "desktop::dig2" "8";
+				set "minute2::text" "8";
+			}
+			else if ("desktop::dig2" == 8) {
+				set "desktop::dig2" "9";
+				set "minute2::text" "9";
+			}
+			else if ("desktop::dig2" == 9) {
+				set "desktop::dig2" "0";
+				set "minute2::text" "0";
+				
+				resetTime "minute1" "0";
+			}
+		}
+	}
+
+	windowDef Colon {
+		rect		250, 0, 100, 480
+		backcolor	0, 0, 0, 0
+		forecolor	0.7, 0, 0, 1
+		text		":"
+		textscale	6.5
+		textalign	1
+		textaligny	15
+	}
+	
+}

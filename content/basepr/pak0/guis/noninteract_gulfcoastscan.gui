@@ -1,0 +1,545 @@
+//GULF COAST SCAN
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+
+	
+	windowDef bg1 {
+		rect		0, 0, 320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	windowDef bg2 {
+		rect		320, 0, -320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	windowDef bg3 {
+		rect		0, 240, 320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	windowDef bg4 {
+		rect		320, 240, -320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg"
+		visible 1
+	}
+	
+	
+	
+	windowDef sphere {
+		rect		210, 130, 220, 220
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/dialog_elhuit/bg_sphere"
+		rotate 	time * -0.003
+		onTime 0 {
+		}
+
+		onTime 6000 {
+		
+			transition "sphere::matcolor" "1, 1, 1, 1" "1, 0.0, 0.0, 1" "1200" ;		}
+		onTime 7300 {
+			transition "sphere::matcolor" "1, 0.0, 0.0, 1" "1, 1, 1, 1" "450" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+
+	windowDef scanner4a {
+
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		background	"guis/assets/mutate/1/blur1"
+
+		onTime 0 {
+		}
+
+		onTime 4000 {
+		
+			transition "scanner4a::matcolor" "1, 0.2, 0.0, 0.0" "1, 0.2, 0.0, 0.7" "1200" ;
+			transition "scanner4a::rect" "175, 10, 450, 420" "70, 235, 400, 40 " "4000" ;
+		}
+		onTime 6900 {
+			transition "scanner4a::matcolor" "1, 0.2, 0.0, 0.7" "1, 0.2, 0.0, 0" "500" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+
+//==================================================
+//TEXT HERE
+//==================================================
+
+	windowDef scanner3 {
+
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"806808 866 6 738732  366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.4
+		visible		1
+//		background	"textures/hologram/text2"
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4700 {
+		
+			transition "scanner3::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.7" "1000" ;
+			transition "scanner3::rect" "-300, 220, 500, 50 " "-30, 220, 500, 50 " "3000" ;
+			set "scanner3::visible" "1"
+		}
+		onTime 6500 {
+			transition "scanner3::forecolor" "1, 0.4, 0.1, 0.7" "1, 0.4, 0.1, 0" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner3::visible" "0"
+		}
+	}
+
+
+	windowDef scanner6 {
+
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"8 8  8384324  7588 7366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.3
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4400 {
+		
+			transition "scanner6::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.5" "500" ;
+			transition "scanner6::rect" "450, 180, 500, 50 " "80, 180, 500, 50 " "3000" ;
+			set "scanner6::visible" "1"
+		}
+		onTime 6400 {
+			transition "scanner6::forecolor" "1, 0.4, 0.1, 0.5" "1, 0.4, 0.1, 0" "700" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner3::visible" "0"
+		}
+	}
+	windowDef scanner7 {
+
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		" 1166 7387 112 4351222 23  32  366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.35
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4600 {
+		
+			transition "scanner7::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.5" "500" ;
+			transition "scanner7::rect" "470, 280, 500, 50 " "100, 280, 500, 50 " "3000" ;
+			set "scanner7::visible" "1"
+		}
+		onTime 6300 {
+			transition "scanner7::forecolor" "1, 0.4, 0.1, 0.5" "1, 0.4, 0.1, 0" "700" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner3::visible" "0"
+		}
+	}	
+	windowDef scanner8 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"  8384324  7588 73872  366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.95
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4700 {
+		
+			transition "scanner8::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.3" "1700" ;
+			transition "scanner8::rect" "40, 0, 575, 450 " "40, 300, 575, 450 " "3000" ;
+			set "scanner8::visible" "1"
+		}
+		onTime 6500 {
+			transition "scanner8::forecolor" "1, 0.4, 0.1, 0.3" "1, 0.4, 0.1, 0" "700" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner8::visible" "0"
+		}
+	}
+
+	windowDef scanner88 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"1  32 56  1166 738732  366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.9
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4700 {
+		
+			transition "scanner88::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.3" "1700" ;
+			transition "scanner88::rect" "40, 200, 575, 450 " "40, -50, 575, 450 " "3000" ;
+			set "scanner88::visible" "1"
+		}
+		onTime 6500 {
+			transition "scanner88::forecolor" "1, 0.4, 0.1, 0.3" "1, 0.4, 0.1, 0" "700" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scanner88::visible" "0"
+		}
+	}	
+	
+	windowDef scannerup {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"1  32 56  1166 738732  366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.3
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4400 {
+		
+			transition "scannerup::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.5" "500" ;
+			transition "scannerup::rect" "-400, 130, 500, 50 " "-40, 130, 500, 50 " "3000" ;
+			set "scannerup::visible" "1"
+		}
+		onTime 6400 {
+			transition "scannerup::forecolor" "1, 0.4, 0.1, 0.5" "1, 0.4, 0.1, 0" "700" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scannerup::visible" "0"
+		}
+	}	
+	
+	
+	windowDef scannerlow {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"1  32 56  1166 738732  366 3  5621  112 4351222 23 421128 8  8384324  7588 738732  366 3 256  3 8 "
+		font		"fonts/alien"
+		textscale	0.3
+		visible		1
+		notranslation	1
+
+		onTime 0 {
+		}
+
+		onTime 4400 {
+		
+			transition "scannerlow::forecolor" "1, 0.3, 0.1, 0.0" "1, 0.3, 0.1, 0.4" "500" ;
+			transition "scannerlow::rect" "-400, 310, 500, 50 " "-40, 310, 500, 50 " "3000" ;
+			set "scannerlow::visible" "1"
+		}
+		onTime 6400 {
+			transition "scannerlow::forecolor" "1, 0.4, 0.1, 0.4" "1, 0.4, 0.1, 0" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+			set "scannerlow::visible" "0"
+		}
+	}
+	
+	
+//==================================================
+//TEXT UP
+//==================================================
+
+		
+	windowDef coast {
+		rect		35, 85, 600, 340
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/gulfcoast"
+		onTime 0 {
+		}
+
+		onTime 3000 {
+		
+			transition "coast::matcolor" "1, 1, 1, 1" "1, 0.1, 0.0, 0.4" "2200" ;		
+		}
+		onTime 6500 {
+			transition "coast::matcolor" "1, 0.1, 0.0, 0.4" "1, 1, 1, 1" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}	
+	
+	windowDef scanner1 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 0.3, 0.1, 0.8
+		background	"guis/assets/mutate/1/blur1"
+//		rotate time * 0.1
+		onTime 0 {
+		}
+
+		onTime 1000 {
+			transition "scanner1::matcolor" "1, 1, 1, 0.0" "1, 0.9, 0.6, 0.7" "5" ;
+			transition "scanner1::rect" "90, 235, 10, 10 " "365, 60, 350, 350 " "2000" ;
+		}
+		onTime 3000 {
+			transition "scanner1::matcolor" "1, 0.1, 0.1, 0.8" "1, 0.1, 0.1, 0.0" "500" ;
+	
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}	
+	
+	windowDef scanner2 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 0.3, 0.1, 0.8
+		background	"guis/assets/non_interact/earthscan/cir_1"
+//		rotate time * -0.1
+//		background	"guis/assets/gravity/butback"
+		onTime 0 {
+		}
+
+		onTime 1000 {
+			transition "scanner2::matcolor" "1, 1, 1, 0.0" "1, 0.9, 0.9, 0.4" "5" ;
+			transition "scanner2::rect" "70, 235, 120, 5 " "365, 60, 350, 350 " "2000" ;
+		}
+		onTime 3000 {
+			transition "scanner2::matcolor" "1, 0.1, 0.1, 0.5" "1, 0.1, 0.1, 0.0" "500" ;
+	
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}	
+
+
+	
+	
+	windowDef scanner5 {
+
+		rect 		0, 0, 0, 0
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		background	"guis/assets/mutate/1/blur1"
+//		background	"textures/sfx/flare1"
+
+		onTime 0 {
+		}
+
+		onTime 4000 {
+		
+			transition "scanner5::matcolor" "1, 0.1, 0.1, 0.0" "1, 0.1, 0.1, 0.3" "100" ;
+			transition "scanner5::rect" "485, -50, 380, 580" "160, 235, 300, 10 " "2900" ;
+		}
+		onTime 4300 {
+		
+			transition "scanner5::matcolor" "1, 0.1, 0.1, 0.3" "1, 0.8, 0.4, 0.6" "2000" ;
+		}
+		onTime 6700 {
+			transition "scanner5::matcolor" "1, 0.8, 0.4, 0.6" "1, 0.8, 0.5, 0" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+
+
+
+
+	windowDef scanner11 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 0.3, 0.1, 0.8
+		background	"guis/assets/mutate/1/blur1"
+//		rotate time * 0.1
+		onTime 0 {
+		}
+
+		onTime 1000 {
+			transition "scanner11::matcolor" "1, 1, 1, 0.0" "1, 0.9, 0.6, 0.7" "5" ;
+			transition "scanner11::rect" "475, 235, 10, 10 " "-130, 60, 350, 350 " "2000" ;
+		}
+		onTime 3000 {
+			transition "scanner11::matcolor" "1, 0.1, 0.1, 0.8" "1, 0.1, 0.1, 0.0" "500" ;
+	
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}	
+	
+	windowDef scanner22 {
+
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 0.3, 0.1, 0.8
+		background	"guis/assets/non_interact/earthscan/cir_1"
+//		rotate time * -0.1
+//		background	"guis/assets/gravity/butback"
+		onTime 0 {
+		}
+
+		onTime 1000 {
+			transition "scanner22::matcolor" "1, 1, 1, 0.0" "1, 0.9, 0.9, 0.4" "5" ;
+			transition "scanner22::rect" "415, 235, 120, 5 " "-80, 60, 350, 350 " "2000" ;
+		}
+		onTime 3000 {
+			transition "scanner22::matcolor" "1, 0.1, 0.1, 0.5" "1, 0.1, 0.1, 0.0" "500" ;
+	
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}	
+
+
+	
+
+	windowDef scanner55 {
+
+		rect 		0, 0, 0, 0
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		background	"guis/assets/mutate/1/blur1"
+//		background	"textures/sfx/flare1"
+
+		onTime 0 {
+		}
+
+		onTime 4000 {
+		
+			transition "scanner55::matcolor" "1, 0.1, 0.1, 0.0" "1, 0.1, 0.1, 0.3" "100" ;
+			transition "scanner55::rect" "-305, -50, 380, 580" "160, 235, 300, 10 " "2900" ;
+		}
+		onTime 4300 {
+		
+			transition "scanner55::matcolor" "1, 0.1, 0.1, 0.3" "1, 0.8, 0.4, 0.6" "2000" ;
+		}
+		onTime 6700 {
+			transition "scanner55::matcolor" "1, 0.8, 0.4, 0.6" "1, 0.8, 0.5, 0" "1000" ;
+
+		}
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+	
+	
+	
+	
+	windowDef bg1b {
+		rect		0, 0, 320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+	windowDef bg2b {
+		rect		320, 0, -320, 240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+	windowDef bg3b {
+		rect		0, 240, 320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+	windowDef bg4b {
+		rect		320, 240, -320, -240
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/earthmoonscan/bg2"
+		visible 1
+	}
+
+
+
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.2
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	} 
+}

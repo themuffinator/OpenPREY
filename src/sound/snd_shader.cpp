@@ -90,6 +90,67 @@ static bool SND_IsMusicSamplePath( const idToken &token ) {
 		token.IcmpPrefixPath( "sound/ambience/musical/" ) == 0;
 }
 
+static bool ParseSoundClassToken( idToken& token, int& soundClass )
+{
+	if( token.type == TT_NUMBER )
+	{
+		soundClass = token.GetIntValue();
+		return true;
+	}
+	if( !token.Icmp( "SC_NORMAL" ) )		{ soundClass = SOUNDCLASS_NORMAL; return true; }
+	if( !token.Icmp( "SC_VOICEDUCKER" ) )	{ soundClass = SOUNDCLASS_VOICEDUCKER; return true; }
+	if( !token.Icmp( "SC_SPIRIT" ) || !token.Icmp( "SC_SPIRITWALK" ) )
+	{
+		soundClass = SOUNDCLASS_SPIRITWALK;
+		return true;
+	}
+	if( !token.Icmp( "SC_VOICE" ) )		{ soundClass = SOUNDCLASS_VOICE; return true; }
+	if( !token.Icmp( "SC_MUSIC" ) )		{ soundClass = SOUNDCLASS_MUSIC; return true; }
+	return false;
+}
+
+static bool ParseSubtitleDirective( idLexer& src, const idToken& directive, const char* shaderName, int& tableIndex )
+{
+	const bool combat = directive.IcmpPrefix( "subtitlecombat" ) == 0;
+	const char* prefix = combat ? "subtitlecombat" : "subtitle";
+	const char* suffix = directive.c_str() + idStr::Length( prefix );
+	if( suffix[0] == '\0' )
+	{
+		suffix = "1";
+	}
+	for( const char* p = suffix; *p != '\0'; ++p )
+	{
+		if( *p < '0' || *p > '9' )
+		{
+			src.Warning( "Subtitle token '%s' has an invalid channel suffix", directive.c_str() );
+			return false;
+		}
+	}
+
+	int subtitleNumber = atoi( suffix );
+	if( subtitleNumber < 1 || ( combat && subtitleNumber > 4 ) )
+	{
+		src.Warning( "Subtitle index out of range in '%s'", directive.c_str() );
+		return false;
+	}
+	if( combat )
+	{
+		subtitleNumber += 3;
+	}
+
+	idToken delay;
+	idToken text;
+	if( !src.ExpectAnyToken( &delay ) || !src.ExpectAnyToken( &text ) )
+	{
+		src.Warning( "Incomplete subtitle directive '%s'", directive.c_str() );
+		return false;
+	}
+
+	tableIndex = soundSystemLocal.GetSubtitleIndex( shaderName );
+	soundSystemLocal.SetSubtitleData( tableIndex, subtitleNumber, text.c_str(), delay.GetFloatValue(), subtitleNumber );
+	return true;
+}
+
 //typedef enum
 //{
 //	SPEAKER_LEFT = 0,
@@ -282,7 +343,25 @@ bool idSoundShader::RebuildTextSource() {
 
 	file.WriteFloatString( "\tminDistance\t%d\r\n", (int)parms.minDistance );
 	file.WriteFloatString( "\tmaxDistance\t%d\r\n", (int)parms.maxDistance );
-	file.WriteFloatString( "\tvolumeDb\t%.2g\r\n", idMath::ScaleToDb( parms.volume ) );
+	// Prey authors the legacy volume token in dB. Emit that same dialect so a
+	// rebuilt decl parses identically when loaded again.
+	file.WriteFloatString( "\tvolume\t%.2g\r\n", idMath::ScaleToDb( parms.volume ) );
+	if( parms.profanityDuration > 0.0f )
+	{
+		file.WriteFloatString( "\tbleep\t%d %.4g %.4g\r\n", parms.profanityIndex, parms.profanityDelay, parms.profanityDuration );
+	}
+	if( parms.subIndex >= 0 )
+	{
+		const soundSubtitleList_t* subtitleList = soundSystemLocal.GetSubtitleList( parms.subIndex );
+		if( subtitleList != NULL )
+		{
+			for( int i = 0; i < subtitleList->subList.Num(); i++ )
+			{
+				const soundSub_t& sub = subtitleList->subList[i];
+				file.WriteFloatString( "\tsubtitle%d\t%.4g \"%s\"\r\n", sub.subChannel, sub.subTime, sub.subText.c_str() );
+			}
+		}
+	}
 
 	if ( minFrequencyShift != SOUND_SHADER_DEFAULT_FREQUENCY_SHIFT ||
 			maxFrequencyShift != SOUND_SHADER_DEFAULT_FREQUENCY_SHIFT ) {
@@ -383,6 +462,10 @@ bool idSoundShader::ParseShader( idLexer& src )
 	parms.maxDistance = 400.0f;
 	parms.volume = 1;
 	parms.attenuatedVolume = 0.0f;
+	parms.subIndex = -1;
+	parms.profanityIndex = 0;
+	parms.profanityDelay = 0.0f;
+	parms.profanityDuration = 0.0f;
 	parms.shakes = 0;
 	parms.soundShaderFlags = 0;
 	parms.soundClass = 0;
@@ -521,10 +604,21 @@ bool idSoundShader::ParseShader( idLexer& src )
 			}
 			parms.dryLevel = src.ParseFloat();
 		}
+		else if( token.IcmpPrefix( "noreverb" ) == 0 )
+		{
+			parms.wetLevel = 0.0f;
+			parms.dryLevel = 1.0f;
+		}
 		// volume
 		else if( !token.Icmp( "volume" ) )
 		{
-			parms.volume = src.ParseFloat();
+			float db = src.ParseFloat();
+			if( db > SOUND_SHADER_MAX_VOLUME_DB )
+			{
+				src.Warning( "Clamping volume to +10dB" );
+				db = SOUND_SHADER_MAX_VOLUME_DB;
+			}
+			parms.volume = idMath::dBToScale( db );
 		}
 		// leadinVolume is used to allow light breaking leadin sounds to be much louder than the broken loop
 		else if( !token.Icmp( "leadinVolume" ) )
@@ -564,7 +658,11 @@ bool idSoundShader::ParseShader( idLexer& src )
 		// soundClass
 		else if( !token.Icmp( "soundClass" ) )
 		{
-			parms.soundClass = src.ParseInt();
+			if( !src.ExpectAnyToken( &token ) || !ParseSoundClassToken( token, parms.soundClass ) )
+			{
+				src.Warning( "Unknown soundClass value '%s'", token.c_str() );
+				return false;
+			}
 			if( parms.soundClass < 0 || parms.soundClass >= SOUND_MAX_CLASSES )
 			{
 				src.Warning( "SoundClass out of range" );
@@ -611,7 +709,7 @@ bool idSoundShader::ParseShader( idLexer& src )
 			parms.soundShaderFlags |= SSF_LOOPING;
 		}
 		// no occlusion
-		else if( !token.Icmp( "no_occlusion" ) )
+		else if( !token.Icmp( "no_occlusion" ) || !token.Icmp( "noPortalFlow" ) )
 		{
 			parms.soundShaderFlags |= SSF_NO_OCCLUSION;
 		}
@@ -641,13 +739,37 @@ bool idSoundShader::ParseShader( idLexer& src )
 			parms.soundShaderFlags |= SSF_UNCLAMPED;
 		}
 		// omnidirectional
-		else if( !token.Icmp( "omnidirectional" ) )
+		else if( !token.Icmp( "omnidirectional" ) || !token.Icmp( "omniwhenclose" ) )
 		{
 			parms.soundShaderFlags |= SSF_OMNIDIRECTIONAL;
 		}
 		else if( !token.Icmp( "onDemand" ) )
 		{
 			// no longer loading sounds on demand
+		}
+		else if( !token.Icmp( "if" ) )
+		{
+			// Legacy platform conditional metadata is not used by the modern backend.
+			src.SkipRestOfLine();
+		}
+		else if( !token.Icmp( "bleep" ) )
+		{
+			parms.profanityIndex = src.ParseInt();
+			parms.profanityDelay = src.ParseFloat();
+			parms.profanityDuration = src.ParseFloat();
+		}
+		else if( !token.Icmp( "jawflap" ) )
+		{
+			parms.soundShaderFlags |= SSF_VOICEAMPLITUDE;
+		}
+		else if( token.IcmpPrefix( "subtitle" ) == 0 )
+		{
+			int subtitleTableIndex = -1;
+			if( !ParseSubtitleDirective( src, token, GetName(), subtitleTableIndex ) )
+			{
+				return false;
+			}
+			parms.subIndex = subtitleTableIndex;
 		}
 		// the wave files
 		else if( !token.Icmp( "leadin" ) )

@@ -1,0 +1,96 @@
+//off1.gui
+//by mflynn
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0.2, 0.2, 0.2, 0.8
+	forecolor		1, 1, 1, 1
+
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+	windowDef TurnOnSequence {
+
+		onTime 0 {
+			set		"offline::rect" "30 90 600 320" ;
+		}
+		onTime 100 {
+			set		"offline::visible" "0" ;
+		}
+		onTime 200 {
+			set		"offline::visible" "1" ;
+			set		"offline::rect" "10 80 600 320" ;
+		}
+		onTime 300 {
+			set		"offline::rect" "30 90 600 320" ;
+		}
+		onTime 350 {
+			set		"offline::rect" "20 70 600 320" ;
+		}
+		onTime 500 {
+			set		"offline::rect" "20 220 560 160" ;
+		}
+		onTime 600 {
+			set		"offline::rect" "40 90 600 320" ;
+		}
+		onTime 1000 {
+			transition	"offline::forecolor" "0.7 0.1 0.1 0.7" "0.7 0.1 0.1 0.2" "400" ;
+			set			"offline::rect" "30 90 600 320" ;
+		}
+		onTime 1100 {
+			set		"offline::visible" "0" ;
+		}
+		onTime 1200 {
+			set		"offline::visible" "1" ;
+			set		"offline::rect" "10 70 600 320" ;
+		}
+		onTime 1350 {
+			set		"offline::rect" "220 220 400 160" ;
+		}
+		onTime 1400 {
+			set			"offline::rect" "30 90 600 320" ;
+			transition	"offline::forecolor" "0.7 0.1 0.1 0.2" "0.7 0.1 0.1 0.7" "400" ;
+		}
+		onTime 1500 {
+			set		"offline::rect" "20 70 600 320" ;
+		}
+		onTime 1600 {
+			set		"offline::rect" "40 90 600 320" ;
+		}
+		onTime 3000 {
+			resetTime "0" ;
+		}
+	}
+	windowDef eyestalk {
+		rect		50, 100, 150, 320
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.85
+		visible		1
+	}	
+	windowDef offline {
+		text		"#str_20636"
+		rect		80, 50, 500, 400
+		backcolor	1, 0, 0, 0
+		forecolor	0.7, 0.1, 0.1, 0.7
+		matcolor	1, 1, 1, 1
+		textscale	3.2
+		textalign	1
+		font		"fonts/alien"
+		visible		1
+	}
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 0.1
+		background	"guis/assets/damageOverlayStatic"
+		visible		1
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		
+		matcolor	1, 1, 1, 0.5
+		background	"guis/assets/damageOverlayVHold"
+		visible		1
+	}
+	
+}

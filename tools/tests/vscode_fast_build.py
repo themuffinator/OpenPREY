@@ -41,21 +41,21 @@ def validate_tasks() -> None:
     if len(default_tasks) != 1:
         raise AssertionError(f"Expected exactly one default build task, found {len(default_tasks)}")
 
-    fast_build = find_task(tasks, "Build openQ4 (Meson Debug)")
+    fast_build = find_task(tasks, "Build openPREY (Meson Debug)")
     if fast_build is not default_tasks[0]:
-        raise AssertionError("Build openQ4 (Meson Debug) must be the default VS Code build task")
+        raise AssertionError("Build openPREY (Meson Debug) must be the default VS Code build task")
     if fast_build.get("dependsOn"):
         raise AssertionError("Fast default build must not depend on configure or full install tasks")
     if "fastbuild" not in fast_build.get("args", []):
         raise AssertionError("Fast default build must invoke meson-task.ps1 fastbuild")
 
-    full_build = find_task(tasks, "Full Build and Stage openQ4 (Meson Debug)")
+    full_build = find_task(tasks, "Full Build and Stage openPREY (Meson Debug)")
     if full_build.get("dependsOrder") != "sequence":
         raise AssertionError("Full build task must keep ordered configure, compile, install steps")
     for label in (
-        "Configure openQ4 (Meson Debug)",
-        "Compile openQ4 (Meson Debug)",
-        "Stage openQ4 Install Tree (Meson Debug)",
+        "Configure openPREY (Meson Debug)",
+        "Compile openPREY (Meson Debug)",
+        "Stage openPREY Install Tree (Meson Debug)",
     ):
         if label not in full_build.get("dependsOn", []):
             raise AssertionError(f"Full build task is missing dependency {label!r}")
@@ -81,6 +81,14 @@ def validate_launch_configs() -> None:
     for config in launch.get("configurations", []):
         if "preLaunchTask" in config:
             raise AssertionError(f"Launch config {config.get('name')!r} must not define preLaunchTask")
+        args = config.get("args", [])
+        if not isinstance(args, list) or not any(
+            args[index : index + 3] == ["+set", "r_fullscreen", "0"]
+            for index in range(max(0, len(args) - 2))
+        ):
+            raise AssertionError(f"Launch config {config.get('name')!r} must force windowed mode")
+        if "basepr" not in args:
+            raise AssertionError(f"Launch config {config.get('name')!r} must select basepr")
 
 
 def validate_validation_coverage() -> None:

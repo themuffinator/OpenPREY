@@ -292,7 +292,13 @@ void rvBSE::UpdateAttenuation()
 
 	idVec3 viewOrigin;
 	idMat3 viewAxis;
+#if defined(HUMANHEAD)
+	// OPENPREY-GATED(D3): no BSE callbacks are present in Prey's v7 idGame ABI.
+	viewOrigin = mCurrentOrigin;
+	viewAxis = mCurrentAxis;
+#else
 	game->GetPlayerView(viewOrigin, viewAxis);
+#endif
 
 	const float originDistance = (mCurrentOrigin - viewOrigin).LengthFast();
 	mOriginDistanceToCamera = idMath::ClampFloat(1.0f, 131072.0f, originDistance);

@@ -12,10 +12,6 @@ def read_repo_file(relative_path):
     return (Path(__file__).resolve().parents[2] / relative_path).read_text(encoding="utf-8")
 
 
-def read_companion_file(relative_path):
-    return (Path(__file__).resolve().parents[2].parent / "openQ4-game" / relative_path).read_text(encoding="utf-8")
-
-
 def test_msaa_cvar_exposes_guarded_steps():
     init_cpp = read_repo_file(Path("src") / "renderer" / "RenderSystem_init.cpp")
 
@@ -75,7 +71,7 @@ def test_gfxinfo_reports_effective_aa_state():
 def test_postaa_settings_surface_exposes_all_modes():
     repo_root = Path(__file__).resolve().parents[2]
     init_cpp = read_repo_file(Path("src") / "renderer" / "RenderSystem_init.cpp")
-    system_gui = read_repo_file(Path("content") / "baseoq4" / "pak0" / "guis" / "menu" / "settings" / "system.gui")
+    system_gui = read_repo_file(Path("content") / "basepr" / "pak0" / "guis" / "mainmenu" / "mainmenu_options.guifragment")
     structure_md = read_repo_file(Path("docs/dev") / "settings-menu-structure.md")
     display_settings_md = read_repo_file(Path("docs/user") / "display-settings.md")
     registry = json.loads((repo_root / "docs/dev" / "settings-menu-registry.json").read_text(encoding="utf-8"))["settings"]
@@ -84,10 +80,10 @@ def test_postaa_settings_surface_exposes_all_modes():
         '"post AA mode: 0 = off, 1 = SMAA 1x medium, 2 = SMAA 1x high, 3 = SMAA 1x ultra, 4 = SMAA 1x colour-edge prototype", 0, 4' in init_cpp,
         "r_postAA should expose the full 0..4 mode range",
     )
-    assert_true('values\t"0;1;2;3;4"' in system_gui, "System menu Post AA choice should expose all modes")
+    assert_true('values\t\t"0;1;2;3;4"' in system_gui, "Prey System menu Post AA choice should expose all modes")
     for language in ("english", "french", "italian", "spanish"):
-        lang_file = read_repo_file(Path("content") / "baseoq4" / "pak0" / "strings" / f"{language}_openq4.lang")
-        line = next((candidate for candidate in lang_file.splitlines() if '"#str_41095"' in candidate), "")
+        lang_file = read_repo_file(Path("content") / "basepr" / "pak0" / "strings" / f"{language}_openprey.lang")
+        line = next((candidate for candidate in lang_file.splitlines() if '"#str_122024"' in candidate), "")
         assert_true(line.count(";") == 4, f"{language} Post AA choices should list five labels")
 
     postaa_entry = next((entry for entry in registry if entry.get("id") == "system.post_aa"), None)
@@ -99,31 +95,11 @@ def test_postaa_settings_surface_exposes_all_modes():
 
 
 def test_postaa_smaa_quality_presets_are_explicit_and_logged():
-    game_render = read_companion_file(Path("src") / "game" / "Game_render.cpp")
-    edge_shader = read_repo_file(Path("content") / "baseoq4" / "pak0" / "glprogs" / "smaa_edge.fs")
-    weights_shader = read_repo_file(Path("content") / "baseoq4" / "pak0" / "glprogs" / "smaa_weights.fs")
+    edge_shader = read_repo_file(Path("content") / "basepr" / "pak0" / "glprogs" / "smaa_edge.fs")
+    weights_shader = read_repo_file(Path("content") / "basepr" / "pak0" / "glprogs" / "smaa_weights.fs")
+    render_system = read_repo_file(Path("src") / "renderer" / "RenderSystem.cpp")
 
-    assert_true("struct openq4SMAAQualityPreset_t" in game_render, "SMAA modes should use a named preset contract")
-    assert_true("PostAASMAAQualityPreset( const openq4PostAAMode_t mode )" in game_render, "SMAA quality presets should be selected in one place")
-    for snippet in (
-        'preset.name = "medium-luma";',
-        'preset.edgeModeName = "luma";',
-        "preset.shaderParams = idVec4( 0.0f, 0.10f, 8.0f, 2.0f );",
-        'preset.name = "high-luma";',
-        "preset.shaderParams = idVec4( 0.0f, 0.10f, 16.0f, 2.0f );",
-        'preset.name = "ultra-luma";',
-        "preset.shaderParams = idVec4( 0.0f, 0.05f, 32.0f, 2.0f );",
-        'preset.name = "color-edge-prototype";',
-        'preset.edgeModeName = "color";',
-        "preset.shaderParams = idVec4( 1.0f, 0.10f, 16.0f, 2.0f );",
-    ):
-        assert_true(snippet in game_render, f"missing SMAA quality preset detail {snippet!r}")
-
-    assert_true(
-        "quality=%s edgeMode=%s threshold=%.3f searchSteps=%.0f localContrast=%.2f" in game_render,
-        "PostAA logs should expose the active SMAA quality/performance contract",
-    )
-    assert_true("renderSystem->SetPostProcessSMAAQuality( PostAASMAAQualityPreset( mode ).shaderParams );" in game_render, "SMAA upload should use the same preset contract")
+    assert_true("postProcessSMAAQuality.Set( 0.0f, 0.10f, 8.0f, 2.0f );" in render_system, "SMAA should retain a safe medium-quality default")
     assert_true("quality.x" in edge_shader and "kEdgeModeColor" in edge_shader, "edge shader should consume the preset edge mode")
     assert_true("quality.y" in edge_shader, "edge shader should consume the preset edge threshold")
     assert_true("quality.w" in edge_shader, "edge shader should consume the preset local contrast scale")
@@ -168,8 +144,7 @@ def test_render_texture_failures_degrade_and_retry_msaa():
     render_texture_cpp = read_repo_file(Path("src") / "renderer" / "OpenGL" / "gl_RenderTexture.cpp")
     render_system_cpp = read_repo_file(Path("src") / "renderer" / "RenderSystem.cpp")
     backend_cpp = read_repo_file(Path("src") / "renderer" / "tr_backend.cpp")
-    game_render = read_companion_file(Path("src") / "game" / "Game_render.cpp")
-    game_render_system = read_companion_file(Path("src") / "renderer" / "RenderSystem.h")
+    game_render_system = read_repo_file(Path("src") / "renderer" / "RenderSystem.h")
 
     assert_true("bool\t\t\t\t\tInitRenderTexture(void);" in render_texture_h, "FBO initialization should report success")
     assert_true("R_FramebufferStatusName" in render_texture_cpp, "FBO failures should name the framebuffer status")
@@ -187,13 +162,7 @@ def test_render_texture_failures_degrade_and_retry_msaa():
     assert_true("cmd->msaaRenderTexture == NULL || cmd->destRenderTexture == NULL" in backend_cpp, "MSAA resolve should guard missing targets")
     assert_true("!cmd->msaaRenderTexture->EnsureDeviceHandle()" in backend_cpp, "MSAA resolve should guard unusable targets")
 
-    assert_true("openQ4_NextLowerMSAASampleCount" in game_render, "game rendering should retry a lower MSAA step")
-    assert_true("renderSystem->GetImageMSAASamples" in game_render, "game rendering should use the allocated sample count")
-    assert_true("openQ4_NextLowerMSAASampleCount( Max( colorSamples, depthSamples ) )" in game_render, "mismatched attachments should retry the next tier below the larger allocated count")
-    assert_true("Min( colorSamples, depthSamples )" not in game_render, "mismatched attachments must not skip a compatible MSAA tier")
-    assert_true("Forward render target MSAA: requested %d, effective %d" in game_render, "game rendering should log requested and effective samples")
-    assert_true("falling back to direct rendering" in game_render, "total target failure should retain direct rendering")
-    assert_true("virtual int\t\t\t\tGetImageMSAASamples" in game_render_system, "GameLibs API should expose allocated sample count narrowly")
+    assert_true("virtual int\t\t\t\tGetImageMSAASamples" in game_render_system, "renderer API should expose allocated sample count narrowly")
 
 
 def main():

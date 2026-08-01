@@ -29,6 +29,18 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __NETWORKSYSTEM_H__
 #define __NETWORKSYSTEM_H__
 
+#ifndef OPENPREY_ENABLE_BOTS
+#define OPENPREY_ENABLE_BOTS 0
+#endif
+
+#ifndef OPENPREY_ENABLE_MVD
+#define OPENPREY_ENABLE_MVD 0
+#endif
+
+#ifndef OPENPREY_ENABLE_REPEATER
+#define OPENPREY_ENABLE_REPEATER 0
+#endif
+
 
 /*
 ===============================================================================
@@ -90,19 +102,9 @@ class idNetworkSystem {
 public:
 	virtual					~idNetworkSystem( void ) {}
 
-// jmarshall
-	virtual int				AllocateClientSlotForBot(const char *botName, int maxPlayersOnServer);
-	virtual int				ServerSetBotUserCommand(int clientNum, int frameNum, const usercmd_t& cmd);
-	virtual int				ServerSetBotUserName(int clientNum, const char* playerName);
-// jmarshall end
-
+	// Keep this virtual prefix byte-for-byte compatible with Prey's v7 game API.
 	virtual void			ServerSendReliableMessage( int clientNum, const idBitMsg &msg );
 	virtual void			ServerSendReliableMessageExcluding( int clientNum, const idBitMsg &msg );
-	// Instance-scoped game helpers fan out one logical message to several
-	// clients. These variants avoid recording each physical delivery.
-	virtual void			ServerSendReliableMessageNoDemo( int clientNum, const idBitMsg &msg );
-	virtual void			ServerSendReliableMessageExcludingNoDemo( int clientNum, const idBitMsg &msg );
-	virtual void			ServerRecordInstanceReliableMessage( int instance, int excludeClient, const idBitMsg &msg );
 	virtual int				ServerGetClientPing( int clientNum );
 	virtual int				ServerGetClientPrediction( int clientNum );
 	virtual int				ServerGetClientTimeSinceLastPacket( int clientNum );
@@ -118,46 +120,62 @@ public:
 	virtual int				ClientGetIncomingRate( void );
 	virtual float			ClientGetIncomingPacketLoss( void );
 
-public:
+	// Engine-only helpers below are deliberately non-virtual. Adding them to the
+	// vtable would shift every Prey idNetworkSystem call across the DLL boundary.
+	const char *			GetServerAddress( void );
+	void					SetLoadingText( const char *loadingText );
+	void					AddLoadingIcon( const char *icon );
+
+#if OPENPREY_ENABLE_MVD
+	// OPENPREY-GATED(D9): upstream MVD routing is outside game API v7.
+	void					ServerSendReliableMessageNoDemo( int clientNum, const idBitMsg &msg );
+	void					ServerSendReliableMessageExcludingNoDemo( int clientNum, const idBitMsg &msg );
+	void					ServerRecordInstanceReliableMessage( int instance, int excludeClient, const idBitMsg &msg );
+#endif
+
+#if OPENPREY_ENABLE_BOTS
+	// OPENPREY-GATED(D9): upstream bot entry points are outside game API v7.
+	int					AllocateClientSlotForBot( const char *botName, int maxPlayersOnServer );
+	int					ServerSetBotUserCommand( int clientNum, int frameNum, const usercmd_t &cmd );
+	int					ServerSetBotUserName( int clientNum, const char *playerName );
+	int					ServerConnectBot( void ) { return -1; }
+#endif
+
 	// RAVEN BEGIN
 // ddynerman: added some utility functions
 	// uses a static buffer, copy it before calling in game again
-	virtual const char* GetServerAddress(void);
-	virtual const char* GetClientAddress(int clientNum) { return 0; }
-	virtual	void			AddFriend(int clientNum) { }
-	virtual void			RemoveFriend(int clientNum) { }
+	const char* GetClientAddress(int clientNum) { return 0; }
+	void			AddFriend(int clientNum) { }
+	void			RemoveFriend(int clientNum) { }
 	// for MP games
-	virtual void			SetLoadingText(const char* loadingText);
-	virtual void			AddLoadingIcon(const char* icon);
-	virtual const char* GetClientGUID(int clientNum) { return 0; }
+	const char* GetClientGUID(int clientNum) { return 0; }
 	// RAVEN END
 
-	virtual void			GetTrafficStats(int& bytesSent, int& packetsSent, int& bytesReceived, int& packetsReceived) const { }
+	void			GetTrafficStats(int& bytesSent, int& packetsSent, int& bytesReceived, int& packetsReceived) const { }
 
 	// server browser
-	virtual int				GetNumScannedServers(void) { return 0; }
-	virtual const scannedServer_t* GetScannedServerInfo(int serverNum) { return 0; }
-	virtual const scannedClient_t* GetScannedServerClientInfo(int serverNum, int clientNum) { return 0; }
-	virtual void			AddSortFunction(const sortInfo_t& sortInfo) { }
-	virtual bool			RemoveSortFunction(const sortInfo_t& sortInfo) { return 0; }
-	virtual void			UseSortFunction(const sortInfo_t& sortInfo, bool use = true) { }
-	virtual bool			SortFunctionIsActive(const sortInfo_t& sortInfo) { return 0; }
+	int				GetNumScannedServers(void) { return 0; }
+	const scannedServer_t* GetScannedServerInfo(int serverNum) { return 0; }
+	const scannedClient_t* GetScannedServerClientInfo(int serverNum, int clientNum) { return 0; }
+	void			AddSortFunction(const sortInfo_t& sortInfo) { }
+	bool			RemoveSortFunction(const sortInfo_t& sortInfo) { return 0; }
+	void			UseSortFunction(const sortInfo_t& sortInfo, bool use = true) { }
+	bool			SortFunctionIsActive(const sortInfo_t& sortInfo) { return 0; }
 
 	// returns true if enabled
-	virtual bool			HTTPEnable(bool enable) { return 0; }
+	bool			HTTPEnable(bool enable) { return 0; }
 
-	virtual void			ClientSetServerInfo(const idDict& serverSI) { }
-	virtual void			RepeaterSetInfo(const idDict& info) { }
+	void			ClientSetServerInfo(const idDict& serverSI) { }
 
-	virtual const char* GetViewerGUID(int clientNum) { return 0; }
+#if OPENPREY_ENABLE_REPEATER
+	// OPENPREY-GATED(D9): repeater support is not exposed through game API v7.
+	void			RepeaterSetInfo(const idDict& info) { }
+	const char* GetViewerGUID(int clientNum) { return 0; }
+	int				RepeaterGetClientNum(int clientId) { return -1; }
+#endif
 
-	virtual int				ServerGetClientNum(int clientId) { return 0; }
-	virtual	int				ServerGetServerTime(void) { return 0; }
-
-	// returns the new clientNum or -1 if there weren't any free.
-	virtual int				ServerConnectBot(void) { return 0; }
-
-	virtual int				RepeaterGetClientNum(int clientId) { return 0; }
+	int				ServerGetClientNum(int clientId) { return 0; }
+	int				ServerGetServerTime(void) { return 0; }
 };
 
 extern idNetworkSystem *	networkSystem;

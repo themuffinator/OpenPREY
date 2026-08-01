@@ -671,7 +671,7 @@ public:
 	virtual int					Memory() const;
 
 private:
-	//const idDeclParticle *		particleSystem;
+	const idDeclParticle *		particleSystem;
 };
 
 /*
@@ -754,6 +754,21 @@ public:
 	virtual	bool			IsLoaded() const;
 	virtual	idRenderModel *	InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
 	virtual	idBounds		Bounds( const struct renderEntity_s *ent ) const;
+};
+
+// Prey declaration-driven multi-segment beam model.
+class hhRenderModelBeam : public idRenderModelStatic {
+public:
+	virtual void				InitFromFile( const char *fileName );
+	virtual void				LoadModel( void );
+	virtual dynamicModel_t		IsDynamicModel( void ) const;
+	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
+	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
+
+private:
+	void					UpdateSurface( const struct renderEntity_s *ent, const struct viewDef_s *view, int beamIndex, const hhBeamNodes_t *beam, modelSurface_t *surf );
+	void					UpdateQuadSurface( const struct renderEntity_s *ent, const struct viewDef_s *view, int beamIndex, int quadIndex, const hhBeamNodes_t *beam, modelSurface_t *surf );
+	const hhDeclBeam *		declBeam = NULL;
 };
 
 #endif /* !__MODEL_LOCAL_H__ */

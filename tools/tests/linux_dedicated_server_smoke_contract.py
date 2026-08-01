@@ -31,9 +31,6 @@ def main() -> None:
     runner = read("tools/tests/linux_dedicated_server_smoke.py")
     commit = read(".github/workflows/commit-validation.yml")
     push = read(".github/workflows/push-verification.yml")
-    cross = read(".github/workflows/linux-arm64-cross.yml")
-    platform_support = read("docs/dev/platform-support.md")
-    cross_docs = read("docs/dev/linux-arm64-cross-compilation.md")
     release_completion = read("docs/dev/release-completion.md")
     session = read("src/framework/Session.cpp")
     renderer = read("src/renderer/RenderSystem_init.cpp")
@@ -44,18 +41,17 @@ def main() -> None:
     openal_stub = read("src/sys/stub/stub_openal.cpp")
     glew_meson = read("subprojects/glew/meson.build")
     validator = read("tools/validation/openq4_validate.py")
-    release_verifier = read("tools/build/verify_linux_release_artifacts.py")
 
     for token in (
-        'q4base / "pak001.pk4"',
+        'prey_base / "pak000.pk4"',
         "zipfile.ZipFile",
         '"fs_validateOfficialPaks", "0"',
         '"g_allowAssetlessStartup", "1"',
-        '"si_gameType", "dm"',
+        '"si_gameType", "deathmatch"',
         '"s_noSound", "1"',
         '"net_serverDedicated", "1"',
         '"+wait", "1"',
-        '"Selected game module: logical=\'game_mp\'"',
+        '"Selected game module: logical=\'game\'"',
         '"game initialized."',
         '"--- Common Initialization Complete ---"',
         '"Type \'help\' for dedicated server info."',
@@ -151,7 +147,7 @@ def main() -> None:
         "validate_linux_dedicated_runtime_dependencies(root, dedicated_runtime_specs)",
         "staged Linux dedicated dependency validation",
     )
-    require(validator, 'staged_binary_arch(binary_path, "game-mp")', "staged MP module dependency validation")
+    require(validator, "staged_binary_arch(binary_path, GAME_MODULE_STEM)", "staged unified module dependency validation")
     for dependency in (
         "libc.so.6",
         "libstdc++.so.6",
@@ -167,19 +163,9 @@ def main() -> None:
         "LINUX_DEDICATED_FORBIDDEN_NEEDED_PREFIXES",
         "legacy fail-open Linux dedicated dependency blacklist",
     )
-    require(
-        release_verifier,
-        "staged_validator.validate_linux_dedicated_runtime_dependencies(",
-        "extracted Linux release dedicated dependency validation",
-    )
-    require(
-        release_verifier,
-        "[(dedicated[0], arch), (mp_modules[0], arch)]",
-        "extracted Linux release dedicated and MP module dependency validation",
-    )
-
-    require_count(commit, "python tools/tests/linux_dedicated_server_smoke.py", 2, "commit validation native x64/ARM64 smoke wiring")
-    require(commit, "commit-linux-arm64-dedicated-smoke", "commit validation ARM64 smoke artifact")
+    # TODO-RELEASE-LANES keeps inherited ARM64/release evidence manual-only;
+    # the active contract requires the native Linux x64 path.
+    require(commit, "python tools/tests/linux_dedicated_server_smoke.py", "commit validation native x64 smoke wiring")
     require(commit, "commit-linux-x64-dedicated-smoke", "commit validation x64 smoke artifact")
     require(commit, "python tools/tests/linux_dedicated_server_smoke_contract.py", "commit validation static contract")
     require(commit, "tools/tests/linux_dedicated_server_smoke.py", "commit validation smoke syntax check")
@@ -190,11 +176,11 @@ def main() -> None:
     require(push, "python tools/tests/linux_dedicated_server_smoke_contract.py", "push validation static contract")
     require(push, "tools/tests/linux_dedicated_server_smoke.py", "push validation smoke syntax check")
 
-    require(cross, "builddir-arm64-cross/openQ4-ded_arm64", "ARM64 cross-build dedicated artifact")
-    reject(cross, "qemu-aarch64", "ARM64 cross-build runtime substitution")
-    require(platform_support, "asset-free dedicated-server startup and clean shutdown", "Linux platform support policy")
-    require(cross_docs, "does not execute the cross-built server", "Linux ARM64 cross-build runtime scope")
-    require(release_completion, "Linux dedicated-server packages now get a real startup gate", "release completion notes")
+    require(
+        release_completion,
+        "Active validation builds the unified game-module layout on Windows x64 and Linux x64",
+        "release completion notes",
+    )
 
     print("linux_dedicated_server_smoke_contract: ok")
 

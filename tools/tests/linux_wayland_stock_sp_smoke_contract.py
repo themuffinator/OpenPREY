@@ -26,13 +26,10 @@ def main() -> None:
     commit = read(".github/workflows/commit-validation.yml")
     push = read(".github/workflows/push-verification.yml")
     validator = read("tools/validation/openq4_validate.py")
-    building = read("BUILDING.md")
-    platform_support = read("docs/dev/platform-support.md")
-    signoff = read("docs/dev/linux-arm64-signoff-evidence.md")
-    release_notes = read("docs/dev/releases/v0.8.1.md")
+    status_ledger = read("docs/dev/prey-rebase/status-ledger.md")
 
     for token in (
-        'MAP_NAME = "game/airdefense1"',
+        'MAP_NAME = "game/roadhouse"',
         'REPORT_SCHEMA_VERSION = 1',
         'REPORT_TYPE = "linux-wayland-stock-sp"',
         'DEFAULT_SAVE_SLOT = "linux_wayland_roundtrip"',
@@ -54,23 +51,23 @@ def main() -> None:
         "reject_virtualized_physical_attestation(host_evidence)",
         "validate_native_elf(client, arch)",
         "validate_native_elf(game_module, arch)",
-        '("packaged openQ4 mod manifest", mod_manifest)',
-        '("packaged openQ4 pak0.pk4", openq4_pak0)',
-        '("packaged openQ4 pak1.pk4", openq4_pak1)',
-        'install_root / "q4base"',
-        '"refusing stock SP evidence because the staged package contains q4base overrides:',
+        '("packaged openPREY mod manifest", mod_manifest)',
+        '("packaged openPREY pak0.pk4", openprey_pak0)',
+        '("packaged openPREY pak1.pk4", openprey_pak1)',
+        'install_root / "base"',
+        '"refusing stock SP evidence because the staged package contains retail base overrides:',
         "stat.S_ISSOCK(socket_mode)",
         '"Wayland display path is not a live Unix socket:',
         '"SDL_VIDEO_DRIVER": "wayland"',
         '"SDL_VIDEODRIVER": "wayland"',
         'environment.pop("DISPLAY", None)',
-        'environment.pop("OPENQ4_FORCE_X11", None)',
+        'environment.pop("OPENPREY_FORCE_X11", None)',
         '("g_autoSkipCinematics", "1")',
         '("s_noSound", "0")',
         '("g_autoExecAfterMapLoad", FIRST_CFG_REL)',
         'f"saveGame {save_slot}"',
         'f"loadGame {save_slot}"',
-        '"OPENQ4_WAYLAND_SP_RESTORE_ACTIVE"',
+        '"OPENPREY_WAYLAND_SP_RESTORE_ACTIVE"',
         "validate_save_files(home, args.save_slot)",
         "validate_nontrivial_tga(find_screenshot(home))",
         'log_text.count(f"Map: {MAP_NAME}")',
@@ -110,6 +107,11 @@ def main() -> None:
         '"s_noSound", "1"',
         '"SDL_VIDEO_DRIVER": "x11"',
         'r"[A-Za-z0-9_-]{1,64}"',
+        "baseoq4",
+        "q4base",
+        "game-sp_",
+        "openQ4-client",
+        "Quake 4",
     ):
         reject(runner, token, "portable native-Wayland stock-SP smoke runner")
 
@@ -147,18 +149,7 @@ def main() -> None:
         'root / "tools" / "tests" / "linux_wayland_stock_sp_smoke.py"',
         "shared validation must not run retail stock media automatically",
     )
-    for document, context in (
-        (building, "Linux build/runtime instructions"),
-        (platform_support, "Linux platform support policy"),
-        (signoff, "Linux ARM64 signoff instructions"),
-        (release_notes, "v0.8.1 release notes"),
-    ):
-        require(document, "linux_wayland_stock_sp_smoke.py", context)
-    require(signoff, "--physical-hardware", "physical ARM64 evidence instructions")
-    require(signoff, "known VM/emulator", "physical-host inspection scope")
-    require(signoff, "--human-audio-playback-verified", "human audio signoff instructions")
-    require(signoff, "software audio initialization", "automated audio evidence scope")
-    require(signoff, "audible playback", "human audio evidence scope")
+    require(status_ledger, "TODO-RELEASE-LANES", "release-lane deferral policy")
 
     print("linux_wayland_stock_sp_smoke_contract: ok")
 

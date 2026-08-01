@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compute the next openQ4 manual release version."""
+"""Compute the next openPREY manual release version."""
 
 from __future__ import annotations
 
@@ -63,12 +63,12 @@ def parse_bump_mode(value: str) -> str:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compute the next manual openQ4 release version."
+        description="Compute the next manual openPREY release version."
     )
     parser.add_argument(
         "--source-root",
         default=".",
-        help="openQ4 repository root (default: current directory).",
+        help="openPREY repository root (default: current directory).",
     )
     parser.add_argument(
         "--current-version",
@@ -199,13 +199,13 @@ CATEGORY_RULES: tuple[tuple[str, str, int, bool], ...] = (
     ("src/script/", "scripting", 3, True),
     ("src/ui/", "ui", 3, True),
     ("src/sys/", "platform", 3, True),
-    ("content/baseoq4/pak1/env/", "maps", 3, True),
-    ("content/baseoq4/pak1/gfx/guis/loadscreens/", "maps", 3, False),
-    ("content/baseoq4/pak1/maps/", "maps", 3, True),
-    ("content/baseoq4/pak0/guis/", "ui-content", 2, False),
-    ("content/baseoq4/pak0/def/", "defs", 2, False),
-    ("content/baseoq4/pak0/strings/", "localization", 1, False),
-    ("content/baseoq4/", "content", 1, False),
+    ("content/basepr/pak1/env/", "maps", 3, True),
+    ("content/basepr/pak1/gfx/guis/loadscreens/", "maps", 3, False),
+    ("content/basepr/pak1/maps/", "maps", 3, True),
+    ("content/basepr/pak0/guis/", "ui-content", 2, False),
+    ("content/basepr/pak0/def/", "defs", 2, False),
+    ("content/basepr/pak0/strings/", "localization", 1, False),
+    ("content/basepr/", "content", 1, False),
     ("assets/docs/", "docs", 0, False),
     ("assets/icons/", "packaging", 2, False),
     ("assets/linux/", "platform", 2, False),
@@ -359,7 +359,7 @@ def main(argv: list[str]) -> int:
                 "version": override_version.text,
                 "version_tag": override_version.text,
                 "release_tag": f"v{override_version.text}",
-                "release_name": f"openQ4 {override_version.text}",
+                "release_name": f"openPREY {override_version.text}",
                 "release_scale": "override",
                 "release_reason": "Version override was supplied manually.",
                 "bump_mode": args.bump_mode,
@@ -381,7 +381,7 @@ def main(argv: list[str]) -> int:
                 "version": current_version.text,
                 "version_tag": current_version.text,
                 "release_tag": f"v{current_version.text}",
-                "release_name": f"openQ4 {current_version.text}",
+                "release_name": f"openPREY {current_version.text}",
                 "release_scale": "floor",
                 "release_reason": (
                     f"No published v* release tag was found, so the configured version "
@@ -407,7 +407,7 @@ def main(argv: list[str]) -> int:
                 "version": current_version.text,
                 "version_tag": current_version.text,
                 "release_tag": f"v{current_version.text}",
-                "release_name": f"openQ4 {current_version.text}",
+                "release_name": f"openPREY {current_version.text}",
                 "release_scale": "floor",
                 "release_reason": (
                     f"The configured repo version {current_version.text} is ahead of "
@@ -438,7 +438,7 @@ def main(argv: list[str]) -> int:
                 "version": latest_version.text,
                 "version_tag": latest_version.text,
                 "release_tag": latest_tag,
-                "release_name": f"openQ4 {latest_version.text}",
+                "release_name": f"openPREY {latest_version.text}",
                 "release_scale": "current",
                 "release_reason": (
                     f"No commits were found since {latest_tag}, so the existing release version is reused."
@@ -495,7 +495,7 @@ def main(argv: list[str]) -> int:
             "version": next_version,
             "version_tag": next_version,
             "release_tag": f"v{next_version}",
-            "release_name": f"openQ4 {next_version}",
+            "release_name": f"openPREY {next_version}",
             "release_scale": release_scale,
             "release_reason": release_reason,
             "bump_mode": args.bump_mode,

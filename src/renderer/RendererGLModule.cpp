@@ -25,7 +25,7 @@
 #define OPENQ4_RENDERER_BACKEND_NAME		"gl"
 #endif
 #ifndef OPENQ4_RENDERER_BACKEND_DESC
-#define OPENQ4_RENDERER_BACKEND_DESC		"openQ4 OpenGL renderer module"
+#define OPENQ4_RENDERER_BACKEND_DESC		"openPREY OpenGL renderer module"
 #endif
 
 #include "tr_local.h"
@@ -96,6 +96,12 @@ idCVar r_skipGuiShaders( "r_skipGuiShaders", "0", CVAR_RENDERER | CVAR_INTEGER, 
 static const renderModuleServices_t *rgm_services = NULL;
 static const renderWindowServices_t *rgm_windowServices = NULL;
 static renderExport_t rgm_export;
+
+int R_RendererGetTimeGroupTime( int timeGroup, int fallbackTime ) {
+	return rgm_services != NULL && rgm_services->GetTimeGroupTime != NULL
+		? rgm_services->GetTimeGroupTime( timeGroup, fallbackTime )
+		: fallbackTime;
+}
 
 // the engine-owned window state is mirrored through the import; the module's
 // engineWindowState instance satisfies the renderer sources' references and

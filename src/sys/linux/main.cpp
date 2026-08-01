@@ -43,7 +43,7 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 #ifndef LINUX_DEFAULT_PATH
-#define LINUX_DEFAULT_PATH "/usr/local/games/openq4"
+#define LINUX_DEFAULT_PATH "/usr/local/games/openprey"
 #endif
 
 static idStr	basepath;
@@ -199,7 +199,7 @@ static bool Sys_ExecProcessArgs( char *const argv[], bool dofork ) {
 			return true;
 		}
 		execvp( argv[0], argv );
-		Sys_WriteProcessChildText( "openQ4 child exec failed: " );
+		Sys_WriteProcessChildText( "openPREY child exec failed: " );
 		Sys_WriteProcessChildText( argv[0] );
 		Sys_WriteProcessChildText( "\n" );
 		_exit( 127 );
@@ -462,24 +462,37 @@ static void Sys_ReportWaylandRuntime( void ) {
 	const char *x11Display = getenv( "DISPLAY" );
 	const char *sdlVideoDriver = getenv( "SDL_VIDEO_DRIVER" );
 	const char *legacySdlVideoDriver = getenv( "SDL_VIDEODRIVER" );
-	const char *openQ4ForceX11 = getenv( "OPENQ4_FORCE_X11" );
-	const char *openQ4DisableLibdecor = getenv( "OPENQ4_WAYLAND_DISABLE_LIBDECOR" );
-	const char *openQ4PreferLibdecor = getenv( "OPENQ4_WAYLAND_PREFER_LIBDECOR" );
-	const char *openQ4SyncWindowOps = getenv( "OPENQ4_WAYLAND_SYNC_WINDOW_OPS" );
+	const char *openPreyForceX11 = getenv( "OPENPREY_FORCE_X11" );
+	const char *openPreyDisableLibdecor = getenv( "OPENPREY_WAYLAND_DISABLE_LIBDECOR" );
+	const char *openPreyPreferLibdecor = getenv( "OPENPREY_WAYLAND_PREFER_LIBDECOR" );
+	const char *openPreySyncWindowOps = getenv( "OPENPREY_WAYLAND_SYNC_WINDOW_OPS" );
+	// Temporary migration aliases for environments configured before the rebase.
+	if ( openPreyForceX11 == NULL || openPreyForceX11[0] == '\0' ) {
+		openPreyForceX11 = getenv( "OPENQ4_FORCE_X11" );
+	}
+	if ( openPreyDisableLibdecor == NULL || openPreyDisableLibdecor[0] == '\0' ) {
+		openPreyDisableLibdecor = getenv( "OPENQ4_WAYLAND_DISABLE_LIBDECOR" );
+	}
+	if ( openPreyPreferLibdecor == NULL || openPreyPreferLibdecor[0] == '\0' ) {
+		openPreyPreferLibdecor = getenv( "OPENQ4_WAYLAND_PREFER_LIBDECOR" );
+	}
+	if ( openPreySyncWindowOps == NULL || openPreySyncWindowOps[0] == '\0' ) {
+		openPreySyncWindowOps = getenv( "OPENQ4_WAYLAND_SYNC_WINDOW_OPS" );
+	}
 	const char *effectiveSdlVideoDriver = ( sdlVideoDriver != NULL && sdlVideoDriver[0] != '\0' )
 		? sdlVideoDriver
 		: legacySdlVideoDriver;
-	const char *effectiveOpenQ4ForceX11 = ( openQ4ForceX11 != NULL && openQ4ForceX11[0] != '\0' )
-		? openQ4ForceX11
+	const char *effectiveOpenPreyForceX11 = ( openPreyForceX11 != NULL && openPreyForceX11[0] != '\0' )
+		? openPreyForceX11
 		: "<unset>";
-	const char *effectiveOpenQ4DisableLibdecor = ( openQ4DisableLibdecor != NULL && openQ4DisableLibdecor[0] != '\0' )
-		? openQ4DisableLibdecor
+	const char *effectiveOpenPreyDisableLibdecor = ( openPreyDisableLibdecor != NULL && openPreyDisableLibdecor[0] != '\0' )
+		? openPreyDisableLibdecor
 		: "<unset>";
-	const char *effectiveOpenQ4PreferLibdecor = ( openQ4PreferLibdecor != NULL && openQ4PreferLibdecor[0] != '\0' )
-		? openQ4PreferLibdecor
+	const char *effectiveOpenPreyPreferLibdecor = ( openPreyPreferLibdecor != NULL && openPreyPreferLibdecor[0] != '\0' )
+		? openPreyPreferLibdecor
 		: "<unset>";
-	const char *effectiveOpenQ4SyncWindowOps = ( openQ4SyncWindowOps != NULL && openQ4SyncWindowOps[0] != '\0' )
-		? openQ4SyncWindowOps
+	const char *effectiveOpenPreySyncWindowOps = ( openPreySyncWindowOps != NULL && openPreySyncWindowOps[0] != '\0' )
+		? openPreySyncWindowOps
 		: "<unset>";
 
 	if ( waylandDisplay == NULL || waylandDisplay[0] == '\0' ) {
@@ -490,17 +503,17 @@ static void Sys_ReportWaylandRuntime( void ) {
 #if defined( USE_SDL3 )
 		Sys_Printf(
 			"Wayland session detected (%s) without X11 DISPLAY. "
-			"openQ4 will use SDL3's native Wayland path when selected; "
-			"use OPENQ4_FORCE_X11=1 from an XWayland-enabled session for fallback, "
-			"OPENQ4_WAYLAND_DISABLE_LIBDECOR=1 to bypass libdecor issues, "
-			"OPENQ4_WAYLAND_PREFER_LIBDECOR=1 for decoration issues, or "
-			"OPENQ4_WAYLAND_SYNC_WINDOW_OPS=1 for window-operation diagnostics.\n",
+			"openPREY will use SDL3's native Wayland path when selected; "
+			"use OPENPREY_FORCE_X11=1 from an XWayland-enabled session for fallback, "
+			"OPENPREY_WAYLAND_DISABLE_LIBDECOR=1 to bypass libdecor issues, "
+			"OPENPREY_WAYLAND_PREFER_LIBDECOR=1 for decoration issues, or "
+			"OPENPREY_WAYLAND_SYNC_WINDOW_OPS=1 for window-operation diagnostics.\n",
 			waylandDisplay
 		);
 #else
 		Sys_Printf(
 			"Wayland session detected (%s) without X11 DISPLAY. "
-			"openQ4 currently requires X11/GLX on Linux; launch from an XWayland-enabled session.\n",
+			"openPREY currently requires X11/GLX on Linux; launch from an XWayland-enabled session.\n",
 			waylandDisplay
 		);
 #endif
@@ -510,18 +523,18 @@ static void Sys_ReportWaylandRuntime( void ) {
 #if defined( USE_SDL3 )
 	Sys_Printf(
 		"Wayland session detected (%s) with X11 DISPLAY=%s available. SDL3 video override: %s; "
-		"OPENQ4_FORCE_X11=%s OPENQ4_WAYLAND_DISABLE_LIBDECOR=%s OPENQ4_WAYLAND_PREFER_LIBDECOR=%s OPENQ4_WAYLAND_SYNC_WINDOW_OPS=%s.\n",
+		"OPENPREY_FORCE_X11=%s OPENPREY_WAYLAND_DISABLE_LIBDECOR=%s OPENPREY_WAYLAND_PREFER_LIBDECOR=%s OPENPREY_WAYLAND_SYNC_WINDOW_OPS=%s.\n",
 		waylandDisplay,
 		x11Display,
 		( effectiveSdlVideoDriver != NULL && effectiveSdlVideoDriver[0] != '\0' ) ? effectiveSdlVideoDriver : "<unset>",
-		effectiveOpenQ4ForceX11,
-		effectiveOpenQ4DisableLibdecor,
-		effectiveOpenQ4PreferLibdecor,
-		effectiveOpenQ4SyncWindowOps
+		effectiveOpenPreyForceX11,
+		effectiveOpenPreyDisableLibdecor,
+		effectiveOpenPreyPreferLibdecor,
+		effectiveOpenPreySyncWindowOps
 	);
 #else
 	Sys_Printf(
-		"Wayland session detected (%s). openQ4 is using X11 via XWayland (DISPLAY=%s).\n",
+		"Wayland session detected (%s). openPREY is using X11 via XWayland (DISPLAY=%s).\n",
 		waylandDisplay,
 		x11Display
 	);
@@ -571,9 +584,9 @@ const char *Sys_DefaultSavePath(void) {
 		savepath = xdgDataHome;
 		savepath.StripTrailing( '/' );
 #if defined( ID_DEMO_BUILD )
-		savepath += "/openq4-demo";
+		savepath += "/openprey-demo";
 #else
-		savepath += "/openq4";
+		savepath += "/openprey";
 #endif
 		return savepath.c_str();
 	}
@@ -583,9 +596,9 @@ const char *Sys_DefaultSavePath(void) {
 		savepath = home;
 		savepath.StripTrailing( '/' );
 #if defined( ID_DEMO_BUILD )
-		savepath += "/.local/share/openq4-demo";
+		savepath += "/.local/share/openprey-demo";
 #else
-		savepath += "/.local/share/openq4";
+		savepath += "/.local/share/openprey";
 #endif
 	} else {
 		savepath = Posix_Cwd();

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a single openQ4 runtime PK4."""
+"""Build a single openPREY runtime PK4."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from openq4_pak import OPENQ4_PACK_NAMES, copy_file_if_changed, create_game_pk4
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build one openQ4 runtime PK4.")
+    parser = argparse.ArgumentParser(description="Build one openPREY runtime PK4.")
     parser.add_argument("--pak-name", required=True, choices=OPENQ4_PACK_NAMES, help="Output pack name.")
     parser.add_argument("--source-dir", required=True, help="Source content directory for this pack.")
     parser.add_argument(
@@ -23,7 +23,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--stage-out",
         default="",
-        help="Optional additional baseoq4/<pak>.pk4 path to copy for direct builddir launches.",
+        help="Optional additional basepr/<pak>.pk4 path to copy for direct builddir launches.",
     )
     return parser.parse_args(argv[1:])
 

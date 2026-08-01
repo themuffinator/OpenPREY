@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 
-THIN_MANIFEST_NAME = "OPENQ4-MACOS-THIN.json"
+THIN_MANIFEST_NAME = "OPENPREY-MACOS-THIN.json"
 THIN_MANIFEST_FORMAT = 1
 ASSEMBLY_MANIFEST_FORMAT = 1
 UNIVERSAL_ARCH = "universal2"
@@ -43,31 +43,30 @@ COMMON_BUILD_FIELDS = (
     "buildType",
 )
 # libMoltenVK.dylib is a third-party Vulkan-on-Metal translation layer that
-# openQ4 does not build. It ships as a genuinely universal (arm64 + x86_64)
+# openPREY does not build. It ships as a genuinely universal (arm64 + x86_64)
 # binary, so the arm64 and x64 thin trees stage byte-identical copies of it and
 # it flows through as ordinary shared payload. It is deliberately NOT a
 # CODE_KEY: lipo must not touch it, its install name must not be rewritten, and
-# it has no openQ4 entry point to check. Treating it as shared payload also
+# it has no openPREY entry point to check. Treating it as shared payload also
 # means validate_matching_inputs() rejects two thin trees that staged different
 # MoltenVK builds, and copy_shared_payload() reproduces it byte-for-byte.
 MOLTENVK_DYLIB_NAME = "libMoltenVK.dylib"
 REQUIRED_SHARED_PATHS = (
-    "openQ4.icns",
+    "openPREY.icns",
     "collect_macos_support_info.sh",
-    "assets/splash/quake4_rt_bitmap_4001.bmp",
-    "baseoq4/mod.json",
-    "baseoq4/pak0.pk4",
-    "baseoq4/pak1.pk4",
+    "assets/splash/prey_rt_bitmap_4001.bmp",
+    "basepr/mod.json",
+    "basepr/pak0.pk4",
+    "basepr/pak1.pk4",
     MOLTENVK_DYLIB_NAME,
 )
 # Code files that lipo merges into one universal2 artifact. renderer-vk is the
 # macOS Vulkan renderer module; renderer-gl is not built on darwin, so it has no
 # entry here (the stale-code sweep below still rejects one if it ever appears).
-CODE_KEYS = ("client", "dedicated", "game-sp", "game-mp", "renderer-vk")
+CODE_KEYS = ("client", "dedicated", "game", "renderer-vk")
 # Loadable modules carry a @loader_path install name and one required export.
 MODULE_ENTRY_POINT_EXPORTS = {
-    "game-sp": "GetGameAPI",
-    "game-mp": "GetGameAPI",
+    "game": "GetGameAPI",
     "renderer-vk": "GetRenderAPI",
 }
 
@@ -80,13 +79,12 @@ def thin_code_paths(arch: str) -> dict[str, Path]:
     if arch not in THIN_MACHO_ARCHES:
         raise Universal2Error(f"unsupported thin macOS architecture: {arch}")
     return {
-        "client": Path(f"openQ4-client_{arch}"),
-        "dedicated": Path(f"openQ4-ded_{arch}"),
-        "game-sp": Path("baseoq4") / f"game-sp_{arch}.dylib",
-        "game-mp": Path("baseoq4") / f"game-mp_{arch}.dylib",
+        "client": Path(f"openPREY-client_{arch}"),
+        "dedicated": Path(f"openPREY-ded_{arch}"),
+        "game": Path("basepr") / f"game_{arch}.dylib",
         # meson installs the renderer module beside the engine binaries in the
         # install root; package_nightly.py is what relocates it into
-        # openQ4.app/Contents/Frameworks.
+        # openPREY.app/Contents/Frameworks.
         "renderer-vk": Path(f"renderer-vk_{arch}.dylib"),
     }
 
@@ -94,12 +92,11 @@ def thin_code_paths(arch: str) -> dict[str, Path]:
 def universal_code_paths() -> dict[str, Path]:
     # A fused package carries ONE file per code key, so every per-arch name
     # collapses onto the same "universal2" arch token the game modules already
-    # use (openQ4-client_universal2, game-sp_universal2.dylib, ...).
+    # use (openPREY-client_universal2, game_universal2.dylib, ...).
     return {
-        "client": Path("openQ4-client_universal2"),
-        "dedicated": Path("openQ4-ded_universal2"),
-        "game-sp": Path("baseoq4") / "game-sp_universal2.dylib",
-        "game-mp": Path("baseoq4") / "game-mp_universal2.dylib",
+        "client": Path("openPREY-client_universal2"),
+        "dedicated": Path("openPREY-ded_universal2"),
+        "game": Path("basepr") / "game_universal2.dylib",
         "renderer-vk": Path("renderer-vk_universal2.dylib"),
     }
 
@@ -246,7 +243,7 @@ def dependencies(path: Path, *, macho_arch: str | None = None, own_install_name:
 def require_module_entry_export(path: Path, *, macho_arch: str, code_key: str) -> None:
     """Check the one entry point the loader resolves for this module kind.
 
-    game-sp/game-mp export GetGameAPI; the renderer module exports GetRenderAPI
+    The unified game module exports GetGameAPI; the renderer module exports GetRenderAPI
     and nothing else (tools/build/macos_renderer_module.exp). Checking the wrong
     symbol would silently accept a module the engine can never bind.
     """
@@ -333,8 +330,8 @@ def classify_staged_tree(root: Path, arch: str) -> tuple[dict[str, dict[str, obj
         # renderer arm covers gl as well as vk so a future renderer-gl build on
         # darwin cannot slip through unnoticed.
         if (
-            (path.parent == root and re.fullmatch(r"openQ4-(?:client|ded)_[A-Za-z0-9]+", path.name))
-            or (path.parent == root / "baseoq4" and re.fullmatch(r"game-(?:sp|mp)_[A-Za-z0-9]+\.dylib", path.name))
+            (path.parent == root and re.fullmatch(r"openPREY-(?:client|ded)_[A-Za-z0-9]+", path.name))
+            or (path.parent == root / "basepr" and re.fullmatch(r"game_[A-Za-z0-9]+\.dylib", path.name))
             or (path.parent == root and re.fullmatch(r"renderer-(?:gl|vk)_[A-Za-z0-9]+\.dylib", path.name))
         ) and relative not in expected_code_names:
             raise Universal2Error(f"thin macOS payload contains a stale or mismatched code file: {relative}")

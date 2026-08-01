@@ -1,0 +1,85 @@
+// railhud.gui
+
+// Available gui vars:
+//	yaw, pitch, roll	vehicle orientation
+//	yawToEnemy			yaw to last attacker
+//	powerfraction		fraction of power remaining
+//	healthfraction		fraction of health remaining
+//	velocityfraction	current fraction of maximum velocity
+//	crosshair			whether the crosshair should be used
+//	progress			percentage of progress
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	nocursor	1
+
+	onTrigger {
+		// Just acquired a pilot
+	}
+
+	onActivate {
+		// Transition HUD parts in
+	}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//  Boss/Progress Bar
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++	
+	onNamedEvent ShowProgressBar {
+		transition "ProgressbgL::matcolor" "1 1 1 0" "1 1 1 0.8" "2000" ;
+		transition "ProgressbgR::matcolor" "1 1 1 0" "1 1 1 0.8" "2000" ;
+		transition "ProgressBar::matcolor" "1 1 1 0" "1 1 1 0.8" "1600" ;
+		set "ProgressbgL::rect" "210, -15, 115, -36" ;
+		set "ProgressbgR::rect" "325, -15, -115, -36" ;
+		transition "ProgressbgL::rect" "210, -15, 115, -36" "210, 10, 115, -36" "800";
+		transition "ProgressbgR::rect" "325, -15, -115, -36" "325, 10, -115, -36" "800";
+	}
+	onNamedEvent HideProgressBar {
+		transition "ProgressbgL::matcolor" "1 1 1 0.8" "1 1 1 0" "2000" ;
+		transition "ProgressbgR::matcolor" "1 1 1 0.8" "1 1 1 0" "2000" ;
+		transition "ProgressBar::matcolor" "1 1 1 1" "1 1 1 0" "200" ;
+		transition "ProgressbgL::rect" "210, 10, 115, -36" "210, -15, 115, -36" "800";
+		transition "ProgressbgR::rect" "325, 10, -115, -36" "325, -15, -115, -36" "800";
+	}
+	onNamedEvent ProgressNone {
+		set "ProgressText::text" "" ;
+	}
+	onNamedEvent ProgressVictory {
+		// flash & scale up
+		set "ProgressText::text" "#str_20011" ;
+	}
+	onNamedEvent ProgressFailure {
+		// dim and shrink out
+		set "ProgressText::text" "#str_20012" ;
+	}
+	
+windowDef ProgressbgL{
+		rect			210, 10, 115, -36
+		matcolor		1, 1, 1, 0
+		background		"guis/assets/hud/bossbarbg"
+	}
+	windowDef ProgressbgR {
+		rect			325, 10, -115, -36
+		matcolor		1, 1, 1, 0
+		background		"guis/assets/hud/bossbarbg"
+	}
+	windowDef ProgressBarClip {
+		rect	220, 22, "gui::progress" * 210, 20
+		
+		windowDef ProgressBar {
+			rect		0, 0, 210, 20
+			background	"guis/assets/hud/bossbar"
+			matcolor	1, 1, 1, 0.8
+		}
+	}
+	windowDef ProgressText {
+		rect			220, 90, 200, 15
+		backcolor		0, 0, 0, 0
+		forecolor		1, 1, 1, 1
+		textscale		0.3
+		textalign		1
+		textaligny		-3
+		text			""
+		font			"fonts/alien"		//This needs to be here for text to show up on the vehicle huds
+	}
+}

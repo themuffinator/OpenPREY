@@ -1,0 +1,56 @@
+	// text based HUD for debugging -----------------------------------------------------------------
+#if 0
+	windowDef TextBasedReadouts {
+		rect		2, 200, 200, 100
+		backcolor	0, 0, 0, 0
+
+		windowDef healthlabel {
+			rect		0, 0, 80, 20
+			text		"#str_20013"
+			textaligny	-5
+		}
+		windowDef health {
+			rect		80, 0, 80, 20
+			text		"gui::player_health"
+			textaligny	-5
+		}
+		windowDef spiritlabel {
+			rect		0, 20, 80, 20
+			text		"#str_20014"
+			textaligny	-5
+		}
+		windowDef spirit {
+			rect		80, 20, 80, 20
+			text		"gui::player_spirit"
+			textaligny	-5
+		}
+		windowDef ammolabel {
+			rect		0, 40, 80, 20
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			text		"#str_20015"
+			textaligny	-5
+		}
+		windowDef ammo {
+			rect		80, 40, 80, 20
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			text		"gui::player_ammoamounttext"
+			textaligny	-5
+		}
+		windowDef altammolabel {
+			rect		0, 60, 80, 20
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			text		"#str_20016"
+			textaligny	-5
+		}
+		windowDef altammo {
+			rect		80, 60, 80, 20
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			text		"gui::player_altammoamounttext"
+			textaligny	-5
+		}
+	}
+#endif

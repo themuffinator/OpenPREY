@@ -1,20 +1,20 @@
 # macOS Package Layout And Release Policy
 
-Updated: 2026-07-15
+Updated: 2026-08-01
 
-This document records the current macOS package support contract for openQ4.
+This document records the current macOS package support contract for openPREY.
 The client application is self-contained; loose binaries remain beside it for
 dedicated-server and diagnostic use while macOS remains experimental.
 
 ## Current Layout Decision
 
 The supported macOS client layout is a self-contained, drag-installable
-`openQ4.app`:
+`openPREY.app`:
 
-- `Contents/MacOS/openQ4` contains the client executable.
-- `Contents/Resources/baseoq4/` contains `mod.json`, `pak0.pk4`, and `pak1.pk4`.
-- `Contents/Frameworks/` contains the flat, signed
-  `game-sp_<arch>.dylib` and `game-mp_<arch>.dylib` modules.
+- `Contents/MacOS/openPREY` contains the client executable.
+- `Contents/Resources/basepr/` contains `mod.json`, `pak0.pk4`, and `pak1.pk4`.
+- `Contents/Frameworks/` contains the flat, signed unified
+  `game_<arch>.dylib` module used by both single-player and multiplayer.
 - `Contents/Resources/assets/splash/` contains the startup splash resource.
 
 Mach-O game modules deliberately live in `Contents/Frameworks`, not
@@ -24,22 +24,22 @@ app, does not copy app entitlements onto those nested libraries, validates their
 architecture, dependencies, install names, and deployment floor, and rejects
 stale or wrong-platform modules in either location.
 
-The distribution root also keeps `openQ4-client_<arch>`,
-`openQ4-ded_<arch>`, the support collector, version/symbol manifests, and
+The distribution root also keeps `openPREY-client_<arch>`,
+`openPREY-ded_<arch>`, the support collector, version/symbol manifests, and
 documentation for command-line diagnostics and dedicated servers. Those loose
 binaries resolve content and game modules from the sibling self-contained app;
-the large `baseoq4` payload is not duplicated beside the bundle.
+the `basepr` payload is not duplicated beside the bundle.
 
-`.install/baseoq4/` remains the build/staging contract. Package generation
+`.install/basepr/` remains the build/staging contract. Package generation
 moves that staged payload into the app's code/data locations through
 `tools/build/package_nightly.py` without changing the repository staging
 layout. `Contents/Info.plist` declares
-`OpenQ4RuntimeLayout=self-contained-v1`, so a damaged current app still gets
+`OpenPREYRuntimeLayout=self-contained-v1`, so a damaged current app still gets
 the self-contained-runtime diagnostic even when its embedded data or module
 directories have been removed completely.
 
 Release packages and archive validation require the bundle to be named
-`openQ4.app`. Runtime app-bundle detection still recognizes renamed `.app`
+`openPREY.app`. Runtime app-bundle detection still recognizes renamed `.app`
 bundles that keep the standard `*.app/Contents/MacOS` layout, so a hand-renamed
 bundle retains the same self-contained runtime discovery instead of falling
 through to generic base-path probing.
@@ -48,50 +48,50 @@ through to generic base-path probing.
 
 Supported for experimental macOS signoff:
 
-- Double-click `openQ4.app` from the mounted signed/notarized DMG payload.
-- Drag only `openQ4.app` to `/Applications` or another user-writable folder,
+- Double-click `openPREY.app` from the mounted signed/notarized DMG payload.
+- Drag only `openPREY.app` to `/Applications` or another user-writable folder,
   then launch the copied app from Finder.
 - Copy the whole package payload when the loose client, dedicated server, or
   support collector is also wanted.
 - Finder/LaunchServices may supply an unrelated process working directory.
   The app validates `Contents/Resources` and uses it as `fs_cdpath`; retail
-  Steam/GOG discovery remains an independent `fs_basepath` source for
-  `q4base`.
+  Prey install discovery remains an independent `fs_basepath` source for the
+  original `base/` assets.
 - Launch the app executable from Terminal with any working directory.
-- Launch the loose `openQ4-client_<arch>` or `openQ4-ded_<arch>` binaries from
+- Launch the loose `openPREY-client_<arch>` or `openPREY-ded_<arch>` binaries from
   package root; they discover the sibling app's embedded runtime.
 
-Retail Quake 4 `q4base` assets are not bundled. Do not copy them into
-`openQ4.app`, because modifying a signed bundle invalidates its signature.
-Use the supported Steam/GOG discovery paths or explicit base-path selection.
+Retail Prey assets are not bundled. Do not copy them into `openPREY.app`,
+because modifying a signed bundle invalidates its signature. Use CD-era install
+discovery or explicit base-path selection instead.
 
 An incomplete new app produces a localized diagnostic that names missing
-`Contents/Resources/baseoq4` data or `Contents/Frameworks` modules. Engines
+`Contents/Resources/basepr` data or the `Contents/Frameworks` module. Engines
 from the transition period still accept a complete legacy adjacent package,
 but newly generated packages must use the self-contained layout.
 
 The legacy adjacent-package startup diagnostic title is:
 
 ```text
-openQ4.app adjacent package root is incomplete
+openPREY.app adjacent package root is incomplete
 ```
 
 The diagnostic must name this contract:
 
 ```text
-Expected adjacent package-root contract: `openQ4.app`, loose binaries, and `baseoq4/` together
+Expected adjacent package-root contract: `openPREY.app`, loose binaries, and `basepr/` together
 ```
 
 It must also make clear that this applies only to legacy adjacent packages:
 
 ```text
 Legacy adjacent packages need the app, loose binaries, and data together.
-Current self-contained packages support moving only `openQ4.app` to `/Applications`.
+Current self-contained packages support moving only `openPREY.app` to `/Applications`.
 ```
 
 Hosted release validation launches the app executable from an unrelated
 temporary working directory and requires the log's `fs_cdpath` to resolve to
-`openQ4.app/Contents/Resources`. This closes the path-selection blind spot without
+`openPREY.app/Contents/Resources`. This closes the path-selection blind spot without
 claiming that CI has exercised Finder UI, Gatekeeper prompts, mounted-DMG
 gameplay, or a copied package on end-user hardware.
 
@@ -102,7 +102,7 @@ Added: 2026-07-25.
 Both existing macOS package variants also carry the Vulkan renderer module and
 its translation layer as nested code:
 
-- `Contents/Frameworks/renderer-vk_<arch>.dylib` — openQ4's Vulkan renderer
+- `Contents/Frameworks/renderer-vk_<arch>.dylib` — openPREY's Vulkan renderer
   module, built with hidden symbol visibility and an export list that exposes
   only `GetRenderAPI`, because the macOS client still links a second copy of the
   renderer statically and any further exported symbol would interpose at
@@ -143,8 +143,8 @@ support archives can identify matching binaries and dSYM archives.
 
 Runtime DMGs and tarballs must not include `.dSYM` bundles or other debug
 payloads. dSYMs are published as separate artifacts named like
-`openq4-<version>-macos-arm64-opengl-symbols.tar.xz` and
-`openq4-<version>-macos-arm64-metal-symbols.tar.xz`.
+`openprey-<version>-macos-arm64-opengl-symbols.tar.xz` and
+`openprey-<version>-macos-arm64-metal-symbols.tar.xz`.
 
 See [macOS Symbolication Workflow](macos-symbolication.md) for the crash-log
 pairing process.
@@ -152,16 +152,16 @@ pairing process.
 ## Support Path Reports
 
 `collect_macos_support_info.sh` writes `package/path-resolution.txt` without
-launching openQ4. The report records the package root, app path, expected loose
-runtime paths, embedded `Contents/Resources/baseoq4` and
-`Contents/Frameworks` paths, and any copied log lines that mention
+launching openPREY. The report records the package root, app path, expected loose
+runtime paths, embedded `Contents/Resources/basepr` and unified
+`Contents/Frameworks/game_<arch>.dylib` paths, and any copied log lines that mention
 `fs_basepath`, `fs_cdpath`, or `fs_savepath`.
 If `HOME` is absent in a sparse launch environment, the collector keeps the
 package-local log checks and records archive notes instead of aborting on
 home-scoped log or DiagnosticReports paths.
 
 The same archive also includes `package/binary-architecture.txt` and
-`package/dylib-dependencies.txt` without launching openQ4. These reports record
+`package/dylib-dependencies.txt` without launching openPREY. These reports record
 read-only `file`/`lipo` architecture output, `otool -L` dependency output, and
 `otool -D` install names for game modules so maintainers can confirm the
 package shape when users report architecture, loader, or `@loader_path`
@@ -185,12 +185,13 @@ sessions from native arm64 package failures.
 Every completed macOS signoff archive for a release candidate must record:
 
 - Finder launch from the mounted DMG or final release image.
-- Finder launch after dragging only `openQ4.app` to `/Applications` or another
+- Finder launch after dragging only `openPREY.app` to `/Applications` or another
   user-writable location.
 - Whole-package copied launch for loose-binary and support-tool coverage.
 - Terminal launch of the app executable from an unrelated working directory.
 - Confirmation that the copied app resolves `fs_cdpath` to its own
-  `Contents/Resources` and loads both signed modules from `Contents/Frameworks`.
+  `Contents/Resources` and loads the signed unified game module from
+  `Contents/Frameworks`.
 - `fs_basepath`, `fs_cdpath`, and `fs_savepath` log lines from Finder/copied
   package and terminal launches.
 - Gatekeeper behavior for the package under test, including `spctl` assessment
@@ -231,8 +232,9 @@ Credentialed macOS release artifacts must keep these checks mandatory:
 ## Backward Compatibility
 
 The runtime keeps a legacy adjacent-package fallback so older experimental
-downloads can still launch when their original `openQ4.app`, `baseoq4/`, loose
-client, and loose dedicated binary remain together. New package generation,
+downloads can still launch when their original `openPREY.app`, `basepr/`, loose
+client, loose dedicated binary, and unified game module remain together. New
+package generation,
 archive validation, signing, release smoke tests, support intake, and signoff
 evidence must use the self-contained contract. Remove the fallback only through
 an explicit compatibility decision with release-note notice.

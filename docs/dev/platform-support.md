@@ -1,130 +1,78 @@
-# openQ4 Platform And Architecture Roadmap
+# openPREY platform and architecture roadmap
 
-This document defines the long-term platform direction for openQ4 and how SDL3 + Meson are used to get there.
+This document records the current platform policy for the Prey (2006)-focused rebase.
+It is a roadmap, not a release-support claim.
 
-## Target End State
+## Current baseline
 
-- First-class support on modern desktop operating systems:
-  - Windows
-  - Linux
-  - macOS, currently experimental until the first-class criteria below are met
-- First-class support for modern 64-bit desktop architecture:
-  - x64 (`x86_64`)
-  - arm64 (`aarch64`)
-- Keep original Quake 4 gameplay/module behavior compatible while modernizing platform and build layers.
+- Version line: `0.0.1`.
+- Canonical build system: Meson + Ninja.
+- Standard build output: `builddir/`.
+- Standard staged runtime: `.install/`.
+- Canonical game source: adjacent `OpenPrey-game` checkout, overridable with
+  `OPENPREY_GAMELIBS_REPO`.
+- Runtime game directory: `basepr/`.
+- Module model: one `game_<arch>` module for SP and MP.
+- Platform backend direction: SDL3 first; native/legacy backends are diagnostic
+  fallbacks where they remain available.
 
-## Current Baseline (v0.8.x release line)
+## Support matrix
 
-- Published releases are currently on the `v0.8.x` line. The `0.1.010` version in `meson.build` is only the internal repo version floor consumed by the release-version helper (see `BUILDING.md`), not a released line.
-- Primary actively validated build targets: Windows x64, Linux x64, preview Linux ARM64 build/package plus assetless compositor startup, and experimental macOS arm64 through hosted CI/package generation. Linux ARM64 real-hardware SP/MP gameplay, dedicated-server, audio, input, and package signoff is still required before claiming complete runtime support. The manual release workflow defaults to `linux_arm64_support_tier=preview`; `first-class` publication is blocked until [the Linux ARM64 evidence record](linux-arm64-signoff-evidence.md) is accepted and machine-bound to the exact source pair, release identity, archive, and four packaged runtime ELFs.
-- Windows arm64 remains package-validated during bring-up, with runtime validation still required on hardware.
-- Experimental manual macOS release artifacts are Apple Silicon/arm64 only. The macOS support matrix policy is recorded in `docs/dev/macos-support-matrix-policy.md`: current user-facing releases are `arm64 only`, Intel Mac/`x86_64`, universal2, and Rosetta compatibility are not supported release targets, and the documented OS floor remains `macOS 11` until changed in Meson, package metadata, docs, workflows, and evidence together. Credentialed release runs publish signed/notarized DMGs; runs without Apple Developer ID signing and notarization credentials publish clearly labeled unsigned/unnotarized `-unsigned.tar.gz` archives. The manual release workflow defaults to `macos_support_tier=experimental`; `macos_support_tier=first-class` is a hard gate that requires signed/notarized DMGs and fails when Apple signing/notary secrets are missing. Dedicated `macos-15-intel` engine and companion jobs now provide experimental x86_64 compile, staging, thin-slice, assetless renderer, and dedicated MP-module-loader checks for both bridge variants, but no Intel package or compatibility claim is made until real Intel gameplay, package, and signing evidence exists. Intel Mac and universal2 packages are intentionally not claimed by the current release matrix.
-- Build system: Meson + Ninja.
-- Dependency model: Meson subprojects/wraps.
-- Platform backend direction: SDL3-first (legacy Win32 backend is transitional only).
-- Language baseline target: C++23 semantics (`vc++latest` on current MSVC Meson front-end).
-- Toolchain baseline direction: MSVC 19.46+ (Visual Studio 2026 generation), with compatibility fallback permitted during migration.
-- As of March 30, 2026, Linux and experimental macOS default to the SDL3 backend and keep `-Dplatform_backend=native` as a fallback/comparison path. On macOS, `platform_backend=native` is comparison-only diagnostic infrastructure and is not a supported release backend.
-- Steam Deck and SteamOS support is delivered through the explicit `openQ4-steamdeck` launcher/profile, plus direct-client host auto-detection when `com_platformProfile` is still `default`.
-- Native Wayland is supported through the SDL3 backend. The bundled SDL fallback dynamically loads Wayland, optional libdecor, and PipeWire support, enables the DBus Fcitx and optional IBus IME paths, and has a `-Dlinux_x11=disabled` Wayland/EGL-only build mode. PipeWire development headers remain a build requirement, but the finished client can start without the PipeWire runtime; openQ4's game-audio path remains owned by OpenAL. Text input is active only while a console or GUI field can consume it, while the native IBus/Fcitx UI owns composition and candidate presentation using the text-input area supplied by the game. Quake 4's stock edit widgets and bitmap fonts remain single-byte; committed codepoints outside that asset-supported range are ignored rather than narrowed into corrupt characters. The shared SDL3 path logs the selected video driver, active Wayland hints, display content scale, orientation, current/desktop display modes, exact refresh details when SDL reports them, and compositor-accepted window state after screen changes; applies Wayland-aware defaults; avoids persisting compositor-owned window positions; keeps relative mouse-look usable when pointer confinement is unavailable; synchronizes compositor-negotiated size/fullscreen changes before refreshing renderer placement; and tries SDL's unversioned OpenGL compatibility fallback first when `r_glTier` is `auto` on native Wayland. CI exercises assetless native-Wayland SDL3 window lifecycle, relative mouse-capture, and display-diagnostics cases under Weston on x64 and ARM64, including fullscreen/windowed `vid_restart` transitions, real libdecor load/opt-out assertions, a direct-X11/GLX dependency rejection lane, and the optional blocking window-operation synchronization path.
-- Fresh Linux x64 native-Wayland stock-asset validation has entered `game/airdefense1` and a two-process `mp/q4dm1` loopback session, captured valid active-gameplay frames, matched the multiplayer declaration checksum, and shut down cleanly. A packaged dedicated server has also loaded stock `mp/q4dm1` to post-load readiness while remaining headless, accepted and spawned a separately packaged native-Wayland client with the same checksum, captured its active view, and shut down both processes cleanly. That WSLg/Wayland software-rendering evidence complements hosted Weston CI; it does not replace physical GNOME/KWin/wlroots/SteamOS audio, input-device, suspend/resume, and display-transition coverage.
-- The opt-in `tools/tests/linux_wayland_stock_sp_smoke.py` runner makes the stock SP case repeatable: it enforces host-matching client/module ELF files and a real Wayland socket, enables sound, enters `game/airdefense1`, saves and reloads an isolated slot, proves a second active lifecycle, validates the save set and a nontrivial post-restore frame, and preserves hashes plus ordered logs. The stock SP and dedicated/client reports now record best-effort virtualization/container inspection, and a claimed physical run fails if a known VM/emulator is detected; the operator attestation remains necessary because software cannot prove bare metal. First-class evidence schema 2 binds both exact report blobs and validates their generated identity, native ARM64/Wayland/physical state, passing lifecycle, and candidate binary hashes before release. The current x64 WSLg run passed native-Wayland rendering, OpenAL/software sound initialization, save/load, and clean shutdown. Software initialization does not mean that automation heard audio; human audible-playback verification and physical-hardware attestation remain separate evidence fields, and neither the WSLg result nor hosted CI replaces physical ARM64 signoff.
-- `-Dlinux_x11=enabled` and `-Dlinux_x11=disabled` force the bundled SDL fallback so the requested Linux video-driver set is actually honored. `-Dlinux_x11=auto` may use a suitable system SDL and leaves X11/XWayland availability to that dependency.
-- Linux ARM64 compiler-specific regressions are caught in the full engine before packaging: the native Wayland-only/libdecor-opt-out lane builds with Clang, while the native libdecor and dedicated-server lanes retain GCC coverage. A supplementary Ubuntu multiarch cross-build from x64 also compiles the client, dedicated server, and both game modules in Wayland-only mode. A complete x64-hosted run has produced all four AArch64 ELF artifacts and passed architecture, dependency, required PIE/RELRO/NOW/non-executable-stack hardening, distinct-module, and `GetGameAPI` export validation. Native ARM64 runners are authoritative for the current build/package and assetless window/input-startup checks; real-hardware native-Wayland audio, input, dedicated-server, and SP/MP gameplay remain required for release signoff. See [Linux ARM64 cross-compilation](linux-arm64-cross-compilation.md) and the [first-class signoff evidence record](linux-arm64-signoff-evidence.md).
-- The companion openQ4-game repository also supports standalone native Linux x64 and ARM64 Meson builds with GCC or Clang. Its CI builds distinct SP/MP `.so` modules, rejects unresolved definitions at link time, limits the public ABI to `GetGameAPI`, and validates architecture, hardening, LP64 semantics, alignment, and deterministic checksum behavior; openQ4's staged companion-source build remains authoritative for integrated runtime, packaging, and gameplay validation.
-- Native Linux x64 and ARM64 CI require asset-free dedicated-server startup and clean shutdown through the staged multiplayer module. Dedicated builds use a separate headless source/link contract: they retain the integrated BSE declaration allocator and common engine behavior but do not directly depend on OpenAL, OpenGL/GLX, SDL, PipeWire, Wayland, or X11/Xext runtime libraries. They also skip splash/system-console video, client GUI preloading, loading wipes/screens, presentation updates, and uninitialized OpenGL vertex-cache teardown while preserving network pacifier updates during map changes. Staged and extracted-package validation fail closed unless both the dedicated executable and its loaded MP module depend only on the architecture-appropriate core C/C++/POSIX/compiler runtime set. The hosted smoke creates a test-only minimal `pak001.pk4`, disables official-media validation, proves `game_mp` initialization, waits through a live server frame, and verifies error-free game shutdown; it is not a map/gameplay test. The separate opt-in stock-media harness additionally requires a post-load map-ready marker, a packaged client connection/spawn, matching checksums, ordered nonempty engine logs, active native-Wayland gameplay capture, no dedicated-side SDL/video markers, and clean exits; Linux x64 has passed that stronger `mp/q4dm1` case, while real-hardware ARM64 execution remains pending.
-- SDL3 Linux VRAM autodetection can enumerate DRM card/render-node sysfs before legacy `/proc/dri` fallback, and native Wayland skips optional XNVCtrl/X11 probing, so native Wayland and minimal X11-free sessions are less dependent on optional X11 helpers.
-- SDL3 Linux and experimental macOS desktop-resolution queries fall back from desktop mode to current mode and display bounds, improving startup robustness on compositors or display bridges that do not report a conventional desktop mode.
-- Windows, Linux, and experimental macOS SDL3 builds share the same `r_screen`, `r_multiScreen`, fullscreen, exclusive-mode, borderless, windowed-placement, high-DPI drawable, display-change, selected-display spanned-UI viewport, and diagnostic display-list code paths. Native Wayland keeps compositor-owned placement semantics and falls back from multi-display spanning to the selected display when absolute placement is unavailable. The shared SDL3 renderer path also verifies a live, current OpenGL context before screen changes, swaps, deactivation, and teardown, validates extension lookups, uses overflow-safe selected-display viewport math, clamps malformed mouse movement, wheel, controller, and rumble values before integer conversion and event queuing, normalizes unusual app-entry argument state, guards POSIX clipboard/console command/input allocation, terminal and desktop-console cursor and scroll state, pthread setup and initialization state, requires error-checking mutex attributes before enabling critical sections, checks thread/event indexing, signal reporting, process handoff, and fatal-error/print formatting paths, and makes the macOS display selector fall back from requested display to main display to first active display before returning a null display id.
-- Windows, Linux, and experimental macOS keyboard, mouse, and controller input are routed through the shared SDL3 backend. Linux and experimental macOS explicitly keep SDL's HIDAPI controller stack, enhanced reports, hotplug events, rumble, battery diagnostics, gyro, touchpad, and touchscreen routing available at the same feature level as the Windows SDL3 path while preserving user/SDL environment overrides.
-- XWayland remains available as an explicit fallback by setting `OPENQ4_FORCE_X11=1` or an SDL video-driver override such as `SDL_VIDEO_DRIVER=x11`.
-- The Linux X11/Xvfb fallback lane also runs an SDL3 display-diagnostics smoke in CI so native Wayland and explicit X11 driver paths both prove display enumeration, scale/orientation reporting, and selected-display diagnostics.
-- The project-level `OPENQ4_FORCE_X11=1` fallback is runtime-validated separately from raw SDL driver overrides; CI launches the staged client under Xvfb with that flag and checks that SDL reports the X11 driver plus normal display diagnostics.
-- If a native Wayland compositor has decoration, resize, or window-control issues, `OPENQ4_WAYLAND_PREFER_LIBDECOR=1` asks SDL to prefer libdecor without changing the default path for other sessions.
-- If libdecor itself causes startup or decoration issues on a compositor stack, `OPENQ4_WAYLAND_DISABLE_LIBDECOR=1` asks SDL to keep libdecor disabled for that launch.
-- If a compositor applies window changes too asynchronously for diagnosis, `OPENQ4_WAYLAND_SYNC_WINDOW_OPS=1` asks SDL to synchronize every window operation. Use it only as a troubleshooting option because some compositors may block during window animations.
-- Experimental macOS arm64 release packages are built and validated in both OpenGL and Metal bridge variants, with `.app` metadata, executable bits, runtime dependency roots, and architecture-matched `.dylib` game modules checked before release publication. The client is now a self-contained drag-installable app: openQ4 PK4 data lives in `Contents/Resources/baseoq4`, signed SP/MP game dylibs live flat in `Contents/Frameworks`, and `openQ4.app` can move independently to `/Applications`; loose client/server diagnostics discover the sibling app runtime without duplicating the large data payload. Credentialed runs add final compressed DMG creation, `hdiutil` image verification, inside-out Developer ID signing, and app/DMG notarization/stapling. Release runs without Apple signing/notary credentials publish `-unsigned.tar.gz` archives instead, ad-hoc signed only for bundle validity and clearly marked as unsigned/unnotarized. The current release line does not publish Intel Mac or universal2 artifacts; those remain future support-policy decisions rather than implied compatibility. The SDL3 release path links Cocoa/OpenGL/ApplicationServices and keeps the legacy Carbon framework isolated to `-Dplatform_backend=native`. The Metal bridge keeps the stock-compatible OpenGL renderer path, links Metal/QuartzCore for the SDL3/Cocoa host surface, applies the bridge define consistently across C/C++/Objective-C/Objective-C++ sources, logs failed SDL Metal hint setup, requires valid SDL window IDs before splash/system-console renderer creation, lets those support windows try the Metal/default renderer before falling back to software, and reports failed splash event requeues during startup/error UI draining. The renderer/backend policy is tracked in `docs/dev/macos-renderer-backend-policy.md`, and native backend containment is tracked in `docs/dev/macos-native-backend-containment-policy.md`: current `-metal` packages are Metal bridge packages, not native Metal renderer packages.
-- Experimental macOS runtime recovery now separates window MSAA from offscreen target viability: game targets retry rejected multisample RGBA8 + depth/stencil FBOs down to single-sample, emit symbolic status/attachment diagnostics, and use the direct-render fallback rather than terminating. Apple GL 2.1 interaction mode `0` now routes eligible stock surfaces through neutral GLSL 1.10 lighting and uses a client-memory-safe simple ARB fallback per surface; mode `3` preserves the previous ambient-only bypass only for emergency recovery. Finder-style app launches bind validated `Contents/Resources` to `fs_cdpath` and load game code only from the trusted `Contents/Frameworks` root even when retail assets are discovered elsewhere. Hosted push jobs now require an assetless launch for both macOS bridge variants, and release jobs launch the app executable from an unrelated working directory. These checks improve regression coverage but do not replace the still-pending real-hardware SP/MP, macOS-floor, latest-macOS, display, input, audio, and Gatekeeper evidence.
-- macOS platform-sensitive debugging now has a manual ASan+UBSan workflow for both OpenGL and Metal bridge variants. It disables PCH, instruments the client, dedicated server, and staged SP/MP game modules, verifies the resulting arm64 Mach-O files, runs an assetless fail-fast runtime probe, and retains toolchain/build/runtime diagnostics. This remains opt-in investigation coverage rather than release evidence and does not replace physical gameplay or package signoff.
-- Native arm64 commit and push jobs now require asset-free macOS dedicated-server startup through the staged `game-mp` module for both package bridge configurations. The smoke generates only a test marker PK4, disables official-media validation, proves game initialization plus a live server frame, and requires clean game shutdown; it is a hosted loader/lifecycle gate, not stock-map or real-hardware multiplayer signoff.
-- Experimental macOS audio still defaults to Apple's OpenAL framework for release stability through `-Dmacos_openal_provider=apple_framework`. The `-Dmacos_openal_provider=system` build option is available only for local OpenAL Soft migration testing with a system `openal` dependency and `AL/...` headers, but it is not the packaged release default and current macOS packages do not bundle OpenAL Soft. The detailed provider policy is recorded in `docs/dev/macos-openal-provider-policy.md`.
-- Experimental macOS release signing uses the Hardened Runtime without custom entitlements by default. Optional entitlement files are validated as plist dictionaries and App Sandbox or `get-task-allow` entitlements are rejected until the project has a reviewed sandbox/file-access design for user-selected Quake 4 assets, saves, logs, and staged runtime overlays.
-- The native macOS Cocoa/OpenGL fallback is experimental and kept crash-resistant for comparison testing: it now stores a valid CGL context pointer, validates pixel-format/context/window setup before use, releases created contexts if final make-current fails, fails cleanly when fullscreen display capture/mode/context setup cannot complete, unwinds partial display captures, treats missing or invalid-display VRAM telemetry as non-fatal, guards mouse capture, scroll-wheel overflow, nil event entry points, display/gamma-table, stack-free extension lookup, verified-current context swap/activation/pause/resume, and shutdown lifetime paths, returns deterministic unsupported status from legacy render-thread and screen-change stubs, uses the engine allocator for clipboard text, owns UTF-8 strings handed back from Cocoa key-name, clipboard, and fatal-error alert paths, keeps obsolete Carbon/Xcode-era macOS sources out of the Meson build manifest, and validates that live macOS backend sources do not reintroduce raw `strcpy`/`strcat`/`sprintf`/`alloca` string builders.
-- Windows arm64 currently uses a custom OpenAL Soft package path during bring-up because the in-repo bundled Windows runtime payload is still x64-only.
+| Platform | Build status | Runtime status | Current claim |
+|---|---|---|---|
+| Windows x64 | Active | Deepest local validation target | Primary bring-up target; retail matrix still pending |
+| Linux x64 | Active CI GameLib lane and packaging tooling | Retail gameplay validation pending | Build target, not yet a fully signed-off release |
+| Windows/Linux ARM64 | Inherited build support exists | Prey runtime evidence pending | Gated |
+| macOS arm64/x64/universal2 | Inherited backend/tooling support exists | Prey runtime and package evidence pending | Experimental and gated |
 
-## macOS Support Matrix
+The active workflow is `.github/workflows/openprey-validation.yml`. It validates the
+canonical companion staging contract, deterministic `pak0.pk4`/`pak1.pk4` inputs,
+one staged `game_<arch>` module, `basepr/`, and openPREY desktop/icon payloads on the
+enabled x64 lanes.
 
-- Current architecture policy: `arm64 only` for experimental Apple Silicon/arm64 release packages.
-- Unsupported current macOS release targets: Intel Mac/`x86_64`, universal2 packages, and Rosetta as a supported compatibility layer.
-- Current OS-version policy: `macOS 11` is the documented Apple Silicon/arm64 package floor, while the latest public macOS release is the rolling current-version signoff target.
-- Hosted `macos-15` CI builds prove configure, build, package, signing, notarization, and static validation paths; they do not replace real Apple-hardware runtime signoff for the macOS 11 floor or the latest public macOS release.
-- First-class macOS support requires completed OpenGL and Metal bridge evidence for both the documented floor and latest public macOS, with architecture policy, CPU architecture, OS matrix role, Xcode version, and macOS SDK version recorded in `docs/dev/macos-signoff-evidence.md`.
-- Matrix expansion requirements are tracked in `docs/dev/macos-support-matrix-policy.md` and `docs/dev/plan/2026-06-30-macos-compatibility-support.md`.
-- Current audio limitations under the release OpenAL provider (Apple's OpenAL framework): no EFX reverb/occlusion filtering, no HRTF control, and stereo-only output mode. The `-Dmacos_openal_provider=system` build option exists as the migration corridor toward an OpenAL Soft-class provider, but it is not the packaged release default.
+Inherited OpenQ4 ARM64, macOS, Universal2, signing, and manual-release workflows are
+retained only as manual static-test/reference fixtures. Every job is unconditionally
+false-gated because it clones `openQ4-game` and asserts split `game-sp`/`game-mp`
+modules. Those gates must not be removed until the lanes are rebuilt around the
+openPREY contract and backed by runtime evidence.
 
-## macOS Renderer And Backend Policy
+## Linux and Steam Deck
 
-- Current release renderer policy: both macOS package variants use the stock-compatible OpenGL renderer.
-- Current package variants: `OpenGL` and `Metal bridge`. The Metal bridge is not a native Metal renderer and must not be described as OpenGL-free.
-- Current backend policy: release packages use `platform_backend=sdl3`; `platform_backend=native` on macOS is retained for comparison-only diagnostics.
-- Native Metal is not selected for the current release line. If native Metal becomes a target, create a separate design plan covering stock asset parity, shader translation, BSE effects, screenshot/readback behavior, diagnostics, performance counters, and rollback/fallback behavior before implementation.
-- Native Cocoa/OpenGL backend results are useful for comparing SDL3 regressions but do not count as release support evidence unless a future support decision adds dedicated CI, packaging, and real Apple-hardware signoff.
-- The detailed policy is recorded in `docs/dev/macos-renderer-backend-policy.md` and `docs/dev/macos-native-backend-containment-policy.md`.
-- Current macOS Vulkan policy (added 2026-07-25): openQ4's Vulkan renderer module now also builds and ships for macOS, where it runs through MoltenVK, a Vulkan-on-Metal translation layer bundled in the package. It is opt-in only through `r_renderApi vulkan`, applied at the next engine start. OpenGL remains the default and recommended macOS renderer in both package variants, and `r_renderApi best` still resolves to `gl` on macOS.
-- `renderer-vk_<arch>.dylib` and `libMoltenVK.dylib` are additions inside the existing `OpenGL` and `Metal bridge` packages, staged in `openQ4.app/Contents/Frameworks` and signed as nested code. They do not create a third package variant or a new `macos_graphics_bridge` value.
-- MoltenVK is a translation layer. It is not a Metal renderer, not a Vulkan driver, and does not make any macOS package OpenGL-free; the `Metal bridge` variant keeps its existing meaning. MoltenVK is pinned to `v1.4.1` because that is the newest release compatible with the documented `macOS 11` floor.
-- macOS Vulkan is experimental inside an experimental platform. No real Apple-hardware evidence that it renders correctly exists yet, so no supported-renderer or first-class claim follows from it. The decision-gate plan is recorded in `docs/dev/macos-moltenvk-decision.md`, the staged record in `docs/dev/plans/2026-07-25-macos-moltenvk.md`, and the provider policy in `docs/dev/macos-moltenvk-provider-policy.md`.
+SDL3 may use Wayland or X11 according to the available host. Preferred project
+environment variables use the `OPENPREY_*` prefix:
 
-## Runtime Baselines
+- `OPENPREY_FORCE_X11=1`
+- `OPENPREY_WAYLAND_DISABLE_LIBDECOR=1`
+- `OPENPREY_WAYLAND_PREFER_LIBDECOR=1`
+- `OPENPREY_WAYLAND_SYNC_WINDOW_OPS=1`
+- `OPENPREY_STEAMDECK=1`
 
-- Windows packaged compatibility floor: `Windows 7` or later.
-- Windows validation focus: current `Windows 11` releases first, with `Windows 10` retained as a practical compatibility target even though Microsoft's general Windows 10 servicing ended on `October 14, 2025`.
-- Windows 7/8/8.1 are no longer hard-blocked by the current x64 binaries, but they are legacy and outside the actively validated support matrix.
-- Experimental macOS packaged compatibility floor for the Apple Silicon/arm64 release line: `macOS 11` or later. Meson now pins the deployment target to `11.0` so the binary floor matches the documented floor. Intel Mac and universal2 package floors are not published because those packages are not part of the current release matrix.
-- Linux packaged compatibility floor: release archives and AppImages are built on pinned `Ubuntu 24.04` runners and should be treated as targeting a comparable modern 64-bit desktop userspace with desktop OpenGL plus EGL/Wayland or X11/GLX. AppImages bundle the release dependency closure while deliberately retaining host graphics-driver and desktop integration boundaries; they do not imply compatibility with an older glibc than the release runner. Linux ARM64 currently means 64-bit little-endian AArch64 hardware (the `aarch64` AppImage spelling) with a desktop-OpenGL-capable driver; GLES-only boards require a translation layer or future renderer work and are not implied by the package label. Hosted ARM64 CI builds the archive and AppImage and launches the final images assetlessly under Weston and Xvfb, but ARM64 packages remain preview; release signoff additionally requires the real-hardware stock-asset, dedicated-server, audio, input, and display evidence tracked in [the Linux ARM64 evidence record](linux-arm64-signoff-evidence.md).
-- Steam Deck support assumes a SteamOS 3.x style environment. The explicit `openQ4-steamdeck` launcher remains the preferred shipping path, while raw `openQ4-client_<arch>` launches can auto-select the `steamdeck` profile from Deck/SteamOS host signals unless disabled by environment.
+Legacy `OPENQ4_*` names remain temporary migration aliases only. The staged
+`openPREY-steamdeck` launcher always forces windowed mode.
 
-## SDL3 Direction
+## macOS boundary
 
-- SDL3 is the default backend path and the portability layer for:
-  - window lifecycle
-  - input event handling
-  - context/window interop glue
-- New platform-facing work should prefer SDL3 abstractions first.
-- Platform-specific code should be isolated under `src/sys/<platform>/` when SDL3 cannot cover a requirement directly.
-- OpenGL context selection now uses the shared renderer ladder across SDL3, native GLX, and native NSOpenGL paths. macOS remains capped at OpenGL 4.1 core by the platform OpenGL stack, while Linux and Windows can continue down through core and compatibility-profile fallbacks according to `r_glTier`.
-- macOS startup validates both advertised OpenGL extensions and the callable entry points behind the multitexture, ARB2, VBO upload, PBO readback, and GLSL paths. If Apple's OpenGL 2.1 compatibility fallback reports an incomplete loader state, openQ4 now downgrades optional upload/readback paths to CPU-backed fallbacks or fails through the normal missing-feature path instead of continuing into a SIGSEGV.
-- Apple OpenGL 2.1 compatibility contexts now disable the legacy VBO vertex cache and use CPU-backed vertex data, keeping the renderer upload bridge and ARB2 startup away from the crash-prone VBO path reported on Apple Silicon. Apple OpenGL 2.1 compatibility also skips the full `interaction.vfp` upload and prefers `SimpleInteraction.vfp`, avoiding the startup crash observed immediately after interaction color-mode detection on the Metal bridge path.
-- Apple OpenGL 2.1 compatibility now bypasses the ARB2 light-interaction pass on the fragile M4/M5 compatibility path reported in issue #73. This is a degraded-lighting fallback: affected launches log `ARB2 interaction driver bypass`, restore the classic post-interaction GL state, texture-unit, and ARB program-binding baseline, force a neutral light-scale state, skip the post-interaction light-scale pass, keep an ambient rescue floor, and avoid the first-frame ARB2 light interaction crash while normal GL paths retain full ARB2 interaction rendering. Post-bypass breadcrumbs record state restoration, light-scale skip, ambient rescue, and frame tail so follow-up reports can identify the next operation reached.
-- Optional buffer-object users share the same capability contract: renderer upload cleanup tolerates missing delete/bind entry points, HDR exposure readback and light-grid baking use `glConfig.pixelBufferObjectAvailable`, and disabled upload bridges report zero ring buffers in diagnostics.
-- Classic ARB2 interaction draws use explicit `idDrawVert` VBO byte offsets instead of deriving member addresses from the vertex-cache offset token, which keeps Apple's OpenGL 2.1 compatibility path away from undefined C++ pointer formation during the first in-game interaction pass.
+macOS code and packaging helpers are retained from upstream, but openPREY currently
+makes no signed-package or first-class runtime claim. One unified game module must be
+used by any future app bundle. OpenGL is the first compatibility target; Vulkan through
+MoltenVK and other backend parity remain explicit validation TODOs.
 
-## Meson Direction
+## Validation requirements
 
-- Meson is the canonical build system going forward.
-- External dependencies should be consumed via Meson dependency resolution and subprojects/wraps.
-- New build logic should be host-aware and architecture-aware, with x64 as the active compatibility baseline.
-- Meson configuration defaults to `cpp_std=vc++latest` (C++23-targeting mode on MSVC).
-- Meson currently adds `/Zc:strictStrings-` on MSVC to preserve compatibility with legacy string-literal usage while the codebase is modernized.
-- `tools/build/meson_setup.ps1` prefers VS 2026+ (major 18) when present; strict minimum enforcement can be enabled with `-Denforce_msvc_2026=true`.
+First-class support for a platform requires all of the following on real target
+hardware:
 
-## Bring-Up Staging
+1. clean configure, compile, and staged install;
+2. architecture and runtime-dependency checks for client, dedicated server, renderer
+   modules, and unified game module;
+3. launch from `.install/` with a legitimate Prey installation;
+4. SP map entry, MP listen/dedicated startup, save/load, input, audio, and clean shutdown;
+5. logs free of new engine/game/parser/loader errors;
+6. renderer validation using the engine `screenshot` command, never an OS capture;
+7. package extraction/install and launcher/icon checks;
+8. evidence tied to exact engine and `OpenPrey-game` commits.
 
-1. Keep Windows x64 stable with SDL3 default backend.
-2. Keep Linux on the SDL3 backend by default, validate x64 release paths, and complete Linux ARM64 real-hardware Wayland SP/MP, stock-map dedicated-server, audio, input, display, and package signoff beyond hosted assetless startup.
-3. Validate Windows arm64 beyond compile/package bring-up, especially runtime audio and in-game coverage.
-4. Continue experimental macOS Apple Silicon hardware signoff for input devices, audio devices, and in-game renderer coverage on real Macs before promoting the CI build/package path to first-class.
-5. Add an explicit Intel Mac or universal2 release lane only after the project has architecture-specific CI, `lipo`/install-name validation, and launch evidence for both packaged architectures.
+All agent-driven runtime validation must force `+set r_fullscreen 0`.
 
-## SDL3 Migration Staging (Linux/Experimental macOS)
-
-- Linux and experimental macOS now use the shared SDL3 runtime path when `-Dplatform_backend=sdl3` is selected, and that is the default configuration as of March 30, 2026.
-- Experimental macOS SDL3 builds select `src/sys/osx/macosx_sdl3.cpp` and `src/sys/osx/macosx_sdl3_main.cpp` with the shared SDL3 window, input, controller, and OpenGL context path.
-- The native Linux X11/GLX backend and experimental macOS Cocoa/OpenGL diagnostic backend remain available through `-Dplatform_backend=native` for comparison and rollback while SDL3 remains the release path. On macOS, native backend results are comparison-only unless a future support decision adds dedicated validation. On SteamOS, the SDL3 path also watches application lifecycle events so suspend/resume and foreground/background transitions flow through the same input release, rumble stop, config write, and controller reacquire behavior used by the normal event pump.
-
-## Definition Of Done For First-Class Platform Support
-
-- Clean configure + build in Meson.
-- Engine initializes and reaches map/session startup with stock Quake 4 assets.
-- Core input, rendering, audio, and networking paths work without platform-specific content hacks.
-- Regressions are tracked in docs and fixed in engine/platform code, not with asset overrides.
+Current outstanding evidence is tracked in
+[the rebase status ledger](prey-rebase/status-ledger.md#explicit-deferral-register).

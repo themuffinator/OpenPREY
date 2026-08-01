@@ -64,7 +64,7 @@ def validate_workflow() -> None:
         "ERROR: AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:",
         "Publish sanitizer diagnostics",
         "builddir/meson-logs",
-        ".tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json",
+        "builddir/.tmp/openprey_gamelibs_stage/openprey_gamelibs_stage_manifest.json",
         ".tmp/macos-sanitizer-${{ matrix.artifact_suffix }}-runtime",
     ):
         require(workflow, token, "macOS sanitizer workflow")

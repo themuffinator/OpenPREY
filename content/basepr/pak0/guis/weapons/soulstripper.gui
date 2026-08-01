@@ -1,0 +1,511 @@
+// gui::type			type of ammo currently installed
+// gui::leeching		whether currently leeching
+// gui::souls			how many canisters total held [1..3]
+// gui::meter			charge meter level [0..1]
+// gui::leechtype		type of ammo being leeched while leeching
+// gui::soulpercentageA	percent of ammo in soul A available [0..1]
+// gui::soulpercentageB	percent of ammo in soul B available [0..1]
+// gui::soulpercentageC	percent of ammo in soul C available [0..1]
+
+#define COLOR_WHITE				1, 1, 1, 1
+#define COLOR_YELLOW			1, 0.7, 0.3, 1
+#define COLOR_BLUE				0.6, 0.65, 1, 1
+#define COLOR_AQUA				0.6, 0.9, 1, 1
+#define COLOR_LIGHTAQUA		0.85, 1, 1, 1
+#define COLOR_RED					1, 0.3, 0.2, 1
+#define COLOR_ORANGE			1, 0.7, 0.3, 1
+#define COLOR_LIGHTYELLOW	1, 0.9, 0.75, 1
+
+windowDef Desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+
+//---------------------------------------------------------	
+//   Draw meter
+//---------------------------------------------------------	
+	windowDef crop_meter {
+		rect		0, 100, 580 * ("gui::meter"), 240
+		visible		"gui::leeching"
+
+		windowDef meterType1 {	// Plasma
+			rect		0, 0, 580, 240
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/weapons/soulstripper/meter_plasma"
+			visible		("gui::leechtype" == 1)
+		}
+		windowDef meterType2 {	// Railgun
+			rect		0, 0, 580, 240
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/weapons/soulstripper/meter_lightning"
+			visible		("gui::leechtype" == 2)
+		}
+		windowDef meterType3 {	// Sunbeam
+			rect		0, 0, 580, 240
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/weapons/soulstripper/meter_sunbeam"
+			visible		("gui::leechtype" == 3)
+		}
+		windowDef meterType4 {	// Freeze
+			rect		0, 0, 580, 240
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/weapons/soulstripper/meter_freeze"
+			visible		("gui::leechtype" == 4)
+		}
+	}
+	
+//---------------------------------------------------------	
+//   Non-animating Main outlines
+//---------------------------------------------------------	
+
+	windowDef CylinderOutsides_Plasma {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 1)
+		windowDef outline1b {
+			rect		180, 100, 70, 240
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline2b {
+			rect		335, 100, 70, 230
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline3b {
+			rect		500, 100, 70, 220
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+	}
+
+	windowDef CylinderOutsides_Railgun {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 2)
+		windowDef outline1b {
+			rect		180, 100, 70, 240
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline2b {
+			rect		335, 100, 70, 230
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline3b {
+			rect		500, 100, 70, 220
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+	}
+
+	windowDef CylinderOutsides_Sunbeam {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 3)
+		windowDef outline1b {
+			rect		180, 100, 70, 240
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline2b {
+			rect		335, 100, 70, 230
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline3b {
+			rect		500, 100, 70, 220
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+	}
+
+	windowDef CylinderOutsides_Freeze {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 4)
+		windowDef outline1b {
+			rect		180, 100, 70, 240
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline2b {
+			rect		335, 100, 70, 230
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+		windowDef outline3b {
+			rect		500, 100, 70, 220
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/1outline"
+			visible		("gui::leeching" == 0)
+		}
+	}
+	
+
+//---------------------------------------------------------	
+//   main cyclinder images
+//---------------------------------------------------------
+	
+	windowDef CylinderInsides_White {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 4)
+		windowDef ciw_main1 {
+			rect		208, 150, 30, 140
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_LIGHTAQUA
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 3) && ("gui::leeching" == 0)
+		}
+		windowDef ciw_main2 {
+			rect		364, 150, 28, 138
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_LIGHTAQUA
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 2) && ("gui::leeching" == 0)
+		}
+		windowDef ciw_main3 {
+			rect		531, 143, 26, 136
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_LIGHTAQUA
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 1) && ("gui::leeching" == 0)
+		}
+	}
+	windowDef CylinderInsides_White_Lightning {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 2)
+		windowDef ciw_main1 {
+			rect		208, 150, 30, 140
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_WHITE
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 3) && ("gui::leeching" == 0)
+		}
+		windowDef ciw_main2 {
+			rect		364, 150, 28, 138
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_WHITE
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 2) && ("gui::leeching" == 0)
+		}
+		windowDef ciw_main3 {
+			rect		531, 143, 26, 136
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_WHITE
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 1) && ("gui::leeching" == 0)
+		}
+	}
+	windowDef CylinderInsides_Sunbeam {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 3)	// all but plasma
+		windowDef ciw_main1 {
+			rect		208, 150, 30, 140
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_LIGHTYELLOW
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 3) && ("gui::leeching" == 0)
+		}
+		windowDef ciw_main2 {
+			rect		364, 150, 28, 138
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_LIGHTYELLOW
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 2) && ("gui::leeching" == 0)
+		}
+		windowDef ciw_main3 {
+			rect		531, 143, 26, 136
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_LIGHTYELLOW
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 1) && ("gui::leeching" == 0)
+		}
+	}
+	windowDef CylinderInsides_Plasma {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 1)	// plasma only
+		windowDef ciy_main1 {
+			rect		208, 150, 30, 140
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_YELLOW
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 3) && ("gui::leeching" == 0)
+		}
+		windowDef ciy_main2 {
+			rect		364, 150, 28, 138
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_YELLOW
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 2) && ("gui::leeching" == 0)
+		}
+		windowDef ciy_main3 {
+			rect		531, 143, 26, 136
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_YELLOW
+			background	"guis/assets/weapons/soulstripper/main"
+			visible		("gui::souls" >= 1) && ("gui::leeching" == 0)
+		}
+	}
+	
+
+	
+//-------------------------------------------------------
+//		In-between canister ticks
+//-------------------------------------------------------
+
+	windowDef Ticks_plasma {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 1)
+		windowDef line1b {	// Leftmost (bottom)
+			rect		110, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.66)
+		}
+		windowDef line2b {
+			rect		150, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.33)
+		}
+		windowDef line3b {
+			rect		265, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.66)
+		}
+		windowDef line4b {
+			rect		305, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.33)
+		}
+		windowDef line5b {
+			rect		425, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.66)
+		}
+		windowDef line6b {
+			rect		468, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_RED
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.33)
+		}
+	}
+
+	windowDef Ticks_railgun {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 2)
+		windowDef line1b {	// Leftmost (bottom)
+			rect		110, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.66)
+		}
+		windowDef line2b {
+			rect		150, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.33)
+		}
+		windowDef line3b {
+			rect		265, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.66)
+		}
+		windowDef line4b {
+			rect		305, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.33)
+		}
+		windowDef line5b {
+			rect		425, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.66)
+		}
+		windowDef line6b {
+			rect		468, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_BLUE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.33)
+		}
+	}
+
+	windowDef Ticks_sunbeam {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 3)
+		windowDef line1b {	// Leftmost (bottom)
+			rect		110, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.66)
+		}
+		windowDef line2b {
+			rect		150, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.33)
+		}
+		windowDef line3b {
+			rect		265, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.66)
+		}
+		windowDef line4b {
+			rect		305, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.33)
+		}
+		windowDef line5b {
+			rect		425, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.66)
+		}
+		windowDef line6b {
+			rect		468, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_ORANGE
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.33)
+		}
+	}
+
+	windowDef Ticks_freeze {
+		rect		0, 0, 640, 480
+		visible		("gui::type" == 4)
+		windowDef line1b {	// Leftmost (bottom)
+			rect		110, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.66)
+		}
+		windowDef line2b {
+			rect		150, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageC" > 0.33)
+		}
+		windowDef line3b {
+			rect		265, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.66)
+		}
+		windowDef line4b {
+			rect		305, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageB" > 0.33)
+		}
+		windowDef line5b {
+			rect		425, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.66)
+		}
+		windowDef line6b {
+			rect		468, 140, 32, 135
+			backcolor	0, 0, 0, 0
+			forecolor	1, 1, 1, 1
+			matcolor	COLOR_AQUA
+			background	"guis/assets/weapons/soulstripper/block"
+			visible		("gui::leeching" == 0 && "gui::soulpercentageA" > 0.33)
+		}
+	}
+}

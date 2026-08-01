@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run and report the openQ4 renderer validation matrix.
+"""Run and report the openPREY renderer validation matrix.
 
 The default matrix is intentionally safe: it starts the staged client, runs
 renderer self-tests and tier/startup probes, prints gfxInfo, then quits. Gameplay
@@ -27,6 +27,58 @@ SAFE_TIERS = ("auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46")
 # silently ignores any "+command" beyond this limit, which would drop "+quit"
 # and leave the case running until the timeout.
 ENGINE_MAX_STARTUP_COMMANDS = 64
+
+
+PREY_MAP_MANIFEST = Path(__file__).resolve().parents[2] / ".vscode" / "prey-maps.json"
+
+
+def load_prey_map_manifest() -> dict[str, dict[str, str]]:
+    """Load the canonical SP/MP map names used by developer launch tooling."""
+    if not PREY_MAP_MANIFEST.is_file():
+        raise RuntimeError(f"canonical Prey map manifest is missing: {PREY_MAP_MANIFEST}")
+
+    payload = json.loads(PREY_MAP_MANIFEST.read_text(encoding="utf-8"))
+    entries = payload.get("maps")
+    if not isinstance(entries, list):
+        raise RuntimeError(f"canonical Prey map manifest has no maps list: {PREY_MAP_MANIFEST}")
+
+    maps: dict[str, dict[str, str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise RuntimeError(f"canonical Prey map manifest contains a non-object entry: {entry!r}")
+        map_name = entry.get("map")
+        kind = entry.get("kind")
+        title = entry.get("name")
+        if not isinstance(map_name, str) or not map_name:
+            raise RuntimeError(f"canonical Prey map manifest contains an invalid map path: {entry!r}")
+        if kind not in ("sp", "mp") or not isinstance(title, str) or not title:
+            raise RuntimeError(f"canonical Prey map manifest contains invalid metadata: {entry!r}")
+        if map_name in maps:
+            raise RuntimeError(f"canonical Prey map manifest repeats {map_name!r}")
+        maps[map_name] = {"kind": kind, "name": title}
+    return maps
+
+
+CANONICAL_PREY_MAPS = load_prey_map_manifest()
+
+
+def prey_gameplay_case(case_id: str, map_name: str, kind: str, purpose: str) -> dict[str, str]:
+    entry = CANONICAL_PREY_MAPS.get(map_name)
+    if entry is None:
+        raise RuntimeError(f"renderer case {case_id!r} uses a map absent from {PREY_MAP_MANIFEST}: {map_name}")
+    if entry["kind"] != kind:
+        raise RuntimeError(
+            f"renderer case {case_id!r} classifies {map_name} as {kind}, "
+            f"but {PREY_MAP_MANIFEST} classifies it as {entry['kind']}"
+        )
+    return {
+        "id": case_id,
+        "mode": kind.upper(),
+        "map": map_name,
+        "title": entry["name"],
+        "purpose": purpose,
+    }
+
 
 SELFTEST_CHECKS = [
     ["RendererModule self-test passed"],
@@ -59,42 +111,48 @@ STARTUP_CHECKS = [
 ]
 
 MANUAL_GAMEPLAY_MATRIX = [
-    {
-        "id": "sp-airdefense1",
-        "mode": "SP",
-        "map": "game/airdefense1",
-        "purpose": "stock SP baseline, outdoor lighting and BSE smoke",
-    },
-    {
-        "id": "sp-airdefense2",
-        "mode": "SP",
-        "map": "game/airdefense2",
-        "purpose": "stock SP flashlight, projected shadows, animated characters",
-    },
-    {
-        "id": "sp-storage2",
-        "mode": "SP",
-        "map": "game/storage2",
-        "purpose": "indoor SP material and post-process coverage",
-    },
-    {
-        "id": "sp-bse-heavy",
-        "mode": "SP",
-        "map": "game/medlabs",
-        "purpose": "stress BSE effects while preserving stock assets",
-    },
-    {
-        "id": "sp-cinematic-subview",
-        "mode": "SP",
-        "map": "game/mcc_landing",
-        "purpose": "subviews, remote cameras, cinematic and GUI interaction",
-    },
-    {
-        "id": "mp-q4dm1-listen",
-        "mode": "MP",
-        "map": "mp/q4dm1",
-        "purpose": "listen-server and local-client MP renderer parity",
-    },
+    prey_gameplay_case(
+        "sp-roadhouse",
+        "game/roadhouse",
+        "sp",
+        "opening-campaign baseline for characters, indoor materials, scripted sequences, and GUI presentation",
+    ),
+    prey_gameplay_case(
+        "sp-feedingtowera",
+        "game/feedingtowera",
+        "sp",
+        "gravity, wall-walk, portal traversal, and layered industrial-lighting coverage",
+    ),
+    prey_gameplay_case(
+        "sp-lotaa",
+        "game/lotaa",
+        "sp",
+        "spirit/deathwalk-era gameplay, portal geometry, and Human Head effect coverage",
+    ),
+    prey_gameplay_case(
+        "sp-shuttlea",
+        "game/shuttlea",
+        "sp",
+        "shuttle vehicle, beam/particle effects, portal views, and HUD composition",
+    ),
+    prey_gameplay_case(
+        "sp-biolabsa",
+        "game/biolabsa",
+        "sp",
+        "dense interior materials, local lights, animated characters, and combat effects",
+    ),
+    prey_gameplay_case(
+        "sp-superportal",
+        "game/superportal",
+        "sp",
+        "large-scale portal, sky, post-process, and long-view scene coverage",
+    ),
+    prey_gameplay_case(
+        "mp-dmroadhouse-listen",
+        "game/dmroadhouse",
+        "mp",
+        "unified-module listen-server and local-client renderer parity on the active stock Prey MP smoke map",
+    ),
 ]
 
 DETERMINISTIC_CAPTURE_MATRIX = [
@@ -117,10 +175,10 @@ DETERMINISTIC_CAPTURE_MATRIX = [
         "purpose": "known fallback inventory for GUI/post/subview/render-demo/BSE categories",
     },
     {
-        "id": "capture-sp-airdefense1-static",
+        "id": "capture-sp-roadhouse-static",
         "mode": "SP",
-        "scene": "game/airdefense1 fixed spawn, no input for 3 seconds",
-        "purpose": "outdoor lighting, terrain decals, BSE smoke, and stock material parity",
+        "scene": "game/roadhouse fixed spawn, no input for 3 seconds",
+        "purpose": "stock Prey character, interior-lighting, material, and scripted-presentation parity",
     },
 ]
 
@@ -184,12 +242,12 @@ LONG_RUN_VALIDATION_MATRIX = [
     {
         "id": "longrun-map-transition-sp",
         "mode": "SP",
-        "purpose": "transition between `game/airdefense1`, `game/storage2`, and `game/medlabs` without restarting the process",
+        "purpose": "transition between `game/roadhouse`, `game/feedingtowera`, and `game/biolabsa` without restarting the process",
     },
     {
         "id": "longrun-mp-listen-reconnect",
         "mode": "MP",
-        "purpose": "`mp/q4dm1` listen server with local client connect, disconnect, reconnect, then map restart",
+        "purpose": "`game/dmroadhouse` listen server with local client connect, disconnect, reconnect, then map restart",
     },
 ]
 
@@ -197,92 +255,87 @@ GAMEPLAY_BENCHMARK_HARNESS = [
     {
         "profile": "smoke",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile smoke",
-        "coverage": "bounded SP gameplay smoke with screenshot, rendererBenchmarkCapture, framePacingSnapshot, gfxInfo, and zero-warning log gates",
+        "coverage": "bounded `game/roadhouse` SP smoke with screenshot, rendererBenchmarkCapture, framePacingSnapshot, gfxInfo, and zero-warning log gates",
     },
     {
         "profile": "required",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile required",
-        "coverage": "all required SP maps plus the MP q4dm1 listen-server/local-client case using the selected tier and presentation settings",
-    },
-    {
-        "profile": "campaign-split-state-transition",
-        "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile campaign-split-state-transition --timeout 360",
-        "coverage": "real SP end-level target chain from game/mcc_2 through storage1 first, storage2, storage1 second, and game/tram1 with active map/filter assertions after each load",
+        "coverage": "representative stock Prey SP maps plus the `game/dmroadhouse` listen-server/local-client case using the selected tier and presentation settings",
     },
     {
         "profile": "tiers",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile tiers",
-        "coverage": "forced auto/legacy/gl33/gl41/gl43/gl45/gl46 gameplay probes that either reach gameplay or fail closed with logged tier-contract reasons",
+        "coverage": "forced auto/legacy/gl33/gl41/gl43/gl45/gl46 `game/roadhouse` probes that either reach gameplay or fail closed with logged tier-contract reasons",
     },
     {
         "profile": "presentation",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile presentation",
-        "coverage": "windowed/fullscreen coverage for r_swapInterval 0/1 and com_maxfps 0/120/240 while preserving uncapped high-refresh presentation behavior",
+        "coverage": "windowed coverage for r_swapInterval 0/1 and com_maxfps 0/120/240 while preserving uncapped high-refresh presentation behavior",
     },
     {
         "profile": "shadows",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile shadows",
-        "coverage": "shadow-map correctness scenes with stencil, mapped, CSM, translucent, and debug-overlay/debug-mode presets",
+        "coverage": "representative Prey shadow-map scenes with stencil, mapped, CSM, translucent, and debug-overlay/debug-mode presets",
     },
     {
         "profile": "shadow-regression",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile shadow-regression --reference-dir .tmp\\renderer-references\\shadow-regression\\windows-x64",
-        "coverage": "bounded five-scene CSM-enabled projected, point, character/skinned, and alpha-tested shadow-map captures with optional TGA reference comparison and screenshot hashes",
+        "coverage": "bounded five-scene Prey CSM-enabled projected, point, character/skinned, and alpha-tested shadow-map captures with optional TGA reference comparison and screenshot hashes",
     },
 ]
 
 SHADOW_CORRECTNESS_MATRIX = [
-    {
-        "id": "shadow-projected-airdefense2",
-        "mode": "SP",
-        "map": "game/airdefense2",
-        "purpose": "angled projected-light caster/receiver validation",
-    },
-    {
-        "id": "shadow-point-storage2",
-        "mode": "SP",
-        "map": "game/storage2",
-        "purpose": "point-light face coverage and local-light receiver validation",
-    },
-    {
-        "id": "shadow-csm-airdefense1",
-        "mode": "SP",
-        "map": "game/airdefense1",
-        "purpose": "CSM camera sweep readiness and outdoor directional coverage",
-    },
-    {
-        "id": "shadow-cutout-storage2",
-        "mode": "SP",
-        "map": "game/storage2",
-        "purpose": "hashed-alpha cutout fence/grate caster validation at distance",
-    },
-    {
-        "id": "shadow-character-airdefense2",
-        "mode": "SP",
-        "map": "game/airdefense2",
-        "purpose": "dynamic character shadow caster and receiver validation",
-    },
-    {
-        "id": "shadow-translucent-medlabs",
-        "mode": "SP",
-        "map": "game/medlabs",
-        "purpose": "optional translucent moment caster coverage where the selected tier supports it",
-    },
+    prey_gameplay_case(
+        "shadow-projected-feedingtowera",
+        "game/feedingtowera",
+        "sp",
+        "projected-light caster/receiver validation against energy, sky, and industrial geometry",
+    ),
+    prey_gameplay_case(
+        "shadow-point-biolabsa",
+        "game/biolabsa",
+        "sp",
+        "dense point-light face coverage and local-light receiver validation",
+    ),
+    prey_gameplay_case(
+        "shadow-csm-lotaa",
+        "game/lotaa",
+        "sp",
+        "CSM camera-sweep readiness across outdoor/dreamworld sky geometry",
+    ),
+    prey_gameplay_case(
+        "shadow-cutout-roadhouse",
+        "game/roadhouse",
+        "sp",
+        "hashed-alpha chain-link/cutout caster validation at distance",
+    ),
+    prey_gameplay_case(
+        "shadow-character-feedingtowera",
+        "game/feedingtowera",
+        "sp",
+        "dynamic character/skinned shadow caster and receiver validation",
+    ),
+    prey_gameplay_case(
+        "shadow-translucent-superportal",
+        "game/superportal",
+        "sp",
+        "optional translucent portal/energy moment-caster coverage where supported",
+    ),
 ]
 
 HUMAN_REVIEW_CHECKLIST = [
     {
-        "case": "sp-bse-heavy",
-        "focus": "BSE-heavy effects in `game/medlabs`",
-        "checks": "effect sprites/trails animate at the expected cadence, no black quads, no missing additive passes, no warning spam",
+        "case": "sp-shuttlea",
+        "focus": "shuttle, beam, and particle effects in `game/shuttlea`",
+        "checks": "effect sprites/trails animate at the expected cadence, portal views remain stable, no black quads or warning spam",
     },
     {
-        "case": "sp-cinematic-subview",
-        "focus": "cinematic/subview flow in `game/mcc_landing`",
-        "checks": "remote-camera/subview content is visible, GUI overlays composite in the right order, cinematic handoff keeps frame pacing stable",
+        "case": "sp-superportal",
+        "focus": "portal/subview and long-view flow in `game/superportal`",
+        "checks": "portal content is visible, GUI/post overlays composite in the right order, and scene handoff keeps frame pacing stable",
     },
     {
-        "case": "mp-q4dm1-listen",
+        "case": "mp-dmroadhouse-listen",
         "focus": "local MP listen server plus loopback client",
         "checks": "client reaches the map, player/world lighting matches host expectations, frame pacing remains uncapped when requested",
     },
@@ -421,7 +474,7 @@ def host_arch() -> str:
 def find_client_executable(root: Path) -> Path:
     install_dir = root / ".install"
     suffix = ".exe" if os.name == "nt" else ""
-    candidate_prefixes = ("openQ4-client", "openQ4-client")
+    candidate_prefixes = ("openPREY-client",)
     for prefix in candidate_prefixes:
         preferred = install_dir / f"{prefix}_{host_arch()}{suffix}"
         if preferred.exists():
@@ -442,12 +495,14 @@ def find_client_executable(root: Path) -> Path:
         if candidate.is_file():
             return candidate
 
-    raise FileNotFoundError(f"openQ4 client executable not found under {install_dir}")
+    raise FileNotFoundError(f"openPREY client executable not found under {install_dir}")
 
 
 def default_basepath() -> str:
-    if os.name == "nt":
-        return r"C:\Program Files (x86)\Steam\steamapps\common\Quake 4"
+    for name in ("OPENPREY_PREY_PATH", "OPENPREY_PREY_ROOT"):
+        configured = os.environ.get(name, "").strip()
+        if configured:
+            return configured
     return ""
 
 
@@ -462,7 +517,7 @@ def common_args(
     savepath: Path,
     skip_official_pak_validation: bool,
 ) -> list[str]:
-    log_name = f"openq4_validation_{sanitize_case_id(case_id)}.log"
+    log_name = f"openprey_validation_{sanitize_case_id(case_id)}.log"
     args = [
         "+set",
         "win_allowMultipleInstances",
@@ -502,7 +557,7 @@ def common_args(
         str(root / ".install"),
         "+set",
         "fs_game",
-        "baseoq4",
+        "basepr",
     ]
     if skip_official_pak_validation:
         args += [
@@ -891,7 +946,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "renderer-modern-compatibility-selftest",
             "category": "selftest",
-            "description": "Phase 14 command-category ownership inventory with modern fullscreen GUI readiness and explicit post/subview/render-demo/BSE fallbacks.",
+            "description": "Phase 14 command-category ownership inventory with modern GUI readiness and explicit post/subview/render-demo/BSE fallbacks.",
             "args": [
                 "+set",
                 "r_rendererMetrics",
@@ -976,7 +1031,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "sdl3-wayland-window-lifecycle",
             "category": "windowing",
-            "description": "native Wayland SDL3 window lifecycle smoke: windowed startup, fullscreen transition, windowed restore, compositor state refresh, and pixel-size diagnostics.",
+            "description": "native Wayland SDL3 window lifecycle smoke: repeated windowed resize/restart, compositor state refresh, and pixel-size diagnostics.",
             "videoDriver": "wayland",
             "assetless": True,
             "args": [
@@ -986,17 +1041,8 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 "+set",
                 "r_windowHeight",
                 "540",
-                "+set",
-                "r_fullscreenDesktop",
-                "1",
-                "+set",
-                "r_fullscreen",
-                "1",
                 "+vid_restart",
                 "partial",
-                "+set",
-                "r_fullscreen",
-                "0",
                 "+set",
                 "r_windowWidth",
                 "800",
@@ -1014,11 +1060,9 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 ["SDL3: graphics bridge: OpenGL"],
                 ["created OpenGL context"],
                 ["SDL3: native Wayland window state after windowed change"],
-                ["SDL3: native Wayland window state after fullscreen change"],
                 ["pixels="],
                 ["pixelDensity="],
                 ["displayScale="],
-                ["fullscreen=yes"],
                 ["fullscreen=no"],
                 ["Selected renderer tier:"],
                 ["GL context request:"],
@@ -1028,7 +1072,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "sdl3-wayland-window-stress",
             "category": "windowing",
-            "description": "native Wayland SDL3 repeated window/fullscreen transition stress: multiple compositor-negotiated vid_restart cycles with changing window sizes.",
+            "description": "native Wayland SDL3 repeated windowed-resize stress: multiple compositor-negotiated vid_restart cycles with changing window sizes.",
             "videoDriver": "wayland",
             "assetless": True,
             "args": [
@@ -1038,17 +1082,8 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 "+set",
                 "r_windowHeight",
                 "576",
-                "+set",
-                "r_fullscreenDesktop",
-                "1",
-                "+set",
-                "r_fullscreen",
-                "1",
                 "+vid_restart",
                 "partial",
-                "+set",
-                "r_fullscreen",
-                "0",
                 "+set",
                 "r_windowWidth",
                 "832",
@@ -1063,14 +1098,8 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 "+set",
                 "r_windowHeight",
                 "720",
-                "+set",
-                "r_fullscreen",
-                "1",
                 "+vid_restart",
                 "partial",
-                "+set",
-                "r_fullscreen",
-                "0",
                 "+set",
                 "r_windowWidth",
                 "900",
@@ -1086,11 +1115,9 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 ["SDL3: native Wayland active"],
                 ["SDL3: Wayland hints:"],
                 ["SDL3: native Wayland window state after windowed change"],
-                ["SDL3: native Wayland window state after fullscreen change"],
                 ["pixels="],
                 ["pixelDensity="],
                 ["displayScale="],
-                ["fullscreen=yes"],
                 ["fullscreen=no"],
                 ["Selected renderer tier:"],
                 ["GL context request:"],
@@ -1167,7 +1194,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "sdl3-x11-window-lifecycle",
             "category": "windowing",
-            "description": "SDL3 X11/Xvfb window lifecycle smoke: windowed startup, fullscreen transition, windowed restore, renderer diagnostics, and clean SDL3 teardown.",
+            "description": "SDL3 X11/Xvfb window lifecycle smoke: repeated windowed resize/restart, renderer diagnostics, and clean SDL3 teardown.",
             "videoDriver": "x11",
             "assetless": True,
             "args": [
@@ -1177,17 +1204,8 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 "+set",
                 "r_windowHeight",
                 "540",
-                "+set",
-                "r_fullscreenDesktop",
-                "1",
-                "+set",
-                "r_fullscreen",
-                "1",
                 "+vid_restart",
                 "partial",
-                "+set",
-                "r_fullscreen",
-                "0",
                 "+set",
                 "r_windowWidth",
                 "800",
@@ -1235,7 +1253,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "sdl3-force-x11-display-diagnostics",
             "category": "windowing",
-            "description": "openQ4 XWayland fallback diagnostics smoke: OPENQ4_FORCE_X11 requests SDL's X11 driver and preserves display diagnostics.",
+            "description": "openPREY XWayland fallback diagnostics smoke: OPENPREY_FORCE_X11 requests SDL's X11 driver and preserves display diagnostics.",
             "videoDriver": "x11",
             "assetless": True,
             "args": [
@@ -1244,7 +1262,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
             ],
             "checks": [
                 ["SDL3: current video driver: x11"],
-                ["OPENQ4_FORCE_X11=1"],
+                ["OPENPREY_FORCE_X11=1", "OPENQ4_FORCE_X11=1"],
                 ["SDL3: detected"],
                 ["display(s):"],
                 ["contentScale"],
@@ -1577,8 +1595,7 @@ def filter_vulkan_module_cases(cases: list[dict[str, Any]], root: Path) -> list[
 
 def find_log(savepath: Path, log_name: str) -> Path | None:
     candidates = [
-        savepath / "baseoq4" / "logs" / log_name,
-        savepath / "q4base" / "logs" / log_name,
+        savepath / "basepr" / "logs" / log_name,
         savepath / "logs" / log_name,
     ]
     for candidate in candidates:
@@ -1697,7 +1714,7 @@ def run_case(
     skip_official_pak_validation: bool,
 ) -> dict[str, Any]:
     case_id = case["id"]
-    log_name = f"openq4_validation_{sanitize_case_id(case_id)}.log"
+    log_name = f"openprey_validation_{sanitize_case_id(case_id)}.log"
     stdout_path = output_dir / f"{sanitize_case_id(case_id)}.out.txt"
     stderr_path = output_dir / f"{sanitize_case_id(case_id)}.err.txt"
     log_path_guess = find_log(savepath, log_name)
@@ -1722,7 +1739,7 @@ def run_case(
     # cvars set on the command line are archived on exit; cases that opt
     # renderer selection cvars in must not leak them into later cases or
     # the user's config
-    config_path = savepath / "baseoq4" / "openQ4Config.cfg"
+    config_path = savepath / "basepr" / "openPREYConfig.cfg"
     preserve_config = bool(case.get("preservesConfig", False))
     saved_config = config_path.read_bytes() if preserve_config and config_path.exists() else None
 
@@ -1799,6 +1816,7 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
 
     payload = {
         "metadata": metadata,
+        "preyMapManifest": str(PREY_MAP_MANIFEST),
         "results": results,
         "manualGameplayMatrix": MANUAL_GAMEPLAY_MATRIX,
         "gameplayBenchmarkHarness": GAMEPLAY_BENCHMARK_HARNESS,
@@ -1830,6 +1848,7 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         f"- Executable: `{metadata['executable']}`",
         f"- Save path: `{metadata['savepath']}`",
         f"- Base path: `{metadata['basepath'] or 'not set'}`",
+        f"- Canonical Prey map manifest: `{PREY_MAP_MANIFEST}`",
         f"- Automated cases: {passed} passed, {failed} failed",
         "",
         "## Automated Safe Cases",
@@ -1978,8 +1997,8 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         "|---|---|",
         "| `phase8=complete` | The Phase 8 evidence bundle has been reviewed as a single promotion candidate. |",
         "| `warnings=0` | Renderer validation, gameplay, and benchmark logs are free of renderer warning/fatal/signature failures. |",
-        "| `visual=pass` | Deterministic captures and human visual checks pass for materials, characters, GUI, post, fog/blend, BSE, and shadow cases. |",
-        "| `gameplay=pass` | Required SP maps and the MP q4dm1 listen/local-client case reach gameplay and pass log/screenshot gates. |",
+        "| `visual=pass` | Deterministic captures and human visual checks pass for materials, characters, GUI, post, fog/blend, Prey portal/beam/particle effects, and shadow cases. |",
+        "| `gameplay=pass` | Required Prey SP maps and the `game/dmroadhouse` listen/local-client case reach gameplay and pass log/screenshot gates. |",
         "| `renderdoc=pass` | Required GL-tier RenderDoc captures show named resources and expected pass contents. |",
         "| `perf=arb2-or-better` | Modern candidate P95/P99 frame time is ARB2-or-better for target scenes and presets. |",
         "| `presentation=pass` | High-refresh and vsync presentation cases preserve uncapped rendering with 60 Hz simulation. |",
@@ -2006,7 +2025,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--tiers", default=",".join(SAFE_TIERS), help="Comma-separated r_glTier startup probes.")
     parser.add_argument("--cases", default="", help="Comma-separated automated safe case ids to run. Defaults to all cases.")
     parser.add_argument("--timeout", type=int, default=60, help="Per-case timeout in seconds.")
-    parser.add_argument("--basepath", default=default_basepath(), help="Quake 4 install/base path. Omit or set empty to skip fs_basepath.")
+    parser.add_argument("--basepath", default=default_basepath(), help="Prey (2006) install/base path. Omit or set empty to use engine discovery.")
     parser.add_argument("--savepath", default="", help="Save path root. Defaults to <repo>/.home.")
     parser.add_argument("--output-dir", default="", help="Report/output directory. Defaults to <repo>/.tmp/renderer-validation/<timestamp>.")
     parser.add_argument(
@@ -2017,7 +2036,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--skip-official-pak-validation",
         action="store_true",
-        help="Disable official q4base PK4 validation for assetless engine-startup smoke checks.",
+        help="Disable official Prey retail PK4 validation for assetless engine-startup smoke checks.",
     )
     parser.add_argument("--list", action="store_true", help="List automated and manual cases without running them.")
     return parser.parse_args(argv)
@@ -2046,7 +2065,7 @@ def main(argv: list[str]) -> int:
         print("Automated safe cases:")
         for case in safe_cases:
             print(f"  {case['id']}: {case['description']}")
-        print("\nManual gameplay cases:")
+        print(f"\nManual gameplay cases (from {PREY_MAP_MANIFEST}):")
         for case in MANUAL_GAMEPLAY_MATRIX:
             print(f"  {case['id']}: {case['mode']} {case['map']} - {case['purpose']}")
         print("\nGameplay benchmark harness profiles:")

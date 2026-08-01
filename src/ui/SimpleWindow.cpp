@@ -523,6 +523,17 @@ void idSimpleWindow::Redraw(float x, float y) {
 	}
 	DrawBackground(drawRect);
 	DrawBorderAndCaption(drawRect);
+	if ( textShadow ) {
+		idStr shadowText = text;
+		idRectangle shadowRect = textRect;
+		idVec4 shadowColor = colorBlack;
+		shadowText.RemoveColors();
+		shadowRect.x += textShadow;
+		shadowRect.y += textShadow;
+		shadowColor[3] = foreColor.w();
+		dc->DrawText( shadowText, textScale, textAlign, shadowColor, shadowRect, !( flags & WIN_NOWRAP ), -1,
+			false, NULL, 0, textSpacing, textStyle, ( flags & WIN_CHATWINDOW ) != 0 );
+	}
 	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textSpacing, textStyle, ( flags & WIN_CHATWINDOW ) != 0 );
 	dc->SetTransformInfo(vec3_origin, mat3_identity);
 	if ( flags & WIN_NOCLIP ) {

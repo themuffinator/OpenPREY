@@ -233,7 +233,7 @@ static bool RenderDoc_UpdateCaptureTemplate( idStr &captureTemplate ) {
 	fileSystem->CreateOSPath( captureDir.c_str() );
 
 	captureTemplate = captureDir;
-	captureTemplate.AppendPath( "openq4" );
+	captureTemplate.AppendPath( "openprey" );
 
 	if ( renderDocState.api->SetCaptureFilePathTemplate != NULL ) {
 		renderDocState.api->SetCaptureFilePathTemplate( captureTemplate.c_str() );
@@ -244,7 +244,7 @@ static bool RenderDoc_UpdateCaptureTemplate( idStr &captureTemplate ) {
 
 static void RenderDoc_PrintUnavailable( void ) {
 	common->Printf(
-		"RenderDoc API unavailable. Launch openQ4 through RenderDoc first "
+		"RenderDoc API unavailable. Launch openPREY through RenderDoc first "
 		"(for example tools/debug/renderdoc_capture.ps1 or renderdoccmd capture).\n" );
 }
 

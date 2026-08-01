@@ -73,7 +73,7 @@ usually the executable. It defaults to the current directory, but can be overrid
 with "+set fs_basepath c:\doom" on the command line. The base path cannot be modified
 at all after startup.
 
-The "home path" is the user-writable root path for openQ4 data. It can be overridden
+The "home path" is the user-writable root path for openPREY data. It can be overridden
 with "+set fs_homepath c:\users\you\saved games\openq4" on the command line.
 
 The "save path" is the path to the directory where game files will be saved. It defaults
@@ -264,46 +264,50 @@ typedef struct {
 } officialPk4Info_t;
 
 static officialPk4Info_t officialPk4s[] = {
-	// core retail media baseline for Quake 4
-	{ "pak001.pk4",				0xf2cbc998,	true,	true },
-	{ "pak002.pk4",				0x7f8d80d1,	true,	true },
-	{ "pak003.pk4",				0x1b57b207,	true,	true },
-	{ "pak004.pk4",				0x385aa578,	true,	true },
-	{ "pak005.pk4",				0x60d50a1d,	true,	true },
-	{ "pak006.pk4",				0x9099ed11,	true,	true },
-	{ "pak007.pk4",				0xaf301fff,	true,	true },
-	{ "pak008.pk4",				0x4ac6f6d9,	true,	true },
-	{ "pak009.pk4",				0x36030c7d,	true,	true },
-	{ "pak010.pk4",				0x4b80fbda,	true,	true },
-	{ "pak011.pk4",				0x8acf4cfa,	true,	true },
-	{ "pak012.pk4",				0xbe4120b0,	true,	true },
-	{ "pak013.pk4",				0x6ad67f40,	true,	true },
-	{ "pak014.pk4",				0xee51cd59,	true,	true },
-	{ "pak015.pk4",				0xf5bf4e0c,	true,	true },
-	{ "pak016.pk4",				0x2196f58c,	true,	true },
-	{ "pak017.pk4",				0x91118a35,	true,	true },
-	{ "pak018.pk4",				0x98a14f03,	true,	true },
-	{ "pak019.pk4",				0xbc82ac79,	true,	true },
-	{ "pak020.pk4",				0xce74cda5,	true,	true },
-	{ "pak021.pk4",				0x2ba6e70c,	true,	true },
-	{ "pak022.pk4",				0x4e390eec,	true,	true },
+	// Prey CD/DVD layout. Checksums remain presence-only until clean retail
+	// samples for every disc/patch variant have been catalogued.
+	{ "pak000.pk4",				0,			false,	true },
+	{ "pak001.pk4",				0,			false,	true },
+	{ "pak002.pk4",				0,			false,	true },
+	{ "pak003.pk4",				0,			false,	true },
+	{ "pak004.pk4",				0,			false,	true },
 
-	// official patch/menu media, but not required by openQ4 startup
-	{ "pak023.pk4",				0x7c1fd3a5,	false,	true },
-	{ "pak024.pk4",				0x5546d551,	false,	true },
-	{ "pak025.pk4",				0xcaeec1fd,	false,	true },
+	// Consolidated layout used by legacy digital distributions.
+	{ "pak_data.pk4",			0xbe295ead,	false,	true },
+	{ "pak_sound.pk4",			0xe0c27ee2,	false,	true },
+	{ "pak_en_v.pk4",			0x952b910e,	false,	true },
+	{ "pak_en_t.pk4",			0x6625f12d,	false,	true },
 
-	// official but optional
-	{ "q4cmp_pak001.pk4",		0xd0813943,	false,	false },
-	{ "zpak_english.pk4",		0x5868f530,	false,	false },
-	{ "zpak_english_01.pk4",	0xd9f04b8b,	false,	false },
-	{ "zpak_english_02.pk4",	0x9dbd91fd,	false,	false },
-	{ "zpak_english_03.pk4",	0x02eb6ad8,	false,	false },
-	{ "zpak_english_04.pk4",	0xd3fefaa1,	false,	false },
-	{ "zpak_english_05.pk4",	0x8596af60,	false,	false },
-	{ "zpak_spanish.pk4",		0xb706e2b8,	false,	false },
+	// Known optional patch and game media. The gameXX packs are not assumed to
+	// be binary-only: unlike Quake 4's game000 family, their contents have not
+	// yet been verified across all Prey releases.
+	{ "pak005.pk4",				0,			false,	true },
+	{ "pak006.pk4",				0,			false,	true },
+	{ "pak020.pk4",				0,			false,	true },
+	{ "pak040.pk4",				0,			false,	true },
+	{ "game00.pk4",				0,			false,	false },
+	{ "game01.pk4",				0,			false,	false },
+	{ "game02.pk4",				0,			false,	false },
+	{ "game03.pk4",				0,			false,	false },
 
 	{ NULL,						0,			false,	false }
+};
+
+static const char *requiredClassicPk4s[] = {
+	"pak000.pk4",
+	"pak001.pk4",
+	"pak002.pk4",
+	"pak003.pk4",
+	"pak004.pk4",
+	NULL
+};
+
+static const char *requiredDigitalPk4s[] = {
+	"pak_data.pk4",
+	"pak_sound.pk4",
+	"pak_en_v.pk4",
+	"pak_en_t.pk4",
+	NULL
 };
 
 static bool FS_IsIgnoredOfficialGameBinaryPk4( const char *pakName ) {
@@ -316,6 +320,8 @@ static bool FS_IsIgnoredOfficialGameBinaryPk4( const char *pakName ) {
 	name = pakName;
 	name.StripPath();
 
+	// Preserve upstream's fail-safe for the inherited Quake 4 binary-pack
+	// names. No Prey gameXX pack is ignored until its contents are verified.
 	if ( !name.Icmp( "game000.pk4" ) ||
 		 !name.Icmp( "game100.pk4" ) ||
 		 !name.Icmp( "game200.pk4" ) ||
@@ -633,14 +639,32 @@ static void FS_LogPathList( const char *label, const idStrList &paths ) {
 
 static bool FS_HasGameFilesAtGameDirPath( const char *gameDirPath ) {
 	idStr pakPath;
+	static const char *preyPackProbes[] = {
+		// Either complete required layout is accepted later by
+		// ValidateRequiredOfficialPaks. A single hit is enough for discovery so
+		// that startup can report the exact missing members of a partial install.
+		"pak000.pk4",
+		"pak001.pk4",
+		"pak_data.pk4",
+		"pak_sound.pk4",
+		"pak_en_v.pk4",
+		"pak_en_t.pk4",
+		NULL
+	};
 
 	if ( !gameDirPath || !gameDirPath[ 0 ] ) {
 		return false;
 	}
 
-	pakPath = gameDirPath;
-	pakPath.AppendPath( "pak001.pk4" );
-	return FS_FileExists( pakPath.c_str() );
+	for ( int i = 0; preyPackProbes[ i ] != NULL; i++ ) {
+		pakPath = gameDirPath;
+		pakPath.AppendPath( preyPackProbes[ i ] );
+		if ( FS_FileExists( pakPath.c_str() ) ) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static bool FS_TryResolveBasePathCandidate( const char *candidatePath, idStr &resolvedBasePath ) {
@@ -735,6 +759,139 @@ static void FS_ExtractQuotedTokens( const char *line, idStrList &tokens ) {
 	}
 }
 
+static void FS_AppendInstallRootCandidate( idStrList &candidates, const char *pathHint ) {
+	idStr normalized;
+	idStr lower;
+	int commaPos;
+	int exePos;
+
+	if ( !pathHint || !pathHint[ 0 ] ) {
+		return;
+	}
+
+	normalized = pathHint;
+	normalized.Strip( ' ' );
+	normalized.Strip( '\t' );
+	normalized.StripQuotes();
+	normalized.StripLeading( '"' );
+	normalized.Replace( "\\\\", "\\" );
+	normalized.BackSlashesToSlashes();
+	normalized.StripTrailing( '/' );
+	if ( !normalized.Length() ) {
+		return;
+	}
+
+	// DisplayIcon values commonly append an icon index. Command values may
+	// append switches. Retain only the executable before resolving its parent.
+	lower = normalized;
+	lower.ToLower();
+	exePos = lower.Find( ".exe", true );
+	if ( exePos >= 0 ) {
+		normalized.CapLength( exePos + 4 );
+	} else {
+		commaPos = normalized.Find( ',' );
+		if ( commaPos > 0 ) {
+			normalized.CapLength( commaPos );
+		}
+	}
+	normalized.StripTrailing( '"' );
+
+	lower = normalized;
+	lower.ToLower();
+	if ( lower.Length() > 4 && !idStr::Icmp( lower.Right( 4 ).c_str(), ".exe" ) ) {
+		idStr directory;
+		normalized.ExtractFilePath( directory );
+		normalized = directory;
+	}
+
+	normalized.Strip( ' ' );
+	normalized.Strip( '\t' );
+	normalized.StripQuotes();
+	normalized.StripTrailing( '/' );
+	if ( !normalized.Length() ) {
+		return;
+	}
+
+	// Registry values and App Paths sometimes point directly at retail base/.
+	lower = normalized;
+	lower.ToLower();
+	if ( lower.Length() > 5 && !idStr::Icmp( lower.Right( 5 ).c_str(), "/base" ) ) {
+		normalized.CapLength( normalized.Length() - 5 );
+		normalized.StripTrailing( '/' );
+	}
+
+	FS_AddUniquePath( candidates, normalized.c_str() );
+}
+
+static bool FS_ExtractExecutableDirectoryFromCommand( const char *commandLine, idStr &directoryOut ) {
+	idStr command;
+	idStr executable;
+	int endQuote;
+	int exePos;
+
+	directoryOut.Clear();
+	if ( !commandLine || !commandLine[ 0 ] ) {
+		return false;
+	}
+
+	command = commandLine;
+	command.Strip( ' ' );
+	command.Strip( '\t' );
+	if ( !command.Length() ) {
+		return false;
+	}
+
+	if ( command[ 0 ] == '"' ) {
+		endQuote = command.Find( '"', 1 );
+		if ( endQuote <= 1 ) {
+			return false;
+		}
+		executable = command.Mid( 1, endQuote - 1 );
+	} else {
+		exePos = command.Find( ".exe", false );
+		if ( exePos >= 0 ) {
+			executable = command.Left( exePos + 4 );
+		} else {
+			int separator = command.Find( ' ' );
+			executable = separator > 0 ? command.Left( separator ) : command;
+		}
+	}
+
+	executable.Replace( "\\\\", "\\" );
+	executable.BackSlashesToSlashes();
+	executable.StripQuotes();
+	executable.StripTrailing( '/' );
+	if ( executable.Length() <= 4 || idStr::Icmp( executable.Right( 4 ).c_str(), ".exe" ) ) {
+		return false;
+	}
+
+	executable.ExtractFilePath( directoryOut );
+	directoryOut.StripTrailing( '/' );
+	return directoryOut.Length() > 0;
+}
+
+static void FS_AddKnownInstallCandidatesFromRoot( idStrList &candidates, const char *rootPath ) {
+	static const char *relativePaths[] = {
+		"Human Head Studios/Prey",
+		"2K Games/Prey",
+		"3D Realms/Prey",
+		"Games/Prey",
+		"Prey",
+		NULL
+	};
+	idStr candidate;
+
+	if ( !rootPath || !rootPath[ 0 ] ) {
+		return;
+	}
+
+	for ( int i = 0; relativePaths[ i ] != NULL; i++ ) {
+		candidate = rootPath;
+		candidate.AppendPath( relativePaths[ i ] );
+		FS_AddUniquePath( candidates, candidate.c_str() );
+	}
+}
+
 #ifdef WIN32
 static bool FS_ReadRegistryString( HKEY root, const char *subKey, const char *valueName, REGSAM accessFlags, idStr &result ) {
 	HKEY	hKey;
@@ -744,7 +901,7 @@ static bool FS_ReadRegistryString( HKEY root, const char *subKey, const char *va
 	DWORD	size;
 
 	result.Clear();
-	if ( !subKey || !subKey[ 0 ] || !valueName || !valueName[ 0 ] ) {
+	if ( !subKey || !subKey[ 0 ] ) {
 		return false;
 	}
 
@@ -755,7 +912,7 @@ static bool FS_ReadRegistryString( HKEY root, const char *subKey, const char *va
 
 	type = 0;
 	size = sizeof( buffer ) - 1;
-	status = RegQueryValueExA( hKey, valueName, NULL, &type, buffer, &size );
+	status = RegQueryValueExA( hKey, ( valueName && valueName[ 0 ] ) ? valueName : NULL, NULL, &type, buffer, &size );
 	RegCloseKey( hKey );
 	if ( status != ERROR_SUCCESS || size == 0 ) {
 		return false;
@@ -778,6 +935,13 @@ static bool FS_ReadRegistryString( HKEY root, const char *subKey, const char *va
 	result.BackSlashesToSlashes();
 	result.StripTrailing( '/' );
 	return result.Length() > 0;
+}
+
+static void FS_AppendRegistryValueCandidate( idStrList &candidates, HKEY root, const char *subKey, const char *valueName, REGSAM accessFlags ) {
+	idStr value;
+	if ( FS_ReadRegistryString( root, subKey, valueName, accessFlags, value ) ) {
+		FS_AppendInstallRootCandidate( candidates, value.c_str() );
+	}
 }
 
 static void FS_AppendGogPathsFromRegistryGamesBranch( HKEY root, const char *branch, idStrList &candidates, REGSAM accessFlags ) {
@@ -819,7 +983,7 @@ static void FS_AppendGogPathsFromRegistryGamesBranch( HKEY root, const char *bra
 	RegCloseKey( hKey );
 }
 
-static void FS_AppendGogPathsFromRegistryUninstallBranch( HKEY root, const char *branch, idStrList &candidates, REGSAM accessFlags ) {
+static void FS_AppendPreyPathsFromRegistryUninstallBranch( HKEY root, const char *branch, idStrList &candidates, REGSAM accessFlags ) {
 	HKEY	hKey;
 	LONG	status;
 	DWORD	index;
@@ -827,10 +991,10 @@ static void FS_AppendGogPathsFromRegistryUninstallBranch( HKEY root, const char 
 	DWORD	subKeyNameLen;
 	idStr	subKeyPath;
 	idStr	displayName;
-	idStr	publisher;
 	idStr	installLocation;
-	bool	matchesQuake4;
-	bool	matchesGog;
+	idStr	displayIcon;
+	idStr	uninstallString;
+	idStr	commandDirectory;
 
 	if ( !branch || !branch[ 0 ] ) {
 		return;
@@ -852,33 +1016,87 @@ static void FS_AppendGogPathsFromRegistryUninstallBranch( HKEY root, const char 
 		subKeyPath = branch;
 		subKeyPath += "\\";
 		subKeyPath += subKeyName;
-		if ( !FS_ReadRegistryString( root, subKeyPath.c_str(), "InstallLocation", accessFlags, installLocation ) ) {
+		displayName.Clear();
+		if ( !FS_ReadRegistryString( root, subKeyPath.c_str(), "DisplayName", accessFlags, displayName ) ||
+			 displayName.Find( "prey", false ) < 0 ) {
 			index++;
 			continue;
 		}
 
-		displayName.Clear();
-		publisher.Clear();
-		FS_ReadRegistryString( root, subKeyPath.c_str(), "DisplayName", accessFlags, displayName );
-		FS_ReadRegistryString( root, subKeyPath.c_str(), "Publisher", accessFlags, publisher );
-
-		matchesQuake4 =
-			( displayName.Find( "Quake 4", false ) >= 0 ) ||
-			( displayName.Find( "Quake IV", false ) >= 0 ) ||
-			( subKeyPath.Find( "Quake 4", false ) >= 0 ) ||
-			( subKeyPath.Find( "Quake IV", false ) >= 0 );
-		matchesGog =
-			( publisher.Find( "GOG", false ) >= 0 ) ||
-			( subKeyPath.Find( "GOG", false ) >= 0 );
-
-		if ( matchesQuake4 || ( matchesGog && installLocation.Find( "Quake", false ) >= 0 ) ) {
-			FS_AddUniquePath( candidates, installLocation.c_str() );
+		if ( FS_ReadRegistryString( root, subKeyPath.c_str(), "InstallLocation", accessFlags, installLocation ) ) {
+			FS_AppendInstallRootCandidate( candidates, installLocation.c_str() );
+		}
+		if ( FS_ReadRegistryString( root, subKeyPath.c_str(), "DisplayIcon", accessFlags, displayIcon ) ) {
+			FS_AppendInstallRootCandidate( candidates, displayIcon.c_str() );
+		}
+		if ( FS_ReadRegistryString( root, subKeyPath.c_str(), "UninstallString", accessFlags, uninstallString ) &&
+			 FS_ExtractExecutableDirectoryFromCommand( uninstallString.c_str(), commandDirectory ) ) {
+			FS_AppendInstallRootCandidate( candidates, commandDirectory.c_str() );
 		}
 
 		index++;
 	}
 
 	RegCloseKey( hKey );
+}
+
+static void FS_BuildRegistryInstallCandidates( idStrList &candidates ) {
+	static HKEY rootKeys[] = {
+		HKEY_CURRENT_USER,
+		HKEY_LOCAL_MACHINE
+	};
+	static const REGSAM registryViews[] = {
+		KEY_WOW64_64KEY,
+		KEY_WOW64_32KEY
+	};
+	static const char *installKeys[] = {
+		"SOFTWARE\\Human Head Studios\\Prey",
+		"SOFTWARE\\2K Games\\Prey",
+		"SOFTWARE\\3D Realms\\Prey",
+		"SOFTWARE\\WOW6432Node\\Human Head Studios\\Prey",
+		"SOFTWARE\\WOW6432Node\\2K Games\\Prey",
+		"SOFTWARE\\WOW6432Node\\3D Realms\\Prey",
+		NULL
+	};
+	static const char *installValueNames[] = {
+		"InstallPath",
+		"InstallDir",
+		"InstallLocation",
+		"Path",
+		NULL
+	};
+	static const char *appPathKeys[] = {
+		"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\prey.exe",
+		"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths\\prey.exe",
+		NULL
+	};
+	static const char *uninstallRoots[] = {
+		"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+		"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+		NULL
+	};
+
+	for ( int rootIndex = 0; rootIndex < (int)( sizeof( rootKeys ) / sizeof( rootKeys[ 0 ] ) ); rootIndex++ ) {
+		for ( int viewIndex = 0; viewIndex < (int)( sizeof( registryViews ) / sizeof( registryViews[ 0 ] ) ); viewIndex++ ) {
+			const REGSAM accessFlags = registryViews[ viewIndex ];
+
+			for ( int keyIndex = 0; installKeys[ keyIndex ] != NULL; keyIndex++ ) {
+				for ( int valueIndex = 0; installValueNames[ valueIndex ] != NULL; valueIndex++ ) {
+					FS_AppendRegistryValueCandidate( candidates, rootKeys[ rootIndex ], installKeys[ keyIndex ], installValueNames[ valueIndex ], accessFlags );
+				}
+				FS_AppendRegistryValueCandidate( candidates, rootKeys[ rootIndex ], installKeys[ keyIndex ], NULL, accessFlags );
+			}
+
+			for ( int keyIndex = 0; appPathKeys[ keyIndex ] != NULL; keyIndex++ ) {
+				FS_AppendRegistryValueCandidate( candidates, rootKeys[ rootIndex ], appPathKeys[ keyIndex ], NULL, accessFlags );
+				FS_AppendRegistryValueCandidate( candidates, rootKeys[ rootIndex ], appPathKeys[ keyIndex ], "Path", accessFlags );
+			}
+
+			for ( int uninstallIndex = 0; uninstallRoots[ uninstallIndex ] != NULL; uninstallIndex++ ) {
+				FS_AppendPreyPathsFromRegistryUninstallBranch( rootKeys[ rootIndex ], uninstallRoots[ uninstallIndex ], candidates, accessFlags );
+			}
+		}
+	}
 }
 
 static void FS_AppendGogInstallCandidatesFromRegistry( idStrList &candidates ) {
@@ -888,12 +1106,49 @@ static void FS_AppendGogInstallCandidatesFromRegistry( idStrList &candidates ) {
 	FS_AppendGogPathsFromRegistryGamesBranch( HKEY_CURRENT_USER, "SOFTWARE\\GOG.com\\Games", candidates, KEY_WOW64_64KEY );
 	FS_AppendGogPathsFromRegistryGamesBranch( HKEY_CURRENT_USER, "SOFTWARE\\GOG.com\\Games", candidates, KEY_WOW64_32KEY );
 
-	FS_AppendGogPathsFromRegistryUninstallBranch( HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_64KEY );
-	FS_AppendGogPathsFromRegistryUninstallBranch( HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_32KEY );
-	FS_AppendGogPathsFromRegistryUninstallBranch( HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_64KEY );
-	FS_AppendGogPathsFromRegistryUninstallBranch( HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_32KEY );
+	FS_AppendPreyPathsFromRegistryUninstallBranch( HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_64KEY );
+	FS_AppendPreyPathsFromRegistryUninstallBranch( HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_32KEY );
+	FS_AppendPreyPathsFromRegistryUninstallBranch( HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_64KEY );
+	FS_AppendPreyPathsFromRegistryUninstallBranch( HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", candidates, KEY_WOW64_32KEY );
 }
 #endif
+
+static void FS_BuildKnownInstallCandidates( idStrList &candidates ) {
+	const char *envPath;
+
+#ifdef WIN32
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/Human Head Studios/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/Human Head Studios/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/2K Games/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/2K Games/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/3D Realms/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/3D Realms/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/Prey" );
+	FS_AddUniquePath( candidates, "C:/Games/Prey" );
+
+	envPath = getenv( "ProgramFiles(x86)" );
+	FS_AddKnownInstallCandidatesFromRoot( candidates, envPath );
+	envPath = getenv( "ProgramFiles" );
+	FS_AddKnownInstallCandidatesFromRoot( candidates, envPath );
+	envPath = getenv( "ProgramW6432" );
+	FS_AddKnownInstallCandidatesFromRoot( candidates, envPath );
+	envPath = getenv( "SystemDrive" );
+	if ( envPath && envPath[ 0 ] ) {
+		idStr gamesRoot = envPath;
+		gamesRoot.AppendPath( "Games" );
+		FS_AddKnownInstallCandidatesFromRoot( candidates, gamesRoot.c_str() );
+	}
+#else
+	envPath = getenv( "HOME" );
+	if ( envPath && envPath[ 0 ] ) {
+		idStr path = envPath;
+		path.AppendPath( "Games" );
+		path.AppendPath( "Prey" );
+		FS_AddUniquePath( candidates, path.c_str() );
+	}
+#endif
+}
 
 static void FS_AppendSteamLibrariesFromVdf( const char *steamRoot, idStrList &libraryRoots ) {
 	idStr		vdfPath;
@@ -949,11 +1204,20 @@ static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {
 
 	candidates.Clear();
 
-	FS_AppendEnvPathList( candidates, "OPENQ4_QUAKE4_PATH" );
-	FS_AppendEnvPathList( candidates, "OPENQ4_QUAKE4_ROOT" );
+	FS_AppendEnvPathList( candidates, "OPENPREY_PREY_PATH" );
+	FS_AppendEnvPathList( candidates, "OPENPREY_PREY_ROOT" );
+	FS_AppendEnvPathList( steamRoots, "OPENPREY_STEAM_ROOT" );
+	FS_AppendEnvPathList( steamRoots, "OPENPREY_STEAM_ROOTS" );
+	FS_AppendEnvPathList( steamRoots, "STEAM_COMPAT_CLIENT_INSTALL_PATH" );
+	FS_AppendEnvPathList( explicitLibraryRoots, "OPENPREY_STEAM_LIBRARY" );
+	FS_AppendEnvPathList( explicitLibraryRoots, "OPENPREY_STEAM_LIBRARIES" );
+
+	// Temporary migration aliases. New documentation and diagnostics use only
+	// OPENPREY_* names.
+	FS_AppendEnvPathList( candidates, "OPENQ4_PREY_PATH" );
+	FS_AppendEnvPathList( candidates, "OPENQ4_PREY_ROOT" );
 	FS_AppendEnvPathList( steamRoots, "OPENQ4_STEAM_ROOT" );
 	FS_AppendEnvPathList( steamRoots, "OPENQ4_STEAM_ROOTS" );
-	FS_AppendEnvPathList( steamRoots, "STEAM_COMPAT_CLIENT_INSTALL_PATH" );
 	FS_AppendEnvPathList( explicitLibraryRoots, "OPENQ4_STEAM_LIBRARY" );
 	FS_AppendEnvPathList( explicitLibraryRoots, "OPENQ4_STEAM_LIBRARIES" );
 
@@ -1035,7 +1299,7 @@ static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {
 		path = explicitLibraryRoots[ i ];
 		path.AppendPath( "steamapps" );
 		path.AppendPath( "common" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 	}
 
@@ -1048,7 +1312,7 @@ static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {
 			path = libraryRoots[ j ];
 			path.AppendPath( "steamapps" );
 			path.AppendPath( "common" );
-			path.AppendPath( "Quake 4" );
+			path.AppendPath( "Prey" );
 			FS_AddUniquePath( candidates, path.c_str() );
 		}
 	}
@@ -1056,7 +1320,7 @@ static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {
 	FS_LogPathList( "Steam install discovery roots", steamRoots );
 	FS_LogPathList( "Steam explicit library roots", explicitLibraryRoots );
 	FS_LogPathList( "Steam library roots to probe", discoveryLibraryRoots );
-	FS_LogPathList( "Steam Quake 4 install candidates", candidates );
+	FS_LogPathList( "Steam Prey install candidates", candidates );
 }
 
 static void FS_BuildGogInstallCandidates( idStrList &candidates ) {
@@ -1068,16 +1332,21 @@ static void FS_BuildGogInstallCandidates( idStrList &candidates ) {
 #ifdef WIN32
 	FS_AppendGogInstallCandidatesFromRegistry( candidates );
 
-	FS_AddUniquePath( candidates, "C:/Program Files (x86)/GOG Galaxy/Games/Quake 4" );
-	FS_AddUniquePath( candidates, "C:/Program Files/GOG Galaxy/Games/Quake 4" );
-	FS_AddUniquePath( candidates, "C:/GOG Games/Quake 4" );
+	FS_AppendEnvPathList( candidates, "OPENPREY_GOG_PATH" );
+	FS_AppendEnvPathList( candidates, "OPENPREY_GOG_ROOT" );
+	FS_AppendEnvPathList( candidates, "OPENQ4_GOG_PATH" );
+	FS_AppendEnvPathList( candidates, "OPENQ4_GOG_ROOT" );
+
+	FS_AddUniquePath( candidates, "C:/Program Files (x86)/GOG Galaxy/Games/Prey" );
+	FS_AddUniquePath( candidates, "C:/Program Files/GOG Galaxy/Games/Prey" );
+	FS_AddUniquePath( candidates, "C:/GOG Games/Prey" );
 
 	envPath = getenv( "ProgramFiles(x86)" );
 	if ( envPath && envPath[ 0 ] ) {
 		path = envPath;
 		path.AppendPath( "GOG Galaxy" );
 		path.AppendPath( "Games" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 	}
 	envPath = getenv( "ProgramFiles" );
@@ -1085,14 +1354,14 @@ static void FS_BuildGogInstallCandidates( idStrList &candidates ) {
 		path = envPath;
 		path.AppendPath( "GOG Galaxy" );
 		path.AppendPath( "Games" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 	}
 	envPath = getenv( "SystemDrive" );
 	if ( envPath && envPath[ 0 ] ) {
 		path = envPath;
 		path.AppendPath( "GOG Games" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 	}
 #else
@@ -1100,16 +1369,17 @@ static void FS_BuildGogInstallCandidates( idStrList &candidates ) {
 	if ( envPath && envPath[ 0 ] ) {
 		path = envPath;
 		path.AppendPath( "GOG Games" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 
 		path = envPath;
 		path.AppendPath( "Games" );
 		path.AppendPath( "GOG Games" );
-		path.AppendPath( "Quake 4" );
+		path.AppendPath( "Prey" );
 		FS_AddUniquePath( candidates, path.c_str() );
 	}
 #endif
+	FS_LogPathList( "GOG Prey install candidates", candidates );
 }
 
 static bool FS_FindFirstValidInstallPath( const idStrList &candidates, idStr &result ) {
@@ -1131,6 +1401,22 @@ static bool FS_AutoDiscoverBasePath( idStr &basePath ) {
 
 	if ( FS_GetCurrentWorkingDirectory( cwd ) && FS_TryResolveBasePathCandidate( cwd.c_str(), resolvedBasePath ) ) {
 		basePath = resolvedBasePath;
+		return true;
+	}
+
+#ifdef WIN32
+	candidates.Clear();
+	FS_BuildRegistryInstallCandidates( candidates );
+	FS_LogPathList( "Windows registry Prey install candidates", candidates );
+	if ( FS_FindFirstValidInstallPath( candidates, basePath ) ) {
+		return true;
+	}
+#endif
+
+	candidates.Clear();
+	FS_BuildKnownInstallCandidates( candidates );
+	FS_LogPathList( "Known Prey install candidates", candidates );
+	if ( FS_FindFirstValidInstallPath( candidates, basePath ) ) {
 		return true;
 	}
 
@@ -1209,7 +1495,7 @@ typedef struct searchpath_s {
 #define FSFLAG_BINARY_ONLY		( 1 << 3 )
 #define FSFLAG_SEARCH_ADDONS	( 1 << 4 )
 
-// 3 search path (fs_savepath fs_basepath fs_cdpath)
+// 4 search paths (fs_savepath fs_basepath fs_cdpath fs_devpath)
 // + .jpg and .tga
 #define MAX_CACHED_DIRS 6
 
@@ -1290,6 +1576,7 @@ public:
 	virtual idFile *		OpenFileByMode( const char *relativePath, fsMode_t mode );
 	virtual idFile *		OpenExplicitFileRead( const char *OSPath );
 	virtual idFile *		OpenExplicitFileWrite( const char *OSPath );
+	virtual idFile *		OpenExplicitFileAppend( const char *OSPath, bool sync = false );
 	virtual void			CloseFile( idFile *f );
 	virtual void			BackgroundDownload( backgroundDownload_t *bgl );
 	virtual void			ResetReadCount( void ) { readCount = 0; }
@@ -1345,6 +1632,7 @@ private:
 	static idCVar			fs_homepath;
 	static idCVar			fs_savepath;
 	static idCVar			fs_cdpath;
+	static idCVar			fs_devpath;
 	static idCVar			fs_game;
 	static idCVar			fs_game_base;
 	static idCVar			fs_caseSensitiveOS;
@@ -1436,6 +1724,7 @@ idCVar	idFileSystemLocal::fs_basepath( "fs_basepath", "", CVAR_SYSTEM | CVAR_INI
 idCVar	idFileSystemLocal::fs_homepath( "fs_homepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_savepath( "fs_savepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_cdpath( "fs_cdpath", "", CVAR_SYSTEM | CVAR_INIT, "" );
+idCVar	idFileSystemLocal::fs_devpath( "fs_devpath", "", CVAR_SYSTEM | CVAR_INIT, "optional highest-priority loose development-content root" );
 idCVar	idFileSystemLocal::fs_game( "fs_game", OPENQ4_GAMEDIR, CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "mod path" );
 idCVar  idFileSystemLocal::fs_game_base( "fs_game_base", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "alternate mod path, searched after the main fs_game path, before the basedir" );
 #ifdef WIN32
@@ -1444,7 +1733,7 @@ idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "0", CVAR_SY
 idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 #endif
 idCVar	idFileSystemLocal::fs_searchAddons( "fs_searchAddons", "0", CVAR_SYSTEM | CVAR_BOOL, "search all addon pk4s ( disables addon functionality )" );
-idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base media pk4 checksums on startup" );
+idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official Prey media pk4 files on startup" );
 
 idFileSystemLocal	fileSystemLocal;
 idFileSystem *		fileSystem = &fileSystemLocal;
@@ -3530,6 +3819,7 @@ static bool FS_ModManifestKeyIsKnown( const idStr &key ) {
 		   !key.Icmp( "releaseDate" ) ||
 		   !key.Icmp( "website" ) ||
 		   !key.Icmp( "author" ) ||
+		   !key.Icmp( "requiredopenPREYVersion" ) ||
 		   !key.Icmp( "requiredopenQ4Version" );
 }
 
@@ -3635,6 +3925,9 @@ FS_ParseModManifest
 ===============
 */
 static bool FS_ParseModManifest( const char *jsonText, idModInfo &modInfo, idStr &errorOut ) {
+	idStr legacyRequiredVersion;
+	bool sawRequiredopenPREYVersion = false;
+
 	errorOut.Clear();
 	modInfo.displayName.Clear();
 	modInfo.version.Clear();
@@ -3702,8 +3995,11 @@ static bool FS_ParseModManifest( const char *jsonText, idModInfo &modInfo, idStr
 				modInfo.website = value;
 			} else if ( !key.Icmp( "author" ) ) {
 				modInfo.author = value;
-			} else if ( !key.Icmp( "requiredopenQ4Version" ) ) {
+			} else if ( !key.Icmp( "requiredopenPREYVersion" ) ) {
 				modInfo.requiredopenQ4Version = value;
+				sawRequiredopenPREYVersion = true;
+			} else if ( !key.Icmp( "requiredopenQ4Version" ) ) {
+				legacyRequiredVersion = value;
 			}
 		} else if ( !FS_SkipJsonValue( cursor, errorOut ) ) {
 			errorOut = va( "invalid value for '%s': %s", key.c_str(), errorOut.c_str() );
@@ -3763,8 +4059,13 @@ static bool FS_ParseModManifest( const char *jsonText, idModInfo &modInfo, idStr
 		errorOut = "missing required field 'author'";
 		return false;
 	}
+	// openPREY is authoritative when both keys are present. The inherited key
+	// remains readable for migration of existing third-party manifests.
+	if ( !sawRequiredopenPREYVersion && !legacyRequiredVersion.IsEmpty() ) {
+		modInfo.requiredopenQ4Version = legacyRequiredVersion;
+	}
 	if ( modInfo.requiredopenQ4Version.IsEmpty() ) {
-		errorOut = "missing required field 'requiredopenQ4Version'";
+		errorOut = "missing required field 'requiredopenPREYVersion'";
 		return false;
 	}
 
@@ -3781,14 +4082,15 @@ idModList *idFileSystemLocal::ListMods( void ) {
 	idStrList	dirs;
 	idModList	*list = new idModList;
 
-	const char	*search[ 3 ];
+	const char	*search[ 4 ];
 	int			isearch;
 
-	search[0] = fs_cdpath.GetString();
-	search[1] = fs_basepath.GetString();
-	search[2] = fs_savepath.GetString();
+	search[0] = fs_devpath.GetString();
+	search[1] = fs_cdpath.GetString();
+	search[2] = fs_basepath.GetString();
+	search[3] = fs_savepath.GetString();
 
-	for ( isearch = 0; isearch < 3; isearch++ ) {
+	for ( isearch = 0; isearch < 4; isearch++ ) {
 		if ( !search[ isearch ] || !search[ isearch ][ 0 ] ) {
 			continue;
 		}
@@ -3882,7 +4184,7 @@ modManifestStatus_t idFileSystemLocal::ReadModManifestFile( const char *manifest
 	if ( !FS_ParseopenQ4BaseVersion( modInfo.requiredopenQ4Version.c_str(), requiredVersion ) ) {
 		if ( reason != NULL ) {
 			*reason = va(
-				"%s has invalid required openQ4 version '%s' (expected major.minor.patch)",
+				"%s has invalid required openPREY version '%s' (expected major.minor.patch)",
 				modInfo.displayName.c_str(),
 				modInfo.requiredopenQ4Version.c_str() );
 		}
@@ -3892,7 +4194,7 @@ modManifestStatus_t idFileSystemLocal::ReadModManifestFile( const char *manifest
 	openQ4BaseVersion_t engineVersion;
 	if ( !FS_ParseopenQ4BaseVersion( OPENQ4_VERSION_BASE, engineVersion ) ) {
 		if ( reason != NULL ) {
-			*reason = va( "this build has invalid openQ4 version '%s'", OPENQ4_VERSION_BASE );
+			*reason = va( "this build has invalid openPREY version '%s'", OPENQ4_VERSION_BASE );
 		}
 		return MOD_MANIFEST_INVALID;
 	}
@@ -3900,7 +4202,7 @@ modManifestStatus_t idFileSystemLocal::ReadModManifestFile( const char *manifest
 	if ( FS_CompareopenQ4BaseVersions( engineVersion, requiredVersion ) < 0 ) {
 		if ( reason != NULL ) {
 			*reason = va(
-				"%s requires openQ4 %s or newer but this build is %s",
+				"%s requires openPREY %s or newer but this build is %s",
 				modInfo.displayName.c_str(),
 				modInfo.requiredopenQ4Version.c_str(),
 				OPENQ4_VERSION_BASE );
@@ -3951,13 +4253,14 @@ bool idFileSystemLocal::GetModInfo( const char *modDir, idModInfo &modInfo, idSt
 		return false;
 	}
 
-	const char *search[ 3 ];
-	search[ 0 ] = fs_cdpath.GetString();
-	search[ 1 ] = fs_basepath.GetString();
-	search[ 2 ] = fs_savepath.GetString();
+	const char *search[ 4 ];
+	search[ 0 ] = fs_devpath.GetString();
+	search[ 1 ] = fs_cdpath.GetString();
+	search[ 2 ] = fs_basepath.GetString();
+	search[ 3 ] = fs_savepath.GetString();
 
 	idStr failureReason;
-	for ( int i = 0; i < 3; ++i ) {
+	for ( int i = 0; i < 4; ++i ) {
 		idStr localReason;
 		const modManifestStatus_t status = ReadModManifestFromSearchPath( search[ i ], modDir, modInfo, &localReason );
 		if ( status == MOD_MANIFEST_VALID ) {
@@ -4416,6 +4719,13 @@ void idFileSystemLocal::SetupGameDirectories( const char *gameName ) {
 	if ( fs_cdpath.GetString()[0] ) {
 		AddGameDirectory( fs_cdpath.GetString(), gameName );
 	}
+
+	// Development content is intentionally opt-in and wins over packaged,
+	// retail, and save-path files. This restores the idTech development-root
+	// contract without allowing loose game modules from this path.
+	if ( fs_devpath.GetString()[0] ) {
+		AddGameDirectory( fs_devpath.GetString(), gameName );
+	}
 }
 
 /*
@@ -4730,7 +5040,7 @@ bool idFileSystemLocal::FindMisplacedOfficialPaks( idStr &errors ) const {
 			continue;
 		}
 
-		if ( (unsigned int)openQ4Pack->checksum != info->checksum ) {
+		if ( info->checksum != 0 && (unsigned int)openQ4Pack->checksum != info->checksum ) {
 			errors += va( "%s was found in %s with checksum 0x%08x but belongs in %s (expected 0x%08x from %s)\n",
 				info->name, OPENQ4_GAMEDIR, (unsigned int)openQ4Pack->checksum, BASE_GAMEDIR,
 				info->checksum, openQ4Pack->pakFilename.c_str() );
@@ -4803,22 +5113,65 @@ idFileSystemLocal::ValidateRequiredOfficialPaks
 */
 bool idFileSystemLocal::ValidateRequiredOfficialPaks( idStr &errors ) const {
 	const officialPk4Info_t	*info;
+	const char *const		*requiredSet;
+	const char *const		*setProbe;
 	pack_t					*pack;
+	unsigned int			expectedChecksum;
+	int					classicFoundCount = 0;
+	int					digitalFoundCount = 0;
 
 	errors.Clear();
-	for ( int i = 0; officialPk4s[ i ].name != NULL; i++ ) {
-		info = &officialPk4s[ i ];
-		if ( !info->required ) {
-			continue;
+
+	// Detect the distribution layout first. Requiring every known filename at
+	// once would incorrectly reject both valid retail layouts.
+	for ( setProbe = requiredClassicPk4s; *setProbe != NULL; setProbe++ ) {
+		if ( FindBaseGamePackByName( *setProbe ) != NULL ) {
+			classicFoundCount++;
 		}
-		pack = FindBaseGamePackByName( info->name );
+	}
+	for ( setProbe = requiredDigitalPk4s; *setProbe != NULL; setProbe++ ) {
+		if ( FindBaseGamePackByName( *setProbe ) != NULL ) {
+			digitalFoundCount++;
+		}
+	}
+
+	if ( classicFoundCount == 0 && digitalFoundCount == 0 ) {
+		errors += "no known official Prey retail pack layout detected\n";
+		errors += "expected either classic CD/DVD packs:\n";
+		for ( setProbe = requiredClassicPk4s; *setProbe != NULL; setProbe++ ) {
+			errors += va( "  - %s\n", *setProbe );
+		}
+		errors += "or consolidated digital packs:\n";
+		for ( setProbe = requiredDigitalPk4s; *setProbe != NULL; setProbe++ ) {
+			errors += va( "  - %s\n", *setProbe );
+		}
+		return false;
+	}
+
+	// Prefer a complete layout. For two partial layouts choose the one with the
+	// most members so diagnostics identify the smallest actionable repair.
+	if ( digitalFoundCount == 4 || ( classicFoundCount != 5 && digitalFoundCount > classicFoundCount ) ) {
+		requiredSet = requiredDigitalPk4s;
+	} else {
+		requiredSet = requiredClassicPk4s;
+	}
+
+	for ( ; *requiredSet != NULL; requiredSet++ ) {
+		info = FindOfficialPk4Info( *requiredSet );
+		expectedChecksum = info ? info->checksum : 0;
+		pack = FindBaseGamePackByName( *requiredSet );
 		if ( !pack ) {
-			errors += va( "missing %s (expected 0x%08x)\n", info->name, info->checksum );
+			if ( expectedChecksum != 0 ) {
+				errors += va( "missing %s (expected 0x%08x)\n", *requiredSet, expectedChecksum );
+			} else {
+				errors += va( "missing %s\n", *requiredSet );
+			}
 			continue;
 		}
-		if ( (unsigned int)pack->checksum != info->checksum ) {
+		// A zero catalog checksum intentionally means presence-only validation.
+		if ( expectedChecksum != 0 && (unsigned int)pack->checksum != expectedChecksum ) {
 			errors += va( "checksum mismatch for %s (expected 0x%08x, got 0x%08x from %s)\n",
-				info->name, info->checksum, (unsigned int)pack->checksum, pack->pakFilename.c_str() );
+				*requiredSet, expectedChecksum, (unsigned int)pack->checksum, pack->pakFilename.c_str() );
 		}
 	}
 	return ( errors.Length() == 0 );
@@ -4831,13 +5184,13 @@ idFileSystemLocal::PrintContentSearchDiagnostics
 The startup content checks abort the engine, so the log must say where the
 engine actually looked and what it found there. Without this the user only
 learns that something is "missing or modified"; the dominant Linux cause is a
-case-mismatched 'q4base'/'pakNNN.pk4' tree copied from a Windows install, which
+case-mismatched 'base'/'pak*.pk4' tree copied from a Windows install, which
 no amount of checksum text can reveal.
 ===============
 */
 void idFileSystemLocal::PrintContentSearchDiagnostics( void ) {
-	const char *roots[ 3 ];
-	const char *rootNames[ 3 ];
+	const char *roots[ 4 ];
+	const char *rootNames[ 4 ];
 	const char *dirs[ 2 ];
 	idStrList	found;
 	idStr		osPath;
@@ -4846,6 +5199,7 @@ void idFileSystemLocal::PrintContentSearchDiagnostics( void ) {
 	roots[ 0 ] = fs_basepath.GetString();	rootNames[ 0 ] = "fs_basepath";
 	roots[ 1 ] = fs_savepath.GetString();	rootNames[ 1 ] = "fs_savepath";
 	roots[ 2 ] = fs_cdpath.GetString();		rootNames[ 2 ] = "fs_cdpath";
+	roots[ 3 ] = fs_devpath.GetString();	rootNames[ 3 ] = "fs_devpath";
 
 	dirs[ 0 ] = BASE_GAMEDIR;
 	dirs[ 1 ] = OPENQ4_GAMEDIR;
@@ -4854,7 +5208,7 @@ void idFileSystemLocal::PrintContentSearchDiagnostics( void ) {
 	common->Printf( "fs_game      = '%s'\n", fs_game.GetString() );
 	common->Printf( "fs_game_base = '%s'\n", fs_game_base.GetString() );
 
-	for ( i = 0; i < 3; i++ ) {
+	for ( i = 0; i < 4; i++ ) {
 		if ( roots[ i ] == NULL || roots[ i ][ 0 ] == '\0' ) {
 			common->Printf( "%s = <unset>\n", rootNames[ i ] );
 			continue;
@@ -4959,8 +5313,8 @@ void idFileSystemLocal::Startup( void ) {
 		if ( !idStr::Icmp( fs_game.GetString(), OPENQ4_GAMEDIR ) ) {
 			PrintContentSearchDiagnostics();
 			common->FatalError(
-				"openQ4 runtime directory '%s' is missing a compatible mod.json.\n\n%s\n"
-				"Rebuild or reinstall openQ4 so '<openQ4 package root>/%s/mod.json' is present and matches this engine version. Do not replace '%s' with retail Quake 4 assets.",
+				"openPREY runtime directory '%s' is missing a compatible mod.json.\n\n%s\n"
+				"Rebuild or reinstall openPREY so '<openPREY package root>/%s/mod.json' is present and matches this engine version. Do not replace '%s' with retail Prey assets.",
 				fs_game.GetString(), invalidReason.c_str(), OPENQ4_GAMEDIR, OPENQ4_GAMEDIR );
 		}
 
@@ -4970,7 +5324,7 @@ void idFileSystemLocal::Startup( void ) {
 
 	// File writes should use the selected game directory even while search paths
 	// are still being populated. Pak-load diagnostics can open logFile as soon
-	// as the first q4base search path exists.
+	// as soon as the first retail base search path exists.
 	if ( fs_game.GetString()[ 0 ] && idStr::Icmp( fs_game.GetString(), BASE_GAMEDIR ) ) {
 		gameFolder = fs_game.GetString();
 	} else if ( fs_game_base.GetString()[ 0 ] && idStr::Icmp( fs_game_base.GetString(), BASE_GAMEDIR ) ) {
@@ -4998,8 +5352,8 @@ void idFileSystemLocal::Startup( void ) {
 	if ( !ValidateOpenQ4Paks( openQ4PakErrors ) ) {
 		PrintContentSearchDiagnostics();
 		common->FatalError(
-			"openQ4 runtime content packs in '%s' are missing or modified.\n\n%s\n"
-			"Rebuild or reinstall openQ4 so '<openQ4 package root>/%s/pak0.pk4' and '<openQ4 package root>/%s/pak1.pk4' match this engine. Retail Quake 4 PK4s belong in '%s', not '%s'.",
+			"openPREY runtime content packs in '%s' are missing or modified.\n\n%s\n"
+			"Rebuild or reinstall openPREY so '<openPREY package root>/%s/pak0.pk4' and '<openPREY package root>/%s/pak1.pk4' match this engine. Retail Prey PK4s belong in '%s', not '%s'.",
 			OPENQ4_GAMEDIR, openQ4PakErrors.c_str(), OPENQ4_GAMEDIR, OPENQ4_GAMEDIR, BASE_GAMEDIR, OPENQ4_GAMEDIR );
 	}
 
@@ -5008,9 +5362,9 @@ void idFileSystemLocal::Startup( void ) {
 		if ( FindMisplacedOfficialPaks( misplacedErrors ) ) {
 			PrintContentSearchDiagnostics();
 			common->FatalError(
-				"Retail Quake 4 media pk4 files must be installed in '%s', not '%s'.\n\n%s\n"
-				"Move the listed files into '<Quake 4 install root>/%s', or remove them from '%s' and launch with +set fs_basepath pointing at a Quake 4 install root that contains '%s'. "
-				"The '%s' directory is reserved for openQ4 runtime files such as pak0.pk4, pak1.pk4, mod.json, and game modules.",
+				"Retail Prey media pk4 files must be installed in '%s', not '%s'.\n\n%s\n"
+				"Move the listed files into '<Prey install root>/%s', or remove them from '%s' and launch with +set fs_basepath pointing at a Prey install root that contains '%s'. "
+				"The '%s' directory is reserved for openPREY runtime files such as pak0.pk4, pak1.pk4, mod.json, and game modules.",
 				BASE_GAMEDIR, OPENQ4_GAMEDIR, misplacedErrors.c_str(), BASE_GAMEDIR, OPENQ4_GAMEDIR, BASE_GAMEDIR, OPENQ4_GAMEDIR );
 		}
 
@@ -5018,9 +5372,9 @@ void idFileSystemLocal::Startup( void ) {
 		if ( !ValidateRequiredOfficialPaks( validationErrors ) ) {
 			PrintContentSearchDiagnostics();
 			common->FatalError(
-				"Required official Quake 4 media pk4 files are missing from '%s' or modified.\n\n%s\n"
-				"openQ4 reads the retail Quake 4 assets from '<Quake 4 install root>/%s'. Put pak001.pk4 through pak022.pk4 in that folder, or launch with +set fs_basepath pointing at the install root that contains it. "
-				"Do not put retail pk4 files in '%s'; that directory is reserved for openQ4 runtime files.",
+				"Required official Prey media pk4 files are missing from '%s' or modified.\n\n%s\n"
+				"openPREY reads retail Prey assets from '<Prey install root>/%s'. Keep either pak000.pk4 through pak004.pk4, or pak_data.pk4, pak_sound.pk4, pak_en_v.pk4, and pak_en_t.pk4 in that folder; alternatively launch with +set fs_basepath pointing at the install root that contains it. "
+				"Do not put retail pk4 files in '%s'; that directory is reserved for openPREY runtime files.",
 				BASE_GAMEDIR, validationErrors.c_str(), BASE_GAMEDIR, OPENQ4_GAMEDIR );
 		}
 	}
@@ -5368,6 +5722,7 @@ int idFileSystemLocal::ValidateDownloadPakForChecksum( int checksum, char path[ 
 	testList.Append( fs_cdpath.GetString() );
 	testList.Append( fs_basepath.GetString() );
 	testList.Append( fs_savepath.GetString() );
+	testList.Append( fs_devpath.GetString() );
 	for ( i = 0; i < testList.Num(); i ++ ) {
 		if ( testList[ i ].Length() && !testList[ i ].Icmpn( pak->pakFilename, testList[ i ].Length() ) ) {
 			relativePath = pak->pakFilename.c_str() + testList[ i ].Length() + 1;
@@ -5616,6 +5971,7 @@ void idFileSystemLocal::Init( void ) {
 	common->StartupVariable( "fs_basepath", false );
 	common->StartupVariable( "fs_homepath", false );
 	common->StartupVariable( "fs_savepath", false );
+	common->StartupVariable( "fs_devpath", false );
 	common->StartupVariable( "fs_game", false );
 	common->StartupVariable( "fs_game_base", false );
 	common->StartupVariable( "fs_copyfiles", false );
@@ -5634,8 +5990,10 @@ void idFileSystemLocal::Init( void ) {
 	// fs_basepath auto-discovery order:
 	// 1) valid fs_basepath override
 	// 2) current working directory
-	// 3) Steam install paths, including explicit OPENQ4_* environment overrides
-	// 4) GOG install paths
+	// 3) Windows registry/App Paths/uninstall entries for CD-era installs
+	// 4) known legacy install directories
+	// 5) Steam install paths, including explicit OPENPREY_* overrides
+	// 6) GOG install paths
 	if ( fs_basepath.GetString()[0] ) {
 		if ( !FS_HasGameFilesAtBasePath( fs_basepath.GetString() ) ) {
 			common->Warning( "fs_basepath '%s' has no %s game files, auto-discovery will be attempted", fs_basepath.GetString(), BASE_GAMEDIR );
@@ -5667,11 +6025,12 @@ void idFileSystemLocal::Init( void ) {
 	// directory on macOS, otherwise the process current directory).
 	fs_cdpath.SetString( Sys_DefaultCDPath() );
 	common->Printf(
-		"Filesystem paths: fs_basepath='%s' fs_homepath='%s' fs_savepath='%s' fs_cdpath='%s' fs_game='%s' fs_game_base='%s'\n",
+		"Filesystem paths: fs_basepath='%s' fs_homepath='%s' fs_savepath='%s' fs_cdpath='%s' fs_devpath='%s' fs_game='%s' fs_game_base='%s'\n",
 		fs_basepath.GetString(),
 		fs_homepath.GetString(),
 		fs_savepath.GetString(),
 		fs_cdpath.GetString(),
+		fs_devpath.GetString(),
 		fs_game.GetString(),
 		fs_game_base.GetString() );
 
@@ -5693,8 +6052,8 @@ void idFileSystemLocal::Init( void ) {
 	// Dedicated servers can run with no outside files at all
 	if ( ReadFile( "default.cfg", NULL, NULL ) <= 0 ) {
 		common->FatalError(
-			"openQ4 startup config 'default.cfg' could not be loaded.\n\n"
-			"Rebuild or reinstall openQ4 so '%s/pak0.pk4' contains the runtime config files, and keep retail Quake 4 media PK4s in '%s'.",
+			"openPREY startup config 'default.cfg' could not be loaded.\n\n"
+			"Rebuild or reinstall openPREY so '%s/pak0.pk4' contains the runtime config files, and keep retail Prey media PK4s in '%s'.",
 			OPENQ4_GAMEDIR, BASE_GAMEDIR );
 	}
 }
@@ -5718,8 +6077,8 @@ void idFileSystemLocal::Restart( void ) {
 	// graphics screen when the font fails to load
 	if ( ReadFile( "default.cfg", NULL, NULL ) <= 0 ) {
 		common->FatalError(
-			"openQ4 startup config 'default.cfg' could not be loaded after filesystem restart.\n\n"
-			"Rebuild or reinstall openQ4 so '%s/pak0.pk4' contains the runtime config files, and keep retail Quake 4 media PK4s in '%s'.",
+			"openPREY startup config 'default.cfg' could not be loaded after filesystem restart.\n\n"
+			"Rebuild or reinstall openPREY so '%s/pak0.pk4' contains the runtime config files, and keep retail Prey media PK4s in '%s'.",
 			OPENQ4_GAMEDIR, BASE_GAMEDIR );
 	}
 }
@@ -5880,7 +6239,7 @@ pureStatus_t idFileSystemLocal::GetPackStatus( pack_t *pak ) {
 		return PURE_ALWAYS;
 	}
 
-	// Keep the stock Quake 4 base media in the pure list no matter their contents.
+	// Keep stock Prey base media in the pure list no matter its contents.
 	officialInfo = FindOfficialPk4Info( name.c_str() );
 	if ( officialInfo && officialInfo->pureBase ) {
 		pak->pureStatus = PURE_ALWAYS;
@@ -6359,6 +6718,38 @@ idFile *idFileSystemLocal::OpenExplicitFileWrite( const char *OSPath ) {
 
 /*
 ===========
+idFileSystemLocal::OpenExplicitFileAppend
+===========
+*/
+idFile *idFileSystemLocal::OpenExplicitFileAppend( const char *OSPath, bool sync ) {
+	if ( !searchPaths ) {
+		common->FatalError( "Filesystem call made without initialization\n" );
+	}
+
+	if ( fs_debug.GetInteger() ) {
+		common->Printf( "idFileSystem::OpenExplicitFileAppend: %s\n", OSPath );
+	}
+
+	common->DPrintf( "appending to: %s\n", OSPath );
+	CreateOSPath( OSPath );
+
+	idFile_Permanent *f = new idFile_Permanent();
+	f->o = OpenOSFile( OSPath, "ab" );
+	if ( !f->o ) {
+		delete f;
+		return NULL;
+	}
+	f->name = OSPath;
+	f->fullPath = OSPath;
+	f->mode = ( 1 << FS_WRITE ) + ( 1 << FS_APPEND );
+	f->handleSync = sync;
+	f->fileSize = DirectFileLength( f->o );
+
+	return f;
+}
+
+/*
+===========
 idFileSystemLocal::OpenFileAppend
 ===========
 */
@@ -6778,11 +7169,11 @@ void idFileSystemLocal::FindDLL( const char *name, char _dllPath[ MAX_OSPATH ], 
 	idStr exeDir = Sys_EXEPath();
 	exeDir.StripFilename();
 
-	// Only load openQ4 game modules staged next to the executable or from the
+	// Only load openPREY game modules staged next to the executable or from the
 	// platform's trusted module root (self-contained macOS apps use the flat
 	// Contents/Frameworks code directory; legacy packages use their adjacent
 	// package root). Mods may provide their own module, but content-only mods
-	// inherit baseoq4 modules. Do not load executable code from PK4s,
+	// inherit basepr modules. Do not load executable code from PK4s,
 	// fs_savepath, pure-server code paks, or loose files outside the
 	// executable/package root.
 	idStr moduleSearchRoots[3];
@@ -6913,12 +7304,13 @@ bool idFileSystemLocal::HasD3XP( void ) {
 	// check for d3xp's d3xp/pak000.pk4 in any search path
 	// checking wether the pak is loaded by checksum wouldn't be enough:
 	// we may have a different fs_game right now but still need to reply that it's installed
-	const char	*search[3];
+	const char	*search[4];
 	idFile	  	*pakfile;
-	search[0] = fs_cdpath.GetString();
-	search[1] = fs_basepath.GetString();
-	search[2] = fs_savepath.GetString();
-	for ( i = 0; i < 3; i++ ) {
+	search[0] = fs_devpath.GetString();
+	search[1] = fs_cdpath.GetString();
+	search[2] = fs_basepath.GetString();
+	search[3] = fs_savepath.GetString();
+	for ( i = 0; i < 4; i++ ) {
 		if ( !search[ i ] || !search[ i ][ 0 ] ) {
 			continue;
 		}

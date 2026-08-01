@@ -522,6 +522,12 @@ public:
 	// returns value != 0.0f if the model requires the depth hack
 	virtual float				DepthHack( void ) const = 0;
 
+	// Compatibility hooks used by Prey's liquid and game-updated models.
+	virtual void				IntersectBounds( const idBounds &bounds, float displacement ) {
+		(void)bounds;
+		(void)displacement;
+	}
+
 // RAVEN BEGIN
 // dluetscher: added call to determine if a collision surface exists within this model
 	virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const;
@@ -560,6 +566,7 @@ public:
 
 	// Returns number of the joint nearest to the given triangle.
 	virtual int					NearestJoint( int surfaceNum, int a, int c, int b ) const = 0;
+	virtual void				SetGameUpdatedModel( bool gameUpdated ) { (void)gameUpdated; }
 
 	// Writing to and reading from a demo file.
 //	virtual void				ReadFromDemo( class idDemoFile *f ) = 0;

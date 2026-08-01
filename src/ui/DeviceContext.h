@@ -56,6 +56,7 @@ public:
 
 	void				SetTransformInfo(const idVec3 &origin, const idMat3 &mat);
 	void				DrawMaterial(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex = 1.0, float scaley = 1.0);
+	void				DrawMaterialUV(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float s0, float t0, float s1, float t1);
 	void				DrawRect(float x, float y, float width, float height, float size, const idVec4 &color);
 	void				DrawFilledRect(float x, float y, float width, float height, const idVec4 &color);
 	int					DrawText(const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor = -1, bool calcOnly = false, idList<int> *breaks = NULL, int limit = 0, int adjust = 0, int style = 0, bool chatWindow = false );
@@ -104,10 +105,13 @@ public:
 	bool				GetOverStrike() { return overStrikeMode; }
 
 	void				DrawEditCursor(float x, float y, float scale);
+	bool				SetRetailSplineEffect( float progress, int splinePoints );
+	void				ClearRetailSplineEffect();
 
 	enum {
 		CURSOR_ARROW,
 		CURSOR_HAND,
+		CURSOR_MENU,
 		CURSOR_COUNT
 	};
 
@@ -218,6 +222,9 @@ private:
 	bool				aspectCorrect;
 
 	bool				mbcs;
+	bool				retailSplineEffectActive;
+	float				retailSplineEffectProgress;
+	int					retailSplineEffectPoints;
 };
 
 bool UI_FontParity_RunSelfTest( void );

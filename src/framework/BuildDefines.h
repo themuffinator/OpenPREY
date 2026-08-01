@@ -12,6 +12,11 @@
 	#define ID_NOLANADDRESS 0
 #endif
 
+// Legacy game-version suffix consumed by the Prey game module.
+#ifndef ID_VERSIONTAG
+	#define ID_VERSIONTAG ""
+#endif
+
 // let .dds be loaded from FS without altering pure state. only for developement.
 #ifndef ID_PURE_ALLOWDDS
 	#define ID_PURE_ALLOWDDS 0

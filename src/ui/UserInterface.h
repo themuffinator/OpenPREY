@@ -102,6 +102,8 @@ public:
 
 								// Triggers the gui and runs the onTrigger scripts.
 	virtual void				Trigger( int time ) = 0;
+	virtual void				CallStartup() {}
+	virtual const char*			Translate( const char* text ) { return text != NULL ? text : ""; }
 
 //	virtual	void				ReadFromDemo( class idDemoFile *f ) = 0;
 //	virtual	void				WriteToDemo( class idDemoFile *f ) = 0;

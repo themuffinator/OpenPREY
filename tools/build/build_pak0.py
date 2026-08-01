@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build baseoq4/pak0.pk4, baseoq4/pak1.pk4, and the generated integrity header."""
+"""Build basepr/pak0.pk4, basepr/pak1.pk4, and the generated integrity header."""
 
 from __future__ import annotations
 
@@ -19,22 +19,22 @@ from openq4_pak import (
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build the openQ4 pak0.pk4 and pak1.pk4 runtime packs and generated checksum header."
+        description="Build the openPREY pak0.pk4 and pak1.pk4 runtime packs and generated checksum header."
     )
-    parser.add_argument("--pak0-source-dir", required=True, help="Source content/baseoq4/pak0 directory.")
-    parser.add_argument("--pak1-source-dir", required=True, help="Source content/baseoq4/pak1 directory.")
+    parser.add_argument("--pak0-source-dir", required=True, help="Source content/basepr/pak0 directory.")
+    parser.add_argument("--pak1-source-dir", required=True, help="Source content/basepr/pak1 directory.")
     parser.add_argument("--pak0-out", required=True, help="Output pak0.pk4 path.")
     parser.add_argument("--pak1-out", required=True, help="Output pak1.pk4 path.")
     parser.add_argument("--header-out", required=True, help="Generated C/C++ header path.")
     parser.add_argument(
         "--pak0-stage-out",
         default="",
-        help="Optional additional baseoq4/pak0.pk4 path to copy for direct builddir launches.",
+        help="Optional additional basepr/pak0.pk4 path to copy for direct builddir launches.",
     )
     parser.add_argument(
         "--pak1-stage-out",
         default="",
-        help="Optional additional baseoq4/pak1.pk4 path to copy for direct builddir launches.",
+        help="Optional additional basepr/pak1.pk4 path to copy for direct builddir launches.",
     )
     return parser.parse_args(argv[1:])
 

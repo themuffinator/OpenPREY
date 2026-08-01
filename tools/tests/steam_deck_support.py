@@ -60,18 +60,18 @@ def require_order(haystack: str, first: str, second: str, context: str) -> None:
 
 
 def validate_launcher_templates() -> None:
-    relative_path = "assets/linux/openQ4-steamdeck.in"
+    relative_path = "assets/linux/openPREY-steamdeck.in"
     launcher = read(relative_path)
-    require(launcher, 'export OPENQ4_STEAMDECK="${OPENQ4_STEAMDECK:-1}"', relative_path)
-    require(launcher, 'if [ "${OPENQ4_FORCE_X11:-0}" = "1" ]; then', relative_path)
+    require(launcher, 'export OPENPREY_STEAMDECK="${OPENPREY_STEAMDECK:-1}"', relative_path)
+    require(launcher, 'if [ "${OPENPREY_FORCE_X11:-${OPENQ4_FORCE_X11:-0}}" = "1" ]; then', relative_path)
     require(launcher, "export SDL_VIDEO_DRIVER=x11", relative_path)
     require(launcher, "export SDL_VIDEODRIVER=x11", relative_path)
-    require(launcher, 'exec "$SCRIPT_DIR/@OPENQ4_CLIENT_BINARY@" +set com_platformProfile steamdeck "$@"', relative_path)
+    require(launcher, 'exec "$SCRIPT_DIR/@OPENPREY_CLIENT_BINARY@" +set com_platformProfile steamdeck +set r_fullscreen 0 "$@"', relative_path)
     reject(launcher, "WAYLAND_DISPLAY", f"{relative_path} should not force X11 in mixed Wayland sessions")
 
 
 def validate_profile_defaults() -> None:
-    profile = read("content/baseoq4/pak0/openq4_profile_steamdeck.cfg")
+    profile = read("content/basepr/pak0/openprey_profile_steamdeck.cfg")
     for token in (
         'seta in_joystick "1"',
         'seta in_gyro "1"',
@@ -97,6 +97,8 @@ def validate_common_profile_detection() -> None:
 
     require(source, 'idCVar com_platformProfile( "com_platformProfile", "default"', "platform profile cvar")
     for token in (
+        '"OPENPREY_STEAMDECK"',
+        '"OPENPREY_AUTODETECT_STEAMDECK"',
         '"OPENQ4_STEAMDECK"',
         '"OPENQ4_AUTODETECT_STEAMDECK"',
         '"SteamDeck"',
@@ -115,44 +117,50 @@ def validate_common_profile_detection() -> None:
         require(host_signal, token, "Steam Deck host signal detection")
 
     require(automatic, 'com_platformProfile.GetString(), "default"', "automatic platform profile default gate")
-    require(automatic, '"OPENQ4_DISABLE_STEAMDECK_AUTODETECT"', "automatic platform profile disable knob")
-    require(automatic, '"OPENQ4_NO_STEAMDECK_AUTODETECT"', "automatic platform profile disable knob")
+    require(automatic, '"OPENPREY_DISABLE_STEAMDECK_AUTODETECT"', "automatic platform profile disable knob")
+    require(automatic, '"OPENPREY_NO_STEAMDECK_AUTODETECT"', "automatic platform profile disable knob")
+    require(automatic, '"OPENQ4_DISABLE_STEAMDECK_AUTODETECT"', "automatic platform profile migration alias")
+    require(automatic, '"OPENQ4_NO_STEAMDECK_AUTODETECT"', "automatic platform profile migration alias")
     require(automatic, "Common_HasSteamDeckHostSignal()", "automatic platform profile host signal")
     require(automatic, 'com_platformProfile.SetString( "steamdeck" );', "automatic platform profile assignment")
     require(profile_name, 'sanitized.Icmp( "steamdeck" )', "platform profile allow-list")
-    require(profile_name, '"openq4_profile_%s.cfg"', "platform profile config mapping")
+    require(profile_name, '"openprey_profile_%s.cfg"', "platform profile config mapping")
     require(init, "ApplyAutomaticPlatformProfile();", "Common init profile auto-detection")
     require_order(init, "StartupVariable( NULL, false );", "ApplyAutomaticPlatformProfile();", "Common init profile auto-detection")
 
 
 def validate_filesystem_discovery() -> None:
     source = read("src/framework/FileSystem.cpp")
-    candidates = function_body(source, "static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {")
+    registry = function_body(source, "static void FS_BuildRegistryInstallCandidates( idStrList &candidates ) {")
+    known = function_body(source, "static void FS_BuildKnownInstallCandidates( idStrList &candidates ) {")
+    steam = function_body(source, "static void FS_BuildSteamInstallCandidates( idStrList &candidates ) {")
+    automatic = function_body(source, "static bool FS_AutoDiscoverBasePath( idStr &basePath ) {")
 
     for token in (
-        '"OPENQ4_QUAKE4_PATH"',
-        '"OPENQ4_QUAKE4_ROOT"',
-        '"OPENQ4_STEAM_ROOT"',
-        '"OPENQ4_STEAM_ROOTS"',
-        '"STEAM_COMPAT_CLIENT_INSTALL_PATH"',
-        '"OPENQ4_STEAM_LIBRARY"',
-        '"OPENQ4_STEAM_LIBRARIES"',
-        '"XDG_DATA_HOME"',
-        '".steam"',
-        '"root"',
-        '".local"',
-        '"com.valvesoftware.Steam"',
-        '"steamapps"',
-        '"common"',
-        '"Quake 4"',
+        '"SOFTWARE\\\\Human Head Studios\\\\Prey"',
+        '"SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\prey.exe"',
     ):
-        require(candidates, token, "Steam install discovery candidates")
-
-    require(source, '"libraryfolders.vdf"', "Steam libraryfolders parser")
-    require(source, 'FS_LogPathList( "Steam install discovery roots", steamRoots );', "Steam discovery logging")
-    require(source, 'FS_LogPathList( "Steam explicit library roots", explicitLibraryRoots );', "Steam discovery logging")
-    require(source, 'FS_LogPathList( "Steam library roots to probe", discoveryLibraryRoots );', "Steam discovery logging")
-    require(source, 'FS_LogPathList( "Steam Quake 4 install candidates", candidates );', "Steam discovery logging")
+        require(registry, token, "CD-era Prey registry discovery")
+    require(source, '"DisplayName"', "Prey uninstall registry discovery")
+    require(source, '"InstallLocation"', "Prey uninstall registry discovery")
+    for token in (
+        '"C:/Program Files (x86)/Human Head Studios/Prey"',
+        '"C:/Games/Prey"',
+    ):
+        require(known, token, "known legacy Prey install discovery")
+    for token in (
+        '"OPENPREY_PREY_PATH"',
+        '"OPENPREY_PREY_ROOT"',
+        '"OPENPREY_STEAM_ROOT"',
+        '"OPENPREY_STEAM_LIBRARY"',
+        '"Prey"',
+    ):
+        require(steam, token, "optional Prey Steam install discovery")
+    reject(source, '"OPENQ4_QUAKE4_PATH"', "Quake 4 install discovery")
+    reject(source, '"OPENQ4_QUAKE4_ROOT"', "Quake 4 install discovery")
+    require_order(automatic, "FS_BuildRegistryInstallCandidates", "FS_BuildKnownInstallCandidates", "CD-era discovery precedence")
+    require_order(automatic, "FS_BuildKnownInstallCandidates", "FS_BuildSteamInstallCandidates", "legacy install discovery precedence")
+    require(source, 'FS_LogPathList( "Steam Prey install candidates", candidates );', "Steam discovery logging")
 
 
 def validate_sdl3_input_and_lifecycle() -> None:
@@ -290,9 +298,6 @@ def validate_sdl3_input_and_lifecycle() -> None:
 
 
 def validate_menu_and_docs() -> None:
-    game_gui = read("content/baseoq4/pak0/guis/menu/settings/game.gui")
-    registry = read("docs/dev/settings-menu-registry.json")
-    release = read("docs/dev/release-completion.md")
     steam_deck = read("docs/user/steam-deck.md")
     input_settings = read("docs/user/input-settings.md")
     getting_started = read("docs/user/getting-started.md")
@@ -300,19 +305,7 @@ def validate_menu_and_docs() -> None:
     qa = read("docs/dev/steam-deck-qa.md")
 
     for token in (
-        "set_game_controller_gyro",
-        "set_game_controller_gyro_sensitivity",
-        "set_game_controller_touchpad_mode",
-        "set_game_controller_touchpad_sensitivity",
-        "set_game_controller_touchscreen",
-        "set_game_controller_low_battery_rumble",
-        "set_game_controller_low_battery_rumble_cap",
-    ):
-        require(game_gui, token, "Game Options Controller Deck rows")
-        require(registry, token, "settings registry Deck rows")
-
-    for token in (
-        "OPENQ4_FORCE_X11=1",
+        "OPENPREY_FORCE_X11=1",
         "listControllers",
         "Touch API pass-through",
         "in_gyro",
@@ -322,22 +315,15 @@ def validate_menu_and_docs() -> None:
     ):
         require(steam_deck + input_settings + qa, token, "Steam Deck user and QA docs")
 
-    require(release, "Steam Deck support is more complete", "release completion notes")
-    require(release, "Steam Deck setup is easier to diagnose", "release completion notes")
-    require(release, "Steam Deck controls are easier to tune in-game", "release completion notes")
-
     package_docs = getting_started + package_readme
     for token in (
-        "openQ4-steamdeck",
-        "OPENQ4_STEAMDECK=1",
-        "Direct",
-        "auto-select",
-        "OPENQ4_FORCE_X11=1",
-        "Settings -> Game Options -> Controller",
-        "Settings -&gt; Game Options -&gt; Controller",
-        "listControllers",
+        "openPREY-steamdeck",
+        "OPENPREY_STEAMDECK=1",
+        "OPENPREY_FORCE_X11=1",
     ):
         require(package_docs, token, "Steam Deck package-facing docs")
+    for token in ("openPREY-steamdeck", "OPENPREY_FORCE_X11=1", "OPENPREY_PREY_PATH", "Prey install candidates"):
+        require(qa, token, "Steam Deck QA guidance")
 
 
 def validate_packaging_metadata_checks() -> None:
@@ -353,8 +339,8 @@ def validate_packaging_metadata_checks() -> None:
         (packaged, "packaged Steam Deck launcher validation"),
     ):
         for token in (
-            "OPENQ4_STEAMDECK",
-            "OPENQ4_FORCE_X11",
+            "OPENPREY_STEAMDECK",
+            "OPENPREY_FORCE_X11",
             "SDL_VIDEO_DRIVER=x11",
             "SDL_VIDEODRIVER=x11",
             "+set com_platformProfile steamdeck",

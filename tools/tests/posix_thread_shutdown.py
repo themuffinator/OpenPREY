@@ -85,20 +85,12 @@ def validate_sdl_main_thread_contract() -> None:
         raise AssertionError("POSIX SDL teardown and both clipboard operations must reject worker-thread calls")
 
 
-def validate_release_note() -> None:
-    source = read("docs/dev/release-completion.md")
-
-    require(source, "POSIX thread shutdown is now cooperative", "release completion notes")
-    require(source, "no longer depends on `pthread_cancel()`", "release completion notes")
-
-
 def main() -> None:
     validate_public_thread_state()
     validate_posix_thread_teardown()
     validate_workers_observe_stop_requests()
     validate_cross_platform_shims()
     validate_sdl_main_thread_contract()
-    validate_release_note()
     print("posix_thread_shutdown: ok")
 
 

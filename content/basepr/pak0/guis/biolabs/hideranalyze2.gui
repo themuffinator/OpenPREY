@@ -1,0 +1,515 @@
+// analysis of hider weapon for biolab area
+//--------------------------------------------------
+
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+
+	windowDef bgl {
+		rect		5 ,5 ,315 ,470 
+		backcolor	1, 0, 0, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	0.9, 1,0.8 ,1
+		background	"guis/assets/disintegration/bg"
+		visible		1
+/*		
+		onTime 0 {
+			transition "bgl::matcolor"	"1 1 1 0.5"   "0.9 1 0.8 1" "500" ;
+		}
+		onTime 1000 {
+			transition "bgl::matcolor"	"0.9 1 0.8 1"   "1 1 1 0.5" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}*/
+	}
+	windowDef bgr {
+		rect		320 ,5 ,-315 ,470 
+		backcolor	1, 0, 0, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	0.9, 1, 0.8, 1
+		background	"guis/assets/disintegration/bg"
+		visible		1
+/*		
+		onTime 0 {
+			transition "bgr::matcolor"	"1 1 1 0.5"   "0.9 1 0.8 1" "500" ;
+		}
+		onTime 1000 {
+			transition "bgr::matcolor"	"0.9 1 0.8 1"   "1 1 1 0.5" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}*/
+	} 
+
+
+
+
+	
+	windowDef DroidWindow {
+		rect		75, 220, 473, 200
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, jitter1[time*0.002]
+		background	"guis/assets/hideranalyze/perspective2"
+		}
+
+	windowDef DroidWindow2 {
+		rect		75, 220, 473, 200
+		backcolor	0, 0, 0, 0
+		matcolor	0.9, 1, 0.8, jitter1[time*0.003]
+		background	"guis/assets/hideranalyze/perspective1"
+		}
+			
+
+
+	
+
+//========================================
+//TEXT!
+//========================================
+
+	windowDef AlienText1 {
+		rect		245, 27, 200, 70
+		text		"#str_20005"
+		font		"fonts/alien"
+		textscale	1.0
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 1
+		visible		1
+
+	}
+	windowDef AlienText2 {
+		rect		238, 71, 300, 70
+		text		"#str_20006"
+		font		"fonts/alien"
+		textscale	1.0
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 1
+		visible		1
+
+	}
+	windowDef AlienText3 {
+		rect		188, 115, 170, 70
+		text		"#str_20007"
+		font		"fonts/alien"
+		textscale	1.0
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 1
+		visible		1
+
+	}
+	windowDef AlienText4 {
+		rect		350, 115, 100, 70
+		text		"02345"
+		font		"fonts/alien"
+		textscale	1.0
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 1
+		visible		1
+
+	}
+	
+//FIRST	
+	windowDef AlienText7 {
+		rect		30, 200, 20, 380
+		text		"4 5 7 2 2 1 1 0 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 50 {
+			set "AlienText7::visible" "1"
+		}
+		onTime 100 {
+			set "AlienText7::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText77 {
+		rect		30, 200, 20, 380
+		text		"7 6 1 3 1 7 5 5 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+			set "AlienText77::visible" "1"
+		}
+		onTime 50 {
+			set "AlienText77::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText777 {
+		rect		30, 200, 20, 380
+		text		"0 0 0 3 6 5 7 2 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 100 {
+			set "AlienText777::visible" "1"
+		}
+		onTime 150 {
+			set "AlienText777::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText7777 {
+		rect		30, 200, 20, 380
+		text		"1 2 3 5 4 4 1 4 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 150 {
+			set "AlienText7777::visible" "1"
+		}
+		onTime 200 {
+			set "AlienText7777::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+
+//SECOND
+	windowDef AlienText5 {
+		rect		50, 200, 20, 380
+		text		"3 4 6 1 1 2 2 7 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 50 {
+			set "AlienText5::visible" "1"
+		}
+		onTime 100 {
+			set "AlienText5::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText55 {
+		rect		50, 200, 20, 380
+		text		"0 7 2 4 2 0 6 6 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+			set "AlienText55::visible" "1"
+		}
+		onTime 50 {
+			set "AlienText55::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText555 {
+		rect		50, 200, 20, 380
+		text		"7 7 7 2 5 4 6 1 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 100 {
+			set "AlienText555::visible" "1"
+		}
+		onTime 150 {
+			set "AlienText555::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText5555 {
+		rect		50, 200, 20, 380
+		text		"2 3 4 6 5 5 2 3 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 150 {
+			set "AlienText5555::visible" "1"
+		}
+		onTime 200 {
+			set "AlienText5555::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+
+//THIRD
+	windowDef AlienText6 {
+		rect		570, 200, 20, 380
+		text		"7 6 1 3 1 7 5 5 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 50 {
+			set "AlienText6::visible" "1"
+		}
+		onTime 100 {
+			set "AlienText6::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText66 {
+		rect		570, 200, 20, 380
+		text		"4 5 7 2 2 1 1 0 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+			set "AlienText66::visible" "1"
+		}
+		onTime 50 {
+			set "AlienText66::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText666 {
+		rect		570, 200, 20, 380
+		text		"1 2 3 5 4 4 1 4 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 100 {
+			set "AlienText666::visible" "1"
+		}
+		onTime 150 {
+			set "AlienText666::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText6666 {
+		rect		570, 200, 20, 380
+		text		"0 0 0 3 6 5 7 2 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 150 {
+			set "AlienText6666::visible" "1"
+		}
+		onTime 200 {
+			set "AlienText6666::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+
+//FOURTH
+	windowDef AlienText8 {
+		rect		590, 200, 20, 380
+		text		"0 7 2 4 2 0 6 6 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 50 {
+			set "AlienText8::visible" "1"
+		}
+		onTime 100 {
+			set "AlienText8::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText88 {
+		rect		590, 200, 20, 380
+		text		"3 4 6 1 1 2 2 7 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+			set "AlienText88::visible" "1"
+		}
+		onTime 50 {
+			set "AlienText88::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText888 {
+		rect		590, 200, 20, 380
+		text		"2 3 4 6 5 5 2 3 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 100 {
+			set "AlienText888::visible" "1"
+		}
+		onTime 150 {
+			set "AlienText888::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+	windowDef AlienText8888 {
+		rect		590, 200, 20, 380
+		text		"7 7 7 2 5 4 6 1 "
+		font		"fonts/alien"
+		textscale	0.5
+		backcolor	0, 0, 0, 0
+		forecolor	0.9, 1, 0.8, 0.5
+		visible		0
+		notranslation	1
+		onTime 0 {
+		}
+		onTime 150 {
+			set "AlienText8888::visible" "1"
+		}
+		onTime 200 {
+			set "AlienText8888::visible" "0"
+		}
+		onTime 200 {
+			resettime "0";
+		}
+	}
+
+
+
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.6
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 0.8, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	} 
+
+
+
+
+
+
+
+
+
+	
+	
+	
+	
+	
+	
+/*	
+	renderDef theModel {
+		rect		100, 100, 440, 280
+		backcolor 	0, 0, 0, 0
+		model		"models/weapons/hider/pickup/hider_pickuplo.lwo"
+		modelRotate 0, 0.1*time, 0, 0
+//		model		"models/weapons/hider_world/hider.md5mesh"
+//		animClass	"weaponobj_hiderweapon"
+//		anim		"idle"
+//		modelRotate 0, 0.1*time, 90, 0
+		skin		"skins/invisible"
+		modelOrigin 0, 0, 0, 0
+		viewOffset 	-30, 0, 7, 0
+		lightOrigin -30, 15, 5, 0
+		lightColor 	1, 1, 1, 1		// No light
+	}
+}
+*/
+
+
+}

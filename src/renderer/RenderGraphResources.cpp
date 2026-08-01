@@ -473,7 +473,7 @@ static renderGraphResourceHandle_t *R_RenderGraphResources_AddImportedHandle( co
 		return NULL;
 	}
 	idStr::Copynz( handle->name, name, sizeof( handle->name ) );
-	R_RenderGraphResources_FormatDebugLabel( handle->debugLabel, sizeof( handle->debugLabel ), "openQ4 graph import: %s", name );
+	R_RenderGraphResources_FormatDebugLabel( handle->debugLabel, sizeof( handle->debugLabel ), "openPREY graph import: %s", name );
 	handle->type = type;
 	handle->width = width;
 	handle->height = height;
@@ -497,7 +497,7 @@ static bool R_RenderGraphResources_InitHandleFromGraph( const idRenderGraph &gra
 	}
 	const renderGraphResource_t &resource = graph.Resource( resourceIndex );
 	idStr::Copynz( handle.name, resource.name ? resource.name : "<unnamed>", sizeof( handle.name ) );
-	R_RenderGraphResources_FormatDebugLabel( handle.debugLabel, sizeof( handle.debugLabel ), "openQ4 graph: %s", handle.name );
+	R_RenderGraphResources_FormatDebugLabel( handle.debugLabel, sizeof( handle.debugLabel ), "openPREY graph: %s", handle.name );
 	handle.type = resource.type;
 	handle.graphResourceIndex = resourceIndex;
 	handle.width = R_RenderGraphResources_IsTextureResource( resource.type ) ? R_RenderGraphResources_FrameWidth( resource ) : 0;

@@ -281,7 +281,6 @@ bool idCollisionModelManagerLocal::LoadProcBSP( const char *name, unsigned int m
 	idStr filename;
 	idToken token;
 	Lexer *src;
-	bool isLegacyWorldFile = false;
 
 	// load it
 	filename = name;
@@ -293,29 +292,46 @@ bool idCollisionModelManagerLocal::LoadProcBSP( const char *name, unsigned int m
 		return false;
 	}
 
-	if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILE_ID ) ) {
-		common->Warning( "idCollisionModelManagerLocal::LoadProcBSP: bad id '%s' instead of '%s'", token.c_str(), PROC_FILE_ID );
-		delete src;
-		return false;
-	}
-
 	if ( !src->ReadToken( &token ) ) {
-		common->Warning( "%s is missing version", filename.c_str() );
+		common->Warning( "idCollisionModelManagerLocal::LoadProcBSP: invalid EOF in %s", filename.c_str() );
+		delete src;
+		return false;
+	}
+	const bool isQ4Proc = token.Icmp( PROC_FILE_ID ) == 0;
+	const bool isD3Proc = token.Icmp( "mapProcFile003" ) == 0;
+	if ( !isQ4Proc && !isD3Proc ) {
+		common->Warning( "idCollisionModelManagerLocal::LoadProcBSP: bad id '%s' (expected '%s' or 'mapProcFile003')", token.c_str(), PROC_FILE_ID );
 		delete src;
 		return false;
 	}
 
-	if ( !src->ExpectTokenType( TT_NUMBER, TT_INTEGER, &token ) ) {
-		common->Warning( "%s has no map file CRC", filename.c_str() );
-		delete src;
-		return false;
-	}
+	if ( isQ4Proc ) {
+		if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILEVERSION ) ) {
+			common->Warning( "%s has version '%s', expected '%s'", filename.c_str(), token.c_str(), PROC_FILEVERSION );
+			delete src;
+			return false;
+		}
 
-	const unsigned int crc = token.GetUnsignedLongValue();
-	if ( mapFileCRC && crc != mapFileCRC ) {
-		common->Printf( "%s is out of date\n", filename.c_str() );
-		console->SetProcFileOutOfDate( true );
-		mapFileTime = static_cast<ID_TIME_T>( -1 );
+		if ( !src->ExpectTokenType( TT_NUMBER, TT_INTEGER, &token ) ) {
+			common->Warning( "%s has no map file CRC", filename.c_str() );
+			delete src;
+			return false;
+		}
+
+		const unsigned int crc = token.GetUnsignedLongValue();
+		if ( mapFileCRC && crc != mapFileCRC ) {
+			common->Printf( "%s is out of date\n", filename.c_str() );
+			console->SetProcFileOutOfDate( true );
+			mapFileTime = static_cast<ID_TIME_T>( -1 );
+		}
+	} else {
+		// Doom 3/Prey proc files carry no separate version/CRC stamp. They are
+		// valid inputs and cannot be declared stale by this Q4-only check.
+		static bool loggedLegacyProc = false;
+		if ( !loggedLegacyProc ) {
+			common->DPrintf( "idCollisionModelManagerLocal::LoadProcBSP: accepting CRC-less mapProcFile003 input\n" );
+			loggedLegacyProc = true;
+		}
 	}
 
 	// parse the file
@@ -3921,6 +3937,25 @@ const char *idCollisionModelManagerLocal::GetFullModelName( const char *mapName,
 
 /*
 ==================
+idCollisionModelManagerLocal::GetWorldModel
+
+Resolve the current map's world by canonical name. The manager may retain
+collision models from earlier maps, so array slot zero is not a reliable
+current-world alias.
+==================
+*/
+idCollisionModelLocal *idCollisionModelManagerLocal::GetWorldModel( void ) const {
+	if ( models == NULL || mapName.IsEmpty() ) {
+		return NULL;
+	}
+
+	idStr worldModelName;
+	const int index = FindModelIndex( GetFullModelName( mapName.c_str(), WORLD_MODEL_NAME, worldModelName ) );
+	return index >= 0 ? models[index] : NULL;
+}
+
+/*
+==================
 idCollisionModelManagerLocal::GetModelLoadFileName
 ==================
 */
@@ -4372,19 +4407,32 @@ idCollisionModelManagerLocal::TrmFromModel
 */
 bool idCollisionModelManagerLocal::TrmFromModel( const idCollisionModelLocal *model, idTraceModel &trm ) {
 	int i;
+	auto fallbackToBounds = [&]() -> bool {
+		if ( model->bounds.IsCleared() ) {
+			return false;
+		}
+
+		idBounds bounds = model->bounds;
+		if ( bounds[0].Compare( bounds[1] ) ) {
+			bounds.ExpandSelf( 1.0f );
+		}
+		common->Warning( "idCollisionModelManagerLocal::TrmFromModel: using bounds fallback for model %s", model->name.c_str() );
+		trm = idTraceModel( bounds );
+		return true;
+	};
 
 	// if the model has too many vertices to fit in a trace model
 	if ( model->numVertices > MAX_TRACEMODEL_VERTS ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has too many vertices (%d).\n", model->name.c_str(), model->numVertices );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	// plus one because the collision model accounts for the first unused edge
 	if ( model->numEdges > MAX_TRACEMODEL_EDGES+1 ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has too many edges (%d).\n", model->name.c_str(), model->numEdges );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	trm.type = TRM_CUSTOM;
@@ -4398,7 +4446,7 @@ bool idCollisionModelManagerLocal::TrmFromModel( const idCollisionModelLocal *mo
 	if ( !TrmFromModel_r( trm, model->node, -1 ) ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has too many polygons.\n", model->name.c_str() );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	// copy vertices
@@ -4419,7 +4467,7 @@ bool idCollisionModelManagerLocal::TrmFromModel( const idCollisionModelLocal *mo
 	if ( !trm.IsClosedSurface() ) {
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s has dangling edges, the model has to be an enclosed hull.\n", model->name.c_str() );
 		PrintModelInfo( model );
-		return false;
+		return fallbackToBounds();
 	}
 
 	// offset to center of model

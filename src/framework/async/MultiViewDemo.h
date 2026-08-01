@@ -9,6 +9,12 @@ openQ4 multi-view demo recording and playback.
 #ifndef __MULTIVIEWDEMO_H__
 #define __MULTIVIEWDEMO_H__
 
+// OPENPREY-GATED(D9): upstream MVD serialization calls game API v40-only
+// methods. Re-enable only with a separately versioned Prey game schema.
+#ifndef OPENPREY_ENABLE_MVD
+#define OPENPREY_ENABLE_MVD 0
+#endif
+
 class idFile;
 class idBitMsg;
 class idCmdArgs;
@@ -96,8 +102,10 @@ private:
 		unsigned int		optionalFeatures;
 		unsigned short		protocolMajor;
 		unsigned short		protocolMinor;
-		// Format 1.0/1.1 stored GAME_API_VERSION here. Format 1.2 and newer
-		// stores the independently versioned MVD game schema as major:minor.
+							// Format 1.0/1.1 stored GAME_API_VERSION here. Format 1.2 and newer
+							// stores the independently versioned MVD game schema as major:minor.
+							// TODO(OPENPREY-GATED-D9): use Prey's GAME_API_VERSION=7 schema
+							// when MVD support is deliberately reintroduced.
 		unsigned int		gameSchemaVersion;
 		unsigned int		usercmdHz;
 		int					startGameFrame;

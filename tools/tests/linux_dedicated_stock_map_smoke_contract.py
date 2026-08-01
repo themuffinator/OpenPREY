@@ -26,15 +26,14 @@ def main() -> None:
     commit = read(".github/workflows/commit-validation.yml")
     push = read(".github/workflows/push-verification.yml")
     validator = read("tools/validation/openq4_validate.py")
-    building = read("BUILDING.md")
-    evidence = read("docs/dev/linux-arm64-signoff-evidence.md")
+    status_ledger = read("docs/dev/prey-rebase/status-ledger.md")
     session = read("src/framework/Session.cpp")
     linux_main = read("src/sys/linux/main.cpp")
     macos_main = read("src/sys/osx/macosx_sdl3_main.cpp")
     posix_console = read("src/sys/posix/posix_syscon.cpp")
 
     for token in (
-        'MAP_NAME = "mp/q4dm1"',
+        'MAP_NAME = "game/dmroadhouse"',
         'REPORT_SCHEMA_VERSION = 1',
         'REPORT_TYPE = "linux-wayland-stock-dedicated"',
         '"--dedicated-executable"',
@@ -51,16 +50,16 @@ def main() -> None:
         "host_evidence = collect_linux_host_evidence()",
         "reject_virtualized_physical_attestation(host_evidence)",
         '"packaged runtime architecture mismatch:',
-        '("packaged openQ4 mod manifest", mod_manifest)',
-        '("packaged openQ4 pak0.pk4", openq4_pak0)',
-        '("packaged openQ4 pak1.pk4", openq4_pak1)',
-        'install_root / "q4base"',
-        '"refusing stock-map evidence because the staged package contains q4base overrides:',
-        'home / ".local" / "share" / "openq4"',
+        '("packaged openPREY mod manifest", mod_manifest)',
+        '("packaged openPREY pak0.pk4", openprey_pak0)',
+        '("packaged openPREY pak1.pk4", openprey_pak1)',
+        'install_root / "base"',
+        '"refusing stock-map evidence because the staged package contains retail base overrides:',
+        'home / ".local" / "share" / "openprey"',
         "server_command = [str(dedicated)]",
         "client_command = [str(client)]",
         '("sys_consoleWindow", "0")',
-        "Selected game module: logical='game_mp'",
+        "Selected game module: logical='game'",
         "expected_module_marker(game_module, arch)",
         '"Server decl checksum:"',
         'f"Map: {MAP_NAME}"',
@@ -70,11 +69,11 @@ def main() -> None:
         "stat.S_ISSOCK(socket_mode)",
         '"Wayland display path is not a live Unix socket:',
         'client_environment.pop("DISPLAY", None)',
-        'client_environment.pop("OPENQ4_FORCE_X11", None)',
+        'client_environment.pop("OPENPREY_FORCE_X11", None)',
         'server_environment.pop(name, None)',
-        'tempfile.TemporaryDirectory(prefix=f"openq4-ded-xdg-{arch}-")',
+        'tempfile.TemporaryDirectory(prefix=f"openprey-ded-xdg-{arch}-")',
         '"XDG_RUNTIME_DIR": str(server_runtime)',
-        'SERVER_VIDEO_DRIVER_CANARY = "openq4-dedicated-must-not-init-video"',
+        'SERVER_VIDEO_DRIVER_CANARY = "openprey-dedicated-must-not-init-video"',
         'server_environment["SDL_VIDEO_DRIVER"] = SERVER_VIDEO_DRIVER_CANARY',
         'server_environment["SDL_VIDEODRIVER"] = SERVER_VIDEO_DRIVER_CANARY',
         'private dedicated XDG runtime socket path would exceed the Linux limit',
@@ -110,7 +109,19 @@ def main() -> None:
     ):
         require(runner, token, "Linux stock-map dedicated smoke runner")
 
-    for token in ("/run/user/0", "Program Files", "steamapps", "r_rendererPerfThreshold", '"dummy"'):
+    for token in (
+        "/run/user/0",
+        "Program Files",
+        "steamapps",
+        "r_rendererPerfThreshold",
+        '"dummy"',
+        "baseoq4",
+        "q4base",
+        "game-mp_",
+        "openQ4-client",
+        "openQ4-ded",
+        "Quake 4",
+    ):
         reject(runner, token, "portable opt-in Linux stock-map runner")
 
     for workflow, name in ((commit, "commit validation"), (push, "push validation")):
@@ -136,10 +147,7 @@ def main() -> None:
         'root / "tools" / "tests" / "linux_physical_host_evidence_contract.py"',
         "shared validation host-evidence behavior coverage",
     )
-    require(building, "linux_dedicated_stock_map_smoke.py", "Linux runtime validation instructions")
-    require(evidence, "linux_dedicated_stock_map_smoke.py", "Linux ARM64 signoff evidence instructions")
-    require(evidence, "--physical-hardware", "physical dedicated-server evidence instructions")
-    require(evidence, "known VM/emulator", "physical-host inspection scope")
+    require(status_ledger, "TODO-RELEASE-LANES", "release-lane deferral policy")
     require(
         session,
         "void idSessionLocal::ShowLoadingGui() {\n#ifdef ID_DEDICATED\n\t// Dedicated servers have no loading GUI",

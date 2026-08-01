@@ -1,4 +1,4 @@
-name: Manual Releases
+name: DISABLED - inherited OpenQ4 reference (Manual Releases)
 
 on:
   workflow_dispatch:
@@ -59,6 +59,7 @@ permissions:
 
 jobs:
   metadata:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: Release Metadata
     runs-on: ubuntu-latest
     outputs:
@@ -621,6 +622,7 @@ jobs:
           PY
 
   builds:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: ${{ matrix.label }}
     needs: metadata
     runs-on: ${{ matrix.os }}
@@ -849,7 +851,7 @@ jobs:
           python tools/build/verify_release_source_provenance.py \
             --project-root "${GITHUB_WORKSPACE}" \
             --gamelibs-root "${OPENQ4_GAMELIBS_REPO}" \
-            --stage-manifest "${GITHUB_WORKSPACE}/.tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json" \
+            --stage-manifest "${GITHUB_WORKSPACE}/builddir/.tmp/openprey_gamelibs_stage/openprey_gamelibs_stage_manifest.json" \
             --expected-project-commit "${{ needs.metadata.outputs.openq4_source_sha }}" \
             --expected-gamelibs-commit "${{ needs.metadata.outputs.openq4_game_sha }}"
 
@@ -2021,7 +2023,7 @@ jobs:
   release:
     name: Publish Release
     needs: [metadata, builds]
-    if: ${{ needs.builds.result == 'success' && inputs.generate_linux_arm64_evidence_candidate == false }}
+    if: ${{ false && needs.builds.result == 'success' && inputs.generate_linux_arm64_evidence_candidate == false }} # OPENPREY-GATED
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -2379,7 +2381,7 @@ jobs:
   discord:
     name: Announce On Discord
     needs: [metadata, release]
-    if: ${{ needs.release.result == 'success' }}
+    if: ${{ false && needs.release.result == 'success' }} # OPENPREY-GATED
     runs-on: ubuntu-latest
     permissions:
       contents: read

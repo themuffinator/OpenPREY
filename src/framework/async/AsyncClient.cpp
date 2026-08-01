@@ -823,15 +823,11 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			numDuplicatedUsercmds = msg.ReadByte();
 			aheadOfServer = msg.ReadShort();
 
-			// read the game snapshot
-			if ( !game->ClientReadSnapshot(
-					clientNum, snapshotSequence, snapshotGameFrame, snapshotGameTime,
-					numDuplicatedUsercmds, aheadOfServer, msg ) ) {
-				common->Warning( "server sent malformed snapshot %d; disconnecting safely",
-					snapshotSequence );
-				DisconnectFromServer();
-				return;
-			}
+			// Prey API v7 has a void snapshot reader; malformed-message handling
+			// remains inside the game/bit-message readers rather than a v40 result.
+			game->ClientReadSnapshot(
+				clientNum, snapshotSequence, snapshotGameFrame, snapshotGameTime,
+				numDuplicatedUsercmds, aheadOfServer, msg );
 
 			// read user commands of other clients from the snapshot
 			for ( last = NULL, i = msg.ReadByte(); i < MAX_ASYNC_CLIENTS; i = msg.ReadByte() ) {
@@ -1011,7 +1007,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 					cvarSystem->SetCVarsFromDict( info );
 					cvarSystem->ClearModifiedFlags( CVAR_USERINFO ); // don't emit back
 				}
-				game->SetUserInfo( clientNum, info, true );
+				game->SetUserInfo( clientNum, info, true, false );
 				break;
 			}
 			case SERVER_RELIABLE_MESSAGE_SYNCEDCVARS: {
@@ -1068,7 +1064,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 			}
 			case SERVER_RELIABLE_MESSAGE_ENTERGAME: {
 				SendUserInfoToServer();
-				game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true );
+				game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true, false );
 				cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
 				break;
 			}
@@ -1812,7 +1808,7 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 	if ( cvarSystem->GetModifiedFlags() & CVAR_USERINFO ) {
 		game->ThrottleUserInfo( );
 		SendUserInfoToServer( );
-		game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true );
+		game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true, false );
 		cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
 	}
 
@@ -1843,11 +1839,8 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 			// duplicate usercmds for clients if no new ones are available
 			DuplicateUsercmds( snapshotGameFrame, snapshotGameTime );
 
-			// indicate the last prediction frame before a render
-			bool lastPredictFrame = ( snapshotGameFrame + 1 >= gameFrame && gameTimeResidual + clientPredictTime < AsyncClient_NextGameFrameMsec( gameFrame ) );
-
 			// run client prediction
-			gameReturn_t ret = game->ClientPrediction( clientNum, userCmds[ snapshotGameFrame & ( MAX_USERCMD_BACKUP - 1 ) ], lastPredictFrame );
+			gameReturn_t ret = game->ClientPrediction( clientNum, userCmds[ snapshotGameFrame & ( MAX_USERCMD_BACKUP - 1 ) ] );
 
 			idAsyncNetwork::ExecuteSessionCommand( ret.sessionCommand );
 
@@ -1936,7 +1929,7 @@ void idAsyncClient::HandleDownloads( void ) {
 		// timing out on no reply
 		updateState = UPDATE_DONE;
 		if ( showUpdateMessage ) {
-			session->MessageBox( MSG_OK, common->GetLanguageDict()->GetString ( "#str_104839" ), common->GetLanguageDict()->GetString ( "#str_104837" ), true );
+			session->MessageBox( MSG_OK, common->GetLanguageDict()->GetString ( "#str_04839" ), common->GetLanguageDict()->GetString ( "#str_04837" ), true );
 			showUpdateMessage = false;
 		}
 		common->DPrintf( "No update available\n" );

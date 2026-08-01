@@ -1,359 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>openQ4 Release Package</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>openPREY Release Package</title>
   <style>
-    :root {
-      --black: #040603;
-      --panel: #0f140d;
-      --panel-hi: #151c12;
-      --grey: #1b2118;
-      --edge: #2e3b26;
-      --edge-hot: #6f9c34;
-      --text: #e3ecd8;
-      --muted: #9baa90;
-      --accent: #8fce3f;
-      --accent-dim: #5d8c2a;
-      --accent-pale: #d9ef9f;
-      --code-bg: #070b05;
-      --code-fg: #b7df77;
-      --cut: 18px;
-      --cut-sm: 10px;
-      /* Chamfered frame: top-left and bottom-right corners cut at 45 degrees. */
-      --frame: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
-      --frame-sm: polygon(var(--cut-sm) 0, 100% 0, 100% calc(100% - var(--cut-sm)), calc(100% - var(--cut-sm)) 100%, 0 100%, 0 var(--cut-sm));
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 28px 24px 40px;
-      background:
-        radial-gradient(130% 80% at 50% -12%, rgba(124, 170, 58, 0.22), rgba(0, 0, 0, 0) 62%),
-        linear-gradient(180deg, #0a0f07 0%, #070a06 48%, var(--black) 100%);
-      background-attachment: fixed;
-      color: var(--text);
-      font-family: "Bahnschrift", "Trebuchet MS", "Segoe UI", sans-serif;
-      line-height: 1.6;
-    }
-
-    /* Faint tactical grid wash, strongest behind the masthead. */
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(143, 206, 63, 0.055) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(143, 206, 63, 0.055) 1px, transparent 1px);
-      background-size: 48px 48px, 48px 48px;
-      -webkit-mask-image: radial-gradient(100% 62% at 50% 0%, #000 0%, transparent 78%);
-      mask-image: radial-gradient(100% 62% at 50% 0%, #000 0%, transparent 78%);
-    }
-
-    main {
-      position: relative;
-      z-index: 1;
-      max-width: 940px;
-      margin: 0 auto;
-    }
-
-    section {
-      position: relative;
-      isolation: isolate;
-      margin-top: 18px;
-      padding: 22px 24px;
-      background: var(--edge);
-      clip-path: var(--frame);
-    }
-
-    section::before {
-      content: "";
-      position: absolute;
-      inset: 1px;
-      z-index: -1;
-      background:
-        linear-gradient(180deg, rgba(143, 206, 63, 0.07), rgba(0, 0, 0, 0) 140px),
-        linear-gradient(180deg, var(--panel-hi), var(--panel));
-      clip-path: var(--frame);
-    }
-
-    section:first-of-type {
-      margin-top: 0;
-      padding: 32px 28px 28px;
-      background: var(--edge-hot);
-    }
-
-    section:first-of-type::before {
-      background:
-        linear-gradient(180deg, rgba(143, 206, 63, 0.14), rgba(0, 0, 0, 0) 220px),
-        linear-gradient(180deg, #131a10, #0b0f08);
-    }
-
-    h1,
-    h2 {
-      margin: 0 0 12px;
-      line-height: 1.15;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      color: #f2fbe4;
-      font-size: clamp(2.1rem, 4.4vw, 3.1rem);
-      letter-spacing: 0.1em;
-      text-shadow:
-        0 0 6px rgba(217, 239, 159, 0.35),
-        0 0 26px rgba(143, 206, 63, 0.45);
-    }
-
-    h1 + p {
-      color: var(--accent-pale);
-    }
-
-    h2 {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: var(--accent);
-      font-size: 1.1rem;
-      letter-spacing: 0.12em;
-    }
-
-    /* 45-degree marker instead of a rounded bullet. */
-    h2::before {
-      content: "";
-      flex: none;
-      width: 9px;
-      height: 9px;
-      background: var(--accent);
-      transform: rotate(45deg);
-      box-shadow: 0 0 10px rgba(143, 206, 63, 0.6);
-    }
-
-    h2::after {
-      content: "";
-      flex: 1;
-      height: 1px;
-      background: linear-gradient(90deg, var(--edge), rgba(0, 0, 0, 0));
-    }
-
-    p,
-    li {
-      color: var(--muted);
-    }
-
-    strong {
-      color: var(--text);
-      font-weight: 700;
-    }
-
-    a {
-      color: var(--accent-pale);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(143, 206, 63, 0.35);
-    }
-
-    a:hover {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
-
-    code {
-      padding: 0.1em 0.42em;
-      border-radius: 0;
-      border-left: 2px solid var(--accent-dim);
-      background: var(--code-bg);
-      color: var(--code-fg);
-      font-family: "Cascadia Code", Consolas, monospace;
-      font-size: 0.92em;
-    }
-
-    a code {
-      color: var(--accent-pale);
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 22px;
-    }
-
-    .button {
-      position: relative;
-      isolation: isolate;
-      display: inline-flex;
-      align-items: center;
-      padding: 11px 20px;
-      border: 0;
-      border-radius: 0;
-      background: var(--edge);
-      clip-path: var(--frame-sm);
-      color: var(--text);
-      font-size: 0.95rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      transition: background 0.15s linear, color 0.15s linear;
-    }
-
-    .button::before {
-      content: "";
-      position: absolute;
-      inset: 1px;
-      z-index: -1;
-      background: var(--grey);
-      clip-path: var(--frame-sm);
-    }
-
-    .button:hover {
-      background: var(--accent);
-      color: #f4ffe4;
-    }
-
-    .button:hover::before {
-      background: #22301a;
-    }
-
-    .button.primary {
-      background: var(--accent);
-      color: var(--black);
-      font-weight: 700;
-    }
-
-    .button.primary::before {
-      background: linear-gradient(180deg, var(--accent), var(--accent-dim));
-    }
-
-    .button.primary:hover::before {
-      background: linear-gradient(180deg, #a6e253, #6ea233);
-    }
-
-    ul,
-    ol {
-      margin: 0;
-      padding-left: 22px;
-    }
-
-    li {
-      margin: 4px 0;
-    }
-
-    li::marker {
-      color: var(--accent-dim);
-    }
-
-    ::selection {
-      background: rgba(143, 206, 63, 0.3);
-      color: #f4ffe4;
-    }
+    :root { color-scheme: dark; --bg:#10141a; --panel:#19212b; --text:#edf2f7; --muted:#aebbc8; --accent:#d79a3b; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { width:min(860px,calc(100% - 32px)); margin:32px auto 64px; }
+    header,section { background:var(--panel); border:1px solid #2a3744; border-radius:12px; padding:24px; margin-bottom:18px; }
+    h1,h2 { line-height:1.2; } h1 { color:var(--accent); margin-top:0; }
+    a { color:#8fc8ff; } code { background:#0b0f14; padding:.1em .35em; border-radius:4px; }
+    .muted { color:var(--muted); }
   </style>
 </head>
 <body>
-  <main>
-    <section>
-      <h1>openQ4</h1>
-      <p><strong>Release package</strong> for the open-source Quake 4 engine and game-code replacement.</p>
-      <p>This package contains openQ4 binaries plus the staged <code>baseoq4/</code> runtime payload. Quake 4 assets are not included.</p>
-      <div class="actions">
-        <a class="button primary" href="docs/index.html">Open Documentation Portal</a>
-        <a class="button" href="docs/README.html">Project Overview</a>
-        <a class="button" href="docs/TECHNICAL.html">Technical Reference</a>
-      </div>
-    </section>
+<main>
+  <header>
+    <h1>openPREY</h1>
+    <p><strong>Release package</strong> for the open-source Prey (2006) engine and game-code replacement.</p>
+    <p class="muted">Retail Prey assets are not included.</p>
+  </header>
 
-    <section>
-      <h2>Requirements</h2>
-      <p><strong>Minimum client:</strong> 64-bit CPU matching the package architecture, 4 GB RAM, a working OpenGL compatibility driver with ARB2-era vertex/fragment program support, and about 12 GB free for openQ4 plus the retail Quake 4 assets.</p>
-      <p><strong>Recommended client:</strong> modern quad-core CPU, 8 GB RAM, OpenGL 4.1+ compatibility-class GPU with 2 GB+ VRAM, current graphics drivers, and 15 GB+ free. Use 16 GB RAM and 6 GB+ VRAM for high resolutions, <code>quality</code>, or <code>ultra</code> presets.</p>
-      <ul>
-        <li>A legitimate Quake 4 installation from Steam or GOG.</li>
-        <li>The stock retail PK4 files in a <code>q4base/</code> directory, available through openQ4's asset discovery or a manual <code>fs_basepath</code> setting.</li>
-        <li>A supported package target: Windows, Linux x64, Steam Deck/SteamOS, preview Linux ARM64, or experimental Apple Silicon/arm64 macOS.</li>
-        <li>Use <code>minimum</code>, <code>lowpower</code>, or <code>performance</code> presets on constrained systems before enabling expensive visual options.</li>
-      </ul>
-    </section>
+  <section>
+    <h2>Requirements</h2>
+    <ul>
+      <li>A 64-bit system matching this package architecture.</li>
+      <li>A legitimate Prey (2006) installation with its original <code>base/</code> data.</li>
+      <li>A compatible graphics driver and audio device.</li>
+    </ul>
+  </section>
 
-    <section>
-      <h2>Getting Started</h2>
-      <ol>
-        <li>Install Quake 4 from Steam or GOG and leave its retail <code>q4base/</code> folder intact.</li>
-        <li>Install or extract openQ4 to its own folder when possible. On Windows, either run the installer executable or extract the archive; the installer can detect an existing openQ4 install, adds a standard uninstall entry, and optionally registers <code>openq4://</code> browser links. On Linux, you can instead run the matching AppImage directly after <code>chmod +x openq4-*.AppImage</code>.</li>
-        <li>Use a clean layout: preferably keep retail Quake 4 separate with assets under <code>q4base/</code>; for a portable setup, keep a copied retail <code>q4base/</code> beside openQ4's <code>baseoq4/</code>. Never copy retail PK4s into <code>baseoq4/</code>.</li>
-        <li>Run <code>openQ4-client_&lt;arch&gt;</code>, <code>openQ4-client_&lt;arch&gt;.exe</code>, or the Linux AppImage. The AppImage bundles openQ4 runtime libraries but still discovers the separately installed retail Quake 4 assets; it never embeds them.</li>
-        <li>On Steam Deck, use <code>openQ4-steamdeck</code> when it is included in the package. Direct <code>openQ4-client_&lt;arch&gt;</code> launches on Steam Deck or SteamOS also auto-select the Deck profile when <code>com_platformProfile</code> is still <code>default</code>.</li>
-        <li>Open <code>docs/index.html</code> for the full offline documentation set, or use the installer-created Start Menu shortcuts on Windows.</li>
-        <li>If auto-detection fails, launch with <code>+set fs_basepath "path\\to\\Quake 4"</code>, pointing at the retail root that contains <code>q4base/</code>.</li>
-      </ol>
-    </section>
+  <section>
+    <h2>Install and launch</h2>
+    <ol>
+      <li>Keep the complete openPREY package together; do not copy retail PK4 files into <code>basepr/</code>.</li>
+      <li>Run <code>openPREY-client_&lt;arch&gt;</code> (or the corresponding Windows executable/app bundle).</li>
+      <li>If retail-data discovery fails, add <code>+set fs_basepath "path/to/Prey"</code> and point it at the installation root containing <code>base/</code>.</li>
+    </ol>
+    <p>For Steam Deck packages, use <code>openPREY-steamdeck</code>. The dedicated server is <code>openPREY-ded_&lt;arch&gt;</code>.</p>
+    <p>A Linux AppImage, when provided, still requires your legitimate Prey (2006) assets. Mark it executable with <code>chmod +x openprey-*.AppImage</code>, launch it, and pass <code>+set fs_basepath "path/to/Prey"</code> if discovery does not find the retail install.</p>
+  </section>
 
-    <section>
-      <h2>Linux ARM64 Preview Notes</h2>
-      <ul>
-        <li>Linux ARM64 packages remain preview builds until physical ARM64 hardware completes native-Wayland SP/MP gameplay, dedicated-server, audio, input, and package signoff.</li>
-        <li>The package requires 64-bit little-endian AArch64 hardware, an Ubuntu 24.04-class desktop userspace, and a desktop OpenGL compatibility driver with Wayland/EGL or X11/GLX support.</li>
-        <li>GLES-only boards are not covered by the current Linux ARM64 package.</li>
-      </ul>
-    </section>
+  <section>
+    <h2>Package contents</h2>
+    <ul>
+      <li><code>openPREY-client_&lt;arch&gt;</code> and <code>openPREY-ded_&lt;arch&gt;</code></li>
+      <li><code>basepr/game_&lt;arch&gt;</code>, the unified SP/MP game module</li>
+      <li><code>basepr/pak0.pk4</code>, <code>basepr/pak1.pk4</code>, and <code>basepr/mod.json</code></li>
+      <li>Platform launchers and runtime libraries where required</li>
+      <li>Optional Linux AppImage packages for <code>x86_64</code> or <code>aarch64</code></li>
+    </ul>
+  </section>
 
-    <section>
-      <h2>Steam Deck Notes</h2>
-      <ul>
-        <li>The Deck launcher enables the <code>steamdeck</code> platform profile and sets <code>OPENQ4_STEAMDECK=1</code>.</li>
-        <li>Native Wayland is the default SDL path when available. Set <code>OPENQ4_FORCE_X11=1</code> to force the XWayland fallback from the Deck launcher or a direct client launch.</li>
-        <li>If native Wayland hits a compositor/libdecor startup or decoration issue, set <code>OPENQ4_WAYLAND_DISABLE_LIBDECOR=1</code> for that launch.</li>
-        <li>Deck controller tuning lives under <code>Settings -&gt; Game Options -&gt; Controller</code>, including gyro, touchpad mode, touchscreen routing, and low-battery rumble caps.</li>
-        <li>Run <code>listControllers</code> from the console when reporting Deck input, battery, gyro, touchpad, or touchscreen issues.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Experimental macOS Notes</h2>
-      <ul>
-        <li>macOS support is experimental. Current packages are for Apple Silicon/arm64 Macs on macOS 11 or later. Intel Mac and universal2 packages are not published yet, and Rosetta is not a supported release target.</li>
-        <li>Credentialed experimental macOS release runs publish signed/notarized OpenGL and Metal bridge DMGs. Releases without Apple Developer ID signing and notarization credentials publish clearly labeled <code>-unsigned.tar.gz</code> archives instead.</li>
-        <li>Unsigned macOS archives are ad-hoc signed only for bundle validity, are not notarized, and may require normal Gatekeeper approval on first launch.</li>
-        <li>The Metal package is a bridge mode around the existing OpenGL renderer, preserving stock-asset compatibility while Metal translation-layer work continues; it is not a native Metal renderer.</li>
-        <li>Both macOS packages also carry openQ4's experimental Vulkan renderer. Apple ships no Vulkan driver, so on macOS it runs on top of MoltenVK, a Vulkan-on-Metal translation layer bundled inside the package. It is a translation layer, not a Metal renderer.</li>
-        <li>OpenGL remains the default and recommended macOS renderer in both packages. Vulkan is opt-in: run <code>r_renderApi vulkan</code> in the console, then quit and relaunch openQ4. It is a runtime option rather than a separate download, so there is no third macOS package to install.</li>
-        <li>Expect problems if you try it. macOS support is experimental, the Vulkan renderer is experimental, and this combination has no accepted testing on real Apple hardware yet. If it cannot start, openQ4 logs the reason and renders with OpenGL instead. Run <code>r_renderApi gl</code> and restart to go back.</li>
-        <li>Open the DMG or unpack the <code>-unsigned.tar.gz</code> archive, drag <code>openQ4.app</code> to <code>/Applications</code> (or another user-writable folder), then launch it. The app contains openQ4's runtime data and signed SP/MP modules. Keep the whole package only for the loose diagnostic client, dedicated server, or support collector; do not add retail <code>q4base</code> assets to the signed app.</li>
-        <li>For experimental macOS crashes, attach full terminal output as text plus <code>openq4.log</code> and any matching <code>.ips</code> report. Run <code>collect_macos_support_info.sh</code> from the package root to collect Rosetta, renderer, architecture, dependency, signing, and quarantine diagnostics, then see the <a href="docs/docs/user/macos-support-data.html">macOS support-data guide</a>.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Package Contents</h2>
-      <ul>
-        <li><code>openQ4-client_&lt;arch&gt;</code> and <code>openQ4-ded_&lt;arch&gt;</code>: engine binaries.</li>
-        <li><code>*.pdb</code> files on Windows: diagnostic symbols that make crash dumps actionable.</li>
-        <li><code>baseoq4/pak0.pk4</code> (inside <code>openQ4.app/Contents/Resources</code> on macOS): openQ4-owned runtime content and overrides.</li>
-        <li><code>docs/index.html</code>: full packaged HTML documentation portal.</li>
-        <li><code>docs/docs/user/</code> and <code>docs/docs/dev/</code>: converted user and developer references.</li>
-        <li><code>VERSION.txt</code>: packaged version metadata.</li>
-        <li><code>LICENSE</code>: GPLv3 engine license text.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Crash Reports</h2>
-      <p>On Windows, unhandled openQ4 crashes write a crash log and memory dump under <code>crashes/</code> beside the executable. Attach both generated files when reporting a crash.</p>
-    </section>
-
-    <section>
-      <h2>Documentation</h2>
-      <p>The release archive includes a full offline HTML docs site instead of only a single readme. Start with <a href="docs/index.html"><code>docs/index.html</code></a>, then move into the overview, build guide, technical reference, user guides, and developer notes.</p>
-    </section>
-
-    <section>
-      <h2>More Information</h2>
-      <p><a href="https://github.com/themuffinator/openQ4">Repository</a> | <a href="https://github.com/themuffinator/openQ4/releases">Releases</a> | <a href="https://www.darkmatter-quake.com">Website</a></p>
-    </section>
-  </main>
+  <section>
+    <h2>Support</h2>
+    <p>Logs default to the configured save path under <code>basepr/logs/openprey.log</code>. Include that log and any generated crash report when filing an issue.</p>
+    <p><a href="https://github.com/themuffinator/openPREY">Repository</a> · <a href="https://github.com/themuffinator/openPREY/releases">Releases</a> · <a href="https://github.com/themuffinator/openPREY/issues">Issue tracker</a></p>
+  </section>
+</main>
 </body>
 </html>

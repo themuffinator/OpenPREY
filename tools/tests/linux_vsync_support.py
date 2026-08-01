@@ -120,12 +120,9 @@ def validate_native_glx_swap_interval() -> None:
 def validate_shared_metadata() -> None:
     renderer = read("src/renderer/RenderSystem_init.cpp")
     header = read("src/renderer/tr_local.h")
-    release = read("docs/dev/release-completion.md")
 
     require(renderer, "controls the platform swap interval / VSync state", "r_swapInterval cvar description")
     require(header, "controls platform swap interval / VSync", "r_swapInterval declaration comment")
-    require(release, "Linux VSync support", "release completion notes")
-    require(release, "native GLX fallback", "release completion notes")
 
 
 def validate_ci_smoke() -> None:

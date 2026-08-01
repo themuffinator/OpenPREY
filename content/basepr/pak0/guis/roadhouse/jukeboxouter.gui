@@ -1,0 +1,292 @@
+// These define the 2 colors to fade between for the side panels
+#define PANEL_LOW_R		0.77
+#define PANEL_LOW_G		0.17
+#define PANEL_LOW_B		0.0
+#define PANEL_LOW_A		1
+#define PANEL_HIGH_R	1
+#define PANEL_HIGH_G	1
+#define PANEL_HIGH_B	0
+#define PANEL_HIGH_A	1
+
+// These define the properties of the 2 twitcher displays on top
+#define TWITCHER_LEFT_X				108
+#define TWITCHER_RIGHT_X			332
+#define TWITCHER_Y					-15
+
+#define TWITCHER_WIDTH				50
+#define TWITCHER_HEIGHT				50
+#define TWITCHER_HALFWIDTH			(TWITCHER_WIDTH*0.5)
+#define TWITCHER_HALFHEIGHT			(TWITCHER_HEIGHT*0.5)
+#define TWITCHER_CAGE_WIDTH			200		//	4*WIDTH?
+#define TWITCHER_CAGE_HEIGHT		150		//	3*HEIGHT?
+#define TWITCHER_CAGE_HALFWIDTH		(TWITCHER_CAGE_WIDTH*0.5)
+#define TWITCHER_CAGE_HALFHEIGHT	(TWITCHER_CAGE_HEIGHT*0.5)
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+	nocursor		1
+	noninteractive	1
+
+	//--------------------------------------------------------------------
+	//			On/Off logic
+	//--------------------------------------------------------------------
+	onNamedEvent TurnOff {
+		resettime "PowerOffAnim" "0";
+		set "cmd" "turnoff" ;
+	}
+	onNamedEvent TurnOn {
+		resettime "PowerOnAnim" "0";
+		set "cmd" "turnon" ;
+	}
+
+	windowDef BlackOut {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 1
+		visible		0
+	}
+
+	windowDef PowerOffAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "OuterBackgroundL::visible" "0" ;
+			set "OuterBackgroundR::visible" "0" ;
+			set "TwitcherL::visible" "0" ;
+			set "TwitcherR::visible" "0" ;
+			set "BlackOut::visible" "1" ;
+			transition "BlackOut::rect" "130 10 380 420" "320 240 0 0" "300";
+		}
+	}
+	
+	windowDef PowerOnAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+		}
+		onTime 300 {
+			set "OuterBackgroundL::visible" "1" ;
+			set "OuterBackgroundR::visible" "1" ;
+			set "TwitcherL::visible" "1" ;
+			set "TwitcherR::visible" "1" ;
+		}
+	}
+
+
+	// Procedural effects
+
+/*	windowDef DebugOnly {
+		rect		0, 0, 640, 480
+		visible		0
+		
+		windowDef SoundScape1 {
+			rect		20, 20, 600, 50
+			background	"gui/soundwave"
+			matcolor	1, 1, 1, 1
+			rotate		0
+			visible		0
+		}
+		windowDef SoundScape2 {
+			rect		20, 410, 600, 50
+			background	"gui/soundwave"
+			matcolor	1, 1, 1, 1
+			shear		0, -0.4
+			matscalex	2
+			visible		0
+		}
+		windowDef Amp {
+			rect		480, 180, 100, 50
+			backcolor	0, 0, 0, 0
+			forecolor	1, 0, 0, 1
+			text		"gui::amplitude"
+			textscale	0.5
+			textaligny	5
+		}
+		windowDef Level {
+			rect		620, 100, 20, 150 * "gui::amplitude"
+			backcolor	"gui::amplitude", 1-"gui::amplitude", 0, 1
+			visible		0
+		}
+	}
+*/
+
+	windowDef OuterBackgroundL {
+		rect		0, 14, 110, 470
+		background	"guis/assets/jukebox/sideart.tga"
+		matcolor	PANEL_HIGH_R * "gui::amplitude" + PANEL_LOW_R * (1 - "gui::amplitude"),
+					PANEL_HIGH_G * "gui::amplitude" + PANEL_LOW_G * (1 - "gui::amplitude"),
+					PANEL_HIGH_B * "gui::amplitude" + PANEL_LOW_B * (1 - "gui::amplitude"),
+					PANEL_HIGH_A * "gui::amplitude" + PANEL_LOW_A * (1 - "gui::amplitude")
+	}
+	windowDef OuterBackgroundR {
+		rect		530, 14, -110, 470
+		background	"guis/assets/jukebox/sideart.tga"
+		matcolor	PANEL_HIGH_R * "gui::amplitude" + PANEL_LOW_R * (1 - "gui::amplitude"),
+					PANEL_HIGH_G * "gui::amplitude" + PANEL_LOW_G * (1 - "gui::amplitude"),
+					PANEL_HIGH_B * "gui::amplitude" + PANEL_LOW_B * (1 - "gui::amplitude"),
+					PANEL_HIGH_A * "gui::amplitude" + PANEL_LOW_A * (1 - "gui::amplitude")
+	}
+
+	windowDef TwitcherAnim {
+		rect		0, 0, 0, 0
+		backcolor	0, 0, 0, 0
+		notime		1
+		
+		onTime 5000 {
+			transition "TwitcherL::rect" "-40 0 200 150" "480 0 200 150" "1000" "200" "200" ;
+			transition "TwitcherR::rect" "480 0 200 150" "-40 0 200 150" "1000" "200" "200" ;
+		}
+		onTime 10000 {
+			transition "TwitcherR::rect" "-40 0 200 150" "480 0 200 150" "1000" "200" "200" ;
+			transition "TwitcherL::rect" "480 0 200 150" "-40 0 200 150" "1000" "200" "200" ;
+		}
+		onTime 15000 {
+			transition "TwitcherL::rect" "-40 0 200 150" "-40 100 200 150" "1000" "200" "200" ;
+			transition "TwitcherR::rect" "480 0 200 150" "480 100 200 150" "1000" "200" "200" ;
+		}
+		onTime 20000 {
+			transition "TwitcherL::rect" "-40 100 200 150" "-40 0 200 150" "1000" "200" "200" ;
+			transition "TwitcherR::rect" "480 100 200 150" "480 0 200 150" "1000" "200" "200" ;
+			resetTime "0";
+		}
+	}
+
+	windowDef TwitcherL {
+		rect		TWITCHER_LEFT_X, TWITCHER_Y, TWITCHER_CAGE_WIDTH, TWITCHER_CAGE_HEIGHT
+		backcolor	0, 0, 0, 0
+		
+		windowDef TwitcherbackL {
+			rect		-5, 28, 195, 90
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/twitchscreen.tga"
+		}
+		windowDef Twitcher1 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0.7", 0.7, "gui::amplitude", 1
+			shear		0, "gui::amplitude"
+			rotate		time*0.2
+		}
+		windowDef Twitcher2 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		0, "gui::amplitude"*2
+			rotate		time * -0.2
+		}
+
+		windowDef Twitcher3 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		0, 0-"gui::amplitude"
+			rotate		time*0.2
+		}
+		windowDef Twitcher4 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		0, 0-"gui::amplitude"*2
+			rotate		time * -0.2
+		}
+
+		windowDef Twitcher5 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		"gui::amplitude", 0
+			rotate		time*0.2
+		}
+		windowDef Twitcher6 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		"gui::amplitude", 0
+			rotate		time * -0.2
+		}
+		
+		windowDef TwitcherOverlay {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			matcolor	1, 0, 0, 1
+			background	"guis/assets/jukebox/twitcherback.tga"
+			rotate		time * -0.2
+		}
+	}
+
+	windowDef TwitcherR {
+		rect		TWITCHER_RIGHT_X, TWITCHER_Y, TWITCHER_CAGE_WIDTH, TWITCHER_CAGE_HEIGHT
+		backcolor	0, 0, 0, 0
+		
+		windowDef TwitcherbackR {
+			rect		10, 28, -195, 90
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/twitchscreen.tga"
+		}
+		windowDef TwitcherR1 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0.7", 0.7, "gui::amplitude", 1
+			shear		0, "gui::amplitude"
+			rotate		time*0.2
+		}
+		windowDef TwitcherR2 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		0, "gui::amplitude"*2
+			rotate		time * -0.2
+		}
+
+		windowDef TwitcherR3 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		0, 0-"gui::amplitude"
+			rotate		time*0.2
+		}
+		windowDef TwitcherR4 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		0, 0-"gui::amplitude"*2
+			rotate		time * -0.2
+		}
+
+		windowDef TwitcherR5 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		"gui::amplitude", 0
+			rotate		time*0.2
+		}
+		windowDef TwitcherR6 {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			background	"guis/assets/jukebox/twitcher"
+			backcolor	0, 0, 0, 0
+			matcolor	"0", 1-"gui::amplitude", "gui::amplitude", 1
+			shear		"gui::amplitude", 0
+			rotate		time * -0.2
+		}
+
+		windowDef TwitcherOverlayR {
+			rect		TWITCHER_CAGE_HALFWIDTH-(TWITCHER_HALFWIDTH*"gui::amplitude"), TWITCHER_CAGE_HALFHEIGHT-(TWITCHER_HALFHEIGHT*"gui::amplitude"), TWITCHER_WIDTH*"gui::amplitude", TWITCHER_HEIGHT*"gui::amplitude"
+			matcolor	1, 0, 0, 1
+			background	"guis/assets/jukebox/twitcherback.tga"
+			rotate		time * -0.2
+		}
+	}
+	
+
+
+}

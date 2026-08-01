@@ -32,7 +32,11 @@ If you have questions concerning this license or the applicable additional terms
 #include "tr_local.h"
 #include "../sound/sound.h"
 
-static ID_INLINE idSoundEmitter *R_GetPortalShaderSoundEmitter( int soundEmitterHandle ) {
+static ID_INLINE idSoundEmitter *R_GetPortalShaderSoundEmitter( idSoundEmitter *referenceSound, int soundEmitterHandle ) {
+	if ( referenceSound != NULL ) {
+		return referenceSound;
+	}
+
 	if ( soundEmitterHandle == 0 || soundSystem == NULL ) {
 		return NULL;
 	}
@@ -133,7 +137,7 @@ bool idRenderWorldLocal::PortalIsFoggedOut( const portal_t *p ) {
 	const idMaterial	*lightShader = ldef->lightShader;
 	int		size = sizeof( float ) *lightShader->GetNumRegisters();
 	float	*regs =(float *)_alloca( size );
-	idSoundEmitter *soundEmitter = R_GetPortalShaderSoundEmitter( ldef->parms.referenceSoundHandle );
+	idSoundEmitter *soundEmitter = R_GetPortalShaderSoundEmitter( ldef->parms.referenceSound, ldef->parms.referenceSoundHandle );
 
 	lightShader->EvaluateRegisters( regs, ldef->parms.shaderParms, tr.viewDef, soundEmitter );
 
@@ -806,18 +810,27 @@ void idRenderWorldLocal::AddAreaEntityRefs( int areaNum, const portalStack_t *ps
 		// remove decals that are completely faded away
 		R_FreeEntityDefFadedDecals( entity, tr.viewDef->renderView.time );
 
-		if ( R_ShouldSuppressViewModelForLevelshot( tr.viewDef->renderView.viewID, entity->parms.allowSurfaceInViewID, entity->parms.weaponDepthHackInViewID ) ) {
+		if ( tr.viewDef->renderView.viewSpiritEntities ) {
+			if ( entity->parms.onlyInvisibleInSpirit ) {
+				continue;
+			}
+		} else if ( entity->parms.onlyVisibleInSpirit ) {
+			continue;
+		}
+
+		const int effectiveViewID = R_EffectiveViewIDForSubview();
+		if ( R_ShouldSuppressViewModelForLevelshot( effectiveViewID, entity->parms.allowSurfaceInViewID, entity->parms.weaponDepthHackInViewID ) ) {
 			continue;
 		}
 
 		// check for completely suppressing the model
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( entity->parms.suppressSurfaceInViewID
-					&& entity->parms.suppressSurfaceInViewID == tr.viewDef->renderView.viewID ) {
+					&& entity->parms.suppressSurfaceInViewID == effectiveViewID ) {
 				continue;
 			}
 			if ( entity->parms.allowSurfaceInViewID 
-					&& entity->parms.allowSurfaceInViewID != tr.viewDef->renderView.viewID ) {
+					&& entity->parms.allowSurfaceInViewID != effectiveViewID ) {
 				continue;
 			}
 		}

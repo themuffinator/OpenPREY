@@ -28,6 +28,11 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "snd_local.h"
+#include "../framework/Session_local.h"
+
+extern idCVar g_subtitles;
+extern idCVar s_volume_dB;
+extern idCVar s_musicvolume_dB;
 
 idCVar s_noSound( "s_noSound", "0", CVAR_BOOL, "returns NULL for all sounds loaded and does not update the sound rendering" );
 idCVar s_volume( "s_volume", "0.5", CVAR_ARCHIVE | CVAR_FLOAT, "master volume (0-1)", 0.0f, 1.0f );
@@ -62,6 +67,43 @@ idSoundSystem* soundSystem = &soundSystemLocal;
 static const int SOUND_RUMBLE_DURATION_MSEC = 120;
 static const float SOUND_RUMBLE_STOP_THRESHOLD = 0.01f;
 static const float SOUND_RUMBLE_HIGH_MOTOR_SCALE = 0.75f;
+static const float SOUND_SUBTITLE_AUDIBILITY_EPSILON = 1.0f / 1024.0f;
+
+static float SoundAliasDBToLinear( float db )
+{
+	return idMath::ClampFloat( 0.0f, 1.0f, DBtoLinearClamped( db ) );
+}
+
+static void SyncVolumeAliasCVars( idCVar& linearCvar, idCVar& dbCvar )
+{
+	const bool linearModified = linearCvar.IsModified();
+	const bool dbModified = dbCvar.IsModified();
+	if( dbModified || !linearModified )
+	{
+		const float linear = SoundAliasDBToLinear( dbCvar.GetFloat() );
+		if( idMath::Fabs( linearCvar.GetFloat() - linear ) > 0.0001f )
+		{
+			linearCvar.SetFloat( linear );
+		}
+	}
+	else
+	{
+		const float linear = idMath::ClampFloat( 0.0f, 1.0f, linearCvar.GetFloat() );
+		const float db = linear <= 0.0f ? DB_SILENCE : idMath::ClampFloat( DB_SILENCE, 0.0f, LinearToDB( linear ) );
+		if( idMath::Fabs( dbCvar.GetFloat() - db ) > 0.01f )
+		{
+			dbCvar.SetFloat( db );
+		}
+	}
+	linearCvar.ClearModified();
+	dbCvar.ClearModified();
+}
+
+static void SyncVolumeCompatibilityCVars()
+{
+	SyncVolumeAliasCVars( s_volume, s_volume_dB );
+	SyncVolumeAliasCVars( s_musicVolume, s_musicvolume_dB );
+}
 
 static void Sound_UpdateControllerRumble( float amplitude )
 {
@@ -209,6 +251,28 @@ void ListSamples_f( const idCmdArgs& args )
 	ListSounds_f( args );
 }
 
+void ListSubtitles_f( const idCmdArgs& args )
+{
+	const char* filter = args.Argc() > 1 ? args.Argv( 1 ) : NULL;
+	int total = 0;
+	for( int i = 0; i < soundSystemLocal.soundSubtitleList.Num(); i++ )
+	{
+		const soundSubtitleList_t& list = soundSystemLocal.soundSubtitleList[i];
+		if( filter != NULL && filter[0] != '\0' && idStr::Icmp( filter, list.soundName ) != 0 )
+		{
+			continue;
+		}
+		idLib::Printf( "%5d: %s\n", i, list.soundName.c_str() );
+		for( int j = 0; j < list.subList.Num(); j++ )
+		{
+			const soundSub_t& subtitle = list.subList[j];
+			idLib::Printf( "\t%3d %6.3f %s\n", subtitle.subChannel, subtitle.subTime, subtitle.subText.c_str() );
+			total++;
+		}
+	}
+	idLib::Printf( "%d subtitle entries\n", total );
+}
+
 /*
 ========================
 ListSoundDecoders_f
@@ -292,7 +356,9 @@ idSoundSystemLocal::Restart
 */
 void idSoundSystemLocal::Restart()
 {
-	const bool wasMuted = IsMuted();
+	// Restart needs a temporary hard mute, but must not turn a focus-only mute
+	// into the persistent/manual mute state when the device comes back.
+	const bool wasMuted = IsMutedExplicitly();
 	SetMute( true );
 
 	// Mute all channels in all worlds
@@ -355,6 +421,11 @@ void idSoundSystemLocal::Init()
 
 	soundTime = Sys_Milliseconds();
 	random.SetSeed( soundTime );
+	sb_subtitleQueue.Clear();
+	sf_subtitleQueue.Clear();
+	soundSubtitleList.Clear();
+	subtitleQueueChanged = false;
+	SyncVolumeCompatibilityCVars();
 
 	if( !s_noSound.GetBool() )
 	{
@@ -369,6 +440,7 @@ void idSoundSystemLocal::Init()
 	cmdSystem->AddCommand( "reloadSounds", ReloadSounds_f, CMD_FL_SOUND | CMD_FL_CHEAT, "reloads all sounds" );
 	cmdSystem->AddCommand( "s_restart", RestartSound_f, CMD_FL_SOUND, "restarts the sound system" );
 	cmdSystem->AddCommand( "listSamples", ListSamples_f, CMD_FL_SOUND, "lists all loaded sound samples" );
+	cmdSystem->AddCommand( "listSubtitles", ListSubtitles_f, CMD_FL_SOUND, "lists registered Prey subtitle entries" );
 
 	idLib::Printf( "sound system initialized.\n" );
 	idLib::Printf( "--------------------------------------\n" );
@@ -426,6 +498,11 @@ idSoundSystemLocal::Shutdown
 */
 void idSoundSystemLocal::Shutdown()
 {
+	ClearSubtitleRuntimeQueue();
+	soundSubtitleList.Clear();
+	// Session teardown has already detached the playing sound world and hidden
+	// subtitles while the UI manager is still alive.  Sound shutdown runs after
+	// UI shutdown, so it must not call back into session-owned GUI objects here.
 	samples.DeleteContents( true );
 	sampleHash.Free();
 	FreeStreamBuffers();
@@ -511,6 +588,8 @@ void idSoundSystemLocal::SetPlayingSoundWorld( idSoundWorld* soundWorld )
 	idSoundWorldLocal* oldSoundWorld = currentSoundWorld;
 
 	currentSoundWorld = static_cast<idSoundWorldLocal*>( soundWorld );
+	ClearSubtitleRuntimeQueue();
+	sessLocal.HideSubtitle();
 
 	if( oldSoundWorld != NULL )
 	{
@@ -535,6 +614,7 @@ idSoundSystemLocal::Render
 */
 void idSoundSystemLocal::Render()
 {
+	SyncVolumeCompatibilityCVars();
 
 	if( s_noSound.GetBool() )
 	{
@@ -561,7 +641,21 @@ void idSoundSystemLocal::Render()
 	if( currentSoundWorld != NULL )
 	{
 		currentSoundWorld->Update();
+		if( g_subtitles.GetBool() )
+		{
+			CollectActiveSubtitles();
+			PruneExpiredSubtitles();
+		}
+		else
+		{
+			ClearSubtitleRuntimeQueue();
+		}
 	}
+	else
+	{
+		ClearSubtitleRuntimeQueue();
+	}
+	PresentSubtitles();
 
 	const float controllerRumble = ( currentSoundWorld != NULL && session != NULL && currentSoundWorld == session->sw ) ?
 		currentSoundWorld->CurrentRumbleAmplitude() : 0.0f;
@@ -601,6 +695,8 @@ void idSoundSystemLocal::StopAllSounds()
 			sw->StopAllSounds();
 		}
 	}
+	ClearSubtitleRuntimeQueue();
+	PresentSubtitles();
 	hardware.Update();
 }
 
@@ -899,6 +995,203 @@ idSoundSystemLocal::FreeVoice
 */
 void idSoundSystemLocal::PrintMemInfo( MemInfo_t* mi )
 {
+}
+
+int idSoundSystemLocal::GetSubtitleIndex( const char* soundName )
+{
+	for( int i = 0; i < soundSubtitleList.Num(); i++ )
+	{
+		if( idStr::Icmp( soundName, soundSubtitleList[i].soundName ) == 0 )
+		{
+			return i;
+		}
+	}
+	soundSubtitleList_t list;
+	list.soundName = soundName != NULL ? soundName : "";
+	return soundSubtitleList.Append( list );
+}
+
+void idSoundSystemLocal::SetSubtitleData( int subIndex, int subNum, const char* subText, float subTime, int subChannel )
+{
+	soundSubtitleList_t* list = GetSubtitleList( subIndex );
+	if( list == NULL )
+	{
+		return;
+	}
+	for( int i = 0; i < list->subList.Num(); i++ )
+	{
+		if( list->subList[i].subChannel == subNum )
+		{
+			list->subList[i].subText = subText != NULL ? subText : "";
+			list->subList[i].subTime = subTime;
+			return;
+		}
+	}
+	soundSub_t subtitle;
+	subtitle.subText = subText != NULL ? subText : "";
+	subtitle.subTime = subTime;
+	subtitle.subChannel = subChannel;
+	list->subList.Append( subtitle );
+}
+
+soundSub_t* idSoundSystemLocal::GetSubtitle( int subIndex, int subNum )
+{
+	soundSubtitleList_t* list = GetSubtitleList( subIndex );
+	if( list != NULL )
+	{
+		for( int i = 0; i < list->subList.Num(); i++ )
+		{
+			if( list->subList[i].subChannel == subNum )
+			{
+				return &list->subList[i];
+			}
+		}
+	}
+	return NULL;
+}
+
+soundSubtitleList_t* idSoundSystemLocal::GetSubtitleList( int subIndex )
+{
+	return subIndex >= 0 && subIndex < soundSubtitleList.Num() ? &soundSubtitleList[subIndex] : NULL;
+}
+
+bool idSoundSystemLocal::SubtitleQueueContains( const soundSub_t* subtitle ) const
+{
+	for( int i = 0; i < sb_subtitleQueue.Num(); i++ )
+	{
+		if( sb_subtitleQueue[i].subtitle == subtitle )
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool idSoundSystemLocal::AppendSubtitleForChannel( const idSoundChannel* channel )
+{
+	if( channel == NULL || channel->soundShader == NULL || channel->leadinSample == NULL ||
+		channel->parms.subIndex < 0 || channel->IsLooping() ||
+		DBtoLinearClamped( channel->volumeDB ) <= SOUND_SUBTITLE_AUDIBILITY_EPSILON )
+	{
+		return false;
+	}
+	const soundSubtitleList_t* list = GetSubtitleList( channel->parms.subIndex );
+	if( list == NULL || list->subList.Num() == 0 )
+	{
+		return false;
+	}
+
+	const int currentTime = currentSoundWorld != NULL ? currentSoundWorld->GetSoundTime() : soundTime;
+	const float playedSeconds = Max( 0, currentTime - channel->startTime ) * 0.001f;
+	const soundSub_t* active = NULL;
+	int endTime = channel->endTime > 0 ? channel->endTime : channel->startTime + channel->leadinSample->LengthInMsec();
+	for( int i = 0; i < list->subList.Num(); i++ )
+	{
+		const soundSub_t& subtitle = list->subList[i];
+		if( subtitle.subTime > playedSeconds )
+		{
+			break;
+		}
+		active = &subtitle;
+		if( i + 1 < list->subList.Num() )
+		{
+			endTime = channel->startTime + idMath::FtoiFast( list->subList[i + 1].subTime * 1000.0f );
+		}
+	}
+	if( active == NULL || SubtitleQueueContains( active ) )
+	{
+		return false;
+	}
+	queuedSubtitle_t queued;
+	queued.subIndex = channel->parms.subIndex;
+	queued.subNum = active->subChannel;
+	queued.subtitle = active;
+	queued.endTime = endTime;
+	sb_subtitleQueue.Append( queued );
+	subtitleQueueChanged = true;
+	return true;
+}
+
+void idSoundSystemLocal::CollectActiveSubtitles()
+{
+	if( currentSoundWorld == NULL )
+	{
+		return;
+	}
+	for( int e = 1; e < currentSoundWorld->emitters.Num(); e++ )
+	{
+		idSoundEmitterLocal* emitter = currentSoundWorld->emitters[e];
+		if( emitter == NULL )
+		{
+			continue;
+		}
+		for( int c = 0; c < emitter->channels.Num(); c++ )
+		{
+			AppendSubtitleForChannel( emitter->channels[c] );
+		}
+	}
+}
+
+void idSoundSystemLocal::PruneExpiredSubtitles()
+{
+	const int currentTime = currentSoundWorld != NULL ? currentSoundWorld->GetSoundTime() : soundTime;
+	for( int i = 0; i < sb_subtitleQueue.Num(); )
+	{
+		if( currentTime >= sb_subtitleQueue[i].endTime )
+		{
+			sb_subtitleQueue.RemoveIndex( i );
+			subtitleQueueChanged = true;
+		}
+		else
+		{
+			i++;
+		}
+	}
+}
+
+bool idSoundSystemLocal::SyncSubtitleQueues()
+{
+	if( !subtitleQueueChanged )
+	{
+		return false;
+	}
+	sf_subtitleQueue.Clear();
+	for( int i = 0; i < sb_subtitleQueue.Num(); i++ )
+	{
+		sf_subtitleQueue.Append( sb_subtitleQueue[i].subtitle );
+	}
+	subtitleQueueChanged = false;
+	return true;
+}
+
+void idSoundSystemLocal::PresentSubtitles()
+{
+	if( !SyncSubtitleQueues() )
+	{
+		return;
+	}
+	if( !g_subtitles.GetBool() || sf_subtitleQueue.Num() == 0 )
+	{
+		sessLocal.HideSubtitle();
+		return;
+	}
+	idStrList lines;
+	for( int i = 0; i < sf_subtitleQueue.Num(); i++ )
+	{
+		lines.Append( sf_subtitleQueue[i]->subText );
+	}
+	sessLocal.ShowSubtitle( lines );
+}
+
+void idSoundSystemLocal::ClearSubtitleRuntimeQueue()
+{
+	if( sb_subtitleQueue.Num() == 0 && sf_subtitleQueue.Num() == 0 )
+	{
+		return;
+	}
+	sb_subtitleQueue.Clear();
+	sf_subtitleQueue.Clear();
+	subtitleQueueChanged = true;
 }
 
 // jmarshall: Quake 4 specific code

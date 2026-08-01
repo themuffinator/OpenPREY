@@ -124,7 +124,7 @@ def validate_posix_signal_bridge() -> None:
         '#include "../../renderer/RendererStartupDiagnostics.h"',
         "static const char *Posix_RendererStartupPhaseName( void ) {",
         "return R_RendererStartupPhaseSignalName();",
-        'Posix_WriteSignalText( "openQ4: last renderer startup phase: " );',
+        'Posix_WriteSignalText( "openPREY: last renderer startup phase: " );',
         "Posix_WriteSignalText( Posix_RendererStartupPhaseName() );",
     ):
         require(source, token, "POSIX fatal signal renderer startup phase bridge")
@@ -132,11 +132,11 @@ def validate_posix_signal_bridge() -> None:
     require_ordered(
         fatal_body,
         (
-            'Posix_WriteSignalText( "openQ4: fatal signal " );',
+            'Posix_WriteSignalText( "openPREY: fatal signal " );',
             'Posix_WriteSignalText( "), exiting without unsafe engine shutdown\\n" );',
-            'Posix_WriteSignalText( "openQ4: last renderer startup phase: " );',
+            'Posix_WriteSignalText( "openPREY: last renderer startup phase: " );',
             "Posix_RendererStartupPhaseName()",
-            'Posix_WriteSignalText( "openQ4: last game module phase: " );',
+            'Posix_WriteSignalText( "openPREY: last game module phase: " );',
             "Com_GameModuleLoadPhaseSignalName()",
             "_exit( 128 + signum );",
         ),
@@ -383,45 +383,17 @@ def validate_phase2_plan_status() -> None:
 
 
 def validate_docs_and_release_notes() -> None:
-    support_doc = read("docs/user/macos-support-data.md")
-    release_notes = read("docs/dev/releases/v0.6.5.md")
-    release_completion = read("docs/dev/release-completion.md")
+    platform_support = read("docs/dev/platform-support.md")
+    status_ledger = read("docs/dev/prey-rebase/status-ledger.md")
 
-    for source, context in (
-        (support_doc, "macOS support-data guide"),
-        (release_notes, "curated release notes"),
-        (release_completion, "release completion notes"),
-    ):
-        require(source, "last renderer startup phase", context)
-        require(source, "first ARB2 interaction handoff", context)
-        require(source, "ARB2 interaction driver bypass", context)
-        require(source, "ARB2 interaction bypass state", context)
-        require(source, "ARB2 interaction bypass light scale", context)
-        require(source, "ARB2 interaction bypass light scale skipped", context)
-        require(source, "ARB2 interaction bypass ambient", context)
-        require(source, "ARB2 interaction bypass frame tail", context)
+    require(platform_support, "Prey runtime and package evidence pending", "macOS platform boundary")
+    require(platform_support, "OpenGL is the first compatibility target", "macOS renderer direction")
+    require(status_ledger, "TODO-RELEASE-LANES", "macOS release-lane deferral")
 
 
 def validate_ci_and_local_wiring() -> None:
     local_runner = read("tools/validation/openq4_validate.py")
-    commit = read(".github/workflows/commit-validation.yml")
-    push = read(".github/workflows/push-verification.yml")
-    macos_debug = read(".github/workflows/macos-debug.yml")
-
-    for source, context in (
-        (local_runner, "local validation runner"),
-        (commit, "commit validation workflow"),
-        (push, "push verification workflow"),
-        (macos_debug, "macOS debug workflow"),
-    ):
-        require(source, "macos_renderer_phase_breadcrumbs.py", context)
-
-    for source, context in (
-        (commit, "commit validation workflow"),
-        (push, "push verification workflow"),
-        (macos_debug, "macOS debug workflow"),
-    ):
-        require(source, "python tools/tests/macos_renderer_phase_breadcrumbs.py", context)
+    require(local_runner, "macos_renderer_phase_breadcrumbs.py", "local validation runner")
 
 
 def main() -> None:

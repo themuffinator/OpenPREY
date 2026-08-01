@@ -103,7 +103,7 @@ static void R_ErrorForMissingRequiredOpenGLFeatures( void ) {
 	if ( RenderDoc_IsInjected() ) {
 		common->Printf(
 			"RenderDoc detected during OpenGL initialization.\n"
-			"openQ4 currently requires OpenGL compatibility / ARB2-era features "
+			"openPREY currently requires OpenGL compatibility / ARB2-era features "
 			"that are unavailable in the injected context.\n" );
 		R_ErrorForUnsupportedCompatibilityOpenGL();
 	}
@@ -224,6 +224,10 @@ idCVar r_bloomSoftKnee( "r_bloomSoftKnee", "0.15", CVAR_RENDERER | CVAR_ARCHIVE 
 idCVar r_bloomIntensity( "r_bloomIntensity", "0.8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom contribution scale", 0.0f, 4.0f );
 idCVar r_bloomRadius( "r_bloomRadius", "1.35", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "bloom sample radius scale", 0.1f, 8.0f );
 idCVar r_bloomMipCount( "r_bloomMipCount", "5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of bloom pyramid levels", 1, 5, idCmdSystem::ArgCompletion_Integer<1,5> );
+idCVar r_glowAlpha( "r_glowAlpha", "0.55", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "start alpha used when blurring Prey glow stages", 0.0f, 4.0f );
+idCVar r_glowAlphaChange( "r_glowAlphaChange", "0.85", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "per-step alpha multiplier for Prey glow blur", 0.0f, 4.0f );
+idCVar r_glowSteps( "r_glowSteps", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of Prey glow blur taps", 0, 256 );
+idCVar r_glowStrength( "r_glowStrength", "0.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "strength of the final Prey glow overlay", 0.0f, 4.0f );
 idCVar r_ssao( "r_ssao", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable screen-space ambient occlusion" );
 idCVar r_ssaoRadius( "r_ssaoRadius", "36.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "SSAO sampling radius in view-space units", 4.0f, 256.0f );
 idCVar r_ssaoBias( "r_ssaoBias", "2.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "SSAO horizon bias in view-space units", 0.0f, 32.0f );
@@ -304,7 +308,7 @@ idCVar r_useSilRemap( "r_useSilRemap", "1", CVAR_RENDERER | CVAR_BOOL, "consider
 idCVar r_useNodeCommonChildren( "r_useNodeCommonChildren", "1", CVAR_RENDERER | CVAR_BOOL, "stop pushing reference bounds early when possible" );
 idCVar r_useShadowProjectedCull( "r_useShadowProjectedCull", "1", CVAR_RENDERER | CVAR_BOOL, "discard triangles outside light volume before shadowing" );
 idCVar r_useShadowVertexProgram( "r_useShadowVertexProgram", "1", CVAR_RENDERER | CVAR_BOOL, "do the shadow projection in the vertex program on capable cards" );
-idCVar r_useTrueTypeFonts( "r_useTrueTypeFonts", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "render GUI text from the shipped .ttf faces, rasterised at the display's own resolution, instead of scaling up the fixed 12/24/48 point bitmap atlases" );
+idCVar r_useTrueTypeFonts( "r_useTrueTypeFonts", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "render GUI text from the shipped .ttf faces, rasterised at the display's own resolution, instead of scaling up the fixed 12/24/48 point bitmap atlases" );
 idCVar r_ttfFontResolution( "r_ttfFontResolution", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "multiplier on the resolution the TrueType glyph atlases are rasterised at; raise for sharper text at the cost of atlas memory", 0.25f, 4.0f );
 idCVar r_ttfFontDebug( "r_ttfFontDebug", "0", CVAR_RENDERER | CVAR_BOOL, "dump each TrueType glyph atlas to fs_savepath/ttfatlas and log its layout" );
 idCVar r_useShadowMap( "r_useShadowMap", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use a simple shadow-map path for projected and point lights when supported" );
@@ -498,6 +502,7 @@ idCVar r_skipRenderContext( "r_skipRenderContext", "0", CVAR_RENDERER | CVAR_BOO
 idCVar r_skipTranslucent( "r_skipTranslucent", "0", CVAR_RENDERER | CVAR_BOOL, "skip the translucent interaction rendering" );
 idCVar r_skipAmbient( "r_skipAmbient", "0", CVAR_RENDERER | CVAR_BOOL, "bypasses all non-interaction drawing" );
 idCVar r_skipNewAmbient( "r_skipNewAmbient", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "bypasses all vertex/fragment program ambient drawing" );
+idCVar r_shaderLevel( "r_shaderLevel", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Prey material shader quality level; reload declarations after changing", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_forceAmbient( "r_forceAmbient", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "force ambient lighting level", 0.0f, 1.0f );
 idCVar r_useLightGrid( "r_useLightGrid", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use precomputed irradiance-volume atlases when present" );
 idCVar r_lightGridIntensity( "r_lightGridIntensity", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "scales baked light-grid indirect diffuse contribution", 0.0f, 16.0f );
@@ -3940,12 +3945,21 @@ void R_InitMaterials( void ) {
 	// needed by R_DeriveLightData
 	declManager->FindMaterial( "lights/defaultPointLight" );
 	declManager->FindMaterial( "lights/defaultProjectedLight" );
+
+#if !defined(HUMANHEAD)
 	declManager->FindMaterial( "gfx/lights/flashlight" );
 
 	// Session wipes are used during map transitions after the level-load
 	// precache window has closed.
 	declManager->FindMaterial( "gfx/wipes/fade" );
 	declManager->FindMaterial( "gfx/wipes/fade_blend" );
+#else
+	// Retail Prey has no Quake 4 flashlight or gfx/wipes materials.  Precache
+	// the authored Prey wipe declarations that Session's compatibility lookup
+	// resolves at map transitions instead.
+	declManager->FindMaterial( "wipeMaterial" );
+	declManager->FindMaterial( "wipe2Material" );
+#endif
 }
 
 
@@ -4090,6 +4104,7 @@ void idRenderSystemLocal::Clear( void ) {
 	registered = false;
 	frameCount = 0;
 	viewCount = 0;
+	lastRenderSkybox = -1;
 	videoRestartCount = 0;
 	glContextGeneration = 0;
 	staticAllocCount = 0;
@@ -4100,6 +4115,9 @@ void idRenderSystemLocal::Clear( void ) {
 	postProcessSMAAQuality.Set( 0.0f, 0.10f, 8.0f, 2.0f );
 	deltaTime = 0.0f;
 	lastRenderTimeMsec = 0;
+	scopeViewEnabled = false;
+	spiritWalkViewEnabled = false;
+	shuttleViewEnabled = false;
 	viewportOffset[0] = 0;
 	viewportOffset[1] = 0;
 	tiledViewport[0] = 0;

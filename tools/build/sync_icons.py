@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync openQ4 platform icon artifacts from assets/icons."""
+"""Sync openPREY platform icon artifacts from assets/icons."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ PNG_SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256, 512, 1024)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Sync openQ4 icon outputs for all platforms.")
+    parser = argparse.ArgumentParser(description="Sync openPREY icon outputs for all platforms.")
     parser.add_argument(
         "--source-root",
         default=".",
@@ -58,7 +58,7 @@ def inspect_ico_sizes(path: Path) -> set[tuple[int, int]]:
 def highest_png_source(icon_dir: Path) -> Path:
     highest: tuple[int, Path] | None = None
     for size in PNG_SIZES:
-        candidate = icon_dir / f"quake4_{size}.png"
+        candidate = icon_dir / f"prey_{size}.png"
         if candidate.is_symlink():
             raise FileNotFoundError(f"source PNG icon must not be a symlink: {candidate}")
         if candidate.is_file():
@@ -98,8 +98,8 @@ def resize_png(src_png: Path, dst_png: Path, size: int) -> bool:
 
 def sync_icons(source_root: Path, check_only: bool) -> int:
     icon_dir = source_root / "assets" / "icons"
-    ico_path = icon_dir / "quake4.ico"
-    icns_path = icon_dir / "quake4.icns"
+    ico_path = icon_dir / "prey.ico"
+    icns_path = icon_dir / "prey.icns"
 
     ensure_file(ico_path, "ICO icon")
     ensure_file(icns_path, "ICNS icon")
@@ -108,14 +108,14 @@ def sync_icons(source_root: Path, check_only: bool) -> int:
     expected_ico_sizes = {(16, 16), (20, 20), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256)}
     missing_ico = sorted(expected_ico_sizes.difference(ico_sizes))
     if missing_ico:
-        raise RuntimeError(f"assets/icons/quake4.ico is missing required sizes: {missing_ico}")
+        raise RuntimeError(f"assets/icons/prey.ico is missing required sizes: {missing_ico}")
 
     source_png = highest_png_source(icon_dir)
 
     generated = 0
     pending = 0
     for size in PNG_SIZES:
-        path = icon_dir / f"quake4_{size}.png"
+        path = icon_dir / f"prey_{size}.png"
         if path.is_symlink():
             raise RuntimeError(f"PNG icon output must not be a symlink: {path}")
         if path.is_file():

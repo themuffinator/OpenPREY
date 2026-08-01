@@ -160,14 +160,14 @@ static void sig_handler( int signum, siginfo_t *info, void *context ) {
 	const posixSignalRoute_t *route = Posix_FindSignalRoute( signum );
 	if ( route != NULL && route->graceful ) {
 		pendingQuitSignal = signum;
-		Posix_WriteSignalText( "openQ4: received " );
+		Posix_WriteSignalText( "openPREY: received " );
 		Posix_WriteSignalText( route->name );
 		Posix_WriteSignalText( ", requesting shutdown\n" );
 		return;
 	}
 
 	if ( activeFatalSignal != 0 ) {
-		Posix_WriteSignalText( "openQ4: double fault while handling " );
+		Posix_WriteSignalText( "openPREY: double fault while handling " );
 		Posix_WriteSignalText( Posix_SignalName( static_cast<int>( activeFatalSignal ) ) );
 		Posix_WriteSignalText( "; second signal " );
 		Posix_WriteSignalText( Posix_SignalName( signum ) );
@@ -176,15 +176,15 @@ static void sig_handler( int signum, siginfo_t *info, void *context ) {
 	}
 
 	activeFatalSignal = signum;
-	Posix_WriteSignalText( "openQ4: fatal signal " );
+	Posix_WriteSignalText( "openPREY: fatal signal " );
 	Posix_WriteSignalText( Posix_SignalName( signum ) );
 	Posix_WriteSignalText( " (" );
 	Posix_WriteSignalNumber( signum );
 	Posix_WriteSignalText( "), exiting without unsafe engine shutdown\n" );
-	Posix_WriteSignalText( "openQ4: last renderer startup phase: " );
+	Posix_WriteSignalText( "openPREY: last renderer startup phase: " );
 	Posix_WriteSignalText( Posix_RendererStartupPhaseName() );
 	Posix_WriteSignalText( "\n" );
-	Posix_WriteSignalText( "openQ4: last game module phase: " );
+	Posix_WriteSignalText( "openPREY: last game module phase: " );
 	Posix_WriteSignalText( Com_GameModuleLoadPhaseSignalName() );
 	Posix_WriteSignalText( "\n" );
 

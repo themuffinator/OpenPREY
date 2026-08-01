@@ -1,0 +1,112 @@
+// ElevatorCall.gui
+
+// Available gui vars:
+//	gui_parm1			floor # to call elevator to (eg. 1, 2, 3)
+//	floor				current floor of elevator (0==between floors)
+//	damaged				bool of whether the gui is currently damaged
+
+windowDef Desktop {
+	rect		0 ,0 ,640 ,480 
+	backcolor	0 ,0 ,0 ,0.2 
+	visible		1
+	
+	windowDef backg {
+		rect		10, 10, 620, 460
+		backcolor	1, 1, 1, 0
+		matcolor	1, 1, 1, 0.9
+		background	"guis/assets/elevator_call/bg"
+		visible		1
+	}
+	windowDef buttoncall {
+		rect		57, 200, 523, 210
+		backcolor	0, 0, 0, 0
+		matcolor	0.7, 0.8, 1, 0.5
+		background	"guis/assets/elevator_call/buttoncall"
+		visible		1
+	}
+	windowDef elevatortext {
+		rect		0, 235, 640, 80
+		text		"#str_20471"
+		textalign	1
+		textscale	2
+		forecolor	0.75, 0.95, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+	}
+	
+	windowDef elevatortext {
+		rect		0, 24, 640, 80
+		text		"#str_20469"
+		textalign	1
+		textscale	1.25
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+	}
+	windowDef TempText3 {
+		rect		0, 90, 640, 60
+		text		"#str_20472"
+		textalign	1
+		textscale	0.4
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+	}
+	windowDef TempText2 {
+		rect		0, 120, 640, 60
+		text		"#str_20470"
+		textalign	1
+		textscale	0.7
+		forecolor	1, 1, 1, 0.8
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+		visible		("gui::floor" == 0)
+	}
+	windowDef TempText {
+		rect		0, 120, 640, 60
+		text		"gui::floor"
+		textalign	1
+		textscale	0.7
+		forecolor	1, 1, 1, 0.8
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+		visible		("gui::floor" != 0)
+	}
+	windowDef TriggerButton1 {
+		rect	50, 150, 540, 300
+		backcolor	0, 0, 0, 0
+		//background	"guis/assets/elevator/highlight"
+		matcolor	1, 1, 1, 0.1
+		cursor		1
+		visible		1 
+
+		onMouseEnter {
+			transition	"buttoncall::matcolor" "0.7 0.8 1 0.1" "1 0.2 0 0.6" "200" ;  
+		} 		
+		onMouseExit {
+			transition	"buttoncall::matcolor" "1 0.2 0 0.1" "0.7 0.8 1 0.5" "200" ;  
+		} 
+		onAction {
+			set	"cmd"	"play console_generic_activate ; changefloor" "gui::gui_parm1" ;
+			transition	"matcolor" "1 1 1 0.5" "1 1 1 0.3" "300" ; 
+			ResetTime	"Text2a" "0" ;
+		} 
+	}
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+	
+
+	
+}

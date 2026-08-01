@@ -1,0 +1,290 @@
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	float		channel 1	// In order for this initial value to be recognized, all "channel" references must be scoped explicity (id bug)
+	float		news	0
+	float		started	0
+	nocursor	1
+
+	onNamedEvent NewsFlash {
+		set "desktop::news" "1" ;
+		resettime "AllChannels" "0" ;
+	}
+	
+	//--------------------------------------------------------------------
+	//			On/Off logic
+	//--------------------------------------------------------------------
+	onNamedEvent TurnOff {
+		resettime "PowerOffAnim" "0";
+	}
+	onNamedEvent TurnOn {
+		resettime "PowerOnAnim" "0";
+	}
+
+	windowDef PowerOffAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "desktop::noninteractive" "1" ;
+			transition "Programming::rect" "0 0 640 480" "320 240 0 0" "300" ;
+		}
+		onTime 300 {
+			set "Programming::visible" "0" ;
+		}
+	}
+	
+	windowDef PowerOnAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			transition "Programming::rect" "320 240 0 0" "0 0 640 480" "300" ;
+			set "Programming::visible" "1" ;
+		}
+		onTime 300 {
+			set "desktop::noninteractive" "0" ;
+		}
+	}
+
+	windowDef Programming {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+
+		windowDef AllChannels {
+			rect			20, 35, 600, 410
+			matcolor		1, 1, 1, 1
+			background		"guis/assets/staticoriginal"		// Default channel is static so it's cheap
+			noTime			1
+			float ch2reset	0
+			float ch3reset	0
+
+			onAction {
+				if ("desktop::channel" == 1) {
+					set "desktop::channel" "2" ;
+					set "ChannelNumber::text" "07";
+					if ("desktop::news" == 0) {
+						set	"AllChannels::background" "video/tv/channel2" ;
+						if ("AllChannels::ch2reset" == 0) {
+							resetCinematics ;	// Reset cinematics once, then let them loop
+							set "AllChannels::ch2reset" "1" ;
+						}
+					}
+				}
+				else if ("desktop::channel" == 2) {
+					set "desktop::channel" "3" ;
+					set "ChannelNumber::text" "26";
+					if ("desktop::news" == 0) {
+						set	"AllChannels::background" "video/tv/channel3" ;
+						if ("AllChannels::ch3reset" == 0) {
+							resetCinematics ;	// Reset cinematics once, then let them loop
+							set "AllChannels::ch3reset" "1" ;
+						}
+					}
+				}
+				else if ("desktop::channel" == 3) {
+					set "desktop::channel" "1" ;
+					set "ChannelNumber::text" "03";
+					if ("desktop::news" == 0) {
+						set	"AllChannels::background" "guis/assets/staticoriginal" ;
+					}
+				}
+				resettime "ChannelNumber" "0" ;
+			} 
+
+			// Time based functions for newscast (members of AllChannels so resetCinematics is on this window)
+			onTime 0 {
+				set "Mute::visible" "0" ;
+				set "AllChannels::visible" "0" ;			// Discontinue normal programming
+				set "TestPattern::visible" "1" ;			// Display test pattern
+				set "EBSText1::visible" "1" ;				// Display EBSText1
+// All these sounds moved to script so they are audible when away from the gui
+//				set "cmd" "play console_tv_ebs_intro" ;		// say EBSText1
+			}
+			onTime 6000 {
+//				set "cmd" "play console_tv_ebs_attention" ;	// 8 seconds (2 seconds currently)
+			}
+			onTime 9000 {
+//				set "cmd" "play console_tv_ebs_termination" ;
+			}
+			onTime 10000 {
+//				set "cmd" "play console_tv_ebs_termination" ;
+			}
+			onTime 11000 {
+//				set "cmd" "play console_tv_ebs_termination" ;
+			}
+			onTime 12000 {
+				set "EBSText1::visible" "0" ;				// Hide EBSText1
+				set "EBSText2::visible" "1" ;				// Display EBSText2
+//				set "cmd" "play console_tv_ebs_message" ;	// say EBSText2
+			}
+			onTime 21000 {
+//				set "cmd" "play console_tv_ebs_termination" ;
+			}
+			onTime 22000 {
+//				set "cmd" "play console_tv_ebs_termination" ;
+			}
+			onTime 23000 {
+//				set "cmd" "play console_tv_ebs_termination" ;
+			}
+
+			onTime 25000 {
+				set "TestPattern::visible" "0" ;			// Hide test pattern
+				set "EBSText1::visible" "0" ;				// Hide EBSText1
+				set "EBSText2::visible" "0" ;				// Hide EBSText2
+				
+				set "AllChannels::visible" "1" ;			// Display channels again
+				set "NewsBanner::visible" "1" ;				// Display news on all channels
+				set "AllChannels::background" "video/tv/news" ;
+				resetCinematics ;
+//				set "cmd" "play console_tv_news" ;
+			}
+			onTime 34000 {
+				set "AllChannels::background" "guis/assets/staticoriginal" ;		// Transmision lost
+				set "NewsBanner::visible" "0" ;				// Hide banner on all channels
+//				set "cmd" "play console_tv_static" ;
+			}
+			
+			windowDef NewsBanner {
+				rect		0, 360, 640, 60
+				backcolor	0.1, 0.2, 0.9, 1.0
+				visible		0
+
+				windowDef BannerTitle {
+					rect		40, 0, 550, 40
+					backcolor	0, 0, 0, 0
+					forecolor	1, 1, 0, 1
+					text		"#str_20396"
+					textscale	0.7
+					textalign	2
+					textaligny	5
+				}
+			}
+		}
+		
+		windowDef TestPattern {
+			rect		0, 0, 640, 480
+			backcolor	0, 0, 0, 1
+			visible		0
+			windowDef Bar1 {
+				rect		0, 0, 91, 320
+				backcolor	0.7, 0.7, 0.7, 1
+			}
+			windowDef Bar2 {
+				rect		91, 0, 91, 320
+				backcolor	1, 1, 0, 1
+			}
+			windowDef Bar3 {
+				rect		182, 0, 91, 320
+				backcolor	0, 1, 1, 1
+			}
+			windowDef Bar4 {
+				rect		273, 0, 91, 320
+				backcolor	0, 1, 0, 1
+			}
+			windowDef Bar5 {
+				rect		364, 0, 91, 320
+				backcolor	1, 0, 1, 1
+			}
+			windowDef Bar6 {
+				rect		455, 0, 91, 320
+				backcolor	1, 0, 0, 1
+			}
+			windowDef Bar7 {
+				rect		546, 0, 92, 320
+				backcolor	0, 0, 1, 1
+			}
+			windowDef Bar8 {	// Middle row
+				rect		0, 320, 91, 40
+				backcolor	0, 0, 1, 1
+			}
+			windowDef Bar9 {
+				rect		91, 320, 91, 40
+				backcolor	0, 0, 0, 1
+			}
+			windowDef Bar10 {
+				rect		182, 320, 91, 40
+				backcolor	1, 0, 1, 1
+			}
+			windowDef Bar11 {
+				rect		273, 320, 91, 40
+				backcolor	0, 0, 0, 1
+			}
+			windowDef Bar12 {
+				rect		364, 320, 91, 40
+				backcolor	0, 1, 1, 1
+			}
+			windowDef Bar13 {
+				rect		455, 320, 91, 40
+				backcolor	0, 0, 0, 1
+			}
+			windowDef Bar14 {
+				rect		546, 320, 91, 40
+				backcolor	0.7, 0.7, 0.7, 1
+			}
+			windowDef Bar15 {	// Bottom row
+				rect		0, 360, 120, 120
+				backcolor	0, 0, 0.2, 1
+			}
+			windowDef Bar16 {
+				rect		120, 360, 120, 120
+				backcolor	1, 1, 1, 1
+			}
+			windowDef Bar17 {
+				rect		240, 360, 120, 120
+				backcolor	0, 0, 0.3, 1
+			}
+			windowDef EBSText1 {
+				rect		60, 60, 520, 180
+				backcolor	0, 0, 0, 0.5
+				forecolor	1, 1, 1, 1
+				shadow		2
+				textalign	1
+				textaligny	15
+				textscale	0.6
+				visible		0
+				text		"#str_20397"
+			}
+			windowDef EBSText2 {
+				rect		40, 60, 560, 250
+				backcolor	0, 0, 0, 0.5
+				forecolor	1, 1, 1, 1
+				shadow		2
+				textalign	1
+				textscale	0.6
+				visible		0
+				text		"#str_20398"
+			}
+		}
+		
+		windowDef ChannelNumber {
+			rect		0, 0, 640, 120
+			backcolor	0, 0, 0, 0
+			forecolor	0, 1, 0, 1
+			text		""
+			textscale	1.5
+			textalign	1
+			textaligny	25
+			//shadow		1		// When shadows fade out properly with foreground alpha, put back in
+			onTime 0 {
+				set "forecolor" "0 1 0 1" ;
+			}
+			onTime 3000 {
+				transition "forecolor" "0 1 0 1" "0 1 0 0" "200";
+			}
+		}
+		
+		windowDef Mute {
+			rect		30, 380, 320, 60
+			backcolor	0, 0, 0, 0
+			forecolor	0, 1, 0, 1
+			text		"#str_20399"
+			textscale	1.0
+			textalign	0
+			textaligny	-5
+			shadow		1
+			visible		1
+		}
+
+	}	// Programming
+
+}

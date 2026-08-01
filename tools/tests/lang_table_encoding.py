@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regression checks for language-table encoding and the engine-side transcode.
 
-openQ4 authors its string tables in UTF-8, but the stock Quake 4 fonts are a
+openPREY authors its string tables in UTF-8, but the stock Prey fonts are a
 fixed 256-glyph atlas indexed by a raw byte, so the engine transcodes UTF-8
 tables to Windows-1252 at load time (idLangDict::Load).  Two things therefore
 have to stay true:
@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-STRINGS_DIR = ROOT / "content" / "baseoq4" / "pak0" / "strings"
+STRINGS_DIR = ROOT / "content" / "basepr" / "pak0" / "strings"
 
 # Windows-1252 0x80-0x9F block; None marks the five unassigned slots.
 CP1252_HIGH = [
@@ -27,7 +27,7 @@ CP1252_HIGH = [
     0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, None, 0x017E, 0x0178,
 ]
 
-# CP1252 codes that land on a .notdef cell in every stock Quake 4 font.  The
+# CP1252 codes that land on a .notdef cell in every stock Prey font.  The
 # engine folds these to ASCII rather than drawing nothing; 0xA0 in particular
 # has a zero advance, so leaving it alone would delete the word gap entirely.
 FOLDED_CP1252 = {0x82, 0x84, 0x85, 0x91, 0x92, 0x93, 0x94, 0x96, 0x97, 0xA0}

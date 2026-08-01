@@ -1,10 +1,10 @@
 # Savegame Reliability
 
-This document describes openQ4's save/load compatibility checks, the failure behind
-[GitHub issue #84](https://github.com/themuffinator/openQ4/issues/84), and the
-defensive checks expected when the save format changes.
+This document describes openPREY's save/load compatibility checks, the upstream
+failure recorded in [OpenQ4 issue #84](https://github.com/themuffinator/openQ4/issues/84),
+and the defensive checks expected when the save format changes.
 
-## Issue #84
+## Upstream issue #84
 
 The reported `idMoveState::Restore: invalid path length` values were not valid path
 lengths and did not, by themselves, prove that the restore cursor had drifted. In
@@ -13,16 +13,17 @@ the affected GameLib version, `idMoveState` did not initialize `pathLen`,
 could therefore serialize an indeterminate `pathLen`, and the restore-side range
 check correctly rejected it.
 
-Current GameLib code initializes the complete move state and serializes only the
-clamped, active path points. This covers both newly constructed AI state and
-same-build save/load on the reported `airdefense1` map. Saves produced by an
-affected build may still contain invalid data and are not repaired in place.
+The Q4-specific move-state implementation from that report is not part of Prey's
+unified game module. openPREY retains the broadly applicable outcome: serialized
+counts, indices, strings, object references, script state, animation state, and
+articulated-physics state are range-checked before they can allocate or index
+runtime storage. Saves produced by incompatible builds are not repaired in place.
 
 ## Save Pipeline
 
 The engine owns the session header, screenshot and description sidecars, staged
-file commit, menu discovery, and the transition into a loaded map. The SP or MP
-GameLib owns the positional gameplay payload.
+file commit, menu discovery, and the transition into a loaded map. The single
+unified Prey GameLib owns the positional gameplay payload for both SP and MP.
 
 New gameplay payloads contain:
 
@@ -66,10 +67,10 @@ cryptographic whole-file integrity check. Source- or build-incompatible saves ar
 intentionally rejected rather than guessed through; compatibility across arbitrary
 revisions is not promised.
 
-Menu discovery validates the session header and lists saves from the active game
-directory. A save can therefore remain visible even when its gameplay payload is
-too old to load; selecting it produces a precise warning while the current map
-continues running.
+Menu discovery validates the session header and aggregates saves from the active
+game directory, `basepr`, and the retail `base` directory. A save can therefore
+remain visible even when its gameplay payload is too old to load; selecting it
+produces a precise warning while the current map continues running.
 
 ## Validation
 
@@ -79,8 +80,7 @@ The regression contract is exercised with:
 python tools/tests/savegame_corruption_contract.py
 ```
 
-Runtime validation should use the SP launch path and enter a real map. The issue
-reproduction was checked on `airdefense1` by saving, loading the newly written
-save, and confirming `Game Map Init SaveGame` without restore errors or sound
-assertions. A deliberately stale save was also checked and rejected during engine
-preflight before game-map initialization.
+Runtime validation should load the unified `game_<arch>` module, enter a real Prey
+map such as `game/roadhouse`, save, and load the newly written save. Confirm
+`Game Map Init SaveGame` without restore errors or sound assertions. A deliberately
+stale save should be rejected during engine preflight before game-map initialization.

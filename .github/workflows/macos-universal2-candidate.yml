@@ -1,4 +1,4 @@
-name: macOS Universal2 Release Candidate
+name: DISABLED - inherited OpenQ4 reference (macOS Universal2 Release Candidate)
 
 on:
   workflow_dispatch:
@@ -35,6 +35,7 @@ permissions:
 
 jobs:
   metadata:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: Resolve Universal2 Candidate Sources
     runs-on: ubuntu-24.04
     outputs:
@@ -149,6 +150,7 @@ jobs:
           echo "version_tag=${version_tag}" >> "$GITHUB_OUTPUT"
 
   thin_build:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: macOS ${{ matrix.binary_arch }} ${{ matrix.bridge }} Universal2 Thin Candidate
     needs: metadata
     runs-on: ${{ matrix.runner }}
@@ -249,7 +251,7 @@ jobs:
           python tools/build/verify_release_source_provenance.py \
             --project-root "${GITHUB_WORKSPACE}" \
             --gamelibs-root "${OPENQ4_GAMELIBS_REPO}" \
-            --stage-manifest "${GITHUB_WORKSPACE}/.tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json" \
+            --stage-manifest "${GITHUB_WORKSPACE}/builddir/.tmp/openprey_gamelibs_stage/openprey_gamelibs_stage_manifest.json" \
             --expected-project-commit "${{ needs.metadata.outputs.source_sha }}" \
             --expected-gamelibs-commit "${{ needs.metadata.outputs.game_sha }}"
 
@@ -267,7 +269,7 @@ jobs:
           set -euo pipefail
           python tools/build/assemble_macos_universal2.py record \
             --install-root .install \
-            --source-manifest .tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json \
+            --source-manifest builddir/.tmp/openprey_gamelibs_stage/openprey_gamelibs_stage_manifest.json \
             --arch "${{ matrix.binary_arch }}" \
             --graphics-bridge "${{ matrix.bridge }}" \
             --openal-provider apple_framework \
@@ -297,7 +299,7 @@ jobs:
   assemble:
     name: macOS universal2 ${{ matrix.bridge }} Release Candidate
     needs: [metadata, thin_build]
-    if: needs.thin_build.result == 'success'
+    if: ${{ false && needs.thin_build.result == 'success' }} # OPENPREY-GATED
     runs-on: macos-15
     timeout-minutes: 90
     strategy:
@@ -437,6 +439,7 @@ jobs:
             --package-suffix "${package_suffix}"
             --archive-format "${archive_format}"
             --source-root "${GITHUB_WORKSPACE}"
+            --repository-metadata-manifest "${corridor_root}/assembly-manifest.json"
             --install-dir "${corridor_root}/universal2"
             --output-dir "${corridor_root}/package-output"
           )
@@ -451,6 +454,7 @@ jobs:
               --package-suffix "${package_suffix}"
               --archive-format "${archive_format}"
               --source-root "${GITHUB_WORKSPACE}"
+              --repository-metadata-manifest "${corridor_root}/assembly-manifest.json"
               --install-dir "${corridor_root}/universal2"
               --output-dir "${corridor_root}/package-output"
               --macos-signing-mode developer-id

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Run opt-in openQ4 renderer gameplay benchmark and capture cases.
+"""Run opt-in openPREY renderer gameplay benchmark and capture cases.
 
 Unlike renderer_validation_matrix.py, this runner enters maps. It is intended
-for local, target-hardware validation where stock Quake 4 assets are available.
+for local, target-hardware validation where stock Prey (2006) assets are available.
 It launches from .install, writes isolated save/log roots under .tmp, captures
 screenshots, dumps renderer benchmark metrics, and records a Markdown/JSON
 report for performance triage. Every role fails closed on renderer, Vulkan
@@ -30,118 +30,128 @@ from typing import Any
 SAFE_TIERS = ("auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46")
 PRESENTATION_MAXFPS = ("0", "120", "240")
 PRESENTATION_SWAP_INTERVALS = ("0", "1")
-DISPLAY_MODES = ("windowed", "fullscreen")
+DISPLAY_MODES = ("windowed",)
+
+PREY_MAP_MANIFEST = Path(__file__).resolve().parents[2] / ".vscode" / "prey-maps.json"
+
+
+def load_prey_map_manifest() -> dict[str, dict[str, str]]:
+    if not PREY_MAP_MANIFEST.is_file():
+        raise RuntimeError(f"canonical Prey map manifest is missing: {PREY_MAP_MANIFEST}")
+    payload = json.loads(PREY_MAP_MANIFEST.read_text(encoding="utf-8"))
+    entries = payload.get("maps")
+    if not isinstance(entries, list):
+        raise RuntimeError(f"canonical Prey map manifest has no maps list: {PREY_MAP_MANIFEST}")
+
+    maps: dict[str, dict[str, str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise RuntimeError(f"canonical Prey map manifest contains a non-object entry: {entry!r}")
+        map_name = entry.get("map")
+        kind = entry.get("kind")
+        title = entry.get("name")
+        if not isinstance(map_name, str) or not map_name:
+            raise RuntimeError(f"canonical Prey map manifest contains an invalid map path: {entry!r}")
+        if kind not in ("sp", "mp") or not isinstance(title, str) or not title:
+            raise RuntimeError(f"canonical Prey map manifest contains invalid metadata: {entry!r}")
+        if map_name in maps:
+            raise RuntimeError(f"canonical Prey map manifest repeats {map_name!r}")
+        maps[map_name] = {"kind": kind, "name": title}
+    return maps
+
+
+CANONICAL_PREY_MAPS = load_prey_map_manifest()
+
+
+def prey_scene(map_name: str, kind: str, purpose: str) -> dict[str, str]:
+    entry = CANONICAL_PREY_MAPS.get(map_name)
+    if entry is None:
+        raise RuntimeError(f"renderer scene uses a map absent from {PREY_MAP_MANIFEST}: {map_name}")
+    if entry["kind"] != kind:
+        raise RuntimeError(
+            f"renderer scene classifies {map_name} as {kind}, "
+            f"but {PREY_MAP_MANIFEST} classifies it as {entry['kind']}"
+        )
+    return {
+        "mode": kind.upper(),
+        "map": map_name,
+        "title": entry["name"],
+        "purpose": purpose,
+        "path": "spawn-static",
+    }
 
 REQUIRED_SCENES: dict[str, dict[str, Any]] = {
-    "sp-storage1": {
-        "mode": "SP",
-        "map": "game/storage1",
-        "purpose": "primary renderer performance acceptance scene, dense indoor lighting, and early-game storage visual parity",
-        "path": "spawn-static",
-    },
-    "sp-airdefense1": {
-        "mode": "SP",
-        "map": "game/airdefense1",
-        "purpose": "stock SP baseline, outdoor lighting, terrain decals, and BSE smoke",
-        "path": "spawn-static",
-    },
-    "sp-airdefense2": {
-        "mode": "SP",
-        "map": "game/airdefense2",
-        "purpose": "flashlight, projected shadows, animated characters, and dynamic shadow receivers",
-        "path": "spawn-static",
-    },
-    "sp-storage2": {
-        "mode": "SP",
-        "map": "game/storage2",
-        "purpose": "indoor materials, post-process coverage, and dense local lights",
-        "path": "spawn-static",
-    },
-    "sp-medlabs": {
-        "mode": "SP",
-        "map": "game/medlabs",
-        "purpose": "BSE-heavy SP scene and stock scripted effects coverage",
-        "path": "spawn-static",
-    },
-    "sp-mcc-landing": {
-        "mode": "SP",
-        "map": "game/mcc_landing",
-        "purpose": "subviews, remote cameras, cinematic handoff, and GUI interaction",
-        "path": "spawn-static",
-    },
-    "mp-q4dm1-listen": {
-        "mode": "MP",
-        "map": "mp/q4dm1",
-        "purpose": "listen server plus local loopback client renderer parity",
-        "path": "spawn-static",
-    },
+    "sp-roadhouse": prey_scene(
+        "game/roadhouse",
+        "sp",
+        "opening-campaign baseline for characters, indoor materials, scripted sequences, mirror/glass, and GUI presentation",
+    ),
+    "sp-feedingtowera": prey_scene(
+        "game/feedingtowera",
+        "sp",
+        "gravity, wall-walk, portal traversal, sky, energy, glass, and industrial-lighting coverage",
+    ),
+    "sp-biolabsa": prey_scene(
+        "game/biolabsa",
+        "sp",
+        "dense interior materials, scan/energy effects, local lights, animated characters, and combat effects",
+    ),
+    "sp-superportal": prey_scene(
+        "game/superportal",
+        "sp",
+        "large-scale portal, translucent energy, glass, post-process, and long-view coverage",
+    ),
+    "sp-shuttlea": prey_scene(
+        "game/shuttlea",
+        "sp",
+        "shuttle view, cockpit GUI, beam/particle effects, portal views, and HUD composition",
+    ),
+    "sp-lotaa": prey_scene(
+        "game/lotaa",
+        "sp",
+        "outdoor/dreamworld sky, spirit-era gameplay, portal geometry, and Prey effect coverage",
+    ),
+    "mp-dmroadhouse-listen": prey_scene(
+        "game/dmroadhouse",
+        "mp",
+        "unified-module listen server plus local loopback client renderer parity on the stock MP smoke map",
+    ),
 }
 
 SHADOW_SCENES: dict[str, dict[str, Any]] = {
-    "shadow-projected-airdefense2": {
-        "mode": "SP",
-        "map": "game/airdefense2",
-        "purpose": "angled projected-light caster/receiver validation",
-        "path": "spawn-static",
-    },
-    "shadow-point-storage2": {
-        "mode": "SP",
-        "map": "game/storage2",
-        "purpose": "point-light face coverage and local-light receiver validation",
-        "path": "spawn-static",
-    },
-    "shadow-csm-airdefense1": {
-        "mode": "SP",
-        "map": "game/airdefense1",
-        "purpose": "CSM camera sweep readiness and outdoor directional coverage",
-        "path": "spawn-static",
-    },
-    "shadow-cutout-storage2": {
-        "mode": "SP",
-        "map": "game/storage2",
-        "purpose": "hashed-alpha cutout fence/grate caster validation at distance",
-        "path": "spawn-static",
-    },
-    "shadow-character-airdefense2": {
-        "mode": "SP",
-        "map": "game/airdefense2",
-        "purpose": "dynamic character shadow caster and receiver validation",
-        "path": "spawn-static",
-    },
-    "shadow-translucent-medlabs": {
-        "mode": "SP",
-        "map": "game/medlabs",
-        "purpose": "optional translucent moment caster coverage where the selected tier supports it",
-        "path": "spawn-static",
-    },
+    "shadow-projected-feedingtowera": prey_scene(
+        "game/feedingtowera",
+        "sp",
+        "projected-light caster/receiver validation against energy, sky, and industrial geometry",
+    ),
+    "shadow-point-biolabsa": prey_scene(
+        "game/biolabsa",
+        "sp",
+        "dense point-light face coverage and local-light receiver validation",
+    ),
+    "shadow-csm-lotaa": prey_scene(
+        "game/lotaa",
+        "sp",
+        "CSM camera-sweep readiness across outdoor/dreamworld sky geometry",
+    ),
+    "shadow-cutout-roadhouse": prey_scene(
+        "game/roadhouse",
+        "sp",
+        "hashed-alpha chain-link/cutout caster validation at distance",
+    ),
+    "shadow-character-feedingtowera": prey_scene(
+        "game/feedingtowera",
+        "sp",
+        "dynamic character/skinned shadow caster and receiver validation",
+    ),
+    "shadow-translucent-superportal": prey_scene(
+        "game/superportal",
+        "sp",
+        "optional translucent portal/energy moment-caster coverage where supported",
+    ),
 }
 
-CAMPAIGN_TRANSITION_SCENES: dict[str, dict[str, Any]] = {
-    "sp-campaign-mcc2-to-tram1": {
-        "mode": "SP",
-        "map": "game/mcc_2",
-        "purpose": "scripted campaign transition chain from MCC 2 through Storage 1 first/second state handling into Tram 1",
-        "path": "triggered-campaign-transition",
-    },
-}
-
-CAMPAIGN_MCC2_TO_TRAM1_COMMANDS = (
-    "openq4_assertMapState game/mcc_2",
-    "trigger mcc2_endlevel",
-    "wait 180",
-    "openq4_assertMapState game/storage1 first",
-    "trigger endLevel",
-    "wait 180",
-    "openq4_assertMapState game/storage2",
-    "trigger target_endlevel_1",
-    "wait 180",
-    "openq4_assertMapState game/storage1 second",
-    "trigger target_endlevel_2",
-    "wait 180",
-    "openq4_assertMapState game/tram1",
-)
-
-ALL_SCENES = {**REQUIRED_SCENES, **SHADOW_SCENES, **CAMPAIGN_TRANSITION_SCENES}
+ALL_SCENES = {**REQUIRED_SCENES, **SHADOW_SCENES}
 
 SHADOW_PRESETS: dict[str, dict[str, str]] = {
     "default": {},
@@ -187,7 +197,7 @@ for debug_mode in SHADOW_DEBUG_PRESET_MODES:
 
 PROFILE_DEFAULTS = {
     "smoke": {
-        "cases": ("sp-storage1",),
+        "cases": ("sp-roadhouse",),
         "tiers": ("auto",),
         "maxfps": ("240",),
         "swap": ("0",),
@@ -202,17 +212,8 @@ PROFILE_DEFAULTS = {
         "display": ("windowed",),
         "shadows": ("default",),
     },
-    "campaign-split-state-transition": {
-        "cases": tuple(CAMPAIGN_TRANSITION_SCENES.keys()),
-        "tiers": ("auto",),
-        "maxfps": ("240",),
-        "swap": ("0",),
-        "display": ("windowed",),
-        "shadows": ("default",),
-        "execCommands": CAMPAIGN_MCC2_TO_TRAM1_COMMANDS,
-    },
     "tiers": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-roadhouse",),
         "tiers": SAFE_TIERS,
         "maxfps": ("240",),
         "swap": ("0",),
@@ -220,7 +221,7 @@ PROFILE_DEFAULTS = {
         "shadows": ("default",),
     },
     "presentation": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-roadhouse",),
         "tiers": ("auto",),
         "maxfps": PRESENTATION_MAXFPS,
         "swap": PRESENTATION_SWAP_INTERVALS,
@@ -237,11 +238,11 @@ PROFILE_DEFAULTS = {
     },
     "shadow-regression": {
         "cases": (
-            "shadow-projected-airdefense2",
-            "shadow-point-storage2",
-            "shadow-csm-airdefense1",
-            "shadow-character-airdefense2",
-            "shadow-cutout-storage2",
+            "shadow-projected-feedingtowera",
+            "shadow-point-biolabsa",
+            "shadow-csm-lotaa",
+            "shadow-character-feedingtowera",
+            "shadow-cutout-roadhouse",
         ),
         "tiers": ("auto",),
         "maxfps": ("240",),
@@ -262,7 +263,7 @@ PROFILE_DEFAULTS = {
         ),
     },
     "postaa-state-poison": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-roadhouse",),
         "tiers": ("auto",),
         "maxfps": ("240",),
         "swap": ("0",),
@@ -274,7 +275,7 @@ PROFILE_DEFAULTS = {
         ),
     },
     "postaa-high": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-roadhouse",),
         "tiers": ("auto",),
         "maxfps": ("240",),
         "swap": ("0",),
@@ -285,7 +286,7 @@ PROFILE_DEFAULTS = {
         ),
     },
     "postaa-ultra": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-roadhouse",),
         "tiers": ("auto",),
         "maxfps": ("240",),
         "swap": ("0",),
@@ -296,7 +297,7 @@ PROFILE_DEFAULTS = {
         ),
     },
     "postaa-color-prototype": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-roadhouse",),
         "tiers": ("auto",),
         "maxfps": ("240",),
         "swap": ("0",),
@@ -353,7 +354,6 @@ WARNING_PATTERNS = {
         re.IGNORECASE | re.MULTILINE,
     ),
     "errorLine": re.compile(r"^[ \t]*(?:\*+[ \t]*)?ERROR(?:[ \t]*:|[ \t]*$)", re.MULTILINE),
-    "mapStateMismatch": re.compile(r"ERROR:\s+openQ4 map state mismatch|openQ4 map state assertion", re.IGNORECASE),
 }
 
 MAX_FAILURE_DIAGNOSTICS = 32
@@ -373,10 +373,6 @@ class RunSpec:
     display_mode: str
     shadow_preset: str
     renderer: str
-
-    @property
-    def fullscreen(self) -> bool:
-        return self.display_mode == "fullscreen"
 
     @property
     def id(self) -> str:
@@ -410,7 +406,7 @@ def host_arch() -> str:
 def find_client_executable(root: Path) -> Path:
     install_dir = root / ".install"
     suffix = ".exe" if os.name == "nt" else ""
-    candidate_prefixes = ("openQ4-client", "openQ4-client")
+    candidate_prefixes = ("openPREY-client",)
     for prefix in candidate_prefixes:
         preferred = install_dir / f"{prefix}_{host_arch()}{suffix}"
         if preferred.exists():
@@ -430,12 +426,14 @@ def find_client_executable(root: Path) -> Path:
     for candidate in candidates:
         if candidate.is_file():
             return candidate
-    raise FileNotFoundError(f"openQ4 client executable not found under {install_dir}")
+    raise FileNotFoundError(f"openPREY client executable not found under {install_dir}")
 
 
 def default_basepath() -> str:
-    if os.name == "nt":
-        return r"C:\Program Files (x86)\Steam\steamapps\common\Quake 4"
+    for name in ("OPENPREY_PREY_PATH", "OPENPREY_PREY_ROOT"):
+        configured = os.environ.get(name, "").strip()
+        if configured:
+            return configured
     return ""
 
 
@@ -513,7 +511,7 @@ def common_args(
     append_set(args, "logFileName", f"logs/{log_name}")
     append_set(args, "developer", "1")
     append_set(args, "r_ignoreGLErrors", "0")
-    append_set(args, "r_fullscreen", "1" if spec.fullscreen else "0")
+    append_set(args, "r_fullscreen", "0")
     append_set(args, "r_swapInterval", spec.swap_interval)
     append_set(args, "com_maxfps", spec.maxfps)
     append_set(args, "com_showFPS", "1" if show_fps_overlay else "0")
@@ -533,7 +531,7 @@ def common_args(
     append_set(args, "r_rendererBenchmarkPreset", benchmark_preset)
     append_set(args, "fs_savepath", str(savepath))
     append_set(args, "fs_devpath", str(root / ".install"))
-    append_set(args, "fs_game", "baseoq4")
+    append_set(args, "fs_game", "basepr")
     if basepath:
         append_set(args, "fs_basepath", basepath)
 
@@ -636,7 +634,7 @@ def write_autoexec_cfg(
     cfg_rel = f"renderer-bench/{role}_{capture_index}.cfg"
     payload = "\n".join(lines) + "\n"
     screenshot_rel = Path(shot_name.replace("/", os.sep))
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr",):
         cfg_path = savepath / game_dir / Path(cfg_rel)
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(payload, encoding="utf-8")
@@ -647,8 +645,7 @@ def write_autoexec_cfg(
 
 def find_log(savepath: Path, log_name: str) -> Path | None:
     candidates = [
-        savepath / "baseoq4" / "logs" / log_name,
-        savepath / "q4base" / "logs" / log_name,
+        savepath / "basepr" / "logs" / log_name,
         savepath / "logs" / log_name,
     ]
     for candidate in candidates:
@@ -659,7 +656,7 @@ def find_log(savepath: Path, log_name: str) -> Path | None:
 
 def find_screenshot(savepath: Path, relative_name: str) -> Path | None:
     rel = Path(relative_name.replace("/", os.sep))
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr",):
         candidate = savepath / game_dir / rel
         if candidate.exists():
             return candidate
@@ -862,7 +859,7 @@ def screenshot_reference_candidates(
     candidates = [reference_dir / screenshot.name]
     if case_id:
         candidates.insert(0, reference_dir / case_id / screenshot.name)
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr",):
         root = savepath / game_dir
         try:
             rel = screenshot.relative_to(root)
@@ -1047,7 +1044,7 @@ def run_sp_spec(
 ) -> dict[str, Any]:
     savepath = output_dir / "savepaths" / spec.id
     savepath.mkdir(parents=True, exist_ok=True)
-    log_name = f"openq4_gameplay_{spec.id}.log"
+    log_name = f"openprey_gameplay_{spec.id}.log"
     log_path = find_log(savepath, log_name)
     if log_path is not None:
         log_path.unlink()
@@ -1154,8 +1151,8 @@ def run_mp_spec(
     server_savepath.mkdir(parents=True, exist_ok=True)
     client_savepath.mkdir(parents=True, exist_ok=True)
 
-    server_log = f"openq4_gameplay_{spec.id}_server.log"
-    client_log = f"openq4_gameplay_{spec.id}_client.log"
+    server_log = f"openprey_gameplay_{spec.id}_server.log"
+    client_log = f"openprey_gameplay_{spec.id}_client.log"
     for savepath, log_name in ((server_savepath, server_log), (client_savepath, client_log)):
         log_path = find_log(savepath, log_name)
         if log_path is not None:
@@ -1426,9 +1423,9 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
     report_md = output_dir / "renderer_gameplay_benchmark_report.md"
     payload = {
         "metadata": metadata,
+        "preyMapManifest": str(PREY_MAP_MANIFEST),
         "requiredScenes": REQUIRED_SCENES,
         "shadowScenes": SHADOW_SCENES,
-        "campaignTransitionScenes": CAMPAIGN_TRANSITION_SCENES,
         "shadowPresets": SHADOW_PRESETS,
         "results": results,
     }
@@ -1444,6 +1441,7 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         f"- Host: {metadata['host']}",
         f"- Executable: `{metadata['executable']}`",
         f"- Base path: `{metadata['basepath'] or 'not set'}`",
+        f"- Canonical Prey map manifest: `{PREY_MAP_MANIFEST}`",
         f"- Profile: `{metadata['profile']}`",
         f"- Sample: `{metadata['sampleMsec']} ms`" if metadata.get("sampleMsec", 0) > 0 else f"- Sample: `{metadata['sampleFrames']} frames`",
         f"- Cases: {passed} passed, {failed} failed, {planned} planned",
@@ -1554,7 +1552,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--tiers", default="", help="Comma-separated r_glTier values. Overrides profile tiers.")
     parser.add_argument("--maxfps", default="", help="Comma-separated com_maxfps values. Overrides profile values.")
     parser.add_argument("--swap-intervals", default="", help="Comma-separated r_swapInterval values. Overrides profile values.")
-    parser.add_argument("--display-modes", default="", help="Comma-separated display modes: windowed,fullscreen.")
+    parser.add_argument("--display-modes", default="", help="Display mode. openPREY agent validation is windowed-only.")
     parser.add_argument("--shadow-presets", default="", help="Comma-separated shadow presets. Use --list to inspect values.")
     parser.add_argument("--renderer", default="best", help="Value for r_renderer, usually best or arb2.")
     parser.add_argument("--benchmark-preset", default="baseline", help="Value for r_rendererBenchmarkPreset.")
@@ -1566,14 +1564,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-p95-ms", type=float, default=0.0, help="Fail when the parsed frame-pacing P95 exceeds this millisecond budget. Use 0 to disable.")
     parser.add_argument("--max-p99-ms", type=float, default=0.0, help="Fail when the parsed frame-pacing P99 exceeds this millisecond budget. Use 0 to disable.")
     parser.add_argument("--set-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra post-map cvar written into the generated benchmark cfg. Repeat for A/B diagnostics without extending the launch command line.")
-    parser.add_argument("--set-launch-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra cvar applied on the openQ4 launch command line before the map loads. Use for load-time renderer knobs such as vertex/index buffer caching.")
+    parser.add_argument("--set-launch-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra cvar applied on the openPREY launch command line before the map loads. Use for load-time renderer knobs such as vertex/index buffer caching.")
     parser.add_argument("--exec-command", action="append", default=[], metavar="COMMAND", help="Extra post-map console command written into the generated benchmark cfg. Repeat for targeted diagnostics such as flashlight impulses.")
     parser.add_argument("--autoexec-delay-ms", type=int, default=1000, help="Delay after active map draw before executing the generated benchmark cfg.")
     parser.add_argument("--settle-frames", type=int, default=360, help="Frames to wait after map/connect before sampling.")
     parser.add_argument("--sample-frames", type=int, default=600, help="Frames to sample before dumping metrics and screenshots.")
     parser.add_argument("--sample-msec", type=int, default=0, help="Real milliseconds to sample before dumping metrics and screenshots. Overrides --sample-frames when positive.")
     parser.add_argument("--timeout", type=int, default=180, help="Per-case process timeout in seconds.")
-    parser.add_argument("--basepath", default=default_basepath(), help="Quake 4 install/base path. Omit or set empty to skip fs_basepath.")
+    parser.add_argument("--basepath", default=default_basepath(), help="Prey (2006) install/base path. Omit or set empty to use engine discovery.")
     parser.add_argument("--output-dir", default="", help="Report/output directory. Defaults to <repo>/.tmp/renderer-gameplay/<timestamp>.")
     parser.add_argument("--reference-dir", default="", help="Optional TGA reference screenshot root for deterministic image comparison.")
     parser.add_argument("--require-references", action="store_true", help="Fail captures when --reference-dir has no matching reference image.")
@@ -1583,7 +1581,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--mp-client-delay", type=int, default=12, help="Seconds to wait before launching the MP loopback client.")
     parser.add_argument("--mp-client-delay-frames", type=int, default=480, help="Extra server frames before server-side capture in MP runs.")
     parser.add_argument("--limit", type=int, default=0, help="Limit generated specs, useful for bounded local smoke runs.")
-    parser.add_argument("--dry-run", action="store_true", help="Write the planned command lines without launching openQ4.")
+    parser.add_argument("--dry-run", action="store_true", help="Write the planned command lines without launching openPREY.")
     parser.add_argument("--list", action="store_true", help="List profiles, cases, and shadow presets without running.")
     parsed = parser.parse_args(argv)
     try:
@@ -1624,9 +1622,6 @@ def print_list() -> None:
         print(f"  {case_id}: {scene['mode']} {scene['map']} - {scene['purpose']}")
     print("\nShadow correctness cases:")
     for case_id, scene in SHADOW_SCENES.items():
-        print(f"  {case_id}: {scene['mode']} {scene['map']} - {scene['purpose']}")
-    print("\nCampaign transition cases:")
-    for case_id, scene in CAMPAIGN_TRANSITION_SCENES.items():
         print(f"  {case_id}: {scene['mode']} {scene['map']} - {scene['purpose']}")
     print("\nShadow presets:")
     for preset, cvars in SHADOW_PRESETS.items():

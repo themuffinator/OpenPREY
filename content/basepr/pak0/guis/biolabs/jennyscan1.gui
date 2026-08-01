@@ -1,0 +1,221 @@
+//JENNY BIOPSY SCAN 
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+
+
+
+	
+	windowDef bg2 {
+		rect		0, 0, 640, 480
+		backcolor		1, 1, 1, 0
+//		forecolor		1, 1, 1, 1
+
+		background	"guis/assets/non_interact/autopsyscan/bg4"
+		
+
+	}
+
+
+
+	windowDef body1 {
+
+
+		background	"guis/assets/non_interact/autopsyscan/jentank"
+		
+		onTime 0 {
+			transition "body1::matcolor" "1, 1, 1, 1" "0.1, 0.6, 1, 1" "3000" ;	
+			transition "body1::rect" "180, 90, 380, 230" "-135, -15, 740, 447" "3000" ;
+			}
+		onTime 4000 {
+		
+			transition "body1::matcolor" "0.1, 0.6, 1, 1" "1, 1, 1, 1" "3000" ;	
+			transition "body1::rect" "-135, -15, 740, 447" "180, 90, 380, 230"  "3000" ;
+			}
+
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+/*	
+	windowDef bgliquid {
+		rect		0, 0, 640, 480
+		backcolor		1, 1, 1, 0
+		forecolor		1, 1, 1, 0.4
+
+		background	"textures/organic_wall/pulsetube2"
+		visible 1
+	}
+
+*/
+	windowDef nerves {
+
+		matcolor  1, 1, 1, 0
+		background	"guis/assets/non_interact/autopsyscan/nerves"
+
+		onTime 0 {
+			transition "nerves::rect" "170, 115, 380, 190" "-135, 20, 735, 397" "3000" ;
+			}		
+		onTime 1000 {
+			transition "nerves::matcolor" "1, 1, 1, 0" "1, 1, 1, 0.7" "2000" ;	
+
+			}
+		onTime 4000 {
+		
+			transition "nerves::matcolor" "1, 1, 1, 0.7" "1, 1, 1, 0" "3000" ;	
+			transition "nerves::rect" "-135, 20, 735, 397" "170, 115, 380, 190"  "3000" ;
+			}
+
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+
+
+
+	windowDef scanner5 {
+
+		rect 		0, 0, 0, 0
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		background	"guis/assets/mutate/1/blur1"
+
+		onTime 0 {
+		}
+
+		onTime 500 {
+		
+			transition "scanner5::matcolor" "0, 1, 1, 0.0" "0.5, 0.7, 1, 0.9" "100" ;
+			transition "scanner5::rect" "5, 50, 20, 340" "640, 50, 20, 340" "400" ;
+		}
+
+		onTime 1000 {
+			resetTime "0";
+		}
+	}
+
+
+
+
+	
+	windowDef eye1 {
+		rect		30, 45, 200, 200
+		matcolor		1, 1, 1, 0
+		background	"guis/assets/non_interact/autopsyscan/eye1"
+		rotate time * -0.01
+		
+
+		onTime 0 {
+			transition "eye1::rect" "10, 160, 10, 10" "60, 25, 220, 220" "500" ;		
+			transition "eye1::matcolor" "0.5, 0.8, 1, 0" "1, 1, 1, 1, 0.9" "500" ;	
+			}
+		onTime 4000 {
+			transition "eye1::rect" "60, 25, 220, 220" "105, 20, 150, 150" "3000" ;		
+			transition "eye1::matcolor" "1, 1, 1, 1" "0.5, 0.8, 1, 0.0" "4000" ;	
+			}
+
+		onTime 8000 {
+			resetTime "0";
+		}
+	}
+	
+
+
+	
+	windowDef brain1 {
+		rect		530, 345, 200, 200
+		matcolor		1, 1, 1, 0
+		background	"guis/assets/non_interact/autopsyscan/brain1"
+	
+		onTime 0 {
+			transition "brain1::rect" "480, 325, 100, 100" "455, 300, 150, 150" "3000" ;		
+			transition "brain1::matcolor" "1, 1, 1, 0.4" "0.3, 0.8, 1, 1" "3000" ;	
+		}
+
+
+		onTime 4000 {
+			transition "brain1::rect" "455, 300, 150, 150" "480, 325, 100, 100" "3000" ;		
+			transition "brain1::matcolor" "0.3, 0.8, 1, 1" "1, 1, 1, 0.4" "3000" ;	
+			}
+
+		onTime 8000 {
+			resetTime "0";
+		}
+	}	
+	windowDef bg1 {
+		rect		0, 0, 640, 480
+		backcolor		1, 1, 1, 0
+		matcolor		0.7, 0.7, 1, 0.8
+		background	"guis/assets/non_interact/autopsyscan/bg3"
+		onTime 0 {
+			transition "bg1::rect" "0, 0, 640, 480" "5, 5, 630, 470" "200" ;
+		}
+		onTime 200 {
+			transition "bg1::rect" "5, 5, 630, 470" "0, 0, 640, 480" "200" ;
+		}
+		onTime 400 {
+			resetTime "0";
+		}
+	}	
+
+
+	windowDef bg3 {
+		rect		0, 0, 640, 480
+		backcolor		1, 1, 1, 0
+		matcolor		1, 1, 1, 1
+		background	"guis/assets/non_interact/autopsyscan/bg3"
+
+	}	
+	
+	windowDef scan6 {
+
+		rect		350, 387, 60, 100
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		text		"#str_41122"
+		font		"fonts/alien"
+		textscale	0.25
+		notranslation	0
+		onTime 0 {
+			transition "scan6::forecolor" "0.3, 0.6, 1, 0.6 " "0.5, 0.8, 1, 1 " "200" ;
+		}
+		onTime 200 {
+			transition "scan6::forecolor" "0.5, 0.8, 1, 1 " "0.3, 0.6, 1, 0.6 " "200" ;
+		}
+		onTime 400 {
+			resetTime "0";
+		}
+
+	}	
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.2
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	} 
+}

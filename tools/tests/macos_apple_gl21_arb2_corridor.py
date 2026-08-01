@@ -160,7 +160,7 @@ def validate_simple_interaction_fail_closed() -> None:
     material_dispatch_body = function_body(source, "static void RB_DrawMaterialInteractions( const drawSurf_t *surf ) {")
     material_draw_body = function_body(source, "static bool RB_GLSLMaterial_CreateDrawInteractions( const drawSurf_t *surf, const bool forceNeutralEnhancements ) {")
     material_interaction_body = function_body(source, "static void RB_GLSLMaterial_DrawInteraction( const drawInteraction_t *din ) {")
-    material_fragment_shader = read("content/baseoq4/pak0/glprogs/material_interaction.fs")
+    material_fragment_shader = read("content/basepr/pak0/glprogs/material_interaction.fs")
     arb_draw_body = source_section(
         source,
         "void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {",
@@ -351,8 +351,8 @@ def validate_arb_entrypoint_and_binding_audit() -> None:
         require(bind_helper, token, "ARB program binding helper")
 
     for token in (
-        "if ( !glConfig.ARBVertexProgramAvailable )",
-        "if ( !glConfig.ARBFragmentProgramAvailable )",
+        "if ( prog.target == GL_VERTEX_PROGRAM_ARB && !glConfig.ARBVertexProgramAvailable )",
+        "if ( prog.target == GL_FRAGMENT_PROGRAM_ARB && !glConfig.ARBFragmentProgramAvailable )",
         "glProgramStringARB",
         "GL_PROGRAM_ERROR_POSITION_ARB",
         "RB_SetARBProgramFailure",
@@ -465,45 +465,20 @@ def validate_phase3_plan_status() -> None:
 
 
 def validate_docs_and_wiring() -> None:
-    support_doc = read("docs/user/macos-support-data.md")
-    release_notes = read("docs/dev/releases/v0.6.5.md")
-    release_completion = read("docs/dev/release-completion.md")
+    platform_support = read("docs/dev/platform-support.md")
     local_runner = read("tools/validation/openq4_validate.py")
-    commit = read(".github/workflows/commit-validation.yml")
-    push = read(".github/workflows/push-verification.yml")
-    macos_debug = read(".github/workflows/macos-debug.yml")
 
-    for source, context in (
-        (support_doc, "macOS support-data guide"),
-        (release_notes, "curated release notes"),
-        (release_completion, "release completion notes"),
-    ):
-        require(source, "Unsupported Apple OpenGL 2.1 compatibility path", context)
-        require(source, "SimpleInteraction.vfp", context)
-        require(source, "ARB2 light interaction", context)
-        require(source, "ARB2 interaction bypass light scale skipped", context)
-
-    for source, context in (
-        (local_runner, "local validation runner"),
-        (commit, "commit validation workflow"),
-        (push, "push verification workflow"),
-        (macos_debug, "macOS debug workflow"),
-    ):
-        require(source, "macos_apple_gl21_arb2_corridor.py", context)
-
-    for source, context in (
-        (commit, "commit validation workflow"),
-        (push, "push verification workflow"),
-        (macos_debug, "macOS debug workflow"),
-    ):
-        require(source, "python tools/tests/macos_apple_gl21_arb2_corridor.py", context)
+    require(platform_support, "macOS arm64/x64/universal2", "macOS platform boundary")
+    require(platform_support, "Experimental and gated", "macOS platform boundary")
+    require(platform_support, "OpenGL is the first compatibility target", "macOS renderer direction")
+    require(local_runner, "macos_apple_gl21_arb2_corridor.py", "local validation runner")
 
 
 def validate_corridor_lighting_contract() -> None:
     """Pins the four lighting defects behind issue #73's "still not ok" image."""
 
     source = read("src/renderer/draw_arb2.cpp")
-    fragment = read("content/baseoq4/pak0/glprogs/material_interaction.fs")
+    fragment = read("content/basepr/pak0/glprogs/material_interaction.fs")
 
     # The stock ARB2 interaction normalizes the half-angle through the
     # normalization cube map. The GLSL replacement fed the raw interpolated

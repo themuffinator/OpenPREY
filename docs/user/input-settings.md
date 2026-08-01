@@ -1,6 +1,10 @@
 # Input Settings and Controls Guide
 
-This guide covers the main ways to configure keyboard, mouse, and controller input in openQ4, including the in-game menu, console commands, default binds, config files, and common troubleshooting.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
+This guide covers the main ways to configure keyboard, mouse, and controller input in openPREY, including the in-game menu, console commands, default binds, config files, and common troubleshooting.
 
 ## Quick Start
 
@@ -25,25 +29,25 @@ This guide covers the main ways to configure keyboard, mouse, and controller inp
 
 To rebind an action, select its row and press the key, mouse button, or controller button you want to use. Analog sticks are configured through the controller settings instead of being rebound as buttons.
 
-## Where openQ4 Stores Input Settings
+## Where openPREY Stores Input Settings
 
-At startup, openQ4 loads input-related config in this order:
+At startup, openPREY loads input-related config in this order:
 
 1. `default.cfg`
-2. `openq4_defaults.cfg` (if present)
-3. `openq4_profile_<profile>.cfg`, such as `openq4_profile_steamdeck.cfg` when a platform profile is active
-4. `openQ4Config.cfg`
+2. `openprey_defaults.cfg` (if present)
+3. `openprey_profile_<profile>.cfg`, such as `openprey_profile_steamdeck.cfg` when a platform profile is active
+4. `openPREYConfig.cfg`
 5. `autoexec.cfg` (if present)
 
 What this means in practice:
 
-- Stock defaults come from `content/baseoq4/pak0/default.cfg`.
-- openQ4-specific overrides can be layered on top through `openq4_defaults.cfg`.
+- Stock defaults come from `content/basepr/pak0/default.cfg`.
+- openPREY-specific overrides can be layered on top through `openprey_defaults.cfg`.
 - Platform-specific overrides can be applied through `com_platformProfile`.
-- Your saved personal changes live in `openQ4Config.cfg`.
+- Your saved personal changes live in `openPREYConfig.cfg`.
 - Advanced users can place their own final overrides in `autoexec.cfg`.
 
-`openQ4Config.cfg` is the main user config file name, and it is written under the normal writable save/config area (`fs_savepath`, which defaults to `fs_homepath`).
+`openPREYConfig.cfg` is the main user config file name, and it is written under the normal writable save/config area (`fs_savepath`, which defaults to `fs_homepath`).
 
 ## Mouse Settings
 
@@ -82,7 +86,7 @@ seta cl_mouseAccelDebug 0
 
 For CPI-normalized tuning, set `m_cpi` to the mouse hardware value and use `360 / sensitivity` as an approximate centimeters-per-360 target.
 
-SDL3 builds use relative mouse capture during gameplay on Windows, Linux, and experimental macOS. On Linux, openQ4 requests unscaled relative deltas from SDL where the desktop stack supports them and preserves fractional movement before it reaches the integer engine event queue. `Mouse1` through `Mouse8` are bindable by name on SDL3 and the native X11 fallback, and wheel up/down remain available as `MWHEELUP` and `MWHEELDOWN`.
+SDL3 builds use relative mouse capture during gameplay on Windows, Linux, and experimental macOS. On Linux, openPREY requests unscaled relative deltas from SDL where the desktop stack supports them and preserves fractional movement before it reaches the integer engine event queue. `Mouse1` through `Mouse8` are bindable by name on SDL3 and the native X11 fallback, and wheel up/down remain available as `MWHEELUP` and `MWHEELDOWN`.
 
 Experimental native macOS builds also expose `Mouse1` through `Mouse8`, track high-resolution wheel/trackpad deltas before emitting wheel steps, and synthesize common edit-field control characters such as Return, Tab, Backspace, and Ctrl-letter shortcuts.
 
@@ -130,7 +134,7 @@ Linux and macOS SDL3 builds opt into SDL's HIDAPI controller backends by default
 | `in_joystickUseDedicatedLookAxes` | `-1` | `-1` uses look axes only when a paired look stick is available, `0` keeps classic single-stick behavior, and `1` forces dedicated look axes when any mapped look axis exists. |
 | `in_joystickMoveAxisX` / `in_joystickMoveAxisY` | `0` / `1` | Raw joystick axes used for movement or classic stick look. |
 | `in_joystickLookAxisX` / `in_joystickLookAxisY` | `2` / `3` | Raw joystick axes used for dedicated look on four-axis devices. |
-| `in_joystickUpAxis` / `in_joystickUpAxisNegative` | `4` / `5` | Optional vertical/throttle axes; when both exist, openQ4 uses positive minus negative. |
+| `in_joystickUpAxis` / `in_joystickUpAxisNegative` | `4` / `5` | Optional vertical/throttle axes; when both exist, openPREY uses positive minus negative. |
 
 Set an axis cvar to `-1` for auto, or to a raw SDL axis number from `0` through `31`. These advanced joystick cvars only affect generic SDL joysticks; SDL gamepads keep the stable `JOY` button and stick layout described below.
 
@@ -151,7 +155,7 @@ The menu also exposes `in_joystickLowBatteryRumbleThreshold` and `in_joystickLow
 
 ## Stock Keyboard and Mouse Binds
 
-The shipped defaults are defined in `content/baseoq4/pak0/default.cfg`.
+The shipped defaults are defined in `content/basepr/pak0/default.cfg`.
 
 ### Core Movement and Combat
 
@@ -217,7 +221,7 @@ Menu behavior:
 - `JOY4`, `JOY7`, and `JOY8` back out of menus.
 - The D-pad and movement stick move menu focus.
 - Holding the D-pad, movement stick, or shoulder buttons repeats navigation for long lists.
-- Steam Deck packages enable the `steamdeck` platform profile, which applies `openq4_profile_steamdeck.cfg` on top of the normal defaults.
+- Steam Deck packages enable the `steamdeck` platform profile, which applies `openprey_profile_steamdeck.cfg` on top of the normal defaults.
 - `JOY23` through `JOY28`, `JOY29` through `JOY32`, and generic `AUX1` through `AUX16` are bindable for extra device buttons but are intentionally unbound by default.
 
 ## Useful Console Commands
@@ -296,7 +300,7 @@ seta in_joystickRumbleScale 0.50
 seta com_platformProfile steamdeck
 ```
 
-On Steam Deck or SteamOS, direct `openQ4-client_x64` launches auto-select this profile when `com_platformProfile` is still `default`. Set `OPENQ4_NO_STEAMDECK_AUTODETECT=1` to keep direct launches on the default profile.
+On Steam Deck or SteamOS, direct `openPREY-client_x64` launches auto-select this profile when `com_platformProfile` is still `default`. Set `OPENPREY_NO_STEAMDECK_AUTODETECT=1` to keep direct launches on the default profile.
 
 ## Troubleshooting
 
@@ -315,7 +319,7 @@ On Steam Deck or SteamOS, direct `openQ4-client_x64` launches auto-select this p
 | Steam Deck gyro does not work | Confirm `in_gyro 1`, run `listControllers`, and make sure Steam Input is not hiding the gyro from the game. |
 | Steam Deck touchpad moves aim instead of menus | Set `in_touchpadMode 1`; use `2` only when you want touchpad mouse-look during gameplay. Run `listControllers` if SDL reports no touchpad capability. |
 | Mouse look is backwards vertically | Change `Mouse Pitch` or `Invert Look`, depending on the device. |
-| Binding change did not stick | Run `writeConfig my-input-backup.cfg` to confirm your commands are valid, then quit normally so `openQ4Config.cfg` is rewritten. |
+| Binding change did not stick | Run `writeConfig my-input-backup.cfg` to confirm your commands are valid, then quit normally so `openPREYConfig.cfg` is rewritten. |
 
 If you want a final personal override layer that survives menu changes, place your preferred `seta` and `bind` commands in `autoexec.cfg`.
 

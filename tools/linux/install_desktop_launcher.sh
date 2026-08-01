@@ -4,24 +4,24 @@ set -euo pipefail
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/../.." && pwd)"
 
-install_root="${OPENQ4_INSTALL_ROOT:-${repo_root}/.install}"
-desktop_dir="${OPENQ4_DESKTOP_DIR:-}"
-launcher_name="${OPENQ4_DESKTOP_LAUNCHER_NAME:-openQ4.desktop}"
-client_binary="${OPENQ4_CLIENT_BINARY:-}"
-basepath="${OPENQ4_BASEPATH:-}"
+install_root="${OPENPREY_INSTALL_ROOT:-${OPENQ4_INSTALL_ROOT:-${repo_root}/.install}}"
+desktop_dir="${OPENPREY_DESKTOP_DIR:-${OPENQ4_DESKTOP_DIR:-}}"
+launcher_name="${OPENPREY_DESKTOP_LAUNCHER_NAME:-${OPENQ4_DESKTOP_LAUNCHER_NAME:-openPREY.desktop}}"
+client_binary="${OPENPREY_CLIENT_BINARY:-${OPENQ4_CLIENT_BINARY:-}}"
+basepath="${OPENPREY_BASEPATH:-${OPENQ4_BASEPATH:-}}"
 
 usage() {
     cat <<'EOF'
 Usage: install_desktop_launcher.sh [options]
 
-Creates an openQ4 launcher on the current Linux user's desktop.
+Creates an openPREY launcher on the current Linux user's desktop.
 
 Options:
-  --install-root PATH   Staged openQ4 runtime root. Defaults to repo .install.
+  --install-root PATH   Staged openPREY runtime root. Defaults to repo .install.
   --desktop-dir PATH    Desktop directory. Defaults to xdg-user-dir DESKTOP.
-  --name FILENAME       Launcher filename. Defaults to openQ4.desktop.
-  --client PATH         Client binary. Defaults to openQ4-client_<host arch>.
-  --basepath PATH       Quake 4 install root containing q4base/.
+  --name FILENAME       Launcher filename. Defaults to openPREY.desktop.
+  --client PATH         Client binary. Defaults to openPREY-client_<host arch>.
+  --basepath PATH       Prey (2006) install root containing base/.
   --no-basepath         Do not write fs_basepath into the launcher.
   -h, --help            Show this help.
 EOF
@@ -134,7 +134,7 @@ find_client_binary() {
     if [[ -n "${client_binary}" ]]; then
         client_binary="$(canonicalize_existing_file "${client_binary}")"
         if [[ ! -x "${client_binary}" ]]; then
-            echo "openQ4 client is not executable: ${client_binary}" >&2
+            echo "openPREY client is not executable: ${client_binary}" >&2
             exit 1
         fi
         printf '%s\n' "${client_binary}"
@@ -143,7 +143,7 @@ find_client_binary() {
 
     local arch
     arch="$(host_arch_suffix)"
-    local preferred="${install_root}/openQ4-client_${arch}"
+    local preferred="${install_root}/openPREY-client_${arch}"
     if [[ -x "${preferred}" ]]; then
         canonicalize_existing_file "${preferred}"
         return
@@ -155,9 +155,9 @@ find_client_binary() {
             canonicalize_existing_file "${candidate}"
             return
         fi
-    done < <(find "${install_root}" -maxdepth 1 -type f \( -name 'openQ4-client_*' -o -name 'openQ4-client_*' \) | sort)
+    done < <(find "${install_root}" -maxdepth 1 -type f -name 'openPREY-client_*' | sort)
 
-    echo "No executable openQ4 client was found under ${install_root}." >&2
+    echo "No executable openPREY client was found under ${install_root}." >&2
     echo "Run the Linux install step first, then retry this launcher install." >&2
     exit 1
 }
@@ -165,18 +165,18 @@ find_client_binary() {
 find_icon() {
     local candidate=""
     for candidate in \
-        "${install_root}/share/icons/hicolor/scalable/apps/openq4.svg" \
-        "${install_root}/share/icons/hicolor/256x256/apps/openq4.png" \
-        "${install_root}/share/icons/hicolor/128x128/apps/openq4.png" \
-        "${repo_root}/assets/icons/quake4.svg" \
-        "${repo_root}/assets/icons/quake4_256.png"; do
+        "${install_root}/share/icons/hicolor/scalable/apps/openprey.svg" \
+        "${install_root}/share/icons/hicolor/256x256/apps/openprey.png" \
+        "${install_root}/share/icons/hicolor/128x128/apps/openprey.png" \
+        "${repo_root}/assets/icons/prey.svg" \
+        "${repo_root}/assets/icons/prey_256.png"; do
         if [[ -f "${candidate}" ]]; then
             canonicalize_existing_file "${candidate}"
             return
         fi
     done
 
-    printf 'openq4\n'
+    printf 'openprey\n'
 }
 
 resolve_desktop_dir() {
@@ -213,8 +213,8 @@ fi
 
 if [[ -n "${basepath}" ]]; then
     basepath="$(canonicalize_existing_dir "${basepath}")"
-    if [[ ! -d "${basepath}/q4base" ]]; then
-        echo "Quake 4 basepath does not contain q4base/: ${basepath}" >&2
+    if [[ ! -d "${basepath}/base" ]]; then
+        echo "Prey basepath does not contain base/: ${basepath}" >&2
         exit 1
     fi
 fi
@@ -229,15 +229,15 @@ fi
     printf '%s\n' '[Desktop Entry]'
     printf '%s\n' 'Version=1.0'
     printf '%s\n' 'Type=Application'
-    printf '%s\n' 'Name=openQ4'
+    printf '%s\n' 'Name=openPREY'
     printf '%s\n' 'GenericName=First-person shooter'
-    printf '%s\n' 'Comment=Modern open-source engine and game-code replacement for Quake 4'
+    printf '%s\n' 'Comment=Modern open-source engine and game-code replacement for Prey (2006)'
     printf 'Exec=%s\n' "${exec_line}"
     printf 'Path=%s\n' "${install_root}"
     printf 'Icon=%s\n' "${icon_path}"
     printf '%s\n' 'Terminal=false'
     printf '%s\n' 'Categories=Game;ActionGame;Shooter;'
-    printf '%s\n' 'Keywords=quake;idtech;fps;multiplayer;'
+    printf '%s\n' 'Keywords=prey;idtech;fps;multiplayer;'
     printf '%s\n' 'StartupNotify=true'
 } > "${launcher_path}"
 
@@ -247,4 +247,4 @@ if command -v gio >/dev/null 2>&1; then
     gio set "${launcher_path}" metadata::trusted true >/dev/null 2>&1 || true
 fi
 
-echo "Installed openQ4 desktop launcher: ${launcher_path}"
+echo "Installed openPREY desktop launcher: ${launcher_path}"

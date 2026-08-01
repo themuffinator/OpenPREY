@@ -6957,6 +6957,9 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 	const int stageCount = shader->GetNumStages();
 	for ( stage = 0; stage < stageCount ; stage++ ) {
 		pStage = shader->GetStage(stage);
+		if ( backEnd.viewDef->isGlowView && !pStage->glowStage ) {
+			continue;
+		}
 
 		// check the enable condition
 		if ( regs[ pStage->conditionRegister ] == 0 ) {
@@ -7568,6 +7571,173 @@ int RB_STD_DrawShaderPasses( drawSurf_t **drawSurfs, int numDrawSurfs, rbShaderP
 	glColor3f( 1, 1, 1 );
 
 	return i;
+}
+
+static bool RB_GlowEnabledForCurrentView( void ) {
+	return backEnd.viewDef != NULL
+		&& !backEnd.viewDef->isSubview
+		&& !backEnd.viewDef->isEditor
+		&& !backEnd.viewDef->isGlowView
+		&& backEnd.viewDef->viewEntitys != NULL
+		&& !r_skipGlowOverlay.GetBool()
+		&& r_glowStrength.GetFloat() > 0.0f
+		&& globalImages->accumImage != NULL
+		&& globalImages->glowScreenImage != NULL
+		&& globalImages->glowCompositeImage != NULL;
+}
+
+static void RB_GlowSetScreenRect( void ) {
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	const int viewportX = tr.viewportOffset[0] + backEnd.viewDef->viewport.x1;
+	const int viewportY = tr.viewportOffset[1] + backEnd.viewDef->viewport.y1;
+	glViewport( viewportX, viewportY, viewportWidth, viewportHeight );
+	glScissor(
+		viewportX + backEnd.viewDef->scissor.x1,
+		viewportY + backEnd.viewDef->scissor.y1,
+		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+	backEnd.currentScissor = backEnd.viewDef->scissor;
+}
+
+static void RB_GlowBeginScreenPass( void ) {
+	RB_GlowSetScreenRect();
+	glMatrixMode( GL_MODELVIEW );
+	glPushMatrix();
+	glLoadIdentity();
+	glMatrixMode( GL_PROJECTION );
+	glPushMatrix();
+	glLoadIdentity();
+	glOrtho( 0, 1, 0, 1, -4, 1 );
+	GL_Cull( CT_TWO_SIDED );
+	glDisableClientState( GL_COLOR_ARRAY );
+	glDisable( GL_DEPTH_TEST );
+	glDisable( GL_STENCIL_TEST );
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
+	GL_TexEnv( GL_MODULATE );
+}
+
+static void RB_GlowEndScreenPass( void ) {
+	glMatrixMode( GL_PROJECTION );
+	glPopMatrix();
+	glMatrixMode( GL_MODELVIEW );
+	glPopMatrix();
+	glEnable( GL_DEPTH_TEST );
+	glEnable( GL_STENCIL_TEST );
+	GL_Cull( CT_FRONT_SIDED );
+}
+
+static void RB_GlowDrawScreenQuad( float offsetX, float offsetY ) {
+	glBegin( GL_QUADS );
+	glTexCoord2f( 0.0f, 0.0f ); glVertex2f( offsetX, offsetY );
+	glTexCoord2f( 1.0f, 0.0f ); glVertex2f( 1.0f + offsetX, offsetY );
+	glTexCoord2f( 1.0f, 1.0f ); glVertex2f( 1.0f + offsetX, 1.0f + offsetY );
+	glTexCoord2f( 0.0f, 1.0f ); glVertex2f( offsetX, 1.0f + offsetY );
+	glEnd();
+}
+
+static void RB_GlowCopyViewToImage( idImage *image ) {
+	if ( image == NULL ) {
+		return;
+	}
+	const int width = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int height = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	if ( width > 0 && height > 0 ) {
+		image->CopyFramebuffer(
+			tr.viewportOffset[0] + backEnd.viewDef->viewport.x1,
+			tr.viewportOffset[1] + backEnd.viewDef->viewport.y1,
+			width, height );
+	}
+}
+
+static void RB_GlowDrawImage( idImage *image, int stateBits, float colorScale ) {
+	if ( image == NULL ) {
+		return;
+	}
+	GL_State( stateBits );
+	GL_SelectTexture( 0 );
+	image->Bind();
+	glColor4f( colorScale, colorScale, colorScale, colorScale );
+	RB_GlowDrawScreenQuad( 0.0f, 0.0f );
+}
+
+static void RB_GlowBlurPass( idImage *sourceImage, idImage *captureImage, bool horizontal ) {
+	if ( sourceImage == NULL || captureImage == NULL ) {
+		return;
+	}
+	const int steps = idMath::ClampInt( 0, 256, r_glowSteps.GetInteger() );
+	const float startAlpha = idMath::ClampFloat( 0.0f, 8.0f, r_glowAlpha.GetFloat() );
+	const float alphaChange = idMath::ClampFloat( 0.0f, 8.0f, r_glowAlphaChange.GetFloat() );
+	const int blurExtent = horizontal ? sourceImage->GetUploadWidth() : sourceImage->GetUploadHeight();
+	const float blurStep = 1.0f / (float)Max( 1, blurExtent );
+
+	RB_GlowBeginScreenPass();
+	GL_SelectTexture( 0 );
+	sourceImage->Bind();
+	GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ZERO );
+	glColor4f( 1, 1, 1, 1 );
+	RB_GlowDrawScreenQuad( 0, 0 );
+	if ( steps > 1 && startAlpha > 0.0f ) {
+		float alpha = startAlpha;
+		GL_State( GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE );
+		for ( int step = 1; step < steps && alpha > 0.001f; step++ ) {
+			const float offset = blurStep * (float)step;
+			const float x = horizontal ? offset : 0.0f;
+			const float y = horizontal ? 0.0f : offset;
+			glColor4f( 1, 1, 1, alpha );
+			RB_GlowDrawScreenQuad( x, y );
+			RB_GlowDrawScreenQuad( -x, -y );
+			alpha *= alphaChange;
+		}
+	}
+	glColor4f( 1, 1, 1, 1 );
+	RB_GlowCopyViewToImage( captureImage );
+	RB_GlowEndScreenPass();
+}
+
+static void RB_STD_DrawGlowView( void ) {
+	drawSurf_t **drawSurfs = (drawSurf_t **)&backEnd.viewDef->drawSurfs[0];
+	const int numDrawSurfs = backEnd.viewDef->numDrawSurfs;
+	if ( drawSurfs == NULL || numDrawSurfs <= 0 ) {
+		return;
+	}
+	backEnd.depthFunc = GLS_DEPTHFUNC_EQUAL;
+	RB_BeginDrawingView();
+	glClearColor( 0, 0, 0, 1 );
+	glClear( GL_COLOR_BUFFER_BIT );
+	RB_STD_FillDepthBuffer( drawSurfs, numDrawSurfs );
+	glStencilFunc( GL_ALWAYS, 128, 255 );
+	RB_STD_DrawShaderPasses( drawSurfs, numDrawSurfs );
+}
+
+static void RB_STD_GlowOverlay( void ) {
+	if ( !RB_GlowEnabledForCurrentView() ) {
+		return;
+	}
+	RB_LogComment( "---------- RB_STD_GlowOverlay ----------\n" );
+	RB_GlowCopyViewToImage( globalImages->accumImage );
+
+	viewDef_t glowView = *backEnd.viewDef;
+	glowView.isGlowView = true;
+	const viewDef_t *savedView = backEnd.viewDef;
+	const int savedDepthFunc = backEnd.depthFunc;
+	backEnd.viewDef = &glowView;
+	RB_STD_DrawGlowView();
+	backEnd.viewDef = savedView;
+	backEnd.depthFunc = savedDepthFunc;
+
+	RB_GlowCopyViewToImage( globalImages->glowScreenImage );
+	RB_GlowBlurPass( globalImages->glowScreenImage, globalImages->glowCompositeImage, true );
+	RB_GlowBlurPass( globalImages->glowCompositeImage, globalImages->glowCompositeImage, false );
+	RB_GlowBeginScreenPass();
+	RB_GlowDrawImage( globalImages->accumImage, GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO, 1.0f );
+	RB_GlowDrawImage( globalImages->glowCompositeImage, GLS_DEPTHFUNC_ALWAYS | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE, r_glowStrength.GetFloat() );
+	glColor4f( 1, 1, 1, 1 );
+	RB_GlowEndScreenPass();
+	backEnd.currentRenderCopied = false;
+	backEnd.currentDepthCopied = false;
 }
 
 
@@ -10829,6 +10999,10 @@ void	RB_STD_DrawView( void ) {
 	if ( processed < numDrawSurfs ) {
 		RB_STD_DrawShaderPasses( drawSurfs+processed, numDrawSurfs-processed );
 	}
+
+	// Isolate and blur authored glowStage passes while the complete scene is
+	// still in the active scene target; presentation happens below.
+	RB_STD_GlowOverlay();
 
 	RB_RenderDebugTools( drawSurfs, numDrawSurfs );
 

@@ -1,181 +1,165 @@
-<a id="top"></a>
-
 <div align="center">
 
-<img src="assets/docs/img/banner.png" alt="openQ4 banner">
+<img src="assets/docs/img/banner.png" alt="openPREY banner">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Status](https://img.shields.io/badge/status-Beta%20Development-d97a1f.svg)](https://github.com/themuffinator/openQ4/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20experimental-lightgrey.svg)](https://github.com/themuffinator/openQ4)
-[![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20ARM64-orange.svg)](https://github.com/themuffinator/openQ4)
+[![Version](https://img.shields.io/badge/version-0.0.1-green.svg)](https://github.com/themuffinator/openPREY)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/themuffinator/openPREY)
+[![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20arm64-orange.svg)](https://github.com/themuffinator/openPREY)
+[![Build System](https://img.shields.io/badge/build-Meson%20%2B%20Ninja-yellow.svg)](https://mesonbuild.com/)
 
-**Play Quake 4 on modern systems with an open-source engine and game-code replacement built around the original retail assets.**
+**Prey (2006) reborn — open-source, modern platform, classic feel.**
 
-<a href="https://github.com/themuffinator/openQ4/releases">
-  <img src="https://img.shields.io/badge/Download-Latest%20Release-2d8f4e?style=for-the-badge&logo=github" alt="Download the latest openQ4 release">
-</a>
-<a href="https://github.com/themuffinator/openQ4/stargazers">
-  <img src="https://img.shields.io/github/stars/themuffinator/openQ4?style=for-the-badge&logo=github&label=Star%20on%20GitHub" alt="Star openQ4 on GitHub">
-</a>
-<a href="https://github.com/themuffinator/openQ4/fork">
-  <img src="https://img.shields.io/github/forks/themuffinator/openQ4?style=for-the-badge&logo=github&label=Fork%20on%20GitHub" alt="Fork openQ4 on GitHub">
-</a>
-
-<a href="https://discord.gg/T32mFejwR4">
-  <img src="https://img.shields.io/badge/Join%20the-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the openQ4 Discord server">
-</a>
-
-[Get Started](docs/user/getting-started.md) | [Features](#why-players-use-openq4) | [Player Docs](#player-guides) | [Build from Source](BUILDING.md) | [Technical Reference](TECHNICAL.md)
+[Features](#features) • [Installation](#installation) • [Building](BUILDING.md) • [Documentation](#documentation) • [Credits](#credits)
 
 </div>
 
 ---
 
-<p align="center">
-  <img src="assets/docs/img/readme-airdefense1-cinematic.png" alt="openQ4 airdefense1 intro cinematic showing ships approaching Stroggos" width="92%">
-</p>
+> [!WARNING]
+> **Development Notice:** This project leans heavily on exploratory, agentic AI "vibe coding" for speed. If you want a traditionally engineered codebase, this isn't for you.
 
-## What is openQ4?
+---
 
-**openQ4** is an open-source replacement for the Quake 4 engine and game binaries, built to keep the original game playable on modern PCs while improving presentation, audio, controls, packaging, and day-to-day usability.
+## About
 
-It is designed for players who want the original Quake 4 experience with a cleaner path to running it on today's hardware.
+**openPREY** is a free, open-source engine and game-code replacement for Prey (2006). Built as a minimal, Prey-focused adaptation of the [OpenQ4](https://github.com/themuffinator/OpenQ4) codebase, it keeps the modernization work that makes current builds practical to develop and debug, while retargeting the engine, tooling, and game-library workflow around Prey's unified game-module model.
+
+Run your existing copy of Prey on modern hardware across Windows, Linux, and macOS — without changing the game you remember.
 
 > [!NOTE]
-> openQ4 does **not** include Quake 4 assets. You still need a legitimate Quake 4 copy from Steam or GOG.
+> **openPREY does not include game assets.** You must own a legitimate copy of Prey (2006) to play. On Windows, `fs_basepath` auto-discovery checks the current working directory, registry install entries (including App Paths and uninstall metadata), and known legacy install roots such as `Human Head Studios/Prey`, `2K Games/Prey`, and `Games/Prey`.
 
 ---
 
-## Why players use openQ4
+## Features
 
-- **Modern display support** for widescreen, ultrawide, multi-monitor, borderless, and fullscreen setups.
-- **Optional visual upgrades** such as bloom, HDR, anti-aliasing, baked light grids, soft particles, and enhanced shadow options.
-- **OpenAL audio** restored to the pre-plan compatibility path by default, with newer voice handling revalidated behind an opt-in gate.
-- **Improved input and quality-of-life features** including controller support, better console UX, and modern settings behavior.
-- **Single-player and multiplayer in one install** with active compatibility work aimed at the stock game.
-- **A unified demo library and player** with pause, speed, stepping, rewind/fast-forward controls, honest legacy-format status, and full-world free-fly/player-follow playback for server-side multi-view recordings.
-- **Cross-platform support** with Windows packages, directly executable Linux AppImages and archives for x86_64 plus preview aarch64, Steam Deck support on Linux, and experimental Apple Silicon/arm64 macOS OpenGL/Metal bridge packages through the signed/notarized DMG lane for credentialed release runs.
-- **Open development** with releases, issue tracking, and community feedback all happening in public.
+### Prey Compatibility
+- **Prey-first Runtime Layout** — Unified `basepr/` directory for engine overlays, game modules, GUI scripts, shaders, maps, and strings
+- **Unified Game Module Model** — Engine loads `game_<arch>` for both SP and MP paths, with legacy `gamex86`/`gamex64` aliases accepted during migration
+- **Legacy Install Discovery** — Windows install detection covers CD-era registry keys, App Paths, uninstall entries, and known install roots without assuming Steam/GOG-only layouts
+- **Official Asset Validation** — Startup validation checks the required official Prey base PK4 layout before the game runs
 
----
+### Modern Platform and Tooling
+- **SDL3-first Windows Backend** — SDL3 is the default window, input, and display backend; the legacy Win32 backend remains as a transitional fallback
+- **Meson + Ninja Build System** — Canonical configure/build/install path with repo-local staging under `.install/`
+- **Cross-platform Packaging Tooling** — Windows, Linux, and macOS packages share the same Meson staging flow
+- **Crash Diagnostics** — Windows debug builds write crash logs and minidumps into `crashes/` beside the executable
 
-## System requirements
-
-You need a legitimate Quake 4 install plus the openQ4 package that matches your operating system and CPU architecture.
-
-| Tier | Practical target |
-|---|---|
-| **Minimum** | 64-bit CPU, 4 GB RAM, a working OpenGL compatibility driver with ARB2-era vertex/fragment program support, and about 12 GB free for the openQ4 package plus retail Quake 4 assets. Use the `minimum` or `lowpower` performance preset on constrained systems. |
-| **Recommended** | Modern quad-core CPU, 8 GB RAM, OpenGL 4.1+ compatibility-class GPU with 2 GB+ VRAM, current graphics drivers, and 15 GB+ free. For high resolutions, `quality`, or `ultra`, 16 GB RAM and 6 GB+ VRAM gives much better headroom. |
-
-Packaged support currently focuses on Windows, Linux x64, Steam Deck/SteamOS, preview Linux ARM64, and experimental Apple Silicon/arm64 macOS. Linux ARM64 requires a desktop OpenGL compatibility driver and remains preview until real-hardware Wayland gameplay, audio, and input signoff is accepted. See the [Getting Started guide](docs/user/getting-started.md#system-requirements) for the platform-specific requirements and caveats.
+### Display and Runtime
+- **Modern Window Modes** — Windowed, borderless, desktop-native fullscreen, and exclusive fullscreen all supported
+- **Monitor Selection** — SDL3 builds expose `r_screen`, `listDisplays`, and `listDisplayModes` for multi-monitor setup
+- **Aspect Ratio and FOV** — Automatically derived from the current render size; no manual aspect-ratio setting needed
 
 ---
 
-## Renderer showcase
+## Installation
 
-<p align="center">
-  <img src="assets/docs/img/readme-bloom-hdr.png" alt="openQ4 bloom and HDR side-by-side comparison on mp q4dm2" width="92%">
-</p>
-<p align="center"><sub>Bloom and HDR on mp/q4dm2 from the same loadscreen camera: normal rendering on the left, enhanced post-processing on the right.</sub></p>
+### Step 1 — Get Prey (2006)
 
-<p align="center">
-  <img src="assets/docs/img/readme-lightgrid.png" alt="openQ4 light-grid indirect diffuse off and on comparison" width="92%">
-</p>
-<p align="center"><sub>Baked light-grid indirect diffuse on mp/q4dm2, shown off and on from the same loadscreen camera.</sub></p>
+You need a copy of **Prey (2006)** installed from original media or another legitimate distribution. openPREY supports CD-era install layouts and does not require Steam or GOG.
 
-<p align="center">
-  <img src="assets/docs/img/readme-crt.png" alt="openQ4 CRT post-process off and on comparison on mp q4dm8" width="92%">
-</p>
-<p align="center"><sub>CRT post-processing on mp/q4dm8, shown off and on with a clean no-HUD camera.</sub></p>
+### Step 2 — Download the latest openPREY release
 
-<p align="center">
-  <img src="assets/docs/img/readme-crt-q4dm6.png" alt="openQ4 CRT post-process off and on comparison on mp q4dm6" width="92%">
-</p>
-<p align="center"><sub>A second CRT comparison on mp/q4dm6 shows the same post-process across a brighter indoor arena.</sub></p>
+Head to the **[Releases page](https://github.com/themuffinator/openPREY/releases)** and download the latest archive for your platform (Windows, Linux, or macOS).
 
-> **Renderer backends:** OpenGL remains the default and recommended release renderer on every platform. The **Vulkan** backend is **experimental and opt-in** (`r_renderApi vulkan`, applied on engine restart), but now renders the stock Quake 4 material-program families, including environment and heat-haze effects, displacement and depth/blur post effects, and guide-driven parallax, custom-lighting, water, and refractive-glass stages. Vulkan also supports 4x MSAA with SMAA. On Windows and Linux it drives a Vulkan driver directly. Apple ships no Vulkan driver, so on experimental macOS the same module runs on top of **MoltenVK**, a Vulkan-on-Metal translation layer bundled inside both existing macOS packages — a runtime option rather than a third download, and not a Metal renderer. Broader parity and platform validation are still in progress, so visual artifacts or instability remain possible; an initialization failure falls back safely to OpenGL. See [Display Settings → Renderer Backend](docs/user/display-settings.md#renderer-backend-opengl-default-vulkan-is-experimental).
+### Step 3 — Extract
 
----
+Unzip or unpack the archive to any folder you like.
 
-## Quick start
+### Step 4 — Play
 
-1. Install **Quake 4** from [Steam](https://store.steampowered.com/app/2210/Quake_4/) or [GOG](https://www.gog.com/en/game/quake_4).
-2. Download the latest openQ4 build from the [Releases page](https://github.com/themuffinator/openQ4/releases).
-3. On Linux, make the matching `x86_64` or `aarch64` AppImage executable and launch it; for an extracted archive, launch `openQ4-client_<arch>` (or `openQ4-steamdeck` on Steam Deck).
-4. If openQ4 does not find your Quake 4 install automatically, follow the path setup notes in the [Getting Started guide](docs/user/getting-started.md).
+Launch `openPREY-client_x64` (that's `openPREY-client_x64.exe` on Windows). openPREY will find your Prey (2006) installation automatically in most cases.
 
-**Need the step-by-step version?** Start with [docs/user/getting-started.md](docs/user/getting-started.md).
+> [!NOTE]
+> **Windows players:** The package is self-contained — no extra software needs to be installed.
+
+> [!NOTE]
+> **Linux players:** SDL3 selects native Wayland or X11 from the host. Use
+> `OPENPREY_FORCE_X11=1` only when an XWayland fallback is required.
+
+Linux packaging tooling can produce AppImages named with the standard `x86_64` or
+`aarch64` architecture suffix. Publication lanes remain gated until the unified-module
+runtime matrix is complete.
+
+> [!TIP]
+> If openPREY can't find your Prey installation automatically, launch with `+set fs_basepath "C:\path\to\Prey"`. See the [manual path configuration](TECHNICAL.md#manual-path-configuration) section in the technical reference.
 
 ---
 
-## Player guides
+## Documentation
 
-### Start here
-
-- [Getting Started](docs/user/getting-started.md) - system requirements, installation, first launch, and common setup questions
-- [Client Settings Guide](docs/user/client-settings.md) - where to find the most useful in-game settings
-- [Server Setup Guide](docs/user/server-setup.md) - basic dedicated server setup and common server variables
-
-### Play and tune
-
-- [Display Settings](docs/user/display-settings.md) - fullscreen, windowed mode, resolution scale, and multi-monitor behavior
-- [Input Settings](docs/user/input-settings.md) - keyboard, mouse, controller, and binding help
-- [Gameplay Settings](docs/user/gameplay-settings.md) - gameplay and audio toggles for everyday play
-- [Steam Deck](docs/user/steam-deck.md) - launcher, controls, and Linux handheld notes
-- [Multiplayer Networking](docs/user/multiplayer-networking.md) - multiplayer tuning and lag-comp behavior
-- [Demo Library and Multi-View Demos](docs/user/multiview-demos.md) - browse formats, use playback controls, and record or replay complete multiplayer matches
-- [Shadow Mapping](docs/user/shadow-mapping.md) - optional shadow-map settings and troubleshooting
-- [Light Grids](docs/user/light-grids.md) - advanced lighting guide for players and testers
-- [Cel Shading](docs/user/cel-shading.md) - banded lighting and outline settings for the cel-shaded look
-- [DDS Texture Replacements](docs/user/texture-replacements.md) - install and diagnose DXT/BC7 texture packs
-- [Level-Load Cache](docs/user/level-load-cache.md) - generated animation cache behavior, controls, and cleanup
-
-### Build and technical docs
-
-- [BUILDING.md](BUILDING.md) - compile openQ4 from source
-- [TECHNICAL.md](TECHNICAL.md) - advanced configuration, file layout, compatibility notes, and mod details
+- [Display Settings](docs/user/display-settings.md) — fullscreen, borderless, monitor selection, and anti-aliasing
+- [Technical Reference](TECHNICAL.md) — compatibility status, advanced configuration, file layout, dependencies, and versioning
+- [Building from Source](BUILDING.md) — compiler requirements, build options, and the GameLibs companion repository
 
 ---
 
-## Compatibility at a glance
+## Building from Source
 
-- openQ4 targets the **official Quake 4 retail assets**.
-- It ships its **own engine and game modules**.
-- It is **not** a drop-in runtime for the original proprietary Quake 4 DLL mods.
-- The project is still in **beta development**, so compatibility work is ongoing.
-
-If you run into problems, please use the [issue tracker](https://github.com/themuffinator/openQ4/issues) and include crash logs or setup details when possible. For experimental macOS crashes, use the [macOS support-data guide](docs/user/macos-support-data.md) before filing or updating an issue.
+Want to compile openPREY yourself? Full instructions, compiler requirements, and notes on the [OpenPrey-game](https://github.com/themuffinator/OpenPrey-GameLibs) companion repository live in **[BUILDING.md](BUILDING.md)**.
 
 ---
 
 ## Contributing
 
-Bug reports, compatibility reports, testing feedback, and code contributions are all welcome. If you want to help build the project itself, start with [BUILDING.md](BUILDING.md).
+openPREY is an open project and welcomes contributions of all kinds — bug reports, code fixes, documentation, and platform testing.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes and test thoroughly
+4. Submit a pull request
+
+Keep compatibility with official Prey assets in mind, follow the existing code style, and see [BUILDING.md](BUILDING.md) for build setup instructions.
 
 ---
 
 ## Credits
 
-- **themuffinator** - openQ4 development and maintenance
-- **DarkMatter Productions** - project stewardship and website
-- **Justin Marshall** - Quake4Doom and early BSE reverse engineering reference work
-- **Robert Beckebans** - renderer modernization reference work, including RBDOOM-3-BFG inspiration
-- **id Software** and **Raven Software** - Quake 4 and the underlying technology
-- **akacross** (Discord user) - Thorough playtesting on Linux and Windows, a huge help moving the project forward!
+### Project Lead
+
+- **themuffinator** — openPREY development and maintenance
+
+### Upstream Credit
+
+- **Justin Marshall** — [Quake4Doom](https://github.com/jmarshall23/Quake4Doom) baseline and related reverse-engineering work
+- **Robert Backebans** — RBDOOM-3-BFG modernization work that informs this ecosystem
+
+### Original Developers
+
+- **id Software** — idTech 4 engine lineage
+- **Raven Software** — Quake 4 codebase lineage used by OpenQ4
+- **Human Head Studios** — Prey (2006) and the Prey SDK
+
+### Third-Party Libraries
+
+- **Sean Barrett** — [stb_vorbis](https://github.com/nothings/stb) audio codec
+- **GLEW Team** — OpenGL extension wrangler
+- **OpenAL Soft Contributors** — 3D audio implementation
+- **SDL Team** — Cross-platform framework
 
 ---
 
-## License and disclaimer
+## License
 
-openQ4 engine code is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0). See [LICENSE](LICENSE) for details.
+openPREY is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0) (GPLv3). You are free to use, modify, and distribute the software under its terms.
 
-The game-library code in [openQ4-game](https://github.com/themuffinator/openQ4-game) is derived from the Quake 4 SDK and remains subject to id Software's SDK EULA. Quake 4 assets remain the property of id Software and ZeniMax Media.
+See the [LICENSE](LICENSE) file for full details.
 
-openQ4 is an independent project and is not affiliated with, endorsed by, or sponsored by id Software, Raven Software, Bethesda, or ZeniMax Media.
+**Note:** The GPLv3 license applies to openPREY's engine code only. Game library code in [OpenPrey-game](https://github.com/themuffinator/OpenPrey-GameLibs) is derived from the Prey SDK and subject to the original Human Head Studios SDK EULA. Prey game assets remain the property of Human Head Studios and 2K.
 
 ---
 
-[Website](https://www.darkmatter-quake.com) | [Repository](https://github.com/themuffinator/openQ4) | [Game Library](https://github.com/themuffinator/openQ4-game) | [Issues](https://github.com/themuffinator/openQ4/issues) | [Releases](https://github.com/themuffinator/openQ4/releases)
+## Disclaimer
 
-[Back to Top](#top)
+openPREY is an independent project and is not affiliated with, endorsed by, or sponsored by Human Head Studios, 2K, Bethesda, ZeniMax, id Software, or Raven Software. Prey is a trademark of ZeniMax Media Inc.
+
+You must own a legitimate copy of Prey (2006) to use this software. openPREY does not include any copyrighted game assets.
+
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.** openPREY is experimental software under active development. Use at your own risk.
+
+---
+
+## Links
+
+[Repository](https://github.com/themuffinator/openPREY) • [Game Library](https://github.com/themuffinator/OpenPrey-GameLibs) • [Issue Tracker](https://github.com/themuffinator/openPREY/issues) • [Releases](https://github.com/themuffinator/openPREY/releases) • [OpenQ4](https://github.com/themuffinator/OpenQ4)

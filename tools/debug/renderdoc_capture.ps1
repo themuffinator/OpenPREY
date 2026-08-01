@@ -17,7 +17,7 @@ param(
 
     [switch]$AllowUnsupported,
 
-    [string]$BasePath = "C:\Program Files (x86)\Steam\steamapps\common\Quake 4"
+    [string]$BasePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,17 +26,17 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 $installDir = Join-Path $workspaceRoot ".install"
 $savePath = Join-Path $workspaceRoot ".home"
-$exePath = Join-Path $installDir "openQ4-client_x64.exe"
-$captureTemplate = Join-Path $workspaceRoot ".home\baseoq4\renderdoc\openq4"
+$exePath = Join-Path $installDir "openPREY-client_x64.exe"
+$captureTemplate = Join-Path $workspaceRoot ".home\basepr\renderdoc\openprey"
 $captureDir = Split-Path -Parent $captureTemplate
 $renderDocDoc = Join-Path $workspaceRoot (Join-Path "docs" (Join-Path "dev" "renderdoc-workflow.md"))
 
 if (-not (Test-Path -LiteralPath $exePath)) {
-    throw "openQ4 client executable not found: $exePath"
+    throw "openPREY client executable not found: $exePath"
 }
 
-if (-not (Test-Path -LiteralPath $BasePath)) {
-    throw "Quake 4 base path not found: $BasePath"
+if (-not [string]::IsNullOrWhiteSpace($BasePath) -and -not (Test-Path -LiteralPath (Join-Path $BasePath "base"))) {
+    throw "Prey base path must contain base/: $BasePath"
 }
 
 $renderDocCandidates = @(
@@ -61,31 +61,34 @@ if (-not $renderDocCmd) {
 
 if ([string]::IsNullOrWhiteSpace($Map)) {
     if ($Mode -eq "SP") {
-        $Map = "game/convoy1"
+        $Map = "game/roadhouse"
     } else {
-        $Map = "mp/q4dm2"
+        $Map = "game/dmroadhouse"
     }
 }
 
 if (-not $AllowUnsupported) {
-    throw "RenderDoc capture is not currently supported with the shipping openQ4 OpenGL renderer. The renderer is still hard-wired to ARB2 / compatibility-profile features that RenderDoc drops during startup. See $renderDocDoc. Use -AllowUnsupported only if you intentionally want to reproduce this limitation while testing renderer modernization."
+    throw "RenderDoc capture is not currently supported with the shipping openPREY OpenGL renderer. The renderer is still hard-wired to ARB2 / compatibility-profile features that RenderDoc drops during startup. See $renderDocDoc. Use -AllowUnsupported only if you intentionally want to reproduce this limitation while testing renderer modernization."
 }
 
 New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
 
 $gameArgs = @(
     "+set", "logFile", "2",
-    "+set", "logFileName", "logs/openq4.log",
+    "+set", "logFileName", "logs/openprey.log",
     "+set", "developer", "1",
     "+set", "r_fullscreen", "0",
     "+set", "r_postAA", $PostAA.ToString(),
     "+set", "r_multiSamples", $MultiSamples.ToString(),
     "+set", "r_shaderReport", "2",
-    "+set", "fs_basepath", $BasePath,
     "+set", "fs_savepath", $savePath,
     "+set", "fs_devpath", $installDir,
-    "+set", "fs_game", "baseoq4"
+    "+set", "fs_game", "basepr"
 )
+
+if (-not [string]::IsNullOrWhiteSpace($BasePath)) {
+    $gameArgs += @("+set", "fs_basepath", $BasePath)
+}
 
 if ($Mode -eq "SP") {
     $gameArgs += @(
@@ -98,7 +101,7 @@ if ($Mode -eq "SP") {
         "+seta", "si_pure", "0",
         "+set", "net_serverAllowServerMod", "1",
         "+set", "sv_cheats", "1",
-        "+set", "si_gameType", "DM",
+        "+set", "si_gameType", "deathmatch",
         "+spawnServer", $Map
     )
 }
@@ -135,8 +138,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $logCandidates = @(
-    (Join-Path $workspaceRoot ".home\baseoq4\logs\openq4.log"),
-    (Join-Path $workspaceRoot ".home\q4base\logs\openq4.log")
+    (Join-Path $workspaceRoot ".home\basepr\logs\openprey.log"),
+    (Join-Path $workspaceRoot ".home\base\logs\openprey.log")
 )
 $rendererCompatibilityFailure = $false
 
@@ -154,14 +157,14 @@ foreach ($logPath in $logCandidates) {
 }
 
 if ($rendererCompatibilityFailure) {
-    throw "RenderDoc did not launch successfully because the injected run dropped required openQ4 compatibility / ARB2 OpenGL features. RenderDoc capture is not yet supported with the current openQ4 renderer."
+    throw "RenderDoc did not launch successfully because the injected run dropped required openPREY compatibility / ARB2 OpenGL features. RenderDoc capture is not yet supported with the current openPREY renderer."
 }
 
 if ($LaunchOnly) {
     exit 0
 }
 
-$captures = Get-ChildItem -LiteralPath $captureDir -Filter "openq4*.rdc" -ErrorAction SilentlyContinue |
+$captures = Get-ChildItem -LiteralPath $captureDir -Filter "openprey*.rdc" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending
 
 if (-not $captures) {

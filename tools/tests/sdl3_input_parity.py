@@ -403,7 +403,6 @@ def validate_docs_and_ci() -> None:
     input_docs = read("docs/user/input-settings.md")
     platform_docs = read("docs/dev/platform-support.md")
     migration = read("docs/dev/sdl3-linux-macos-migration.md")
-    release_completion = read("docs/dev/release-completion.md")
     session = read("src/framework/Session.cpp")
 
     for haystack, context in (
@@ -420,9 +419,8 @@ def validate_docs_and_ci() -> None:
     ):
         require(input_docs, token, "input settings docs")
 
-    require(platform_docs, "keyboard, mouse, and controller input are routed through the shared SDL3 backend", "platform support docs")
+    require(platform_docs, "Platform backend direction: SDL3 first;", "platform support docs")
     require(migration, "keyboard, mouse, controller, rumble, hotplug, gyro, touchpad, and touchscreen handling", "SDL3 migration docs")
-    require(release_completion, "SDL3 input support is aligned across Windows, Linux, and macOS", "release completion notes")
     require(session, "Sys_SDL_IsGameWindowFocused", "SDL3 unfocused-audio policy")
     require(session, "s_muteUnfocused.GetBool() && !Sys_SDL_IsGameWindowFocused()", "SDL3 cross-platform unfocused-audio mute")
 

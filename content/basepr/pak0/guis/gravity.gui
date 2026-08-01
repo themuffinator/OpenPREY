@@ -1,0 +1,375 @@
+// Gravity.gui
+// 
+// gui_parm25:		if set, allows one use only
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+	float innerrot	0
+	float turnedon	0
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+	windowDef TopPulseSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		1
+
+		onTime 0 {
+			transition "slidereffect::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "slidereffect::rect" "220 100 200 50" "220 60 200 50" "500" ;
+		}
+		onTime 100 {
+			transition "slidereffect2::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "slidereffect2::rect" "242 75 160 33" "242 30 160 33" "500" ;
+		}
+		onTime 300 {
+			transition "slidereffect::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+		}
+		onTime 500 {
+			transition "slidereffect2::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+		}
+		onTime 2000 {
+			if ("desktop::turnedon" == 1) {
+				resetTime "0" ;
+			}
+		}
+	}
+	windowDef BottomPulseSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		0
+
+		onTime 0 {
+			transition "slidereffect3::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "slidereffect3::rect" "220 340 200 -50" "220 380 200 -50" "500" ;
+		}
+		onTime 100 {
+			transition "slidereffect4::matcolor" "1 1 1 0" "1 1 1 1" "300" ;
+			transition "slidereffect4::rect" "242 380 160 -40" "242 425 160 -40" "500" ;
+		}
+		onTime 300 {
+			transition "slidereffect3::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+		}
+		onTime 500 {
+			transition "slidereffect4::matcolor" "1 1 1 1" "1 1 1 0" "300" ;
+		}
+		onTime 2000 {
+			if ("desktop::turnedon" == 0) {
+				resetTime "0" ;
+			}
+		}
+	}
+
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	
+	windowDef bgtl {
+		rect		0, 0, 320, 240
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/bg"
+	}
+	windowDef bgtr {
+		rect		320, 0, -320, 240
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/bg"
+	}
+	windowDef bgbl {
+		rect		0, 240, 320, -240
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/bg"
+	}
+	windowDef bgbr {
+		rect		320, 240, -320, -240
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/bg"
+	}
+	windowDef gravity {
+		rect		69, 245, 500, 232
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/topeffect"
+		visible		1
+	}
+	windowDef gravity2 {
+		rect		70, 03, 500, -232
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/topeffect"
+		visible		0
+	}
+	windowDef gravityplugTL {
+		rect		68, 15, 215, 215
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/gravity/gravplug"
+	}
+	windowDef gravityplugTR {
+		rect		357, 15, -215, 215
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/gravity/gravplug"
+	}
+	windowDef gravityplugBR {
+		rect		355, 252, -215, -215
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/gravplug"
+	}
+	windowDef gravityplugBL {
+		rect		67, 252, 215, -215
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/gravplug"
+	}
+	windowDef butback {
+		rect		195, 120, 250, 250
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/butback"
+	}
+	windowDef slider
+	{
+		rect		170, 97, 300, 300
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/gravity/slider"
+		rotate		"desktop::innerrot"
+	}	
+	windowDef slidereffect
+	{
+		rect		220, 70, 200, 50
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/gravity/slidereffect"
+	}	
+	windowDef slidereffect2
+	{
+		rect		242, 75, 160, 33
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/gravity/slidereffect"
+	}	
+	windowDef slidereffect3
+	{
+		rect		220, 370, 200, -50
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/gravity/slidereffect"
+	}	
+	windowDef slidereffect4
+	{
+		rect		242, 410, 160, -40
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0
+		background	"guis/assets/gravity/slidereffect"
+	}	
+	windowDef button {
+		rect		250, 170, 140, 150
+		//rect		215, 140, 210, 215
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.3
+		background	"guis/assets/gravity/button"
+	}
+	windowDef scan {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/wallwalk/scanline"
+	}
+	windowDef scan2 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan3 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.0012]
+	}
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.02
+		background	"textures/sfx/static"
+	}
+
+	windowDef Dimmer {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0.8
+		visible		0
+	}
+	
+	windowDef OnButton1 {
+		rect		50, 50, 540, 380
+		backcolor	0, 0, 0, 0
+	//	matcolor	0.7, 0.7, 0.38, 0.6
+		visible		1
+		notime		1
+		
+		onMouseEnter {
+			set "button::matcolor" "1 1 1 0.6" ;
+			transition "button::rect" "250 170 140 150" "215 140 210 215" "170";
+		}
+		onMouseExit {
+			set "button::matColor" "1 1 1 0.3" ;
+			transition "button::rect" "215 140 210 215" "250 170 140 150" "170";
+		}
+		onAction {
+			if ("desktop::turnedon" == 0)
+			{	// Turn towards top
+				transition "desktop::innerrot" "0" "180" "1800" ;
+				transition "gravityplugBL::matColor" "1 1 1 1" "1 1 1 0" "500" ;
+				transition "gravityplugBR::matColor" "1 1 1 1" "1 1 1 0" "500" ;
+				transition "gravityplugTL::matColor" "1 1 1 0" "1 1 1 1" "500" ;
+				transition "gravityplugTR::matColor" "1 1 1 0" "1 1 1 1" "500" ;
+				set "desktop::turnedon" "1";
+				set "gravity2::visible" "1";
+				set "AlienTextBot::visible" "1";
+				set "AlienTextTop::visible" "0";
+				set "gravity::visible" "0";
+				set "OnButton1::visible" "0";
+				set "cmd" "activate ; play console_generic_activate" ;
+				resetTime "0";
+			}
+			else 
+			{	// Turn towards bottom
+				transition "desktop::innerrot" "-180" "0" "1800" ;
+				transition "gravityplugBL::matColor" "1 1 1 0" "1 1 1 1" "500" ;
+				transition "gravityplugBR::matColor" "1 1 1 0" "1 1 1 1" "500" ;
+				transition "gravityplugTL::matColor" "1 1 1 1" "1 1 1 0" "500" ;
+				transition "gravityplugTR::matColor" "1 1 1 1" "1 1 1 0" "500" ;
+				set "desktop::turnedon" "0" ;
+				set "AlienTextTop::visible" "1";
+				set "AlienTextBot::visible" "0";
+				set "gravity2::visible" "0";
+				set "gravity::visible" "1";
+				set "OnButton1::visible" "0";
+				set "cmd" "activate ; play console_generic_deactivate" ;
+				resetTime "0";
+			}
+		}
+		onTime 1800 {
+			// Transition is finished, allow button usage again
+			// Now disable this gui if they requested a one-shot setup
+			if ("gui::gui_parm25" != 0) {	// Turn off after single use
+				set "desktop::noninteractive" "1" ;
+				set "Dimmer::visible" "1";
+			}
+			else {
+				set "OnButton1::visible" "1";
+			}
+			
+			// Start proper pulse effect
+			if ("desktop::turnedon" == 1) {
+				resetTime "TopPulseSequence" "0";
+			}
+			else {
+				resetTime "BottomPulseSequence" "0";
+			}
+		}
+	}
+	windowDef AlienTextTop {
+		rect		60, 50, 350, 50
+		text		"#str_20482"	// Gravity Shift
+		font		"fonts/alien"
+		textscale	0.9
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, .5
+		nowrap		1
+		visible		0
+
+		onTime 0 {
+			transition "AlienTextTop::rect" "60 50 1 50" "60 50 350 50" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienTextTop" "0" ;
+		}
+	}
+	windowDef AlienTextBot {
+		rect		60, 395, 250, 50
+		text		"#str_20482"
+		font		"fonts/alien"
+		textscale	0.9
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, .5
+		nowrap		1
+		visible		0
+
+		onTime 0 {
+			transition "AlienTextBot::rect" "60 395 1 50" "60 395 350 50" "2000" ;
+		}
+		onTime 2000 {
+			resetTime "AlienTextBot" "0" ;
+		}
+	}
+	
+	
+	windowDef AlienText {
+		rect		195, 200, 250, 50
+		text		"#str_20478"
+		font		"fonts/alien"
+		textscale	0.5
+		textalign	1
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, .8
+		visible		1
+	}
+		windowDef AlienText2 {
+		rect		195, 230, 250, 50
+		text		"#str_20482"
+		font		"fonts/alien"
+		textscale	0.5
+		textalign	1
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, .8
+		visible		1
+	}
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

@@ -798,18 +798,24 @@ unsigned int idMapEntity::GetGeometryCRC( void ) const {
 	for ( i = 0; i < GetNumPrimitives(); i++ ) {
 		mapPrim = GetPrimitive( i );
 
+		// Raven/Q4 folds the owning model key into each primitive.  Prey's
+		// retail map, CM, and AAS files use the Doom 3-era geometry-only CRC.
 		switch( mapPrim->GetType() ) {
 			case idMapPrimitive::TYPE_BRUSH:
 				crc ^= static_cast<idMapBrush*>(mapPrim)->GetGeometryCRC();
+#ifndef HUMANHEAD
 				if ( epairs.GetString( "model" ) ) {
 					crc ^= StringCRC( epairs.GetString( "model" ) );
 				}
+#endif
 				break;
 			case idMapPrimitive::TYPE_PATCH:
 				crc ^= static_cast<idMapPatch*>(mapPrim)->GetGeometryCRC();
+#ifndef HUMANHEAD
 				if ( epairs.GetString( "model" ) ) {
 					crc ^= StringCRC( epairs.GetString( "model" ) );
 				}
+#endif
 				break;
 		}
 	}

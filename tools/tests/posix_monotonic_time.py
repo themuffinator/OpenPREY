@@ -54,16 +54,8 @@ def validate_posix_elapsed_clock() -> None:
     reject(source, "sys_timeBase = 0", "legacy wall-clock timer origin")
 
 
-def validate_release_note() -> None:
-    source = read("docs/dev/release-completion.md")
-
-    require(source, "POSIX elapsed timing now uses a monotonic clock", "release completion notes")
-    require(source, "frame/event deltas keep advancing steadily", "release completion notes")
-
-
 def main() -> None:
     validate_posix_elapsed_clock()
-    validate_release_note()
     print("posix_monotonic_time: ok")
 
 

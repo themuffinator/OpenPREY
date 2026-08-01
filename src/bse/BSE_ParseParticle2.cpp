@@ -278,7 +278,13 @@ float rvParticleTemplate::GetFurthestDistance(void) {
 	mpSpawnAcceleration->GetMinsMaxs(minAccel, maxAccel);
 	mpSpawnFriction->GetMinsMaxs(minFriction, maxFriction);
 
+	// OPENPREY-GATED(D3): Prey's v7 game API intentionally does not expose the
+	// Quake 4 BSE service surface. BSE stays compiled but dormant.
+#if defined(HUMANHEAD)
+	const bool multiplayer = false;
+#else
 	const bool multiplayer = (game != NULL) ? game->IsMultiplayer() : false;
+#endif
 	const float gravityMagnitude = cvarSystem->GetCVarFloat(multiplayer ? "g_mp_gravity" : "g_gravity");
 	const float gravityScale = Max(idMath::Fabs(mGravity.x), idMath::Fabs(mGravity.y));
 	const idVec3 gravityVec(0.0f, 0.0f, -gravityMagnitude * gravityScale);

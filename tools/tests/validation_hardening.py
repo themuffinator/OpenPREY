@@ -35,7 +35,7 @@ def load_module(name: str, path: Path) -> ModuleType:
     return module
 
 
-VALIDATOR = load_module("openq4_validation_hardening_test", ROOT / "tools" / "validation" / "openq4_validate.py")
+VALIDATOR = load_module("openprey_validation_hardening_test", ROOT / "tools" / "validation" / "openq4_validate.py")
 
 
 def write_file(path: Path, data: bytes = b"x\n") -> None:
@@ -113,11 +113,11 @@ def validate_source_and_build_dir_guards() -> None:
             "symlink source root",
         )
 
-    fake_root = WORK / "not-openq4"
+    fake_root = WORK / "not-openprey"
     fake_root.mkdir(parents=True, exist_ok=True)
     expect_validation_error(
         lambda: VALIDATOR.validate_source_root(fake_root),
-        "missing required openQ4 files",
+        "missing required openPREY files",
         "invalid source root",
     )
 
@@ -160,16 +160,49 @@ def validate_source_and_build_dir_guards() -> None:
 
 
 def validate_game_libs_repo_guards() -> None:
-    game_libs_target = WORK / "openQ4-game-real"
-    game_libs_link = WORK / "openQ4-game-link"
+    game_libs_target = WORK / "OpenPrey-game-real"
+    game_libs_link = WORK / "OpenPrey-game-link"
     write_file(game_libs_target / "src" / "game" / "Game_local.cpp")
 
     expect_validation_error(
-        lambda: VALIDATOR.ensure_game_libs_repo({"OPENQ4_GAMELIBS_REPO": str(game_libs_target)}),
-        "multiplayer source directory was not found",
-        "missing multiplayer GameLibs source tree",
+        lambda: VALIDATOR.ensure_game_libs_repo({"OPENPREY_GAMELIBS_REPO": str(game_libs_target)}),
+        "Prey gameplay source directory was not found",
+        "missing Prey GameLibs source tree",
     )
-    write_file(game_libs_target / "src" / "mpgame" / "Game_local.cpp")
+    write_file(game_libs_target / "src" / "Prey" / "game_local.cpp")
+    expect_validation_error(
+        lambda: VALIDATOR.ensure_game_libs_repo({"OPENPREY_GAMELIBS_REPO": str(game_libs_target)}),
+        "engine-support source directory was not found",
+        "missing preyengine GameLibs source tree",
+    )
+    write_file(game_libs_target / "src" / "preyengine" / "prey_public.h")
+    VALIDATOR.ensure_game_libs_repo({"OPENPREY_GAMELIBS_REPO": str(game_libs_target)})
+
+    alias_args = argparse.Namespace(game_libs_repo="", build_gamelibs=True, skip_icon_sync=True)
+    original_primary = os.environ.get("OPENPREY_GAMELIBS_REPO")
+    original_legacy = os.environ.get("OPENQ4_GAMELIBS_REPO")
+    try:
+        os.environ.pop("OPENPREY_GAMELIBS_REPO", None)
+        os.environ["OPENQ4_GAMELIBS_REPO"] = str(game_libs_target)
+        alias_env = VALIDATOR.validation_env(alias_args, ROOT)
+        expected_repo = str(game_libs_target.resolve())
+        if alias_env.get("OPENPREY_GAMELIBS_REPO") != expected_repo:
+            raise AssertionError("legacy GameLibs override was not canonicalized")
+        if alias_env.get("OPENQ4_GAMELIBS_REPO") != expected_repo:
+            raise AssertionError("legacy GameLibs compatibility alias did not mirror the canonical path")
+        if alias_env.get("OPENPREY_BUILD_GAMELIBS") != "1":
+            raise AssertionError("canonical GameLibs build switch was not set")
+        if alias_env.get("OPENPREY_SKIP_ICON_SYNC") != "1":
+            raise AssertionError("canonical icon-sync switch was not set")
+    finally:
+        if original_primary is None:
+            os.environ.pop("OPENPREY_GAMELIBS_REPO", None)
+        else:
+            os.environ["OPENPREY_GAMELIBS_REPO"] = original_primary
+        if original_legacy is None:
+            os.environ.pop("OPENQ4_GAMELIBS_REPO", None)
+        else:
+            os.environ["OPENQ4_GAMELIBS_REPO"] = original_legacy
 
     try:
         os.symlink(game_libs_target, game_libs_link, target_is_directory=True)
@@ -177,7 +210,7 @@ def validate_game_libs_repo_guards() -> None:
         return
 
     expect_validation_error(
-        lambda: VALIDATOR.ensure_game_libs_repo({"OPENQ4_GAMELIBS_REPO": str(game_libs_link)}),
+        lambda: VALIDATOR.ensure_game_libs_repo({"OPENPREY_GAMELIBS_REPO": str(game_libs_link)}),
         "must not be a symlink",
         "symlink GameLibs repository",
     )
@@ -189,9 +222,9 @@ def validate_game_libs_repo_guards() -> None:
         "symlink GameLibs CLI argument",
     )
 
-    default_root = WORK / "default-gamelibs" / "openQ4"
-    default_target = WORK / "default-gamelibs" / "openQ4-game-real"
-    default_link = WORK / "default-gamelibs" / "openQ4-game"
+    default_root = WORK / "default-gamelibs" / "openPREY"
+    default_target = WORK / "default-gamelibs" / "OpenPrey-game-real"
+    default_link = WORK / "default-gamelibs" / "OpenPrey-game"
     write_file(default_root / "meson.build")
     write_file(default_target / "src" / "game" / "Game_local.cpp")
     try:
@@ -200,8 +233,10 @@ def validate_game_libs_repo_guards() -> None:
         return
 
     default_args = argparse.Namespace(game_libs_repo="", build_gamelibs=False, skip_icon_sync=False)
-    original_default = os.environ.get("OPENQ4_GAMELIBS_REPO")
+    original_primary = os.environ.get("OPENPREY_GAMELIBS_REPO")
+    original_legacy = os.environ.get("OPENQ4_GAMELIBS_REPO")
     try:
+        os.environ.pop("OPENPREY_GAMELIBS_REPO", None)
         os.environ.pop("OPENQ4_GAMELIBS_REPO", None)
         expect_validation_error(
             lambda: VALIDATOR.validation_env(default_args, default_root),
@@ -209,10 +244,14 @@ def validate_game_libs_repo_guards() -> None:
             "default symlink GameLibs repository",
         )
     finally:
-        if original_default is None:
+        if original_primary is None:
+            os.environ.pop("OPENPREY_GAMELIBS_REPO", None)
+        else:
+            os.environ["OPENPREY_GAMELIBS_REPO"] = original_primary
+        if original_legacy is None:
             os.environ.pop("OPENQ4_GAMELIBS_REPO", None)
         else:
-            os.environ["OPENQ4_GAMELIBS_REPO"] = original_default
+            os.environ["OPENQ4_GAMELIBS_REPO"] = original_legacy
 
 
 def validate_staged_symlink_guard() -> None:
@@ -236,7 +275,7 @@ def validate_staged_symlink_guard() -> None:
     (game_dir_link_root / ".install").mkdir(parents=True, exist_ok=True)
     game_dir_target.mkdir(parents=True, exist_ok=True)
     try:
-        os.symlink(game_dir_target, game_dir_link_root / ".install" / "baseoq4", target_is_directory=True)
+        os.symlink(game_dir_target, game_dir_link_root / ".install" / "basepr", target_is_directory=True)
     except (OSError, NotImplementedError):
         pass
     else:
@@ -249,7 +288,7 @@ def validate_staged_symlink_guard() -> None:
     root = WORK / "symlink-payload"
     install_root = root / ".install"
     target = root / "outside.txt"
-    link = install_root / "baseoq4" / "linked.txt"
+    link = install_root / "basepr" / "linked.txt"
     write_file(target)
     link.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -267,7 +306,7 @@ def validate_staged_symlink_guard() -> None:
 def validate_recursive_non_runtime_scan() -> None:
     root = WORK / "non-runtime"
     install_root = root / ".install"
-    game_dir = install_root / "baseoq4"
+    game_dir = install_root / "basepr"
     write_file(game_dir / "nested" / "debug.lib")
     expect_validation_error(
         lambda: VALIDATOR.validate_no_non_runtime_artifacts(
@@ -284,9 +323,9 @@ def validate_recursive_non_runtime_scan() -> None:
 def validate_engine_architecture_mismatch() -> None:
     root = WORK / "engine-arch"
     install_root = root / ".install"
-    game_dir = install_root / "baseoq4"
-    client = install_root / "openQ4-client_x64.exe"
-    dedicated = install_root / "openQ4-ded_arm64.exe"
+    game_dir = install_root / "basepr"
+    client = install_root / "openPREY-client_x64.exe"
+    dedicated = install_root / "openPREY-ded_arm64.exe"
     write_file(client)
     write_file(dedicated)
 
@@ -305,13 +344,12 @@ def validate_engine_architecture_mismatch() -> None:
 def validate_game_module_suffix_guard() -> None:
     root = WORK / "module-suffix"
     install_root = root / ".install"
-    game_dir = install_root / "baseoq4"
-    client = install_root / "openQ4-client_x64.exe"
-    dedicated = install_root / "openQ4-ded_x64.exe"
+    game_dir = install_root / "basepr"
+    client = install_root / "openPREY-client_x64.exe"
+    dedicated = install_root / "openPREY-ded_x64.exe"
     write_file(client)
     write_file(dedicated)
-    write_file(game_dir / "game-sp_x64.so")
-    write_file(game_dir / "game-mp_x64.dll")
+    write_file(game_dir / "game_x64.so")
 
     with_host_flags(
         True,
@@ -328,13 +366,12 @@ def validate_game_module_suffix_guard() -> None:
 def validate_game_module_architecture_match() -> None:
     root = WORK / "module-arch"
     install_root = root / ".install"
-    game_dir = install_root / "baseoq4"
-    client = install_root / "openQ4-client_x64.exe"
-    dedicated = install_root / "openQ4-ded_x64.exe"
+    game_dir = install_root / "basepr"
+    client = install_root / "openPREY-client_x64.exe"
+    dedicated = install_root / "openPREY-ded_x64.exe"
     write_file(client)
     write_file(dedicated)
-    write_file(game_dir / "game-sp_x64.dll")
-    write_file(game_dir / "game-mp_arm64.dll")
+    write_file(game_dir / "game_arm64.dll")
 
     with_host_flags(
         True,
@@ -347,8 +384,8 @@ def validate_game_module_architecture_match() -> None:
         ),
     )
 
-    (game_dir / "game-mp_arm64.dll").unlink()
-    write_file(game_dir / "game-mp_x64.dll")
+    (game_dir / "game_arm64.dll").unlink()
+    write_file(game_dir / "game_x64.dll")
 
     def assert_valid_arch_set() -> None:
         arches = VALIDATOR.validate_staged_architecture_set(root, game_dir, [client], [dedicated])
@@ -358,32 +395,22 @@ def validate_game_module_architecture_match() -> None:
     with_host_flags(True, False, False, assert_valid_arch_set)
 
 
-def validate_game_module_distinctness_guard() -> None:
-    root = WORK / "module-distinctness"
-    game_dir = root / ".install" / "baseoq4"
-    sp_module = game_dir / "game-sp_x64.so"
-    mp_module = game_dir / "game-mp_x64.so"
-    write_file(sp_module, b"same-module\n")
-    write_file(mp_module, b"same-module\n")
-
-    expect_validation_error(
-        lambda: VALIDATOR.validate_distinct_game_modules(root, [sp_module], [mp_module]),
-        "byte-identical",
-        "SP/MP game module distinctness",
-    )
-
-    write_file(mp_module, b"mp-module!!\n")
-    VALIDATOR.validate_distinct_game_modules(root, [sp_module], [mp_module])
+def validate_split_game_module_guard() -> None:
+    game_dir = WORK / "module-split" / ".install" / "basepr"
+    split_module = game_dir / "game_sp_x64.dll"
+    write_file(split_module)
+    if VALIDATOR.find_legacy_split_game_modules(game_dir) != [split_module]:
+        raise AssertionError("legacy split game module was not rejected")
 
 
 def validate_linux_runtime_dependency_guards() -> None:
     root = WORK / "linux-dedicated-dependencies"
-    client_x64 = root / ".install" / "openQ4-client_x64"
-    client_arm64 = root / ".install" / "openQ4-client_arm64"
-    dedicated_x64 = root / ".install" / "openQ4-ded_x64"
-    dedicated_arm64 = root / ".install" / "openQ4-ded_arm64"
-    mp_x64 = root / ".install" / "baseoq4" / "game-mp_x64.so"
-    mp_arm64 = root / ".install" / "baseoq4" / "game-mp_arm64.so"
+    client_x64 = root / ".install" / "openPREY-client_x64"
+    client_arm64 = root / ".install" / "openPREY-client_arm64"
+    dedicated_x64 = root / ".install" / "openPREY-ded_x64"
+    dedicated_arm64 = root / ".install" / "openPREY-ded_arm64"
+    game_x64 = root / ".install" / "basepr" / "game_x64.so"
+    game_arm64 = root / ".install" / "basepr" / "game_arm64.so"
     original_readelf_output = VALIDATOR.readelf_output
     dynamic_section = ""
 
@@ -395,8 +422,8 @@ def validate_linux_runtime_dependency_guards() -> None:
             client_arm64,
             dedicated_x64,
             dedicated_arm64,
-            mp_x64,
-            mp_arm64,
+            game_x64,
+            game_arm64,
         ) or source_root != root:
             raise AssertionError(f"unexpected Linux dependency path: {path}")
         return dynamic_section
@@ -418,8 +445,8 @@ def validate_linux_runtime_dependency_guards() -> None:
             [
                 (dedicated_x64, "x64"),
                 (dedicated_arm64, "arm64"),
-                (mp_x64, "x64"),
-                (mp_arm64, "arm64"),
+                (game_x64, "x64"),
+                (game_arm64, "arm64"),
             ],
         )
 
@@ -431,7 +458,7 @@ def validate_linux_runtime_dependency_guards() -> None:
 """
         VALIDATOR.validate_linux_dedicated_runtime_dependencies(
             root,
-            [(dedicated_x64, "x64"), (mp_x64, "x64")],
+            [(dedicated_x64, "x64"), (game_x64, "x64")],
         )
 
         dynamic_section = """
@@ -441,7 +468,7 @@ def validate_linux_runtime_dependency_guards() -> None:
 """
         VALIDATOR.validate_linux_dedicated_runtime_dependencies(
             root,
-            [(dedicated_arm64, "arm64"), (mp_arm64, "arm64")],
+            [(dedicated_arm64, "arm64"), (game_arm64, "arm64")],
         )
 
         dynamic_section = (
@@ -481,7 +508,7 @@ def validate_linux_runtime_dependency_guards() -> None:
             expect_validation_error(
                 lambda: VALIDATOR.validate_linux_dedicated_runtime_dependencies(
                     root,
-                    [(mp_x64, "x64")],
+                    [(game_x64, "x64")],
                 ),
                 forbidden_library,
                 f"Linux dedicated dependency guard for {forbidden_library}",
@@ -514,9 +541,9 @@ def validate_linux_runtime_dependency_guards() -> None:
 def validate_windows_pdb_architecture_match() -> None:
     root = WORK / "windows-pdb"
     install_root = root / ".install"
-    game_dir = install_root / "baseoq4"
+    game_dir = install_root / "basepr"
     write_file(install_root / "OpenAL32.dll")
-    write_file(install_root / "openQ4-client_arm64.pdb")
+    write_file(install_root / "openPREY-client_arm64.pdb")
 
     with_host_flags(
         True,
@@ -530,10 +557,9 @@ def validate_windows_pdb_architecture_match() -> None:
     )
 
     for path in (
-        install_root / "openQ4-client_x64.pdb",
-        install_root / "openQ4-ded_x64.pdb",
-        game_dir / "game-sp_x64.pdb",
-        game_dir / "game-mp_x64.pdb",
+        install_root / "openPREY-client_x64.pdb",
+        install_root / "openPREY-ded_x64.pdb",
+        game_dir / "game_x64.pdb",
     ):
         write_file(path)
 
@@ -548,15 +574,105 @@ def validate_windows_pdb_architecture_match() -> None:
         ),
     )
 
-    (install_root / "openQ4-client_arm64.pdb").unlink()
+    (install_root / "openPREY-client_arm64.pdb").unlink()
     with_host_flags(True, False, False, lambda: VALIDATOR.validate_windows_symbols(root, install_root, game_dir, {"x64"}))
+
+
+def validate_windows_unified_staged_payload() -> None:
+    root = WORK / "windows-unified-payload"
+    install_root = root / ".install"
+    game_dir = install_root / "basepr"
+    for path in (
+        install_root / "OpenAL32.dll",
+        install_root / "openPREY-client_x64.exe",
+        install_root / "openPREY-client_x64.pdb",
+        install_root / "openPREY-ded_x64.exe",
+        install_root / "openPREY-ded_x64.pdb",
+        game_dir / "game_x64.dll",
+        game_dir / "game_x64.pdb",
+        game_dir / "mod.json",
+        game_dir / "pak0.pk4",
+        game_dir / "pak1.pk4",
+    ):
+        write_file(path)
+
+    with_host_flags(True, False, False, lambda: VALIDATOR.validate_staged_payload(root, dry_run=False))
+
+    split_module = game_dir / "game-mp_x64.dll"
+    write_file(split_module)
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_payload(root, dry_run=False),
+            "obsolete split game modules",
+            "split module in unified Windows payload",
+        ),
+    )
+    split_module.unlink()
+
+    legacy_game_dir = install_root / "baseoq4"
+    write_file(legacy_game_dir / "pak0.pk4")
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_payload(root, dry_run=False),
+            "obsolete OpenQ4/retail runtime layout",
+            "legacy OpenQ4 game directory in unified Windows payload",
+        ),
+    )
+    shutil.rmtree(legacy_game_dir)
+
+    legacy_executable = install_root / "openQ4-client_x64.exe"
+    write_file(legacy_executable)
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_payload(root, dry_run=False),
+            "obsolete OpenQ4/retail runtime layout",
+            "legacy OpenQ4 executable in unified Windows payload",
+        ),
+    )
+    legacy_executable.unlink()
+
+    legacy_game_alias = game_dir / "gamex64.dll"
+    write_file(legacy_game_alias)
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_payload(root, dry_run=False),
+            "obsolete OpenQ4/retail runtime layout",
+            "retail game-module alias in unified Windows payload",
+        ),
+    )
+    legacy_game_alias.unlink()
+
+    import_library = game_dir / "game_x64.lib"
+    write_file(import_library)
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_payload(root, dry_run=False),
+            "Non-runtime artifacts remain staged",
+            "import library in unified Windows payload",
+        ),
+    )
 
 
 def validate_validation_wiring() -> None:
     validator = (ROOT / "tools" / "validation" / "openq4_validate.py").read_text(encoding="utf-8")
     push = (ROOT / ".github" / "workflows" / "push-verification.yml").read_text(encoding="utf-8")
     commit = (ROOT / ".github" / "workflows" / "commit-validation.yml").read_text(encoding="utf-8")
-    release_notes = (ROOT / "docs/dev" / "release-completion.md").read_text(encoding="utf-8")
+    status_ledger = (ROOT / "docs/dev/prey-rebase/status-ledger.md").read_text(encoding="utf-8")
 
     for token in (
         "positive_int",
@@ -565,11 +681,17 @@ def validate_validation_wiring() -> None:
         "validate_build_dir",
         "validate_no_staged_symlinks",
         "validate_staged_architecture_set",
-        "validate_distinct_game_modules",
+        "find_legacy_split_game_modules",
+        "find_forbidden_staged_legacy_paths",
         "validate_linux_client_runtime_dependencies",
         "validate_linux_dedicated_runtime_dependencies",
         "validate_windows_symbols",
         "validate_no_non_runtime_artifacts",
+        "DEFERRED_RELEASE_LANE_TESTS",
+        "INHERITED_OPENQ4_ONLY_TESTS",
+        "DEFERRED_PREY_API_V7_TESTS",
+        "TODO-D9",
+        "TODO-RELEASE-LANES",
         "Install root must not be a symlink",
         "Staged game directory must not be a symlink",
     ):
@@ -592,18 +714,89 @@ def validate_validation_wiring() -> None:
         "linux_wayland_stock_sp_smoke.py",
         "macos_dedicated_server_smoke.py",
         "renderer_gameplay_benchmark.py",
+        "renderer_validation_matrix.py",
     }
+    deferred_release_lane_tests = set(VALIDATOR.DEFERRED_RELEASE_LANE_TESTS)
+    inherited_openq4_only_tests = set(VALIDATOR.INHERITED_OPENQ4_ONLY_TESTS)
+    deferred_prey_api_v7_tests = set(VALIDATOR.DEFERRED_PREY_API_V7_TESTS)
+    expected_deferred_tests = {
+        "linux_arm64_cross_compile.py",
+        "linux_arm64_ci_coverage.py",
+        "linux_arm64_release_evidence.py",
+        "macos_dedicated_server_smoke_contract.py",
+        "macos_gamelibs_alignment.py",
+        "macos_package_policy.py",
+        "macos_signoff_archive.py",
+        "macos_support_intake.py",
+        "macos_symbolication_policy.py",
+        "macos_universal2_release_candidate.py",
+        "macos_metal_bridge.py",
+    }
+    missing_deferred_tests = expected_deferred_tests.difference(deferred_release_lane_tests)
+    if missing_deferred_tests:
+        raise AssertionError(
+            f"TODO-RELEASE-LANES exclusions are incomplete: {sorted(missing_deferred_tests)}"
+        )
+
     discovered_tests = sorted(path.name for path in (ROOT / "tools" / "tests").glob("*.py"))
     if not discovered_tests:
         raise AssertionError("no python tests discovered under tools/tests")
     unknown_allowlist_entries = smoke_wiring_allowlist.difference(discovered_tests)
     if unknown_allowlist_entries:
         raise AssertionError(f"smoke wiring allowlist names missing tests: {sorted(unknown_allowlist_entries)}")
-    for test_name in discovered_tests:
-        if test_name in smoke_wiring_allowlist:
-            continue
-        if test_name not in validator:
-            raise AssertionError(f"{test_name} is not wired into local validation")
+    unknown_deferred_entries = deferred_release_lane_tests.difference(discovered_tests)
+    if unknown_deferred_entries:
+        raise AssertionError(
+            f"TODO-RELEASE-LANES exclusions name missing tests: {sorted(unknown_deferred_entries)}"
+        )
+    if inherited_openq4_only_tests != {
+        "campaign_split_state_transition.py",
+        "game_class_allocator_alignment.py",
+        "renderer_mp_flat_items.py",
+        "renderer_player_visibility.py",
+        "settings_menu_coverage.py",
+        "ui_embedded_icons.py",
+    }:
+        raise AssertionError(
+            "inherited OpenQ4-only disposition must name the non-applicable campaign, allocator, flat-diffuse, multiplayer visibility, Quake settings-menu, and Quake obituary-icon contracts"
+        )
+    expected_api_v7_deferrals = {
+        "demo_playback.py",
+        "mp_bot_characters.py",
+        "mp_bot_navigation.py",
+        "multiview_demo.py",
+    }
+    if deferred_prey_api_v7_tests != expected_api_v7_deferrals:
+        raise AssertionError("TODO-D9 test disposition does not match the Prey v7 API deferral")
+
+    active_tests: list[str] = []
+    original_run_command = VALIDATOR.run_command
+    try:
+        VALIDATOR.run_command = lambda command, **_kwargs: active_tests.append(Path(command[1]).name)
+        VALIDATOR.run_python_tests(argparse.Namespace(dry_run=True), ROOT, {})
+    finally:
+        VALIDATOR.run_command = original_run_command
+    active_test_set = set(active_tests)
+    if active_test_set.intersection(deferred_release_lane_tests):
+        raise AssertionError("deferred release-lane tests leaked into active local validation")
+    if active_test_set.intersection(inherited_openq4_only_tests):
+        raise AssertionError("inherited OpenQ4-only tests leaked into active local validation")
+    if active_test_set.intersection(deferred_prey_api_v7_tests):
+        raise AssertionError("Prey v7 API-deferred tests leaked into active local validation")
+    if "macos_package_robustness.py" not in active_test_set:
+        raise AssertionError("ported macOS package robustness checks must remain active")
+
+    uncovered_tests = set(discovered_tests).difference(
+        active_test_set,
+        smoke_wiring_allowlist,
+        deferred_release_lane_tests,
+        inherited_openq4_only_tests,
+        deferred_prey_api_v7_tests,
+    )
+    if uncovered_tests:
+        raise AssertionError(f"tests have no active, runtime, or deferred disposition: {sorted(uncovered_tests)}")
+
+    for test_name in sorted(active_test_set):
         if test_name not in push:
             raise AssertionError(f"{test_name} is not wired into push workflow smoke checks")
         if test_name not in commit:
@@ -618,8 +811,9 @@ def validate_validation_wiring() -> None:
         if build_script not in push or build_script not in commit:
             raise AssertionError(f"{build_script} is not covered by workflow py_compile smoke checks")
 
-    if "Validation runs now fail earlier" not in release_notes:
-        raise AssertionError("release notes do not mention validation hardening")
+    for token in ("TODO-RELEASE-LANES", "basepr", "one `game_<arch>` module"):
+        if token not in status_ledger:
+            raise AssertionError(f"rebase status ledger is missing validation deferral contract: {token}")
 
 
 def main() -> None:
@@ -633,9 +827,10 @@ def main() -> None:
         validate_engine_architecture_mismatch()
         validate_game_module_suffix_guard()
         validate_game_module_architecture_match()
-        validate_game_module_distinctness_guard()
+        validate_split_game_module_guard()
         validate_linux_runtime_dependency_guards()
         validate_windows_pdb_architecture_match()
+        validate_windows_unified_staged_payload()
         validate_validation_wiring()
     finally:
         shutil.rmtree(WORK, ignore_errors=True)

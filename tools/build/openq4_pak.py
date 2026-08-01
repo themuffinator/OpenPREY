@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared helpers for building and validating openQ4 PK4 payloads."""
+"""Shared helpers for building and validating openPREY PK4 payloads."""
 
 from __future__ import annotations
 
@@ -13,10 +13,13 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
-GAME_DIR_NAME = "baseoq4"
+GAME_DIR_NAME = "basepr"
 PAK0_NAME = "pak0.pk4"
 PAK1_NAME = "pak1.pk4"
-OPENQ4_PACK_NAMES = (PAK0_NAME, PAK1_NAME)
+OPENPREY_PACK_NAMES = (PAK0_NAME, PAK1_NAME)
+# Compatibility name retained for upstream helper imports while the rebase
+# keeps those scripts structurally aligned with openQ4.
+OPENQ4_PACK_NAMES = OPENPREY_PACK_NAMES
 DETERMINISTIC_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 OPENQ4_PAKS_HEADER_TEMPLATE = """\
 #ifndef OPENQ4_PAKS_GENERATED_H
@@ -54,8 +57,8 @@ OPENQ4_REQUIRED_PK4_FILES_BY_PACK = {
         "materials/postprocess_openq4.mtr",
     },
     PAK1_NAME: {
-        "gfx/guis/loadscreens/generic.dds",
-        "gfx/guis/loadscreens/generic.tga",
+        "guis/assets/guicursor_arrow.tga",
+        "guis/assets/guicursor_menu.tga",
     },
 }
 OPENQ4_REQUIRED_LOOSE_GAME_FILES = {
@@ -255,7 +258,7 @@ def format_pk4_source_manifest(source_root: Path, source_dir: Path, pak_name: st
     source_dir = require_directory_inside(source_dir, source_root, "pack source")
     entries, _skipped_samples = _iter_pk4_entries(source_dir, pak_name)
     lines = [
-        "# openQ4 PK4 source manifest",
+        "# openPREY PK4 source manifest",
         f"pak={pak_name}",
         f"source={source_dir.relative_to(source_root).as_posix()}",
     ]

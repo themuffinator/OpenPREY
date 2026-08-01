@@ -117,16 +117,16 @@ def verify_release_source_provenance(
     expected_gamelibs_commit: str,
 ) -> None:
     expected_project_commit = require_full_git_sha(
-        expected_project_commit, "expected openQ4 commit"
+        expected_project_commit, "expected openPREY commit"
     )
     expected_gamelibs_commit = require_full_git_sha(
-        expected_gamelibs_commit, "expected openQ4-game commit"
+        expected_gamelibs_commit, "expected OpenPrey-game commit"
     )
-    project_root = require_repository(project_root, "openQ4 repository")
-    gamelibs_root = require_repository(gamelibs_root, "openQ4-game repository")
+    project_root = require_repository(project_root, "openPREY repository")
+    gamelibs_root = require_repository(gamelibs_root, "OpenPrey-game repository")
 
-    verify_repository_commit(project_root, expected_project_commit, "openQ4")
-    verify_repository_commit(gamelibs_root, expected_gamelibs_commit, "openQ4-game")
+    verify_repository_commit(project_root, expected_project_commit, "openPREY")
+    verify_repository_commit(gamelibs_root, expected_gamelibs_commit, "OpenPrey-game")
 
     validate_stage_manifest(stage_manifest.parent)
     manifest = read_stage_manifest(stage_manifest)
@@ -135,14 +135,14 @@ def verify_release_source_provenance(
         commit_key="projectGitCommit",
         dirty_key="projectGitDirty",
         expected_commit=expected_project_commit,
-        label="openQ4",
+        label="openPREY",
     )
     verify_manifest_commit(
         manifest,
         commit_key="gameLibsGitCommit",
         dirty_key="gameLibsGitDirty",
         expected_commit=expected_gamelibs_commit,
-        label="openQ4-game",
+        label="OpenPrey-game",
     )
 
 
@@ -172,8 +172,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         "release source provenance verified: "
-        f"openQ4={args.expected_project_commit.lower()} "
-        f"openQ4-game={args.expected_gamelibs_commit.lower()}"
+        f"openPREY={args.expected_project_commit.lower()} "
+        f"OpenPrey-game={args.expected_gamelibs_commit.lower()}"
     )
     return 0
 

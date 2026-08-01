@@ -392,9 +392,9 @@ Without it the macOS ${MOLTENVK_MAX_MINOS} floor cannot be proven, so this fails
                 die "Unparsable macOS minimum version '${value}' in '${path}'." ;;
         esac
         if ! version_le "${value}" "${MOLTENVK_MAX_MINOS}"; then
-            die "MoltenVK dylib requires macOS ${value}, which is above openQ4's ${MOLTENVK_MAX_MINOS} deployment target.
+            die "MoltenVK dylib requires macOS ${value}, which is above openPREY's ${MOLTENVK_MAX_MINOS} deployment target.
   path: ${path}
-This is exactly the MoltenVK v1.4.2 trap: v1.4.2 and later raised the runtime floor to macOS 12.0. Keep MOLTENVK_VERSION pinned to v1.4.1 until openQ4's own macos_deployment_target moves off ${MOLTENVK_MAX_MINOS}."
+This is exactly the MoltenVK v1.4.2 trap: v1.4.2 and later raised the runtime floor to macOS 12.0. Keep MOLTENVK_VERSION pinned to v1.4.1 until openPREY's own macos_deployment_target moves off ${MOLTENVK_MAX_MINOS}."
         fi
         if [ -n "${MINOS_RESULT}" ]; then
             MINOS_RESULT="${MINOS_RESULT},${value}"

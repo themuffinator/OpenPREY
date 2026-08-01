@@ -229,12 +229,12 @@ def validate_ci_wiring() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
     push = read(".github/workflows/push-verification.yml")
-    release_notes = read("docs/dev/release-completion.md")
+    status_ledger = read("docs/dev/prey-rebase/status-ledger.md")
 
     require(validator, "macos_static_policy.py", "validation runner")
     require(commit, script, "commit validation workflow")
     require(push, script, "push verification workflow")
-    require(release_notes, "macOS static policy validation now guards", "release completion macOS static policy note")
+    require(status_ledger, "TODO-RELEASE-LANES", "macOS release-lane deferral")
 
 
 def main() -> None:

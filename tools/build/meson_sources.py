@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit Meson source paths for openQ4 targets."""
+"""Emit Meson source paths for openPREY targets."""
 
 from __future__ import annotations
 

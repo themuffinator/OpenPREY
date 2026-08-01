@@ -125,6 +125,7 @@ static silEdge_t *	silEdges;
 static idHashIndex	silEdgeHash( SILEDGE_HASH_SIZE, MAX_SIL_EDGES );
 static int			numPlanes;
 static int			triSurfReferenceId;
+static bool			triSurfDataInitialized;
 
 static idBlockAlloc<srfTriangles_t, 1<<8, 0>				srfTrianglesAllocator;
 
@@ -165,6 +166,10 @@ R_InitTriSurfData
 ===============
 */
 void R_InitTriSurfData( void ) {
+	if ( triSurfDataInitialized ) {
+		return;
+	}
+
 	silEdges = (silEdge_t *)R_StaticAlloc( MAX_SIL_EDGES * sizeof( silEdges[0] ) );
 
 	// initialize allocators for triangle surfaces
@@ -196,6 +201,8 @@ void R_InitTriSurfData( void ) {
 	silTraceVertexAllocator.SetLockMemory( true );
 	skinToModelTransformAllocator.SetLockMemory( true );
 #endif
+
+	triSurfDataInitialized = true;
 }
 
 /*
@@ -204,7 +211,12 @@ R_ShutdownTriSurfData
 ===============
 */
 void R_ShutdownTriSurfData( void ) {
+	if ( !triSurfDataInitialized ) {
+		return;
+	}
+
 	R_StaticFree( silEdges );
+	silEdges = NULL;
 	silEdgeHash.Free();
 	srfTrianglesAllocator.Shutdown();
 	triVertexAllocator.Shutdown();
@@ -220,8 +232,9 @@ void R_ShutdownTriSurfData( void ) {
 	silTraceVertexAllocator.Shutdown();
 	skinToModelTransformAllocator.Shutdown();
 #endif
-}
 
+	triSurfDataInitialized = false;
+}
 
 /*
 ===============

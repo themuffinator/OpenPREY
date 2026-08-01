@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an openQ4 Windows installer from a packaged release directory."""
+"""Build an openPREY Windows installer from a packaged release directory."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 
-PRODUCT_NAME = "openQ4"
+PRODUCT_NAME = "openPREY"
 PRODUCT_PUBLISHER = "DarkMatter Productions"
-SETUP_ICON_RELATIVE = Path("assets") / "icons" / "quake4.ico"
+SETUP_ICON_RELATIVE = Path("assets") / "icons" / "prey.ico"
 TEMPLATE_RELATIVE = Path("tools") / "build" / "openQ4Installer.iss.in"
 SUPPORTED_ARCHES = ("x64", "x86", "arm64")
 VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){2,3}$")
@@ -37,14 +37,14 @@ ARCHITECTURE_DIRECTIVES = {
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Compile an Inno Setup installer using an already-packaged openQ4 "
+            "Compile an Inno Setup installer using an already-packaged openPREY "
             "Windows release directory."
         )
     )
     parser.add_argument(
         "--package-dir",
         required=True,
-        help="Prepared openQ4 Windows package directory to embed in the installer.",
+        help="Prepared openPREY Windows package directory to embed in the installer.",
     )
     parser.add_argument(
         "--version",
@@ -65,7 +65,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--source-root",
         default=".",
-        help="openQ4 repository root (used for installer assets).",
+        help="openPREY repository root (used for installer assets).",
     )
     parser.add_argument(
         "--output-dir",
@@ -146,13 +146,11 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
         package_dir / "README.html",
         package_dir / "LICENSE",
         package_dir / "docs" / "index.html",
-        package_dir / "baseoq4" / "mod.json",
-        package_dir / "baseoq4" / "pak0.pk4",
-        package_dir / "baseoq4" / "pak1.pk4",
-        package_dir / "baseoq4" / f"game-sp_{arch}.dll",
-        package_dir / "baseoq4" / f"game-sp_{arch}.pdb",
-        package_dir / "baseoq4" / f"game-mp_{arch}.dll",
-        package_dir / "baseoq4" / f"game-mp_{arch}.pdb",
+        package_dir / "basepr" / "mod.json",
+        package_dir / "basepr" / "pak0.pk4",
+        package_dir / "basepr" / "pak1.pk4",
+        package_dir / "basepr" / f"game_{arch}.dll",
+        package_dir / "basepr" / f"game_{arch}.pdb",
     ]
 
     missing = [path for path in required_paths if not path.is_file() and not path.is_symlink()]
@@ -213,7 +211,7 @@ def render_installer_script(
     setup_icon_file: Path,
 ) -> str:
     arch_allowed, arch_install_mode = ARCHITECTURE_DIRECTIVES[arch]
-    installer_basename = f"openq4-{version_tag}-windows-{arch}-setup"
+    installer_basename = f"openprey-{version_tag}-windows-{arch}-setup"
 
     replacements = {
         "@@APP_ARCH@@": arch,
@@ -280,8 +278,8 @@ def main(argv: list[str]) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    script_path = output_dir / f"openq4-{version_tag}-windows-{args.arch}-setup.iss"
-    installer_path = output_dir / f"openq4-{version_tag}-windows-{args.arch}-setup.exe"
+    script_path = output_dir / f"openprey-{version_tag}-windows-{args.arch}-setup.iss"
+    installer_path = output_dir / f"openprey-{version_tag}-windows-{args.arch}-setup.exe"
     try:
         validate_output_paths(output_dir, script_path, installer_path)
     except RuntimeError as exc:

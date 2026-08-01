@@ -134,6 +134,8 @@ private:
 
 static bool ReadDemoShaderParms( idSoundDemoCommandReader& reader, soundShaderParms_t& parms )
 {
+	memset( &parms, 0, sizeof( parms ) );
+	parms.subIndex = -1;
 	if( !reader.ReadFloat( parms.minDistance, "minimum distance" ) ||
 		!reader.ReadFloat( parms.maxDistance, "maximum distance" ) ||
 		!reader.ReadFloat( parms.volume, "volume" ) ||
@@ -234,6 +236,9 @@ public:
 		{
 			return false;
 		}
+		// Hold fades are runtime censorship windows and are deliberately not
+		// archived; restoring one could mute unrelated resumed dialogue.
+		fade.fadeHold = false;
 		fade.Sanitize();
 		if( fade.fadeEndTime > 0 )
 		{
@@ -252,6 +257,10 @@ public:
 			!ReadFloat( parms.maxDistance, "sound max distance" ) ||
 			!ReadFloat( parms.volume, "sound volume" ) ||
 			!ReadFloat( parms.attenuatedVolume, "sound attenuated volume" ) ||
+			!ReadInt( parms.subIndex, "subtitle table index" ) ||
+			!ReadInt( parms.profanityIndex, "profanity sample index" ) ||
+			!ReadFloat( parms.profanityDelay, "profanity delay" ) ||
+			!ReadFloat( parms.profanityDuration, "profanity duration" ) ||
 			!ReadFloat( parms.shakes, "sound shakes" ) ||
 			!ReadInt( parms.soundShaderFlags, "sound shader flags" ) ||
 			!ReadInt( parms.soundClass, "sound class" ) ||
@@ -318,7 +327,7 @@ idCVar s_doorDistanceAdd( "s_doorDistanceAdd", "150", CVAR_FLOAT, "reduce sound 
 idCVar s_quadraticFalloff( "s_quadraticFalloff", "1", CVAR_ARCHIVE | CVAR_BOOL, "use quadratic sound distance falloff" );
 idCVar s_drawSounds( "s_drawSounds", "0", CVAR_INTEGER, "", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
 idCVar s_showVoices( "s_showVoices", "0", CVAR_BOOL, "show active voices" );
-idCVar s_volume_dB( "s_volume_dB", "0", CVAR_ARCHIVE | CVAR_FLOAT, "volume in dB" );
+idCVar s_volume_dB( "s_volume_dB", "-6", CVAR_ARCHIVE | CVAR_SOUND | CVAR_FLOAT, "volume in dB", DB_SILENCE, 0.0f );
 extern idCVar s_noSound;
 
 extern void WriteDeclCache( idDemoFile* f, int demoCategory, int demoCode, declType_t  declType );
@@ -447,6 +456,49 @@ float idSoundWorldLocal::CurrentShakeAmplitude()
 	return shakeAmp;
 }
 
+float idSoundWorldLocal::CurrentShakeAmplitudeForPosition( const int time, const idVec3& listenerPosition )
+{
+	(void)time;
+	if( s_constantAmplitude.GetFloat() >= 0.0f )
+	{
+		return s_constantAmplitude.GetFloat();
+	}
+
+	float amplitude = 0.0f;
+	for( int e = 1; e < emitters.Num(); e++ )
+	{
+		idSoundEmitterLocal* emitter = emitters[e];
+		if( emitter == NULL )
+		{
+			continue;
+		}
+		for( int c = 0; c < emitter->channels.Num(); c++ )
+		{
+			idSoundChannel* channel = emitter->channels[c];
+			if( channel == NULL || channel->parms.shakes == 0.0f || channel->currentAmplitude <= 0.0f )
+			{
+				continue;
+			}
+			float gain = channel->parms.volume;
+			if( ( channel->parms.soundShaderFlags & SSF_GLOBAL ) == 0 )
+			{
+				const float distance = ( listenerPosition - emitter->origin ).LengthFast() * DOOM_TO_METERS;
+				if( distance >= channel->parms.maxDistance )
+				{
+					continue;
+				}
+				if( distance > channel->parms.minDistance && channel->parms.maxDistance > channel->parms.minDistance )
+				{
+					gain *= 1.0f - ( distance - channel->parms.minDistance ) /
+						( channel->parms.maxDistance - channel->parms.minDistance );
+				}
+			}
+			amplitude += channel->parms.shakes * channel->currentAmplitude * Max( 0.0f, gain );
+		}
+	}
+	return amplitude;
+}
+
 /*
 ========================
 idSoundWorldLocal::PlaceListener
@@ -480,6 +532,36 @@ void idSoundWorldLocal::PlaceListener( const idVec3& origin, const idMat3& axis,
 	{
 		listener.area = 0;
 	}
+}
+
+void idSoundWorldLocal::PlaceListener( const idVec3& origin, const idMat3& axis, const int id, const int gameTime, const idStr& areaName )
+{
+	(void)gameTime;
+	PlaceListener( origin, axis, id );
+	listenerAreaName = areaName;
+	if( listenerAreaName.IsEmpty() && listener.area >= 0 && listener.area < areaLocations.Num() )
+	{
+		listenerAreaName = areaLocations[listener.area];
+	}
+}
+
+void idSoundWorldLocal::RegisterLocation( int area, const char* locationName )
+{
+	if( area < 0 )
+	{
+		return;
+	}
+	if( areaLocations.Num() <= area )
+	{
+		areaLocations.SetNum( area + 1 );
+	}
+	areaLocations[area] = locationName != NULL ? locationName : "";
+}
+
+void idSoundWorldLocal::ClearAreaLocations()
+{
+	areaLocations.Clear();
+	listenerAreaName.Clear();
 }
 
 /*
@@ -1570,6 +1652,10 @@ void idSoundWorldLocal::WriteToSaveGame( idFile* savefile )
 			WriteFloat( savefile, parms.maxDistance, "sound max distance" );
 			WriteFloat( savefile, parms.volume, "sound volume" );
 			WriteFloat( savefile, parms.attenuatedVolume, "sound attenuated volume" );
+			WriteInt( savefile, parms.subIndex, "subtitle table index" );
+			WriteInt( savefile, parms.profanityIndex, "profanity sample index" );
+			WriteFloat( savefile, parms.profanityDelay, "profanity delay" );
+			WriteFloat( savefile, parms.profanityDuration, "profanity duration" );
 			WriteFloat( savefile, parms.shakes, "sound shakes" );
 			WriteInt( savefile, parms.soundShaderFlags, "sound shader flags" );
 			WriteInt( savefile, parms.soundClass, "sound class" );

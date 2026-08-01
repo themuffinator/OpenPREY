@@ -42,7 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #define CM_FILE_EXT			"cm"
 #define CM_FILEID			"CM"
-#define CM_FILEVERSION		"3"
+#define CM_FILEVERSION		"1.00"
 
 
 /*
@@ -714,7 +714,7 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 
 	crc = token.GetUnsignedLongValue();
 	if ( mapFileCRC && crc != mapFileCRC ) {
-		common->Printf( "%s is out of date\n", fileName.c_str() );
+		common->Printf( "%s is out of date (file CRC %u, map CRC %u)\n", fileName.c_str(), crc, mapFileCRC );
 		delete src;
 		return false;
 	}

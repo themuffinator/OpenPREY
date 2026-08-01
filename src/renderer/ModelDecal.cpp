@@ -510,7 +510,7 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 	}
 	
 	decalInfo = decals->material->GetDecalInfo();
-	minTime = time - decalInfo.stayTime;
+	minTime = time - ( decalInfo.stayTime + decalInfo.fadeTime );
 	geometryChanged = false;
 
 	newNumIndexes = 0;
@@ -592,8 +592,10 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 	}
 
 	const decalInfo_t decalInfo = material->GetDecalInfo();
-	const int stayTime = ( decalInfo.stayTime > 0 ) ? decalInfo.stayTime : 1;
-	const float stayTimeFloat = (float)stayTime;
+	const int stayTime = Max( decalInfo.stayTime, 0 );
+	const int fadeTime = Max( decalInfo.fadeTime, 0 );
+	const int maxTime = Max( stayTime + fadeTime, 1 );
+	const float maxTimeFloat = (float)maxTime;
 	const float renderTime = (float)tr.viewDef->renderView.time;
 	const int numStages = material->GetNumStages();
 	const int vertexBytes = tri.numVerts * sizeof( idDrawVert );
@@ -616,13 +618,13 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 	memset( vertLifeSpan, 0, tri.numVerts * sizeof( vertLifeSpan[0] ) );
 	for ( int indexBase = 0; indexBase < tri.numIndexes; indexBase += 3 ) {
 		float life = renderTime - indexStartTime[indexBase];
-		if ( life > stayTimeFloat ) {
+		if ( life > maxTimeFloat ) {
 			continue;
 		}
 		if ( life < 0.0f ) {
 			life = 0.0f;
 		}
-		life /= stayTimeFloat;
+		life /= maxTimeFloat;
 		vertLifeSpan[tri.indexes[indexBase + 0]] = life;
 		vertLifeSpan[tri.indexes[indexBase + 1]] = life;
 		vertLifeSpan[tri.indexes[indexBase + 2]] = life;
@@ -637,6 +639,11 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 
 		memset( stageColors, 0, totalColorBytes );
 		memset( shaderParms, 0, sizeof( shaderParms ) );
+		shaderParms[SHADERPARM_RED] = 1.0f;
+		shaderParms[SHADERPARM_GREEN] = 1.0f;
+		shaderParms[SHADERPARM_BLUE] = 1.0f;
+		shaderParms[SHADERPARM_ALPHA] = 1.0f;
+		shaderParms[SHADERPARM_BRIGHTNESS] = 1.0f;
 
 		for ( int stage = 0; stage < numStages; stage++ ) {
 			const shaderStage_t *pStage = material->GetStage( stage );
@@ -665,9 +672,16 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 					lastStartTime = shaderParms[5];
 				}
 
+				const float deltaTime = renderTime - indexStartTime[indexBase];
+				float fadeFraction = 0.0f;
+				if ( fadeTime > 0 && deltaTime > stayTime ) {
+					fadeFraction = ( deltaTime - stayTime ) / (float)fadeTime;
+				}
+				fadeFraction = idMath::ClampFloat( 0.0f, 1.0f, fadeFraction );
 				const float colorScale = vertDepthFade[triVertIndex0] * 255.0f;
 				for ( int k = 0; k < 4; k++ ) {
-					const int icolor = idMath::FtoiFast( regs[pStage->color.registers[k]] * colorScale );
+					const float decalColor = decalInfo.start[k] + ( decalInfo.end[k] - decalInfo.start[k] ) * fadeFraction;
+					const int icolor = idMath::FtoiFast( regs[pStage->color.registers[k]] * decalColor * colorScale );
 					const byte colorByte = (byte)idMath::ClampInt( 0, 255, icolor );
 					stageColor[triVertIndex0 * 4 + k] = colorByte;
 					stageColor[triVertIndex1 * 4 + k] = colorByte;

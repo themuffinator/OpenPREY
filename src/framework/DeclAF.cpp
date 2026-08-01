@@ -694,12 +694,14 @@ int idDeclAF::ContentsFromString( const char *str ) {
 		else if ( token.Icmp( "vehicleclip" ) == 0 ) {
 			c |= CONTENTS_VEHICLECLIP;
 		}
+#ifndef HUMANHEAD
 		else if ( token.Icmp( "flyclip" ) == 0 ) {
 			c |= CONTENTS_FLYCLIP;
 		}
 		else if ( token.Icmp( "itemclip" ) == 0 ) {
 			c |= CONTENTS_ITEMCLIP;
 		}
+#endif
 		else if ( token == "," ) {
 			continue;
 		}
@@ -741,6 +743,7 @@ const char *idDeclAF::ContentsToString( const int contents, idStr &str ) {
 		if ( str.Length() ) str += ", ";
 		str += "vehicleclip";
 	}
+#ifndef HUMANHEAD
 	if ( contents & CONTENTS_FLYCLIP ) {
 		if ( str.Length() ) str += ", ";
 		str += "flyclip";
@@ -749,6 +752,7 @@ const char *idDeclAF::ContentsToString( const int contents, idStr &str ) {
 		if ( str.Length() ) str += ", ";
 		str += "itemclip";
 	}
+#endif
 	if ( str[0] == '\0' ) {
 		str = "none";
 	}

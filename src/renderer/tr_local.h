@@ -357,6 +357,7 @@ typedef struct viewDef_s {
 	bool				isSubview;				// true if this view is not the main view
 	bool				isMirror;				// the portal is a mirror, invert the face culling
 	bool				isXraySubview;
+	bool				isGlowView;
 
 	bool				isEditor;
 
@@ -424,6 +425,7 @@ typedef struct {
 	idImage *			bumpImage;
 	idImage *			diffuseImage;
 	idImage *			specularImage;
+	float				alphaTestThreshold;	// negative disables interaction alpha clipping
 
 	idVec4				diffuseColor;	// may have a light color baked into it, will be < tr.backEndRendererMaxLight
 	idVec4				specularColor;	// may have a light color baked into it, will be < tr.backEndRendererMaxLight
@@ -782,6 +784,12 @@ public:
 	virtual void			DrawSmallStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material );
 	virtual void			DrawBigChar( int x, int y, int ch, const idMaterial *material );
 	virtual void			DrawBigStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material );
+	virtual bool			IsScopeView( void );
+	virtual void			SetScopeView( bool view );
+	virtual bool			IsSpiritWalkView( void );
+	virtual void			SetSpiritWalkView( bool view );
+	virtual bool			IsShuttleView( void );
+	virtual void			SetShuttleView( bool view );
 	virtual void			WriteDemoPics();
 	virtual void			DrawDemoPics();
 	virtual void			SetFrameShaderTime( int timeMsec );
@@ -857,6 +865,12 @@ public:
 	idVec4					postProcessSMAAQuality;	// x = edge mode, y = threshold, z = search steps, w = local contrast
 	float					deltaTime;		// seconds since the previous top-level RenderScene call
 	int						lastRenderTimeMsec;	// host milliseconds of the previous top-level RenderScene call
+	bool					scopeViewEnabled;
+	bool					spiritWalkViewEnabled;
+	bool					shuttleViewEnabled;
+	int						lastRenderSkybox;
+	ID_INLINE bool			SkyboxRenderedInFrame() const { return frameCount == lastRenderSkybox; }
+	ID_INLINE void			RenderSkyboxInFrame() { lastRenderSkybox = frameCount; }
 
 	int						viewportOffset[2];	// for doing larger-than-window tiled renderings
 	int						tiledViewport[2];
@@ -932,6 +946,20 @@ extern bool					tr_levelshotProjectionShiftActive;
 extern float				tr_levelshotProjectionShiftX;
 extern float				tr_levelshotProjectionShiftY;
 
+#ifdef OPENQ4_RENDERER_MODULE
+int R_RendererGetTimeGroupTime( int timeGroup, int fallbackTime );
+#endif
+
+// Retail Prey treats mirrors and remote-camera subviews as the neutral view.
+// View-scoped allow/suppress fields therefore only match the primary view ID.
+static ID_INLINE int R_EffectiveViewIDForSubview( const viewDef_t *viewDef ) {
+	return ( viewDef == NULL || viewDef->isSubview ) ? 0 : viewDef->renderView.viewID;
+}
+
+static ID_INLINE int R_EffectiveViewIDForSubview( void ) {
+	return R_EffectiveViewIDForSubview( tr.viewDef );
+}
+
 static ID_INLINE bool R_IsPortalSkyView( void ) {
 	return tr.viewDef != NULL && ( tr.viewDef->renderFlags & RF_PORTAL_SKY ) != 0;
 }
@@ -978,6 +1006,10 @@ extern idCVar r_bloomSoftKnee;			// relative bloom soft threshold knee
 extern idCVar r_bloomIntensity;			// bloom contribution scale
 extern idCVar r_bloomRadius;			// bloom sample radius scale
 extern idCVar r_bloomMipCount;			// number of bloom pyramid levels
+extern idCVar r_glowAlpha;
+extern idCVar r_glowAlphaChange;
+extern idCVar r_glowSteps;
+extern idCVar r_glowStrength;
 extern idCVar r_ssao;					// enable SSAO post-process
 extern idCVar r_ssaoRadius;			// SSAO sampling radius in view-space units
 extern idCVar r_ssaoBias;				// SSAO horizon bias in view-space units
@@ -1059,6 +1091,7 @@ extern idCVar r_logFile;				// number of frames to emit GL logs
 extern idCVar r_clear;					// force screen clear every frame
 extern idCVar r_shadows;				// enable shadows
 extern idCVar r_subviewOnly;			// 1 = don't render main view, allowing subviews to be debugged
+extern idCVar r_shaderLevel;			// Prey shaderLevel*/shaderFallback* stage gate
 extern idCVar r_lightScale;				// all light intensities are multiplied by this, which is normally 2
 extern idCVar r_lightDetailLevel;		// minimum light detailLevel to include in view lists
 extern idCVar r_flareSize;				// scale the flare deforms from the material def
@@ -1833,6 +1866,8 @@ DRAW_*
 
 void	R_ARB2_Init( void );
 void	RB_ARB2_DrawInteractions( void );
+void	RB_ARB2_DrawShaderInteraction( const drawInteraction_t *din, const shaderStage_t *surfaceStage,
+			const float *surfaceRegs, const float lightColor[4] );
 void	RB_ResetARB2InteractionHandoffBreadcrumb( void );
 void	RB_ResetAppleGL21RouteCounters( void );
 void	RB_ReportAppleGL21RouteCounters( void );
@@ -1870,6 +1905,7 @@ typedef enum {
 } vkMaterialProgramFamily_t;
 
 int		R_FindARBProgram( unsigned int target, const char *program );
+bool	R_ARBProgramUsesInteractionInputs( unsigned int target, const char *program );
 bool	R_IsARBProgramValid( unsigned int target, unsigned int ident );
 vkMaterialProgramFamily_t R_GetARBProgramFamily( unsigned int target, unsigned int ident );
 bool	R_BindARBProgram( unsigned int target, unsigned int ident, const char *usage, bool required );

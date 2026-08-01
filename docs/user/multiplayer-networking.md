@@ -1,6 +1,10 @@
 # Multiplayer Networking Guide
 
-This guide covers openQ4 multiplayer networking behavior and the cvars used to tune or revert prediction/lag-comp behavior.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
+This guide covers openPREY multiplayer networking behavior and the cvars used to tune or revert prediction/lag-comp behavior.
 
 ## Quick Summary
 

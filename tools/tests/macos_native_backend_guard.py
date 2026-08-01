@@ -380,7 +380,7 @@ def validate_objc_text_bridge_guards() -> None:
     require(sys_error, "[NSString stringWithCString:error encoding:NSISOLatin1StringEncoding]", "native macOS Sys_Error fallback encoding")
     require(sys_error, "if (formattedString == nil)", "native macOS Sys_Error formatting fallback")
     require(sys_error, "NSAlert *alert = [[NSAlert alloc] init];", "native macOS Sys_Error modern alert")
-    require(sys_error, '[alert setMessageText:@"openQ4 Error"];', "native macOS Sys_Error modern alert")
+    require(sys_error, '[alert setMessageText:@"openPREY Error"];', "native macOS Sys_Error modern alert")
     require(sys_error, "[alert setInformativeText:formattedString];", "native macOS Sys_Error modern alert")
     require(sys_error, "[alert setAlertStyle:NSAlertStyleCritical];", "native macOS Sys_Error modern alert")
     require(sys_error, "[alert runModal];", "native macOS Sys_Error modern alert")
@@ -388,7 +388,7 @@ def validate_objc_text_bridge_guards() -> None:
     require(sys_error, "[formattedString release];", "native macOS Sys_Error owned string release")
     reject(sys_error, "initWithFormat:[NSString stringWithUTF8String:error]", "native macOS Sys_Error nil format hazard")
     reject(sys_error, "NSRunAlertPanel", "native macOS deprecated alert API")
-    reject(sys_error, 'NSRunAlertPanel(@"openQ4 Error", formattedString', "native macOS Sys_Error alert format guard")
+    reject(sys_error, 'NSRunAlertPanel(@"openPREY Error", formattedString', "native macOS Sys_Error alert format guard")
 
     require(sys_print, "if ( text == NULL ) {", "native macOS Sys_Print null guard")
 
@@ -428,7 +428,7 @@ def validate_default_savepath_guards() -> None:
 
     require(default_savepath, 'candidate.AppendPath( "Library" );', "native macOS Application Support save path")
     require(default_savepath, 'candidate.AppendPath( "Application Support" );', "native macOS Application Support save path")
-    require(default_savepath, 'candidate.AppendPath( "openQ4" );', "native macOS product save path")
+    require(default_savepath, 'candidate.AppendPath( "openPREY" );', "native macOS product save path")
     require(default_savepath, 'Sys_SetUsableMacOSSavePath( candidate, "Application Support" )', "native macOS verified save path")
     require(default_savepath, "idStr cwd = Posix_Cwd();", "native macOS cwd save path fallback")
     require(default_savepath, 'Sys_SetUsableMacOSSavePath( cwd, "cwd fallback" )', "native macOS verified cwd save path fallback")

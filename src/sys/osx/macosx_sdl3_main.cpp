@@ -55,7 +55,7 @@ static int SDLCALL OpenQ4_Main(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-	static char emptyArg0[] = "openQ4";
+	static char emptyArg0[] = "openPREY";
 	char *emptyArgv[] = { emptyArg0, NULL };
 	if (argc <= 0 || argv == NULL) {
 		argc = 1;

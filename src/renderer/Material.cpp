@@ -68,6 +68,13 @@ typedef struct mtrParsingData_s {
 	bool			forceOverlays;
 } mtrParsingData_t;
 
+idCVar r_useFragmentProgramMaterials(
+	"r_useFragmentProgramMaterials",
+	"1",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"enable fragment-program material conditions and Prey interaction stages"
+);
+
 // `glslPrograms` is an authored material-capability condition, while
 // glConfig.GLSLProgramAvailable also advertises the OpenGL renderer's broad
 // post-processing and modern-feature surface. Vulkan implements the stock
@@ -85,6 +92,9 @@ static bool R_MaterialGLSLProgramsAvailable() {
 // families, so declarations must select their programmable branch even
 // though no OpenGL ARB program capability is advertised by this backend.
 static bool R_MaterialFragmentProgramsAvailable() {
+	if ( !r_useFragmentProgramMaterials.GetBool() ) {
+		return false;
+	}
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	return true;
 #else
@@ -298,6 +308,8 @@ void idMaterial::CommonInit() {
 	spectrum = 0;
 	polygonOffset = 0;
 	suppressInSubview = false;
+	subviewClass = SC_MIRROR;
+	directPortalDistance = -1;
 	refCount = 0;
 	portalSky = false;
 // jmarshall - quake 4
@@ -312,6 +324,15 @@ void idMaterial::CommonInit() {
 // jmarshall end
 
 	decalInfo.stayTime = 10000;
+	decalInfo.fadeTime = 4000;
+	decalInfo.start[0] = 1.0f;
+	decalInfo.start[1] = 1.0f;
+	decalInfo.start[2] = 1.0f;
+	decalInfo.start[3] = 1.0f;
+	decalInfo.end[0] = 0.0f;
+	decalInfo.end[1] = 0.0f;
+	decalInfo.end[2] = 0.0f;
+	decalInfo.end[3] = 0.0f;
 	decalInfo.maxAngle = 0.1f;
 }
 
@@ -482,10 +503,28 @@ static infoParm_t	infoParms[] = {
 	{"ikclip",		0,	0,	CONTENTS_IKCLIP },		// solid to IK
 	{"blood",		0,	0,	CONTENTS_BLOOD },		// used to detect blood decals
 	{"trigger",		0,	0,	CONTENTS_TRIGGER },		// used for triggers
-	{"projectileclip",	0,	0,	CONTENTS_PROJECTILECLIP },	// projectiles only
 	{"aassolid",	0,	0,	CONTENTS_AAS_SOLID },	// solid for AAS
 	{"aasobstacle",	0,	0,	CONTENTS_AAS_OBSTACLE },// used to compile an obstacle into AAS that can be enabled/disabled
 	{"flashlight_trigger",	0,	0,	CONTENTS_FLASHLIGHT_TRIGGER }, // used for triggers that are activated by the flashlight
+#ifdef HUMANHEAD
+	{"forcefield",	0,	0,	CONTENTS_FORCEFIELD },	// forcefield matter
+	{"forcefield_nobullets",	1,	SURFTYPE_FORCEFIELD,	CONTENTS_FORCEFIELD },
+	{"spiritbridge",0,	0,	CONTENTS_SPIRITBRIDGE },	// spirit-walk-only collision
+	{"blockradiusdamage",	0,	0,	CONTENTS_BLOCK_RADIUSDAMAGE },	// blocks splash damage
+	{"block_radiusdamage",	0,	0,	CONTENTS_BLOCK_RADIUSDAMAGE },	// compatibility alias
+	{"shootable",	0,	0,	CONTENTS_SHOOTABLE },	// bullets collide with but players can pass
+	{"deathvolume",	0,	0,	CONTENTS_DEATHVOLUME },	// instant-death zones
+	{"vehicleclip",	0,	0,	CONTENTS_VEHICLECLIP },	// solid to vehicles
+	{"ownertoowner",0,	0,	CONTENTS_OWNER_TO_OWNER },	// owner-to-owner collision override
+	{"owner_to_owner",0,	0,	CONTENTS_OWNER_TO_OWNER },	// compatibility alias
+	{"gameportal",	0,	0,	CONTENTS_GAME_PORTAL },	// game portal clipping
+	{"game_portal",0,	0,	CONTENTS_GAME_PORTAL },	// compatibility alias
+	{"shootablebyarrow",	0,	0,	CONTENTS_SHOOTABLEBYARROW },	// spirit-arrow-only collision
+	{"hunterclip",	0,	0,	CONTENTS_HUNTERCLIP },	// hunter-specific collision
+	{"shotclip",	0,	0,	CONTENTS_PROJECTILE },	// blocks hitscan shots
+	{"projectileclip",	0,	0,	CONTENTS_PROJECTILE },	// compatibility alias
+#else
+	{"projectileclip",	0,	0,	CONTENTS_PROJECTILECLIP },	// projectiles only
 	{"sightclip",	0,	0,	CONTENTS_SIGHTCLIP },	// blocks sight for actors and cameras
 	{"shotclip",	0,	0,	CONTENTS_PROJECTILE },	// blocks hitscan shots
 	{"largeshotclip",	0,	0,	CONTENTS_LARGESHOTCLIP },	// blocks large shots
@@ -493,6 +532,7 @@ static infoParm_t	infoParms[] = {
 	{"vehicleclip",	0,	0,	CONTENTS_VEHICLECLIP },	// solid to vehicles
 	{"flyclip",	0,	0,	CONTENTS_FLYCLIP },		// solid to vehicles
 	{"itemclip",	0,	0,	CONTENTS_ITEMCLIP },	// item collision
+#endif
 	{"nonsolid",	1,	0,	0 },					// clears the solid flag
 	{"nullNormal",	0,	SURF_NULLNORMAL,0 },		// renderbump will draw as 0x80 0x80 0x80
 
@@ -522,6 +562,15 @@ static infoParm_t	infoParms[] = {
 	{"cardboard",	0,	SURFTYPE_CARDBOARD,	0 },	// cardboard
 	{"liquid",		0,	SURFTYPE_LIQUID,	0 },	// liquid
 	{"glass",		0,	SURFTYPE_GLASS,		0 },	// glass
+#ifdef HUMANHEAD
+	{"tile",		0,	SURFTYPE_TILE,		0 },	// tile
+	{"wallwalk",	0,	SURFTYPE_WALLWALK,	0 },	// wallwalk
+	{"altmetal",	0,	SURFTYPE_ALTMETAL,	0 },	// alternate metal
+	{"forcefield",	0,	SURFTYPE_FORCEFIELD,0 },	// forcefield
+	{"pipe",		0,	SURFTYPE_PIPE,		0 },	// pipe
+	{"spirit",		0,	SURFTYPE_SPIRIT,	0 },	// spirit
+	{"chaff",		0,	SURFTYPE_CHAFF,		0 },	// chaff
+#else
 	{"plastic",		0,	SURFTYPE_PLASTIC,	0 },	// plastic
 	{"ricochet",	0,	SURFTYPE_RICOCHET,	0 },	// behaves like metal but causes a ricochet sound
 
@@ -532,6 +581,7 @@ static infoParm_t	infoParms[] = {
 	{"surftype13",	0,	SURFTYPE_13,	0 },
 	{"surftype14",	0,	SURFTYPE_14,	0 },
 	{"surftype15",	0,	SURFTYPE_15,	0 },
+#endif
 };
 
 static const int numInfoParms = sizeof(infoParms) / sizeof (infoParms[0]);
@@ -635,20 +685,17 @@ void idMaterial::ParseDecalInfo( idLexer &src ) {
 
 	// Quake 4 syntax: "decalInfo <staySeconds>, <maxAngle>".
 	if ( token == "," ) {
+		decalInfo.fadeTime = 0;
 		decalInfo.maxAngle = src.ParseFloat();
 		return;
 	}
 
-	// Legacy Doom 3 syntax compatibility:
+	// Retail Prey retains the Doom 3 syntax:
 	// "decalInfo <staySeconds> <fadeSeconds> ( <start rgba> ) ( <end rgba> )".
-	if ( token.type == TT_NUMBER || token == "." || token == "-" ) {
-		float dummy[4];
-		src.Parse1DMatrix( 4, dummy );
-		src.Parse1DMatrix( 4, dummy );
-		return;
-	}
-
 	src.UnreadToken( &token );
+	decalInfo.fadeTime = src.ParseFloat() * 1000;
+	src.Parse1DMatrix( 4, decalInfo.start );
+	src.Parse1DMatrix( 4, decalInfo.end );
 }
 
 /*
@@ -849,6 +896,10 @@ int idMaterial::ParseTerm( idLexer &src ) {
 		pd->registersAreConstant = false;
 		return EXP_REG_PARM11;
 	}
+	if ( !token.Icmp( "parm12" ) || !token.Icmp( "distance" ) ) {
+		pd->registersAreConstant = false;
+		return EXP_REG_PARM12;
+	}
 	if ( !token.Icmp( "global0" ) ) {
 		pd->registersAreConstant = false;
 		return EXP_REG_GLOBAL0;
@@ -882,7 +933,8 @@ int idMaterial::ParseTerm( idLexer &src ) {
 		return EXP_REG_GLOBAL7;
 	}
 	if ( !token.Icmp( "fragmentPrograms" ) ) {
-		return GetExpressionConstant( R_MaterialFragmentProgramsAvailable() ? 1.0f : 0.0f );
+		pd->registersAreConstant = false;
+		return EXP_REG_FRAGMENT_PROGRAMS;
 	}
 	if ( !token.Icmp( "glslPrograms" ) ) {
 		// Retail Quake 4 keeps glslPrograms as a runtime capability opcode so
@@ -890,6 +942,18 @@ int idMaterial::ParseTerm( idLexer &src ) {
 		// being folded to a parse-time constant.
 		pd->registersAreConstant = false;
 		return EmitOp( 0, 0, OP_TYPE_GLSL_ENABLED );
+	}
+	if ( !token.Icmp( "scopeView" ) ) {
+		pd->registersAreConstant = false;
+		return EXP_REG_SCOPE_VIEW;
+	}
+	if ( !token.Icmp( "spiritWalk" ) ) {
+		pd->registersAreConstant = false;
+		return EXP_REG_SPIRIT_WALK;
+	}
+	if ( !token.Icmp( "shuttleView" ) ) {
+		pd->registersAreConstant = false;
+		return EXP_REG_SHUTTLE_VIEW;
 	}
 	if ( !token.Icmp( "POTCorrectionX" ) ) {
 		const int width = Max( 1, glConfig.vidWidth );
@@ -1137,6 +1201,11 @@ void idMaterial::ParseBlend( idLexer &src, shaderStage_t *stage ) {
 	// blending combinations
 	if ( !token.Icmp( "blend" ) ) {
 		stage->drawStateBits = GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+		return;
+	}
+	if ( !token.Icmp( "shader" ) ) {
+		// Prey programmable shader stages accumulate their per-mask contribution.
+		stage->drawStateBits = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE;
 		return;
 	}
 	if ( !token.Icmp( "add" ) ) {
@@ -2021,6 +2090,31 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			ts->cinematic->InitFromFile( token.c_str(), true );
 			continue;
 		}
+		if ( !token.Icmp( "portalRenderMap" ) ) {
+			ts->dynamic = DI_PORTAL_RENDER;
+			ts->width = src.ParseInt();
+			ts->height = src.ParseInt();
+			ts->texgen = TG_SCREEN;
+			continue;
+		}
+		if ( !token.Icmp( "skyboxRenderMap" ) ) {
+			ts->dynamic = DI_SKYBOX_RENDER;
+			ts->width = src.ParseInt();
+			ts->height = src.ParseInt();
+			ts->texgen = TG_SCREEN;
+			continue;
+		}
+
+		if ( !token.Icmp( "profilemap" ) ) {
+			if ( !src.ReadToken( &token ) ) {
+				common->Warning( "missing parameter for 'profilemap' keyword in material '%s'", GetName() );
+				continue;
+			}
+			// Profile graphs use the same dynamic sound-window path as sound maps.
+			ts->cinematic = new idSndWindow();
+			ts->cinematic->InitFromFile( token.c_str(), true );
+			continue;
+		}
 
 		if ( !token.Icmp( "cubeMap" ) ) {
 			str = R_ParsePastImageProgram( src );
@@ -2076,6 +2170,10 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			td = R_ApplyMaterialHighQualityUsage( td, true );
 			continue;
 		}
+		if ( !token.Icmp( "highres" ) ) {
+			// Legacy authoring quality hint; modern image selection is automatic.
+			continue;
+		}
 		if ( !token.Icmp( "nopicmip" ) ) {
 			allowPicmip = false;
 			continue;
@@ -2115,6 +2213,12 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 				texGenRegisters[0] = ParseExpression( src );
 				texGenRegisters[1] = ParseExpression( src );
 				texGenRegisters[2] = ParseExpression( src );
+			} else if ( !token.Icmp( "screen" ) ) {
+				ts->texgen = TG_SCREEN;
+			} else if ( !token.Icmp( "screen2" ) ) {
+				ts->texgen = TG_SCREEN2;
+			} else if ( !token.Icmp( "glassWarp" ) ) {
+				ts->texgen = TG_GLASSWARP;
 			} else if ( !token.Icmp( "potCorrection" ) ) {
 				// Retail Quake 4 only needs explicit POT correction on hardware
 				// without NPOT textures; otherwise the stage stays on base coords.
@@ -2335,12 +2439,14 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 				newStage.vertexProgram = R_FindARBProgram( GL_VERTEX_PROGRAM_ARB, token.c_str() );
 				newStage.fragmentProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
 				newStage.md5rVertexProgram = R_FindMD5RVertexProgramForStageProgram( token.c_str() );
+				newStage.interactionProgram |= R_ARBProgramUsesInteractionInputs( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
 			}
 			continue;
 		}
 		if ( !token.Icmp( "fragmentProgram" ) ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
 				newStage.fragmentProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
+				newStage.interactionProgram |= R_ARBProgramUsesInteractionInputs( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
 			}
 			continue;
 		}
@@ -2350,6 +2456,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		if ( !token.Icmp( "fp20Program" ) ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
 				newStage.fragmentProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
+				newStage.interactionProgram |= R_ARBProgramUsesInteractionInputs( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
 			}
 			continue;
 		}
@@ -2418,6 +2525,64 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			ParseShaderTexture( src, &newStage );
 			continue;
 		}
+		if ( !token.Icmp( "glowStage" ) ) {
+			ss->glowStage = true;
+			continue;
+		}
+		if ( !token.Icmpn( "shaderlevel", 11 ) ) {
+			const char *suffix = token.c_str() + 11;
+			if ( suffix[0] < '1' || suffix[0] > '3' || suffix[1] != '\0' ) {
+				src.Warning( "bad shader level token '%s' in material '%s'", token.c_str(), GetName() );
+				SetMaterialFlag( MF_DEFAULTED );
+				return;
+			}
+			const int requestedLevel = suffix[0] - '0';
+			if ( r_shaderLevel.GetInteger() < requestedLevel || r_skipNewAmbient.GetBool() ) {
+				src.SkipBracedSection( false );
+				return;
+			}
+			continue;
+		}
+		if ( !token.Icmpn( "shaderfallback", 14 ) ) {
+			const char *suffix = token.c_str() + 14;
+			if ( suffix[0] < '1' || suffix[0] > '3' || suffix[1] != '\0' ) {
+				src.Warning( "bad shader fallback token '%s' in material '%s'", token.c_str(), GetName() );
+				SetMaterialFlag( MF_DEFAULTED );
+				return;
+			}
+			const int requestedLevel = suffix[0] - '0';
+			if ( r_shaderLevel.GetInteger() >= requestedLevel && !r_skipNewAmbient.GetBool() ) {
+				src.SkipBracedSection( false );
+				return;
+			}
+			continue;
+		}
+		if ( !token.Icmp( "specularExp" ) ) {
+			// Legacy fixed-function hint. Consume its authored value(s).
+			while ( src.ReadTokenOnLine( &token ) ) {
+			}
+			continue;
+		}
+		if ( !token.Icmp( "scopeView" ) || !token.Icmp( "notScopeView" ) ||
+				!token.Icmp( "spiritWalk" ) || !token.Icmp( "notSpiritWalk" ) || !token.Icmp( "shuttleView" ) ) {
+			int viewRegister;
+			bool invert = false;
+			if ( !token.Icmp( "scopeView" ) || !token.Icmp( "notScopeView" ) ) {
+				viewRegister = EXP_REG_SCOPE_VIEW;
+				invert = !token.Icmp( "notScopeView" );
+			} else if ( !token.Icmp( "spiritWalk" ) || !token.Icmp( "notSpiritWalk" ) ) {
+				viewRegister = EXP_REG_SPIRIT_WALK;
+				invert = !token.Icmp( "notSpiritWalk" );
+			} else {
+				viewRegister = EXP_REG_SHUTTLE_VIEW;
+			}
+			pd->registersAreConstant = false;
+			if ( invert ) {
+				viewRegister = EmitOp( viewRegister, GetExpressionConstant( 0.0f ), OP_TYPE_EQ );
+			}
+			ss->conditionRegister = EmitOp( ss->conditionRegister, viewRegister, OP_TYPE_AND );
+			continue;
+		}
 		if ( !token.Icmp( "customLighting" ) ) {
 			stageHasShaderTokens = true;
 			newStage.customLighting = true;
@@ -2436,6 +2601,9 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 	if ( newStage.fragmentProgram || newStage.vertexProgram || newStage.glslProgram ) {
 		ss->newStage = (newShaderStage_t *)Mem_Alloc( sizeof( newStage ) );
 		*(ss->newStage) = newStage;
+		if ( ss->newStage->interactionProgram ) {
+			ss->lighting = SL_INTERACTION;
+		}
 	}
 
 	ss->mNumStageRegisters = numRegisters - ss->mStageRegisterStart;
@@ -2515,6 +2683,33 @@ void idMaterial::ParseDeform( idLexer &src ) {
 		deform = DFRM_FLARE;
 		cullType = CT_TWO_SIDED;
 		deformRegisters[0] = ParseExpression( src );
+		SetMaterialFlag( MF_NOSHADOWS );
+		return;
+	}
+	if ( !token.Icmp( "beam" ) ) {
+		// Retail Prey uses beam as the authored synonym for Doom 3's tube deform.
+		deform = DFRM_TUBE;
+		cullType = CT_TWO_SIDED;
+		SetMaterialFlag( MF_NOSHADOWS );
+		return;
+	}
+	if ( !token.Icmp( "jitter" ) ) {
+		// Obsolete fixed-function effect. Consume all same-line parameters so the
+		// declaration remains aligned and render the undeformed geometry.
+		while ( src.ReadTokenOnLine( &token ) ) {
+		}
+		deform = DFRM_NONE;
+		return;
+	}
+	if ( !token.Icmp( "corona" ) ) {
+		deform = DFRM_CORONA;
+		cullType = CT_TWO_SIDED;
+		if ( src.ReadTokenOnLine( &token ) ) {
+			src.UnreadToken( &token );
+			deformRegisters[0] = ParseExpression( src );
+		} else {
+			deformRegisters[0] = GetExpressionConstant( 1.0f );
+		}
 		SetMaterialFlag( MF_NOSHADOWS );
 		return;
 	}
@@ -2730,6 +2925,15 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		else if ( CheckSurfaceParm( &token ) ) {
 			continue;
 		}
+		// Prey content metadata: "matter_*" aliases to surface type names.
+		else if ( !token.Icmpn( "matter_", 7 ) ) {
+			idToken matterToken;
+			matterToken = token.c_str() + 7;
+			if ( matterToken.Length() > 0 ) {
+				CheckSurfaceParm( &matterToken );
+			}
+			continue;
+		}
 
 
 		// polygonOffset
@@ -2765,9 +2969,36 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			SetMaterialFlag( MF_NEED_CURRENT_RENDER );
 			continue;
 		}
+		else if ( !token.Icmp( "skipClip" ) || !token.Icmp( "noseethru" ) ||
+				!token.Icmp( "lightWholeMesh" ) ) {
+			// Legacy Prey editor/authoring metadata with no runtime effect.
+			continue;
+		}
 // jmarshall end
 		else if ( !token.Icmp( "suppressInSubview" ) ) {
 			suppressInSubview = true;
+			continue;
+		}
+		else if ( !token.Icmp( "directportal" ) ) {
+			directPortalDistance = ParseExpression( src );
+			sort = SS_SUBVIEW;
+			subviewClass = SC_PORTAL;
+			coverage = MC_OPAQUE;
+			SetMaterialFlag( MF_NOSHADOWS );
+			idToken discreteToken;
+			discreteToken = "discrete";
+			CheckSurfaceParm( &discreteToken );
+			continue;
+		}
+		else if ( !token.Icmp( "skyboxportal" ) ) {
+			src.SkipRestOfLine();
+			sort = SS_SUBVIEW;
+			subviewClass = SC_PORTAL_SKYBOX;
+			coverage = MC_OPAQUE;
+			SetMaterialFlag( MF_NOSHADOWS );
+			idToken discreteToken;
+			discreteToken = "discrete";
+			CheckSurfaceParm( &discreteToken );
 			continue;
 		}
 // jmarshall
@@ -3018,13 +3249,14 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			continue;
 		}
 		// DECAL_MACRO for backwards compatibility with the preprocessor macros
-		else if ( !token.Icmp( "DECAL_MACRO" ) ) {
+		else if ( !token.Icmp( "DECAL_MACRO" ) || !token.Icmp( "decal_alphatest_macro" ) ||
+				!token.Icmp( "scorch_macro" ) ) {
 			// polygonOffset
 			SetMaterialFlag( MF_POLYGONOFFSET );
 			polygonOffset = 1;
 
-			// notfix
-			surfaceFlags |= SURF_NO_T_FIX;
+			// keep separately clipped decal geometry
+			surfaceFlags |= SURF_DISCRETE;
 			contentFlags &= ~CONTENTS_SOLID;
 
 			// sort decal
@@ -3032,6 +3264,17 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 
 			// noShadows
 			SetMaterialFlag( MF_NOSHADOWS );
+			coverage = MC_TRANSLUCENT;
+			continue;
+		}
+		else if ( !token.Icmp( "overlay_macro" ) ) {
+			// Authored metadata; unlike decal macros this does not change coverage.
+			continue;
+		}
+		else if ( !token.Icmp( "skipClip" ) || !token.Icmp( "glass_macro" ) ||
+				!token.Icmp( "skybox_macro" ) || !token.Icmp( "seeThru" ) ||
+				!token.Icmp( "noSeeThru" ) ) {
+			// Legacy authoring macros whose declarations already contain stages.
 			continue;
 		}
 		else if ( token == "{" ) {
@@ -3499,6 +3742,7 @@ void idMaterial::EvaluateRegisters( float *registers, const float shaderParms[MA
 	registers[EXP_REG_PARM9] = shaderParms[9];
 	registers[EXP_REG_PARM10] = shaderParms[10];
 	registers[EXP_REG_PARM11] = shaderParms[11];
+	registers[EXP_REG_PARM12] = shaderParms[12];
 	registers[EXP_REG_GLOBAL0] = view->renderView.shaderParms[0];
 	registers[EXP_REG_GLOBAL1] = view->renderView.shaderParms[1];
 	registers[EXP_REG_GLOBAL2] = view->renderView.shaderParms[2];
@@ -3508,6 +3752,10 @@ void idMaterial::EvaluateRegisters( float *registers, const float shaderParms[MA
 	registers[EXP_REG_GLOBAL6] = view->renderView.shaderParms[6];
 	registers[EXP_REG_GLOBAL7] = view->renderView.shaderParms[7];
 	registers[EXP_REG_VERTEX_RANDOM] = shaderParms[SHADERPARM_DIVERSITY];
+	registers[EXP_REG_FRAGMENT_PROGRAMS] = R_MaterialFragmentProgramsAvailable() ? 1.0f : 0.0f;
+	registers[EXP_REG_SCOPE_VIEW] = renderSystem->IsScopeView() ? 1.0f : 0.0f;
+	registers[EXP_REG_SPIRIT_WALK] = renderSystem->IsSpiritWalkView() ? 1.0f : 0.0f;
+	registers[EXP_REG_SHUTTLE_VIEW] = renderSystem->IsShuttleView() ? 1.0f : 0.0f;
 
 	op = ops;
 	for ( i = 0 ; i < numOps ; i++, op++ ) {
@@ -3616,6 +3864,7 @@ void idMaterial::EvaluateStageRegisters( int stageIndex, float *registers,
 	registers[EXP_REG_PARM9] = shaderParms[9];
 	registers[EXP_REG_PARM10] = shaderParms[10];
 	registers[EXP_REG_PARM11] = shaderParms[11];
+	registers[EXP_REG_PARM12] = shaderParms[12];
 	registers[EXP_REG_GLOBAL0] = 0.0f;
 	registers[EXP_REG_GLOBAL1] = 0.0f;
 	registers[EXP_REG_GLOBAL2] = 0.0f;
@@ -3625,6 +3874,10 @@ void idMaterial::EvaluateStageRegisters( int stageIndex, float *registers,
 	registers[EXP_REG_GLOBAL6] = 0.0f;
 	registers[EXP_REG_GLOBAL7] = 0.0f;
 	registers[EXP_REG_VERTEX_RANDOM] = shaderParms[SHADERPARM_DIVERSITY];
+	registers[EXP_REG_FRAGMENT_PROGRAMS] = R_MaterialFragmentProgramsAvailable() ? 1.0f : 0.0f;
+	registers[EXP_REG_SCOPE_VIEW] = 0.0f;
+	registers[EXP_REG_SPIRIT_WALK] = 0.0f;
+	registers[EXP_REG_SHUTTLE_VIEW] = 0.0f;
 
 	op = ops + stage->mStageOpsStart;
 	for ( i = 0 ; i < stage->mNumStageOps ; i++, op++ ) {

@@ -16,9 +16,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-READY_MARKER = "OPENQ4_DEDICATED_SMOKE_READY"
+READY_MARKER = "OPENPREY_DEDICATED_SMOKE_READY"
 REQUIRED_MARKERS = (
-    "Selected game module: logical='game_mp'",
+    "Selected game module: logical='game'",
     "------------- Initializing Game -------------",
     "game initialized.",
     READY_MARKER,
@@ -45,13 +45,13 @@ def host_arch_tag() -> str:
 
 
 def create_minimal_base(base_path: Path) -> Path:
-    q4base = base_path / "q4base"
-    q4base.mkdir(parents=True, exist_ok=False)
-    pak_path = q4base / "pak001.pk4"
+    prey_base = base_path / "base"
+    prey_base.mkdir(parents=True, exist_ok=False)
+    pak_path = prey_base / "pak000.pk4"
     with zipfile.ZipFile(pak_path, "w", compression=zipfile.ZIP_STORED) as archive:
         archive.writestr(
-            "openq4-dedicated-smoke.txt",
-            "Generated test-only media marker; contains no proprietary Quake 4 data.\n",
+            "openprey-dedicated-smoke.txt",
+            "Generated test-only media marker; contains no proprietary Prey data.\n",
         )
     return pak_path
 
@@ -72,7 +72,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--install-root",
         type=Path,
         default=ROOT / ".install",
-        help="Staged package root containing the Linux dedicated server and baseoq4 module.",
+        help="Staged package root containing the Linux dedicated server and basepr module.",
     )
     parser.add_argument(
         "--output-root",
@@ -95,20 +95,20 @@ def main(argv: list[str]) -> int:
 
     arch = args.arch or host_arch_tag()
     install_root = args.install_root.resolve()
-    executable = (args.executable or install_root / f"openQ4-ded_{arch}").resolve()
-    game_module = install_root / "baseoq4" / f"game-mp_{arch}.so"
+    executable = (args.executable or install_root / f"openPREY-ded_{arch}").resolve()
+    game_module = install_root / "basepr" / f"game_{arch}.so"
 
     if not executable.is_file():
         raise RuntimeError(f"dedicated-server executable not found: {executable}")
     if not os.access(executable, os.X_OK):
         raise RuntimeError(f"dedicated-server executable is not executable: {executable}")
     if not game_module.is_file():
-        raise RuntimeError(f"multiplayer game module not found: {game_module}")
+        raise RuntimeError(f"unified game module not found: {game_module}")
 
-    packaged_q4base = install_root / "q4base"
-    if packaged_q4base.is_dir() and any(path.is_file() for path in packaged_q4base.rglob("*")):
+    packaged_retail_base = install_root / "base"
+    if packaged_retail_base.is_dir() and any(path.is_file() for path in packaged_retail_base.rglob("*")):
         raise RuntimeError(
-            f"refusing assetless smoke because the staged package contains q4base files: {packaged_q4base}"
+            f"refusing assetless smoke because the staged package contains retail base files: {packaged_retail_base}"
         )
 
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -127,10 +127,10 @@ def main(argv: list[str]) -> int:
         "+set", "fs_homepath", str(home_path),
         "+set", "fs_savepath", str(home_path),
         "+set", "fs_devpath", str(install_root),
-        "+set", "fs_game", "baseoq4",
+        "+set", "fs_game", "basepr",
         "+set", "fs_validateOfficialPaks", "0",
         "+set", "g_allowAssetlessStartup", "1",
-        "+set", "si_gameType", "dm",
+        "+set", "si_gameType", "deathmatch",
         "+set", "s_noSound", "1",
         "+set", "net_serverDedicated", "1",
         "+set", "logFile", "2",

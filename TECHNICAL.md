@@ -1,8 +1,4 @@
-<div align="center">
-
-# openQ4 Technical Reference
-
-</div>
+# openPREY Technical Reference
 
 This document covers technical details for advanced users and developers: compatibility status, file layout, configuration cvars, asset validation, build dependencies, versioning, and the SDK/game library structure.
 
@@ -12,256 +8,245 @@ For installation and a feature overview, see the [README](README.md). For buildi
 
 ## Table of Contents
 
-- [Quake 4 Compatibility Status](#quake-4-compatibility-status)
+- [Prey Compatibility Status](#prey-compatibility-status)
 - [Game Directory Structure](#game-directory-structure)
 - [Asset Validation](#asset-validation)
 - [Advanced Configuration](#advanced-configuration)
-- [Mod Manifests](#mod-manifests)
+- [Light Grids](#light-grids)
 - [SDK and Game Library](#sdk-and-game-library)
 - [Dependencies](#dependencies)
 - [Versioning](#versioning)
 
 ---
 
-## Quake 4 Compatibility Status
+## Prey Compatibility Status
 
-This status reflects compatibility with official Quake 4 assets (`q4base` PK4s), not proprietary game DLL compatibility.
+This status reflects compatibility with official Prey (2006) assets, not binary interchangeability with proprietary retail DLLs.
 
-### Compatible
+### Landed
 
-- ✅ **Basic Set of Effects (BSE) Reconstruction**: Core BSE runtime behavior rebuilt and integrated so stock effects execute through the openQ4 engine/game pipeline
-- ✅ **Sound Shaders**: Effect-driven sound shader paths restored, including effect sound capability checks and runtime playback behavior
-- ✅ **Screen Effects**: BSE-driven screen/camera effect paths used by stock content are operational
-- ✅ **Material Shaders**: Material handling compatibility restored to remove startup reliance on custom `q4base` material overrides
-- ✅ **Modern Display Handling**: Automatic aspect-ratio/FOV behavior, multi-monitor targeting, and desktop-native fullscreen paths integrated
-- ✅ **Steam Deck Runtime Path**: Linux SDL3 backend, controller/menu integration, and a dedicated `openQ4-steamdeck` launcher/profile are in place as of March 30, 2026
-- ✅ **Stock-Asset Validation Path**: Repeated validation loops with stock assets keep parser/runtime compatibility regressions visible and actionable
-- ✅ **Door/Trigger Script Progression Stability (OpenD3 Parity)**: Right-associative script compiler pointer-temp handling guards x64 storage width mismatches, preventing interpreter write corruption in affected trigger/door event chains
+- ✅ **Project Rebrand Completed** — Meson project metadata, staged binaries, VS Code launch settings, and documentation use openPREY naming throughout
+- ✅ **Prey Install Discovery** — `fs_basepath` auto-detection targets Prey registry/App Paths/uninstall metadata and known legacy install roots; Steam/GOG assumptions removed
+- ✅ **Unified Game Module Loader** — Engine builds and stages a unified `game_<arch>` module under `basepr/` for both SP and MP paths
+- ✅ **Companion Repo Tooling** — Meson stages canonical `OpenPrey-game` sources directly and builds one unified module
+- ✅ **Official PK4 Layout Validation** — Engine startup rejects missing or modified required base-pack layouts when `fs_validateOfficialPaks 1` is enabled
+- ✅ **Cross-host Meson Support** — Source selection, dependency wiring, and packaging tooling cover Windows, Linux, and macOS hosts; active CI currently covers the core x64 lanes
+- ✅ **Precomputed Light-Grid Irradiance** — Portal-area light grids can be loaded, baked, visualized, and applied as an indirect-diffuse pass in the renderer
 
 ### In Progress
 
-- ❌ **Ongoing Compatibility Sweep**: Additional map-by-map gameplay validation remains in progress to catch residual regressions
+- ❌ **Stock-asset SP/MP Smoke Validation** — Default staged launch flow is still being verified across single-player and multiplayer startup cases
+- ❌ **Prey Gameplay Bring-up** — Canonical `OpenPrey-game` integration is implemented; retail runtime verification continues during the migration
+- ❌ **Particle and FX Compatibility** — Doom 3 / Prey-era declarations and runtime paths are restored, with retail parity checks still pending
+- ❌ **Cross-host Runtime Validation** — Windows remains the deepest runtime-validation path while Linux/macOS map validation is extended
 
-Current known regressions and follow-up work are tracked in [TODO.md](TODO.md) and [docs/dev/release-completion.md](docs/dev/release-completion.md).
+### Not Yet Claimed
+
+- **Full Campaign Completion** — The project does not yet claim end-to-end single-player completion against stock assets
+- **Multiplayer Parity** — Multiplayer compatibility remains under active validation
+
+Current follow-up work is tracked in [TODO.md](TODO.md) and [docs/dev/release-completion.md](docs/dev/release-completion.md).
 
 ---
 
 ## Game Directory Structure
 
 ```
-openQ4/
-├── openQ4-client_x64      # Main executable (.exe on Windows)
-├── openQ4-ded_x64         # Dedicated server (.exe on Windows)
-├── openQ4-steamdeck       # Linux Steam Deck launcher
-└── baseoq4/               # Unified game directory
-    ├── pak0.pk4           # Core openQ4 runtime content
-    ├── pak1.pk4           # Level-related openQ4 content
-    ├── game-sp_x64        # Single-player module (.dll / .so / .dylib)
-    └── game-mp_x64        # Multiplayer module (.dll / .so / .dylib)
+.install/
+├── openPREY-client_x64      # Main executable (.exe on Windows)
+├── openPREY-ded_x64         # Dedicated server (.exe on Windows)
+├── OpenAL32.dll             # (Windows) optional bundled runtime
+└── basepr/
+    ├── game_x64             # Unified game module (.dll / .so / .dylib)
+    ├── pak0.pk4             # openPREY code/config/text content
+    ├── pak1.pk4             # openPREY binary assets
+    └── mod.json
 ```
 
-- **Single-player**: loads `game-sp_<arch>`
-- **Multiplayer**: loads `game-mp_<arch>`
-- **BSE runtime**: linked directly into `openQ4-client_<arch>`; dedicated server builds keep a disabled/stub path
-- **Source-owned runtime content**: author core runtime overrides in `content/baseoq4/pak0/` and level-related content in `content/baseoq4/pak1/`
-- **Generated staging output**: treat `.install/baseoq4/` as build output, not an editing target
-- **Runtime identity**: the in-game directory remains `baseoq4/` even though the repo source path now lives under `content/baseoq4/`
-- No separate mod folders or manual mode switching required
+- **Single-player**: loads `game_<arch>` from `basepr/`
+- **Multiplayer**: loads the same unified `game_<arch>` module
+- **Legacy compatibility**: `gamex86` / `gamex64` aliases are still accepted during migration
 
 ---
 
 ## Asset Validation
 
-openQ4 automatically validates your Quake 4 installation to ensure you have legitimate, unmodified media files.
+openPREY automatically validates your Prey installation at startup to confirm the required official base packs are present and unmodified.
 
 **How it works:**
-1. Engine validates required official `q4base` media PK4 checksums at startup
-2. Refuses to run if required assets are missing or modified
-3. Ignores retail game-binary PK4 archives such as `game000.pk4` through `game300.pk4` and `gamex*.pk4` because openQ4 ships its own game modules
-4. Allows optional official patch/menu and language PK4s when present without making them startup requirements
-5. Auto-discovers your installation (checks Steam, GOG, or current directory)
+
+1. Engine scans the detected `base/` pack set
+2. Chooses the required layout to validate against:
+   - Classic retail naming (`pak000.pk4` ... `pak004.pk4`)
+   - Consolidated retail naming (`pak_data.pk4`, `pak_sound.pk4`, `pak_en_v.pk4`, `pak_en_t.pk4`)
+3. Strictly checks known consolidated-layout checksums; classic-layout packs remain
+   presence-only until independently verified CD-era checksums are recorded
 
 **Configuration:**
-- `fs_validateOfficialPaks 1` (default) — Enable asset validation
-- See [official-pk4-checksums.md](docs/dev/official-pk4-checksums.md) for the checksum reference
+
+- `fs_validateOfficialPaks 1` (default) — enable asset validation
+- See [docs/dev/prey-rebase/official-pk4-checksums.md](docs/dev/prey-rebase/official-pk4-checksums.md) for the full checksum reference
 
 ---
 
 ## Advanced Configuration
 
-<details>
-<summary><b>Display and Graphics Settings</b></summary>
+### Display and Graphics
 
-### Multi-Monitor Support
-- `r_screen -1` — Auto-detect current display (default)
-- `r_screen 0..N` — Select specific monitor
-- Use `listDisplays` console command to see available monitors
+#### Multi-Monitor Support
 
-### Display Modes
-- `r_fullscreen 0|1` — Toggle fullscreen
-- `r_fullscreenDesktop 1` — Desktop native fullscreen (default)
-- `r_fullscreenDesktop 0` — Exclusive fullscreen (uses `r_mode`)
-- `r_borderless` — Borderless windowed mode
-- Use `listDisplayModes [displayIndex]` to see available modes
+- `r_screen -1` — auto-detect current display (default)
+- `r_screen 0..N` — select a specific monitor
+- `listDisplays` — list available monitor indices in the console
+- `listDisplayModes [displayIndex]` — list available exclusive fullscreen modes for a display
 
-### Window Settings
-- `r_windowWidth` / `r_windowHeight` — Window dimensions
-- Aspect ratio, FOV behavior, and UI framing are automatically derived from render size
+#### Display Modes
 
-### Rendering and Post-Processing
-- `r_bloom 0|1` — Toggle bloom post-processing
-- `r_hdrToneMap 0|1` — Toggle HDR filmic tone mapping and color correction
-- `r_ssao 0|1` — Toggle screen-space ambient occlusion
-- `r_crt 0|1` — Toggle CRT emulation post-processing
-- `r_crtChromatic` — Optional CRT channel convergence offset; defaults to `0` and is capped to a subtle range to avoid global RGB edge artifacts
-- `r_useShadowMap 0|1` — Enable the experimental shadow-map path
-- `r_shadowMapCSM 0|1` — Enable projected-light cascaded shadow maps (when shadow maps are active)
-- `r_shadowMapHashedAlpha 0|1` — Hashed alpha testing for cutout/perforated shadow casters
-- `r_shadowMapTranslucentMoments 0|1` — Experimental blended/translucent shadow overlay
-- `r_stencilTranslucentShadows 0|1` — Let translucent materials cast and receive stencil shadows in the classic shadow-volume path (`regenerateWorld` or a map reload is required after toggling)
-- `r_softParticles 0|1` — Enable optional depth-faded BSE particles so smoke/dust and additive bursts fade against solid scene depth
-- `r_softParticleFadeDistance` — World-unit fade distance used when `r_softParticles` is enabled (default `64`)
-- `r_enhancedMaterials 0|1` — Route eligible stock material interactions through the enhanced GLSL shading path; animated, deformed, and packed character geometry remains on the classic ARB2 interaction path for visual parity
-- `r_enhancedMaterialNormalScale` — Boost tangent-space normal detail when enhanced materials are active
-- `r_enhancedMaterialSpecularBoost` — Increase specular intensity when enhanced materials are active
-- `r_enhancedMaterialFresnel` — Add grazing-angle fresnel to existing materials when enhanced materials are active
-- `r_useRepeatedStateReuse 0|1` — Keep model-space skinned snapshots across transform-only entity updates so repeated-state presentation frames skip CPU re-skinning (default `1`; reuse hits show as `snapshotsReused` under `r_showUpdates 1`)
-- `r_useRedundantStateFiltering 0|1` — Skip redundant legacy-backend GL calls (repeated program env parameters, vertex attrib array toggles, and vertex/index buffer rebinds); default `1`
-- `com_forceGenericSIMD 0|1` — Force the generic scalar math path instead of the SSE2 SIMD processor used for skinning, shadow, and bounds math on x86-64 (default `0`)
-- `r_hdrAutoExposureAsync 0|1` — Read the HDR auto-exposure luminance sample back asynchronously with one frame of latency instead of stalling the GPU pipeline every frame (default `1`)
-- See [docs/user/shadow-mapping.md](docs/user/shadow-mapping.md) for the full shadow-map CVar reference, presets, transparency behavior, and debug modes
+- `r_fullscreen 0|1` — windowed vs fullscreen
+- `r_fullscreenDesktop 1` — desktop-native fullscreen (default, recommended)
+- `r_fullscreenDesktop 0` — exclusive fullscreen (uses `r_mode`/`r_custom*`)
+- `r_mode -2` — request native desktop resolution for fullscreen mode selection
+- `r_borderless 1` — borderless window when `r_fullscreen 0`
 
-### Resolution Scaling
-- `r_screenFraction` — `10..200`; values below `100` reduce or simulate reduced resolution, while values above `100` supersample the root scene in a single-sample offscreen target and resolve to the native back buffer
-- `r_resolutionScaleMode 0` — Legacy cropped viewport scaling below native resolution
-- `r_resolutionScaleMode 1` — Bilinear fullscreen upscale
-- `r_resolutionScaleMode 2` — High-quality fullscreen upscale + sharpening
-- `r_resolutionScaleSharpness` — HQ sharpen strength (`0.0` to `1.5`)
+#### Windowed Sizing
 
-### Shader Compatibility
-- `r_interactionColorMode` — Interaction shader mode (`0` auto, `1` packed env16.xy, `2` vector env16/env17)
-- `r_shaderReport 1` — Print shader summaries after startup and `vid_restart`
-- `r_shaderReport 2` — Also warn when invalid ARB programs are skipped at runtime
-- `reportShaderPrograms` — Print current ARB program validity plus material/shadow GLSL load state
+- `r_windowWidth` / `r_windowHeight` — window size when running windowed
+- `win_xpos` / `win_ypos` — window position (updated automatically when you move the window)
+- Agent and CI validation runs should always force `+set r_fullscreen 0`
 
-</details>
+See [docs/user/display-settings.md](docs/user/display-settings.md) for the full display reference.
 
-<details>
-<summary><b>Input and Controller Settings</b></summary>
+### File System and Validation
 
-### Controller Support
-- `in_joystick` — Enable/disable gamepad input
-- `in_joystickDeadZone` — Radial analog stick dead zone
-- `in_joystickLookSensitivity` — Controller look speed scale
-- `in_joystickLookCurve` — Controller look response curve
-- `in_joystickMoveCurve` — Controller movement response curve
-- `in_joystickInvertLook` — Invert controller look pitch
-- `in_joystickSouthpaw` — Swap movement and look sticks
-- `in_joystickTriggerThreshold` — Trigger sensitivity
-- `in_joystickRumble` / `in_joystickRumbleScale` — Enable and scale controller rumble
-- `com_platformProfile` — Startup profile selector (`default` or `steamdeck`)
+#### Path Variables
 
-### Features
-- Hotplug support — connect or disconnect a controller at any time
-- Dual-stick analog movement and look with radial dead-zone shaping
-- Full button mapping support
-- `K_JOY7` and `K_JOY8` both open the in-game menu
+- `fs_basepath` — detected Prey install root (auto-discovered)
+- `fs_homepath` — writable user path
+- `fs_savepath` — save/config/log path (defaults to `fs_homepath`)
+- `fs_game` — active game directory (`basepr`)
+- `fs_cdpath` — locked runtime overlay path; use `.install/` as launch dir for testing
 
-</details>
+#### Path Discovery Order
 
-<details>
-<summary><b>File System Paths</b></summary>
-
-### Path Discovery Order
-1. Override (if specified via cvar or command line)
+1. Valid `fs_basepath` override if set via cvar or command line
 2. Current working directory
-3. Steam installation
-4. GOG installation
+3. Windows registry install entries (vendor keys, App Paths, uninstall metadata)
+4. Known legacy CD-era install roots (`Human Head Studios/Prey`, `2K Games/Prey`, `Games/Prey`)
 
-On Linux, Steam auto-discovery checks `~/.steam/steam`, `~/.local/share/Steam`, and the Flatpak Steam root at `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`, then expands any extra libraries listed in `libraryfolders.vdf`.
+#### Manual Path Configuration
 
-### Path Variables
-- `fs_basepath` — Game installation directory (auto-detected)
-- `fs_homepath` — Writable user directory
-- `fs_savepath` — Save games and configs (defaults to `fs_homepath`)
-- `fs_cdpath` — Locked runtime overlay path (use `.install/` as launch dir for testing)
-
-### Manual Path Configuration
-
-If your Quake 4 installation is not auto-detected, launch with:
+If your Prey installation is not auto-detected, launch with:
 
 ```
-openQ4-client_x64 +set fs_basepath "C:\path\to\Quake 4"
+openPREY-client_x64 +set fs_basepath "C:\path\to\Prey"
 ```
 
-</details>
+### Debugging and Local Validation
 
-### Crash Diagnostics
+**Recommended local validation loop:**
 
-On Windows, openQ4 installs an unhandled-exception crash handler in packaged and local builds. Crashes write `openq4_crash_*.log` and `openq4_crash_*.dmp` files under a `crashes/` directory beside the executable, for example `.install/crashes/` when launching from the staged package root. Public Windows release packages include matching PDB diagnostic symbols so those dumps can be symbolized.
+1. Launch from `.install/` in windowed mode:
+   ```powershell
+   .\openPREY-client_x64.exe +set fs_game basepr +set fs_savepath ..\.home +set logFile 2 +set logFileName logs/openprey.log +set r_fullscreen 0
+   ```
+2. Inspect `.home\logs\openprey.log` after each run
+3. Fix warnings and errors in engine/game/parser/loader code before resorting to content-side workarounds
+
+**Build automation helpers:**
+
+- `tools/build/meson_setup.ps1` auto-detects and initialises the Visual Studio developer environment
+- `compile -C builddir` auto-runs `setup --wipe` if the build directory is missing or invalid
+- `tools/build/openprey_devcmd.cmd` is available as a reusable MSVC developer shell
 
 ---
 
-## Mod Manifests
+## Light Grids
 
-Runnable openQ4 mods require a `mod.json` file in the root of the mod directory. This applies to `baseoq4/` as well as any external mod folder selected through the mod menu or requested by multiplayer auto-restart.
+openPREY supports idTech 4-style precomputed irradiance volumes for indirect diffuse lighting. Runtime data is stored in two parts:
 
-The manifest is a flat JSON object with these required string fields:
+- `maps/<map>.lightgrid` — probe layout, atlas metadata, and per-area light-grid parameters
+- `env/maps/<map>/area*_lightgrid_amb.tga` — baked irradiance atlas images, typically one per populated portal area
 
-- `name`
-- `version`
-- `releaseDate`
-- `website`
-- `author`
-- `requiredopenQ4Version`
+### Baking
 
-`requiredopenQ4Version` is matched against the current openQ4 engine version. Mods without a manifest, or with a mismatched required engine version, are hidden from the mod menu and rejected for automatic mod switching.
+Run baking from a staged `.install/` launch against a valid Prey asset install and always force windowed mode:
 
-Game modules are optional for mods. At runtime, openQ4 first checks the selected mod directory for the active `game-sp_<arch>` or `game-mp_<arch>` module; if it is not present, the engine falls back to the matching module in `baseoq4/`. Content-only mods therefore need a compatible `mod.json` and their content files, not copied openQ4 dynamic libraries. Mods that intentionally ship custom game code can still provide their own module in the mod directory.
-
-Example:
-
-```json
-{
-  "name": "openQ4",
-  "version": "0.1.010",
-  "releaseDate": "2026-04-14",
-  "website": "https://www.darkmatter-quake.com",
-  "author": "themuffinator / DarkMatter Productions",
-  "requiredopenQ4Version": "0.1.010"
-}
+```powershell
+.\openPREY-client_x64.exe +set fs_game basepr +set fs_savepath ..\.home +set r_fullscreen 0 +bakeLightGrids game/roadhouse force
 ```
+
+Command form:
+
+```text
+bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<num>] [size<num>] [blends<num>] [samples<num>] [separateAreas] [grid ( x y z )]
+```
+
+Important options:
+
+- `all` — bake every discovered map, single-player first and then multiplayer
+- `all-mp` — bake only multiplayer maps
+- `force` — remove existing `.lightgrid` and atlas outputs before rebaking
+- `-quit` — exit automatically after the bake batch completes
+- `limit<num>` — cap the number of generated probes for a bake pass
+- `bounce<num>` — number of diffuse bounces to integrate
+- `size<num>` — per-probe capture resolution
+- `blends<num>` — atlas blend samples per probe
+- `samples<num>` — supersample count per capture
+- `separateAreas` — regenerate per-area layouts during baking to reduce peak memory use
+- `grid ( x y z )` — override probe spacing in world units
+
+### Runtime and Debugging
+
+- `r_useLightGrid 1` — enable the indirect-diffuse light-grid pass
+- `r_showLightGrid 0..3` — visualize probe placement by area
+- `r_forceAmbient <value>` — lift the final scene toward a minimum brightness floor
+- `r_lightGridBakeWorkers` — control CPU worker count during baking
+- `r_lightGridBakeAsyncReadback 0|1` — enable async GPU readback when supported
+- `r_lightGridBakeMemoryMB` — cap transient bake memory usage
+- `r_lightGridBakeReadbackSlots` — control async readback buffer count
+
+Use `r_showLightGrid 1` to inspect only the current portal area, `2` to draw valid probes in all areas, and `3` to include invalid probe locations as well.
 
 ---
 
 ## SDK and Game Library
 
-The game code is derived from the [Quake 4 SDK](https://www.moddb.com/games/quake-4/downloads/quake-4-sdk-v15) and maintained in the companion [openQ4-game](https://github.com/themuffinator/openQ4-game) repository. The SDK is subject to id Software's EULA, which permits modification for use with Quake 4 and non-commercial distribution of modifications, but prohibits commercial use and standalone game creation. For complete terms, see the [EULA](https://github.com/themuffinator/openQ4-game/blob/main/doc/legacy/EULA.Development%20Kit.rtf).
+openPREY's game code is derived from the Prey Software Development Kit and maintained in the companion [OpenPrey-game](https://github.com/themuffinator/OpenPrey-GameLibs) repository. Canonical edits for SDK/game-library work belong there first. Meson stages its `src/game`, `src/Prey`, and `src/preyengine` trees under `<builddir>/.tmp/openprey_gamelibs_stage/` and builds them against engine headers from this repository; companion copies of those engine headers are deliberately excluded. The per-build snapshot keeps concurrent platform configurations isolated.
+
+The SDK is subject to the original Human Head Studios EULA, which permits non-commercial modification for use with a legitimate copy of Prey, but prohibits commercial exploitation and standalone redistribution of the SDK-derived code. For complete terms, see `EULA.Development Kit.rtf` in the OpenPrey-game repository.
+
+### Companion Workflow
+
+- Default companion repo location: `../OpenPrey-game`
+- `OPENPREY_GAMELIBS_REPO` overrides the companion repository location
+- `tools/build/meson_setup.ps1` and `tools/build/meson_setup.sh` refresh the staged source snapshot when needed
+- `tools/build/build_gamelibs.ps1` is a compatibility entry point that directs developers back to the canonical root Meson build
+- Stage targets: `builddir/basepr/` and `.install/basepr/`
 
 ---
 
 ## Dependencies
 
 | Library | Version | Purpose |
-|---------|---------|---------|
-| [SDL3](https://www.libsdl.org/) | 3.4.4 | Cross-platform window/input/display |
-| [GLEW](http://glew.sourceforge.net/) | 2.3.1 | OpenGL extension wrangler |
-| [OpenAL Soft](https://openal-soft.org/) | 1.25.1 | 3D audio rendering |
+|---|---|---|
+| [SDL3](https://www.libsdl.org/) | 3.4.0 | Cross-platform window, input, and display management |
+| [GLEW](http://glew.sourceforge.net/) | 2.3.4 | OpenGL extension loading |
+| [OpenAL Soft](https://openal-soft.org/) | bundled Windows package | 3D audio rendering |
 | [stb_vorbis](https://github.com/nothings/stb) | 1.22 | Ogg Vorbis audio decoding |
 
-All dependencies are automatically fetched and built during the Meson configure step.
+All dependencies are resolved through Meson subprojects and wraps. No manual dependency installation is required on Windows; Linux requires system development packages (see [BUILDING.md](BUILDING.md)).
 
 ---
 
 ## Versioning
 
-openQ4 uses numeric release versions from `meson.build` and appends an explicit build track when the build is not stable:
+openPREY uses semantic base versions from `meson.build` and appends an explicit build track:
 
 - `stable` — release builds, e.g. `X.Y.Z`
 - `dev` — default local builds, e.g. `X.Y.Z-dev+gabcdef12`
-- `beta` / `rc` — optional pre-release labels, e.g. `X.Y.Z-beta.1+gabcdef12`
+- `nightly` / `beta` / `rc` — pre-release labels, e.g. `X.Y.Z-nightly.20260330.1+gabcdef12`
 
-Published releases are currently on the `v0.6.x` line; the `0.1.010` version in `meson.build` is the internal repo version floor, not a release line. The manual GitHub release workflow treats the repo version as the minimum next release version, then consults existing stable `v*` tags plus the scale of changes since the previous release to decide whether to emit the next patch release or advance the minor release milestone. Manual release dispatch also exposes explicit `auto`, `major (x..)`, `minor (.x.)`, and `patch (..x)` bump choices. Track labels, git metadata, and Windows/macOS resource/build numbers are generated automatically.
+The base version is bumped manually in `meson.build` when advancing to the next release line; track labels, iterations, git metadata, and resource build numbers are generated automatically by the build system (`tools/build/meson_setup.ps1` / `tools/build/meson_setup.sh`).
 
 ---
 

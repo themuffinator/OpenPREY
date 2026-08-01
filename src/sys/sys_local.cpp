@@ -274,7 +274,7 @@ void idSysLocal::DLL_Unload(intptr_t dllHandle ) {
 }
 
 void idSysLocal::DLL_GetFileName( const char *baseName, char *dllName, int maxLength ) {
-	// arch-tagged openQ4 module names (game-sp_x64, renderer-vk_x64) are used
+	// Arch-tagged openPREY module names (game_x64, renderer-vk_x64) are used
 	// as-is; everything else keeps the legacy CPUSTRING suffix behavior
 	const bool explicitGameModuleName =
 		idStr::Icmpn( baseName, "game_", 5 ) == 0 ||

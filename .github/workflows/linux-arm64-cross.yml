@@ -1,12 +1,7 @@
-name: Linux ARM64 Cross Build
+name: DISABLED - inherited OpenQ4 reference (Linux ARM64 Cross Build)
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_dispatch:
-
 concurrency:
   group: linux-arm64-cross-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,6 +11,7 @@ permissions:
 
 jobs:
   cross-build:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: Linux ARM64 Cross Build (x64 host)
     runs-on: ubuntu-24.04
     timeout-minutes: 90

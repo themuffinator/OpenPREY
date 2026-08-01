@@ -338,6 +338,250 @@ static bool NavigateFocus( idWindow *window, int direction, bool runHoverScripts
 
 	return false;
 }
+
+static const idMaterial *FindWindowBackgroundSlice( idWindow *window, const char *materialVarName ) {
+	if ( window == NULL || materialVarName == NULL ) {
+		return NULL;
+	}
+	idWinVar *materialVar = window->GetWinVarByName( materialVarName, false );
+	if ( materialVar == NULL || materialVar->c_str() == NULL || materialVar->c_str()[0] == '\0' ) {
+		return NULL;
+	}
+	return declManager->FindMaterial( materialVar->c_str() );
+}
+
+struct retailTabLayout_t {
+	bool verticalTabs;
+	float tabThickness;
+	float spanStart;
+	float spanEnd;
+	float spanPerTab;
+};
+
+static bool ParseRetailFloatPair( const char *value, float &first, float &second ) {
+	return value != NULL && value[0] != '\0' &&
+		( sscanf( value, "%f , %f", &first, &second ) == 2 || sscanf( value, "%f %f", &first, &second ) == 2 );
+}
+
+static bool ParseRetailFloatQuad( const char *value, float &a, float &b, float &c, float &d ) {
+	return value != NULL && value[0] != '\0' &&
+		( sscanf( value, "%f , %f , %f , %f", &a, &b, &c, &d ) == 4 ||
+		  sscanf( value, "%f %f %f %f", &a, &b, &c, &d ) == 4 );
+}
+
+static bool ParseRetailVec4( const char *value, idVec4 &out ) {
+	return ParseRetailFloatQuad( value, out.x, out.y, out.z, out.w );
+}
+
+static bool ParseRetailBool( const char *value, bool &out ) {
+	if ( value == NULL || value[0] == '\0' ) {
+		return false;
+	}
+	idStr work = value;
+	work.StripLeading( ' ' );
+	work.StripTrailing( ' ' );
+	if ( !work.Icmp( "true" ) || !work.Icmp( "yes" ) || !work.Icmp( "on" ) ) {
+		out = true;
+		return true;
+	}
+	if ( !work.Icmp( "false" ) || !work.Icmp( "no" ) || !work.Icmp( "off" ) ) {
+		out = false;
+		return true;
+	}
+	out = atof( work.c_str() ) != 0.0f;
+	return true;
+}
+
+static const idMaterial *FindRetailWindowMaterial( idWindow *window, const char *name ) {
+	if ( window == NULL ) {
+		return NULL;
+	}
+	idWinVar *var = window->GetWinVarByName( name, false );
+	if ( var == NULL || var->c_str() == NULL || var->c_str()[0] == '\0' ) {
+		return NULL;
+	}
+	return declManager->FindMaterial( var->c_str() );
+}
+
+static idRectangle GetRetailMarginsInsetRect( idWindow *window, const idRectangle &rect ) {
+	idRectangle inset = rect;
+	idWinVar *var = window != NULL ? window->GetWinVarByName( "margins", false ) : NULL;
+	float left = 0.0f;
+	float right = 0.0f;
+	float top = 0.0f;
+	float bottom = 0.0f;
+	if ( var != NULL && ParseRetailFloatQuad( var->c_str(), left, right, top, bottom ) ) {
+		inset.x += left;
+		inset.y += top;
+		inset.w -= left + right;
+		inset.h -= top + bottom;
+	}
+	return inset;
+}
+
+static bool BuildRetailTabLayout( idWindow *window, const idRectangle &rect, int tabCount, retailTabLayout_t &layout ) {
+	if ( window == NULL || tabCount <= 0 ) {
+		return false;
+	}
+	layout.verticalTabs = false;
+	layout.tabThickness = 20.0f;
+	idWinVar *var = window->GetWinVarByName( "tabheight", false );
+	if ( var != NULL && atof( var->c_str() ) > 0.0f ) {
+		layout.tabThickness = static_cast<float>( atof( var->c_str() ) );
+	}
+	var = window->GetWinVarByName( "horizontal", false );
+	if ( var != NULL ) {
+		ParseRetailBool( var->c_str(), layout.verticalTabs );
+	}
+	float marginStart = 0.0f;
+	float marginEnd = 0.0f;
+	var = window->GetWinVarByName( "tabmargins", false );
+	if ( var != NULL ) {
+		ParseRetailFloatPair( var->c_str(), marginStart, marginEnd );
+	}
+	if ( layout.verticalTabs ) {
+		layout.tabThickness = idMath::ClampFloat( 0.0f, rect.w, layout.tabThickness );
+		layout.spanStart = rect.y + marginStart;
+		layout.spanEnd = rect.y + rect.h - marginEnd;
+		if ( layout.spanEnd <= layout.spanStart ) {
+			layout.spanStart = rect.y;
+			layout.spanEnd = rect.y + rect.h;
+		}
+	} else {
+		layout.tabThickness = idMath::ClampFloat( 0.0f, rect.h, layout.tabThickness );
+		layout.spanStart = rect.x + marginStart;
+		layout.spanEnd = rect.x + rect.w - marginEnd;
+		if ( layout.spanEnd <= layout.spanStart ) {
+			layout.spanStart = rect.x;
+			layout.spanEnd = rect.x + rect.w;
+		}
+	}
+	layout.spanPerTab = ( layout.spanEnd - layout.spanStart ) / tabCount;
+	return layout.tabThickness > 0.0f && layout.spanPerTab > 0.0f;
+}
+
+static idRectangle GetRetailTabButtonRect( const idRectangle &rect, const retailTabLayout_t &layout, int tabIndex ) {
+	if ( layout.verticalTabs ) {
+		return idRectangle( rect.x, layout.spanStart + layout.spanPerTab * tabIndex, layout.tabThickness, layout.spanPerTab );
+	}
+	return idRectangle( layout.spanStart + layout.spanPerTab * tabIndex, rect.y, layout.spanPerTab, layout.tabThickness );
+}
+
+static bool IsRetailWindowDescendantOf( idWindow *window, idWindow *ancestor ) {
+	for ( idWindow *current = window; current != NULL; current = current->GetParent() ) {
+		if ( current == ancestor ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void DrawRetailSegments( idDeviceContext *dc, const idRectangle &rect, bool vertical, float edgeSize,
+		const idMaterial *startMat, const idMaterial *middleMat, const idMaterial *endMat,
+		const idVec4 &materialColor, const idVec4 &fallbackColor ) {
+	if ( dc == NULL ) {
+		return;
+	}
+	if ( startMat == NULL && middleMat == NULL && endMat == NULL ) {
+		if ( fallbackColor.w > 0.0f ) {
+			dc->DrawFilledRect( rect.x, rect.y, rect.w, rect.h, fallbackColor );
+		}
+		return;
+	}
+	if ( vertical ) {
+		const float start = startMat != NULL ? idMath::ClampFloat( 0.0f, rect.h, edgeSize ) : 0.0f;
+		const float end = ( endMat != NULL || startMat != NULL ) ? idMath::ClampFloat( 0.0f, rect.h - start, edgeSize ) : 0.0f;
+		if ( start > 0.0f ) dc->DrawMaterial( rect.x, rect.y, rect.w, start, startMat, materialColor );
+		if ( rect.h - start - end > 0.0f ) {
+			if ( middleMat != NULL ) dc->DrawMaterial( rect.x, rect.y + start, rect.w, rect.h - start - end, middleMat, materialColor );
+			else dc->DrawFilledRect( rect.x, rect.y + start, rect.w, rect.h - start - end, fallbackColor );
+		}
+		if ( end > 0.0f ) {
+			if ( endMat != NULL ) dc->DrawMaterial( rect.x, rect.y + rect.h - end, rect.w, end, endMat, materialColor );
+			else dc->DrawMaterial( rect.x, rect.y + rect.h - end, rect.w, -end, startMat, materialColor );
+		}
+		return;
+	}
+	const float start = startMat != NULL ? idMath::ClampFloat( 0.0f, rect.w, edgeSize ) : 0.0f;
+	const float end = ( endMat != NULL || startMat != NULL ) ? idMath::ClampFloat( 0.0f, rect.w - start, edgeSize ) : 0.0f;
+	if ( start > 0.0f ) dc->DrawMaterial( rect.x, rect.y, start, rect.h, startMat, materialColor );
+	if ( rect.w - start - end > 0.0f ) {
+		if ( middleMat != NULL ) dc->DrawMaterial( rect.x + start, rect.y, rect.w - start - end, rect.h, middleMat, materialColor );
+		else dc->DrawFilledRect( rect.x + start, rect.y, rect.w - start - end, rect.h, fallbackColor );
+	}
+	if ( end > 0.0f ) {
+		if ( endMat != NULL ) dc->DrawMaterial( rect.x + rect.w - end, rect.y, end, rect.h, endMat, materialColor );
+		else dc->DrawMaterial( rect.x + rect.w - end, rect.y, -end, rect.h, startMat, materialColor );
+	}
+}
+
+static void DrawRetailSuperWindowFrame( idDeviceContext *dc, const idRectangle &rect, const idMaterial *cornerMat,
+		const idMaterial *sideMat, const idMaterial *topMat, float cornerWidth, float cornerHeight,
+		float edgeSizeX, float edgeSizeY, const idVec4 &color ) {
+	if ( dc == NULL ) {
+		return;
+	}
+	cornerWidth = idMath::Fabs( cornerWidth );
+	cornerHeight = idMath::Fabs( cornerHeight );
+	edgeSizeX = idMath::Fabs( edgeSizeX );
+	edgeSizeY = idMath::Fabs( edgeSizeY );
+	const bool drawTop = rect.h > cornerHeight;
+	if ( cornerMat != NULL && cornerWidth > 0.0f && cornerHeight > 0.0f ) {
+		if ( drawTop ) {
+			dc->DrawMaterial( rect.x, rect.y, cornerWidth, cornerHeight, cornerMat, color );
+			dc->DrawMaterial( rect.x + rect.w - cornerWidth, rect.y, -cornerWidth, cornerHeight, cornerMat, color );
+		}
+		dc->DrawMaterial( rect.x, rect.y + rect.h - cornerHeight, cornerWidth, -cornerHeight, cornerMat, color );
+		dc->DrawMaterial( rect.x + rect.w - cornerWidth, rect.y + rect.h - cornerHeight, -cornerWidth, -cornerHeight, cornerMat, color );
+	}
+	const float horizontalWidth = rect.w - cornerWidth * 2.0f;
+	if ( topMat != NULL && edgeSizeY > 0.0f && horizontalWidth > 0.0f ) {
+		if ( drawTop ) dc->DrawMaterial( rect.x + cornerWidth, rect.y, horizontalWidth, edgeSizeY, topMat, color );
+		dc->DrawMaterial( rect.x + cornerWidth, rect.y + rect.h - edgeSizeY, horizontalWidth, -edgeSizeY, topMat, color );
+	}
+	const float verticalHeight = rect.h - cornerHeight * 2.0f;
+	if ( sideMat != NULL && edgeSizeX > 0.0f && verticalHeight > 0.0f ) {
+		dc->DrawMaterial( rect.x, rect.y + cornerHeight, edgeSizeX, verticalHeight, sideMat, color );
+		dc->DrawMaterial( rect.x + rect.w - edgeSizeX, rect.y + cornerHeight, -edgeSizeX, verticalHeight, sideMat, color );
+	}
+}
+
+enum backgroundExpansionEdge_t {
+	BACKGROUND_EXPANSION_LEFT,
+	BACKGROUND_EXPANSION_RIGHT,
+	BACKGROUND_EXPANSION_TOP,
+	BACKGROUND_EXPANSION_BOTTOM
+};
+
+static void DrawBackgroundExpansionSlice( idDeviceContext *dc, const idRectangle &backgroundRect,
+		float expansionSize, float baseExtent, const idMaterial *material, const idVec4 &color,
+		backgroundExpansionEdge_t edge ) {
+	if ( dc == NULL || material == NULL || expansionSize <= 0.0f || baseExtent <= 0.0f ) {
+		return;
+	}
+	const float fraction = idMath::ClampFloat( 0.0f, 1.0f, expansionSize / baseExtent );
+	if ( fraction <= 0.0f ) {
+		return;
+	}
+	switch ( edge ) {
+		case BACKGROUND_EXPANSION_LEFT:
+			dc->DrawMaterialUV( backgroundRect.x - expansionSize, backgroundRect.y, expansionSize, backgroundRect.h,
+				material, color, 1.0f - fraction, 0.0f, 1.0f, 1.0f );
+			break;
+		case BACKGROUND_EXPANSION_RIGHT:
+			dc->DrawMaterialUV( backgroundRect.x + backgroundRect.w, backgroundRect.y, expansionSize, backgroundRect.h,
+				material, color, 0.0f, 0.0f, fraction, 1.0f );
+			break;
+		case BACKGROUND_EXPANSION_TOP:
+			dc->DrawMaterialUV( backgroundRect.x, backgroundRect.y - expansionSize, backgroundRect.w, expansionSize,
+				material, color, 0.0f, 1.0f - fraction, 1.0f, 1.0f );
+			break;
+		case BACKGROUND_EXPANSION_BOTTOM:
+			dc->DrawMaterialUV( backgroundRect.x, backgroundRect.y + backgroundRect.h, backgroundRect.w, expansionSize,
+				material, color, 0.0f, 0.0f, 1.0f, fraction );
+			break;
+	}
+}
 }
 
 bool idWindow::registerIsTemporary[MAX_EXPRESSION_REGISTERS];		// statics to assist during parsing
@@ -381,11 +625,16 @@ const idRegEntry idWindow::RegisterVars[] = {
 	{ "scale", idRegister::VEC2 },
 	{ "translate", idRegister::VEC2 },
 	{ "rotate", idRegister::FLOAT },
+	{ "shear", idRegister::VEC2 },
 	{ "textscale", idRegister::FLOAT },
 	{ "visible", idRegister::BOOL },
 	{ "noevents", idRegister::BOOL },
 	{ "text", idRegister::STRING },
 	{ "background", idRegister::STRING },
+	{ "backgroundLeft", idRegister::STRING },
+	{ "backgroundRight", idRegister::STRING },
+	{ "backgroundTop", idRegister::STRING },
+	{ "backgroundBottom", idRegister::STRING },
 	{ "runscript", idRegister::STRING },
 	{ "varbackground", idRegister::STRING },
 	{ "cvar", idRegister::STRING },
@@ -464,8 +713,12 @@ const char *idWindow::ScriptNames[] = {
 	"onJoyRight",
 	"onJoyButton1",
 	"onJoyButton2",
-	"onJoyBackButton"
+	"onJoyBackButton",
 // jmarshall end
+	"onTabActivate",
+	"onSliderChange",
+	"onStartup",
+	"onMaxChars"
 };
 
 static bool ParseScreenAlignXToken( const idToken &token, unsigned char &outAlign ) {
@@ -548,6 +801,10 @@ void idWindow::CommonInit() {
 	borderColor.Zero();
 	background = NULL;
 	backGroundName = "";
+	backgroundLeft = "";
+	backgroundRight = "";
+	backgroundTop = "";
+	backgroundBottom = "";
 	focusedChild = NULL;
 	captureChild = NULL;
 	overChild = NULL;
@@ -557,6 +814,11 @@ void idWindow::CommonInit() {
 	timeLine = -1;
 	textShadow = 0;
 	hover = false;
+	windowDefType = "windowDef";
+	activeTabIndex = -1;
+	tabContainerInitialized = false;
+	retailCreditArmed = false;
+	retailTextEffectStartTime = -1;
 
 	for (int i = 0; i < SCRIPT_COUNT; i++) {
 		scripts[i] = NULL;
@@ -615,6 +877,10 @@ size_t idWindow::Allocated() {
 	int sz = name.Allocated();
 	sz += text.Size();
 	sz += backGroundName.Size();
+	sz += backgroundLeft.Size();
+	sz += backgroundRight.Size();
+	sz += backgroundTop.Size();
+	sz += backgroundBottom.Size();
 
 	c = definedVars.Num();
 	for (i = 0; i < c; i++) {
@@ -759,19 +1025,198 @@ float idWindow::GetMaxCharWidth() {
 	return dc->MaxCharWidth(textScale);
 }
 
+idWinVar *idWindow::CreateRetailGuiVar( const char *varName ) {
+	if ( varName == NULL ) {
+		return NULL;
+	}
+
+	idWinVar *var = NULL;
+	if ( idStr::Icmp( varName, "onstart" ) == 0 ||
+		idStr::Icmp( varName, "oncallenable" ) == 0 ||
+		idStr::Icmp( varName, "oncalldisable" ) == 0 ||
+		idStr::Icmp( varName, "oncallreset" ) == 0 ) {
+		var = new idWinBool();
+		var->Set( "0" );
+	} else if ( idStr::Icmp( varName, "splinein" ) == 0 ) {
+		var = new idWinBool();
+		var->Set( "1" );
+	} else if ( idStr::Icmp( varName, "duration" ) == 0 || idStr::Icmp( varName, "trailoffset" ) == 0 ) {
+		var = new idWinFloat();
+		var->Set( idStr::Icmp( varName, "duration" ) == 0 ? "1000" : "0.01" );
+	} else if ( idStr::Icmp( varName, "splinepoints" ) == 0 || idStr::Icmp( varName, "trails" ) == 0 ) {
+		var = new idWinInt();
+		var->Set( idStr::Icmp( varName, "splinepoints" ) == 0 ? "5" : "10" );
+	}
+
+	if ( var != NULL ) {
+		var->SetName( varName );
+		AddDefinedVar( var );
+	}
+	return var;
+}
+
+idWinVar *idWindow::FindDefinedVarByNameNoCreate( const char *varName ) {
+	for ( int i = 0; varName != NULL && i < definedVars.Num(); ++i ) {
+		if ( definedVars[i] != NULL && idStr::Icmp( definedVars[i]->GetName(), varName ) == 0 ) {
+			return definedVars[i];
+		}
+	}
+	return NULL;
+}
+
+int idWindow::GetWinVarIntValue( const char *varName, int defaultValue ) {
+	idWinVar *var = GetWinVarByName( varName, false );
+	return var != NULL ? atoi( var->c_str() ) : defaultValue;
+}
+
+float idWindow::GetWinVarFloatValue( const char *varName, float defaultValue ) {
+	idWinVar *var = GetWinVarByName( varName, false );
+	return var != NULL ? static_cast<float>( atof( var->c_str() ) ) : defaultValue;
+}
+
+void idWindow::HandleRetailSpecialVars() {
+	idWindow *eventTarget = this;
+	if ( gui != NULL && gui->GetDesktop() != NULL ) {
+		eventTarget = gui->GetDesktop();
+	}
+
+	idWinBool *onCallEnable = dynamic_cast<idWinBool *>( FindDefinedVarByNameNoCreate( "onCallEnable" ) );
+	if ( onCallEnable != NULL && *onCallEnable ) {
+		*onCallEnable = false;
+		eventTarget->RunNamedEvent( "Enable" );
+	}
+	idWinBool *onCallDisable = dynamic_cast<idWinBool *>( FindDefinedVarByNameNoCreate( "onCallDisable" ) );
+	if ( onCallDisable != NULL && *onCallDisable ) {
+		*onCallDisable = false;
+		eventTarget->RunNamedEvent( "Disable" );
+	}
+	idWinBool *onCallReset = dynamic_cast<idWinBool *>( FindDefinedVarByNameNoCreate( "onCallReset" ) );
+	if ( onCallReset != NULL && *onCallReset ) {
+		*onCallReset = false;
+		eventTarget->RunNamedEvent( "Reset" );
+	}
+	idWinBool *onStart = dynamic_cast<idWinBool *>( FindDefinedVarByNameNoCreate( "onStart" ) );
+	if ( onStart != NULL && *onStart ) {
+		*onStart = false;
+		idWinBool *splineIn = dynamic_cast<idWinBool *>( GetWinVarByName( "splineIn", false ) );
+		if ( IsRetailSplineWindow() && splineIn != NULL && *splineIn && gui != NULL ) {
+			retailTextEffectStartTime = gui->GetTime();
+		}
+	}
+}
+
+void idWindow::UpdateRetailCreditActivation() {
+	if ( !IsCreditDef() || !retailCreditArmed || gui == NULL || !noTime || drawRect.y > 350.0f ) {
+		return;
+	}
+	ResetTime( 0 );
+	EvalRegs( -1, true );
+	Time();
+	HandleRetailSpecialVars();
+}
+
+bool idWindow::DrawRetailTextEffect( const idVec4 &color ) {
+	if ( retailTextEffectStartTime < 0 || gui == NULL || dc == NULL ) {
+		return false;
+	}
+
+	float duration = GetWinVarFloatValue( "duration", 1000.0f );
+	if ( duration <= 0.0f ) {
+		duration = 1000.0f;
+	}
+	const int trails = idMath::ClampInt( 1, 1000, GetWinVarIntValue( "trails", 10 ) );
+	const int splinePoints = idMath::ClampInt( 3, 100, GetWinVarIntValue( "splinePoints", 5 ) );
+	if ( !dc->SetRetailSplineEffect( 0.0f, splinePoints ) ) {
+		return false;
+	}
+	dc->ClearRetailSplineEffect();
+
+	const float elapsed = static_cast<float>( gui->GetTime() - retailTextEffectStartTime );
+	if ( elapsed <= 0.0f ) {
+		return true;
+	}
+	const float trailOffset = idMath::ClampFloat( 0.0f, 1.0f, GetWinVarFloatValue( "trailOffset", 0.01f ) );
+	if ( elapsed >= duration * ( 1.0f + trailOffset * trails ) ) {
+		retailTextEffectStartTime = -1;
+		return false;
+	}
+
+	const float trailDelay = duration * trailOffset;
+	const int textAdjust = static_cast<int>( textspacing );
+	const int textStyle = static_cast<int>( textstyle );
+	const bool chatWindow = ( flags & WIN_CHATWINDOW ) != 0;
+	auto drawSample = [&]( float sampleElapsed, float alphaScale, bool finalSample ) {
+		if ( sampleElapsed <= 0.0f || !dc->SetRetailSplineEffect( sampleElapsed / duration, splinePoints ) ) {
+			return;
+		}
+		const float progress = idMath::ClampFloat( 0.0f, 1.0f, sampleElapsed / duration );
+		if ( textShadow ) {
+			idStr shadowText = text;
+			idRectangle shadowRect = textRect;
+			idVec4 shadowColor = colorBlack;
+			shadowText.RemoveColors();
+			shadowRect.x += textShadow;
+			shadowRect.y += textShadow;
+			shadowColor[3] = color[3] * alphaScale * ( 0.35f + 0.65f * progress );
+			dc->DrawText( shadowText, textScale, textAlign, shadowColor, shadowRect, !( flags & WIN_NOWRAP ), -1,
+				false, NULL, 0, textAdjust, finalSample ? textStyle : 0, chatWindow );
+		}
+		idVec4 drawColor = color;
+		drawColor[3] *= alphaScale * ( 0.22f + 0.78f * progress );
+		dc->DrawText( text, textScale, textAlign, drawColor, textRect, !( flags & WIN_NOWRAP ), -1,
+			false, NULL, 0, textAdjust, finalSample ? textStyle : 0, chatWindow );
+		dc->ClearRetailSplineEffect();
+	};
+
+	for ( int i = trails; i > 0; --i ) {
+		const float sampleElapsed = elapsed - trailDelay * static_cast<float>( i );
+		const float trailBlend = 1.0f - static_cast<float>( i - 1 ) / static_cast<float>( trails );
+		drawSample( sampleElapsed, 0.06f + 0.34f * trailBlend, false );
+	}
+	drawSample( elapsed, 0.2f + 0.8f * idMath::ClampFloat( 0.0f, 1.0f, elapsed / duration ), true );
+	return true;
+}
+
 /*
 ================
 idWindow::Draw
 ================
 */
 void idWindow::Draw( int time, float x, float y ) {
+	if ( IsTabContainerDef() ) {
+		DrawTabContainerTabs();
+		return;
+	}
+	if ( IsTabDef() && parent != NULL && parent->IsTabContainerDef() ) {
+		// The owning tab container renders the tab label in its header strip.
+		return;
+	}
 	if ( text.Length() == 0 ) {
+		return;
+	}
+	idVec4 drawTextColor = foreColor;
+	if ( parent != NULL && parent->overChild == this && !noEvents ) {
+		drawTextColor = hoverColor;
+	}
+	if ( DrawRetailTextEffect( drawTextColor ) ) {
 		return;
 	}
 	const int textAdjust = static_cast<int>( textspacing );
 	const int style = static_cast<int>( textstyle );
 	const bool isChatWindow = ( flags & WIN_CHATWINDOW ) != 0;
-	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style, isChatWindow );
+	if ( textShadow ) {
+		idStr shadowText = text;
+		idRectangle shadowRect = textRect;
+		idVec4 shadowColor = colorBlack;
+		shadowText.RemoveColors();
+		shadowRect.x += textShadow;
+		shadowRect.y += textShadow;
+		shadowColor[3] = drawTextColor[3];
+		dc->DrawText( shadowText, textScale, textAlign, shadowColor, shadowRect, !( flags & WIN_NOWRAP ), -1,
+			false, NULL, 0, textAdjust, style, isChatWindow );
+	}
+	dc->DrawText( text, textScale, textAlign, drawTextColor, textRect, !( flags & WIN_NOWRAP ), -1,
+		false, NULL, 0, textAdjust, style, isChatWindow );
 
 	if ( gui_edit.GetBool() ) {
 		dc->EnableClipping( false );
@@ -947,6 +1392,7 @@ void idWindow::Init() {
 	for ( int i = 0; i < c; i++ ) {
 		children[i]->Init();
 	}
+	UpdateTabContainerState( true );
 }
 
 /*
@@ -1021,6 +1467,18 @@ idWindow *idWindow::SetCapture(idWindow *w) {
 	return last;
 }
 
+void idWindow::ResetCapture() {
+	idWindow* desktop = gui != NULL ? gui->GetDesktop() : NULL;
+	if ( desktop == NULL ) {
+		return;
+	}
+	if ( desktop->captureChild != NULL ) {
+		desktop->captureChild->LoseCapture();
+		desktop->captureChild = NULL;
+	}
+	desktop->overChild = NULL;
+}
+
 /*
 ================
 idWindow::AddUpdateVar
@@ -1028,6 +1486,34 @@ idWindow::AddUpdateVar
 */
 void idWindow::AddUpdateVar(idWinVar *var) {
 	updateVars.AddUnique(var);
+}
+
+bool idWindow::SetInternalVarValue( const char* name, const char* value ) {
+	if ( name == NULL || value == NULL ) {
+		return false;
+	}
+	idStr key = name;
+	const int separator = key.Find( "::" );
+	if ( separator > 0 && gui != NULL && gui->GetDesktop() != NULL ) {
+		const idStr windowName = key.Left( separator );
+		const idStr varName = key.Right( key.Length() - separator - 2 );
+		drawWin_t* target = gui->GetDesktop()->FindChildByName( windowName );
+		return target != NULL && target->win != NULL && target->win->SetInternalVarValue( varName, value );
+	}
+
+	idParser parser( value, idStr::Length( value ), "SetInternalVarValue",
+		LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
+	idToken token;
+	if ( !parser.ReadToken( &token ) ) {
+		return false;
+	}
+	if ( key.Icmp( "screenalignx" ) == 0 || key.Icmp( "screenalignh" ) == 0 ) {
+		return ParseScreenAlignXToken( token, screenAlignX );
+	}
+	if ( key.Icmp( "screenaligny" ) == 0 || key.Icmp( "screenalignv" ) == 0 ) {
+		return ParseScreenAlignYToken( token, screenAlignY );
+	}
+	return false;
 }
 
 /*
@@ -1133,6 +1619,16 @@ void idWindow::RunNamedEvent ( const char* eventName )
 	for ( i = 0; i < c; i++ ) {
 		children[i]->RunNamedEvent ( eventName );
 	}
+
+	if ( IsCreditDef() ) {
+		if ( idStr::Icmp( eventName, "Enable" ) == 0 ) {
+			retailCreditArmed = true;
+		} else if ( idStr::Icmp( eventName, "Disable" ) == 0 ) {
+			retailCreditArmed = false;
+		} else if ( idStr::Icmp( eventName, "Reset" ) == 0 ) {
+			retailTextEffectStartTime = -1;
+		}
+	}
 }
 
 /*
@@ -1207,10 +1703,11 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 		}
 		RunTimeEvents(gui->GetTime());
 		CalcRects(0,0);
-		dc->SetCursor( idDeviceContext::CURSOR_ARROW );
+		dc->SetCursor( idDeviceContext::CURSOR_MENU );
 	}
 
 	if (visible && !noEvents) {
+		UpdateTabContainerState( true );
 
 		if (event->evType == SE_KEY) {
 			EvalRegs(-1, true);
@@ -1219,6 +1716,20 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 			}
 
 			if (event->evValue == K_MOUSE1) {
+				if ( event->evValue2 && IsTabContainerDef() ) {
+					const int clickedTab = GetTabContainerTabAt( gui->CursorX(), gui->CursorY() );
+					if ( clickedTab >= 0 ) {
+						const int previousTab = activeTabIndex;
+						idWinVar *activeTabVar = GetWinVarByName( "activetab", false );
+						if ( activeTabVar != NULL ) {
+							activeTabVar->Set( va( "%d", clickedTab ) );
+						}
+						UpdateTabContainerState( true );
+						if ( previousTab != activeTabIndex ) {
+							return "";
+						}
+					}
+				}
 
 				if (!event->evValue2 && GetCaptureChild()) {
 					GetCaptureChild()->LoseCapture();
@@ -1609,8 +2120,30 @@ idWindow::DrawBackground
 ================
 */
 void idWindow::DrawBackground(const idRectangle &drawRect) {
-	if ( backColor.w() ) {
-		dc->DrawFilledRect(drawRect.x, drawRect.y, drawRect.w, drawRect.h, backColor);
+	const bool hasFrameDecoration = GetWinVarByName( "cornermat", false ) != NULL || GetWinVarByName( "topmat", false ) != NULL;
+	const bool usesRetailSuperWindowFrame = hasFrameDecoration && windowDefType.Icmp( "superWindowDef" ) == 0;
+	const idRectangle backgroundRect = usesRetailSuperWindowFrame ? GetRetailMarginsInsetRect( this, drawRect ) : drawRect;
+	if ( backColor.w() && backgroundRect.w > 0.0f && backgroundRect.h > 0.0f ) {
+		dc->DrawFilledRect( backgroundRect.x, backgroundRect.y, backgroundRect.w, backgroundRect.h, backColor );
+	}
+
+	if ( dc != NULL && backgroundRect.w > 0.0f && backgroundRect.h > 0.0f && matColor.w() > 0.0f ) {
+		float xExpand = 0.0f;
+		float yExpand = 0.0f;
+		dc->GetVirtualScreenExpansion( forceAspectWidth, forceAspectHeight, xExpand, yExpand );
+		if ( xExpand > 0.0f ) {
+			const float baseWidth = forceAspectWidth > 0.0f ? forceAspectWidth : backgroundRect.w;
+			DrawBackgroundExpansionSlice( dc, backgroundRect, xExpand, baseWidth,
+				FindWindowBackgroundSlice( this, "backgroundLeft" ), matColor, BACKGROUND_EXPANSION_LEFT );
+			DrawBackgroundExpansionSlice( dc, backgroundRect, xExpand, baseWidth,
+				FindWindowBackgroundSlice( this, "backgroundRight" ), matColor, BACKGROUND_EXPANSION_RIGHT );
+		} else if ( yExpand > 0.0f ) {
+			const float baseHeight = forceAspectHeight > 0.0f ? forceAspectHeight : backgroundRect.h;
+			DrawBackgroundExpansionSlice( dc, backgroundRect, yExpand, baseHeight,
+				FindWindowBackgroundSlice( this, "backgroundTop" ), matColor, BACKGROUND_EXPANSION_TOP );
+			DrawBackgroundExpansionSlice( dc, backgroundRect, yExpand, baseHeight,
+				FindWindowBackgroundSlice( this, "backgroundBottom" ), matColor, BACKGROUND_EXPANSION_BOTTOM );
+		}
 	}
 
 	if ( background && matColor.w() ) {
@@ -1759,8 +2292,33 @@ void idWindow::DrawBackground(const idRectangle &drawRect) {
 			scalex = matScalex;
 			scaley = matScaley;
 		}
-		dc->DrawMaterial(drawRect.x, drawRect.y, drawRect.w, drawRect.h, background, matColor, scalex, scaley);
+		dc->DrawMaterial( backgroundRect.x, backgroundRect.y, backgroundRect.w, backgroundRect.h, background, matColor, scalex, scaley );
 	}
+
+	if ( hasFrameDecoration ) {
+		return;
+	}
+	const bool isHovered = parent != NULL && parent->overChild == this && !noEvents;
+	const idMaterial *leftMat = isHovered ? FindRetailWindowMaterial( this, "lefthovermat" ) : NULL;
+	const idMaterial *middleMat = isHovered ? FindRetailWindowMaterial( this, "middlehovermat" ) : NULL;
+	const idMaterial *rightMat = isHovered ? FindRetailWindowMaterial( this, "righthovermat" ) : NULL;
+	if ( leftMat == NULL ) leftMat = FindRetailWindowMaterial( this, "leftmat" );
+	if ( middleMat == NULL ) middleMat = FindRetailWindowMaterial( this, "middlemat" );
+	if ( rightMat == NULL ) rightMat = FindRetailWindowMaterial( this, "rightmat" );
+	if ( leftMat == NULL && middleMat == NULL && rightMat == NULL ) {
+		return;
+	}
+	float edgeWidth = drawRect.h * 0.5f;
+	idWinVar *edgeVar = GetWinVarByName( "edgewidth", false );
+	if ( edgeVar != NULL && atof( edgeVar->c_str() ) >= 0.0f ) {
+		edgeWidth = static_cast<float>( atof( edgeVar->c_str() ) );
+	}
+	idVec4 materialColor = matColor;
+	if ( isHovered ) {
+		idWinVar *hoverColorVar = GetWinVarByName( "hovermatcolor", false );
+		if ( hoverColorVar != NULL ) ParseRetailVec4( hoverColorVar->c_str(), materialColor );
+	}
+	DrawRetailSegments( dc, drawRect, false, edgeWidth, leftMat, middleMat, rightMat, materialColor, backColor );
 }
 
 /*
@@ -1771,6 +2329,35 @@ idWindow::DrawBorderAndCaption
 void idWindow::DrawBorderAndCaption(const idRectangle &drawRect) {
 	if ( flags & WIN_BORDER && borderSize && borderColor.w() ) {
 		dc->DrawRect(drawRect.x, drawRect.y, drawRect.w, drawRect.h, borderSize, borderColor);
+	}
+	if ( windowDefType.Icmp( "superWindowDef" ) == 0 &&
+		 ( GetWinVarByName( "cornermat", false ) != NULL || GetWinVarByName( "topmat", false ) != NULL ) ) {
+		const idMaterial *cornerMat = FindRetailWindowMaterial( this, "cornermat" );
+		const idMaterial *topMat = FindRetailWindowMaterial( this, "topmat" );
+		const idMaterial *sideMat = FindRetailWindowMaterial( this, "leftmat" );
+		float cornerWidth = cornerMat != NULL ? static_cast<float>( cornerMat->GetImageWidth() ) : 16.0f;
+		float cornerHeight = cornerMat != NULL ? static_cast<float>( cornerMat->GetImageHeight() ) : 16.0f;
+		idWinVar *cornerSize = GetWinVarByName( "cornersize", false );
+		if ( cornerSize != NULL ) ParseRetailFloatPair( cornerSize->c_str(), cornerWidth, cornerHeight );
+		float edgeSizeX = 4.0f;
+		float edgeSizeY = 4.0f;
+		idWinVar *edgeSize = GetWinVarByName( "edgesize", false );
+		if ( edgeSize != NULL ) ParseRetailFloatPair( edgeSize->c_str(), edgeSizeX, edgeSizeY );
+		DrawRetailSuperWindowFrame( dc, drawRect, cornerMat, sideMat, topMat, cornerWidth, cornerHeight, edgeSizeX, edgeSizeY, matColor );
+	}
+	if ( IsTabDef() && parent != NULL && parent->IsTabContainerDef() ) {
+		idVec4 separatorColor( 0.74f, 0.81f, 0.88f, 1.0f );
+		idWinVar *separatorVar = GetWinVarByName( "sepcolor", false );
+		if ( separatorVar == NULL ) separatorVar = parent->GetWinVarByName( "sepcolor", false );
+		if ( separatorVar != NULL ) ParseRetailVec4( separatorVar->c_str(), separatorColor );
+		idVec4 lines( 1.0f, 1.0f, 1.0f, 1.0f );
+		idWinVar *linesVar = GetWinVarByName( "seperatorlines", false );
+		if ( linesVar == NULL ) linesVar = GetWinVarByName( "separatorlines", false );
+		if ( linesVar != NULL ) ParseRetailVec4( linesVar->c_str(), lines );
+		if ( lines.x > 0.0f ) dc->DrawFilledRect( drawRect.x, drawRect.y, Min( lines.x, drawRect.w ), drawRect.h, separatorColor );
+		if ( lines.y > 0.0f ) dc->DrawFilledRect( drawRect.x, drawRect.y, drawRect.w, Min( lines.y, drawRect.h ), separatorColor );
+		if ( lines.z > 0.0f ) dc->DrawFilledRect( drawRect.Right() - Min( lines.z, drawRect.w ), drawRect.y, Min( lines.z, drawRect.w ), drawRect.h, separatorColor );
+		if ( lines.w > 0.0f ) dc->DrawFilledRect( drawRect.x, drawRect.Bottom() - Min( lines.w, drawRect.h ), drawRect.w, Min( lines.w, drawRect.h ), separatorColor );
 	}
 }
 
@@ -1793,11 +2380,11 @@ void idWindow::SetupTransforms(float x, float y) {
 		trans = rot.ToMat3();
 	}
 
-	if ( shear.x || shear.y ) {
+	if ( shear.x() || shear.y() ) {
 		static idMat3 smat;
 		smat.Identity();
-		smat[0][1] = shear.x;
-		smat[1][0] = shear.y;
+		smat[0][1] = shear.x();
+		smat[1][0] = shear.y();
 		trans *= smat;
 	}
 
@@ -1870,10 +2457,7 @@ void idWindow::Redraw(float x, float y) {
 		dc->EnableClipping(true);
 	}
 
-	if (!visible) {
-		return;
-	}
-
+	UpdateTabContainerState( true );
 	CalcClientRect(0, 0);
 
 	SetFont();
@@ -1888,6 +2472,15 @@ void idWindow::Redraw(float x, float y) {
 	textRect.Offset(x, y);
 	actualX = drawRect.x;
 	actualY = drawRect.y;
+
+	HandleRetailSpecialVars();
+	UpdateRetailCreditActivation();
+	if ( !visible ) {
+		drawRect.Offset( -x, -y );
+		clientRect.Offset( -x, -y );
+		textRect.Offset( -x, -y );
+		return;
+	}
 
 	idVec3	oldOrg;
 	idMat3	oldTrans;
@@ -1926,8 +2519,15 @@ void idWindow::Redraw(float x, float y) {
 	}
 
 	int c = drawWindows.Num();
+	int tabOrdinal = 0;
 	for ( int i = 0; i < c; i++ ) {
 		if ( drawWindows[i].win ) {
+			if ( IsTabContainerDef() && drawWindows[i].win->IsTabDef() ) {
+				const bool active = tabOrdinal++ == activeTabIndex;
+				if ( !active ) {
+					continue;
+				}
+			}
 			drawWindows[i].win->Redraw( clientRect.x + xOffset, clientRect.y + yOffset );
 		} else {
 			drawWindows[i].simp->Redraw( clientRect.x + xOffset, clientRect.y + yOffset );
@@ -2602,6 +3202,9 @@ intptr_t idWindow::GetWinVarOffset( idWinVar *wv, drawWin_t* owner) {
 	if ( wv == &rotate ) {
 		ret = (intptr_t)&( ( idWindow * ) 0 )->rotate;
 	}
+	if ( wv == &shear ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->shear;
+	}
 
 	if ( ret != -1 ) {
 		owner->win = this;
@@ -2639,6 +3242,18 @@ idWinVar *idWindow::GetWinVarByName(const char *_name, bool fixup, drawWin_t** o
 	}
 	if (idStr::Icmp(_name, "background") == 0) {
 		retVar = &backGroundName;
+	}
+	if (idStr::Icmp(_name, "backgroundLeft") == 0) {
+		retVar = &backgroundLeft;
+	}
+	if (idStr::Icmp(_name, "backgroundRight") == 0) {
+		retVar = &backgroundRight;
+	}
+	if (idStr::Icmp(_name, "backgroundTop") == 0) {
+		retVar = &backgroundTop;
+	}
+	if (idStr::Icmp(_name, "backgroundBottom") == 0) {
+		retVar = &backgroundBottom;
 	}
 	if (idStr::Icmp(_name, "visible") == 0) {
 		retVar = &visible;
@@ -2782,6 +3397,9 @@ idWinVar *idWindow::GetWinVarByName(const char *_name, bool fixup, drawWin_t** o
 	if (idStr::Icmp(_name, "rotate") == 0) {
 		retVar = &rotate;
 	}
+	if (idStr::Icmp(_name, "shear") == 0) {
+		retVar = &shear;
+	}
 	if (idStr::Icmp(_name, "noEvents") == 0) {
 		retVar = &noEvents;
 	}
@@ -2863,6 +3481,11 @@ idWinVar *idWindow::GetWinVarByName(const char *_name, bool fixup, drawWin_t** o
 			*owner = parent->FindChildByName ( name );
 		}
 
+		return retVar;
+	}
+
+	retVar = CreateRetailGuiVar( key.c_str() );
+	if ( retVar != NULL ) {
 		return retVar;
 	}
 
@@ -3010,17 +3633,6 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 		if ( !ParseScreenAlignYToken( token, screenAlignY ) ) {
 			src->Warning( "Unknown screenAlignY value '%s' in window '%s' (expected: middle|top|bottom)", token.c_str(), GetName() );
 		}
-		return true;
-	}
-	if (idStr::Icmp(_name, "shear") == 0) {
-		shear.x = src->ParseFloat();
-		idToken tok;
-		src->ReadToken( &tok );
-		if ( tok.Icmp( "," ) ) {
-			src->Error( "Expected comma in shear definiation" );
-			return false;
-		}
-		shear.y = src->ParseFloat();
 		return true;
 	}
 // jmarshall - quake 4
@@ -3236,6 +3848,8 @@ void idWindow::SetInitialState(const char *_name) {
 		name = name;
 	}
 	name = _name;
+	activeTabIndex = -1;
+	tabContainerInitialized = false;
 	matScalex = 1.0;
 	matScaley = 1.0;
 	forceAspectWidth = 640.0;
@@ -3244,6 +3858,220 @@ void idWindow::SetInitialState(const char *_name) {
 	visible = true;
 	alwaysThink = false;
 	flags = 0;
+}
+
+void idWindow::SetWindowDefType( const char *defType ) {
+	windowDefType = defType != NULL && defType[0] != '\0' ? defType : "windowDef";
+}
+
+bool idWindow::IsTabContainerDef() const {
+	return windowDefType.Icmp( "tabContainerDef" ) == 0;
+}
+
+bool idWindow::IsTabDef() const {
+	return windowDefType.Icmp( "tabDef" ) == 0;
+}
+
+bool idWindow::IsCreditDef() const {
+	return windowDefType.Icmp( "creditDef" ) == 0;
+}
+
+bool idWindow::IsSplineDef() const {
+	return windowDefType.Icmp( "splineDef" ) == 0;
+}
+
+bool idWindow::IsRetailSplineWindow() const {
+	return IsCreditDef() || IsSplineDef();
+}
+
+int idWindow::GetTabContainerTabCount() const {
+	if ( !IsTabContainerDef() ) {
+		return 0;
+	}
+	int count = 0;
+	for ( int i = 0; i < drawWindows.Num(); ++i ) {
+		const idWindow *child = drawWindows[i].win;
+		if ( child != NULL && child->IsTabDef() ) {
+			++count;
+		}
+	}
+	return count;
+}
+
+idWindow *idWindow::GetTabContainerTabWindow( int tabIndex ) const {
+	if ( !IsTabContainerDef() || tabIndex < 0 ) {
+		return NULL;
+	}
+	int ordinal = 0;
+	for ( int i = 0; i < drawWindows.Num(); ++i ) {
+		idWindow *child = drawWindows[i].win;
+		if ( child == NULL || !child->IsTabDef() ) {
+			continue;
+		}
+		if ( ordinal++ == tabIndex ) {
+			return child;
+		}
+	}
+	return NULL;
+}
+
+int idWindow::GetTabContainerRequestedTabIndex() const {
+	idWinVar *var = const_cast<idWindow *>( this )->GetWinVarByName( "activetab", false );
+	return var != NULL ? idMath::Ftoi( static_cast<float>( atof( var->c_str() ) ) ) : 0;
+}
+
+int idWindow::GetTabContainerTabAt( float x, float y ) const {
+	const int count = GetTabContainerTabCount();
+	if ( count <= 0 ) {
+		return -1;
+	}
+	const idRectangle containerRect( actualX, actualY, drawRect.w, drawRect.h );
+	retailTabLayout_t layout;
+	if ( !BuildRetailTabLayout( const_cast<idWindow *>( this ), containerRect, count, layout ) ) {
+		return -1;
+	}
+	for ( int i = 0; i < count; ++i ) {
+		const idRectangle tabRect = GetRetailTabButtonRect( containerRect, layout, i );
+		if ( x >= tabRect.x && y >= tabRect.y && x <= tabRect.Right() && y <= tabRect.Bottom() ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void idWindow::UpdateTabContainerState( bool runActivateScript ) {
+	if ( !IsTabContainerDef() ) {
+		return;
+	}
+	const int count = GetTabContainerTabCount();
+	if ( count <= 0 ) {
+		activeTabIndex = -1;
+		tabContainerInitialized = true;
+		return;
+	}
+	const int requested = idMath::ClampInt( 0, count - 1, GetTabContainerRequestedTabIndex() );
+	if ( tabContainerInitialized && requested == activeTabIndex ) {
+		return;
+	}
+	activeTabIndex = requested;
+	tabContainerInitialized = true;
+	idWinVar *activeTabVar = GetWinVarByName( "activetab", false );
+	if ( activeTabVar != NULL ) {
+		activeTabVar->Set( va( "%d", activeTabIndex ) );
+	}
+	idWindow *activeTab = NULL;
+	int ordinal = 0;
+	for ( int i = 0; i < drawWindows.Num(); ++i ) {
+		idWindow *child = drawWindows[i].win;
+		if ( child == NULL || !child->IsTabDef() ) {
+			continue;
+		}
+		const bool active = ordinal++ == activeTabIndex;
+		child->visible = active;
+		if ( active ) {
+			activeTab = child;
+		}
+	}
+	if ( overChild != NULL && overChild->IsTabDef() && overChild != activeTab ) {
+		overChild->MouseExit();
+		overChild = NULL;
+	}
+	idWindow *desktop = gui != NULL ? gui->GetDesktop() : NULL;
+	if ( desktop != NULL ) {
+		for ( int i = 0; i < drawWindows.Num(); ++i ) {
+			idWindow *tab = drawWindows[i].win;
+			if ( tab == NULL || !tab->IsTabDef() || tab == activeTab ) {
+				continue;
+			}
+			if ( desktop->captureChild != NULL && IsRetailWindowDescendantOf( desktop->captureChild, tab ) ) {
+				desktop->captureChild->LoseCapture();
+				desktop->captureChild = NULL;
+			}
+			if ( desktop->focusedChild != NULL && IsRetailWindowDescendantOf( desktop->focusedChild, tab ) ) {
+				desktop->focusedChild->LoseFocus();
+				desktop->focusedChild = NULL;
+			}
+		}
+	}
+	if ( activeTab != NULL && runActivateScript ) {
+		activeTab->RunScript( ON_TABACTIVATE );
+	}
+}
+
+void idWindow::DrawTabContainerTabs() {
+	const int count = GetTabContainerTabCount();
+	if ( count <= 0 ) {
+		return;
+	}
+	retailTabLayout_t layout;
+	if ( !BuildRetailTabLayout( this, drawRect, count, layout ) ) {
+		return;
+	}
+	const int hovered = gui != NULL ? GetTabContainerTabAt( gui->CursorX(), gui->CursorY() ) : -1;
+	for ( int index = 0; index < count; ++index ) {
+		idWindow *tab = GetTabContainerTabWindow( index );
+		if ( tab == NULL ) {
+			continue;
+		}
+		const bool active = index == activeTabIndex;
+		const bool hoverTab = index == hovered;
+		const idRectangle tabRect = GetRetailTabButtonRect( drawRect, layout, index );
+		idVec4 fillColor = tab->backColor;
+		if ( fillColor.w <= 0.0f ) {
+			fillColor = active ? idVec4( 0.22f, 0.29f, 0.36f, 0.75f ) :
+				( hoverTab ? idVec4( 0.17f, 0.23f, 0.30f, 0.68f ) : idVec4( 0.10f, 0.14f, 0.19f, 0.55f ) );
+		}
+		idVec4 textColor = active ? tab->foreColor : ( hoverTab ? tab->hoverColor : tab->foreColor );
+		if ( active ) {
+			idWinVar *var = tab->GetWinVarByName( "activecolor", false );
+			if ( var != NULL ) ParseRetailVec4( var->c_str(), textColor );
+		}
+		idVec4 materialColor = tab->matColor;
+		if ( hoverTab && !active ) {
+			idWinVar *var = tab->GetWinVarByName( "hovermatcolor", false );
+			if ( var != NULL ) ParseRetailVec4( var->c_str(), materialColor );
+		}
+		const idMaterial *startMat = NULL;
+		const idMaterial *middleMat = NULL;
+		const idMaterial *endMat = NULL;
+		if ( active ) {
+			startMat = FindRetailWindowMaterial( tab, "buttonactiveleftmat" );
+			middleMat = FindRetailWindowMaterial( tab, "buttonactivemiddlemat" );
+			endMat = FindRetailWindowMaterial( tab, "buttonactiverightmat" );
+		}
+		if ( startMat == NULL ) startMat = FindRetailWindowMaterial( tab, "buttonleftmat" );
+		if ( middleMat == NULL ) middleMat = FindRetailWindowMaterial( tab, "buttonmiddlemat" );
+		if ( endMat == NULL ) endMat = FindRetailWindowMaterial( tab, "buttonrightmat" );
+		if ( startMat == NULL ) startMat = FindRetailWindowMaterial( tab, active ? "activeleftmat" : "leftmat" );
+		if ( middleMat == NULL ) middleMat = FindRetailWindowMaterial( tab, active ? "activemiddlemat" : "middlemat" );
+		if ( endMat == NULL ) endMat = FindRetailWindowMaterial( tab, active ? "activerightmat" : "rightmat" );
+		if ( !layout.verticalTabs && startMat == NULL && middleMat == NULL && endMat == NULL ) {
+			startMat = declManager->FindMaterial( active ? "guis/assets/menu/tabedgeactive.tga" : "guis/assets/menu/tabedge.tga" );
+			middleMat = declManager->FindMaterial( active ? "guis/assets/menu/tabstripactive.tga" : "guis/assets/menu/tabstrip.tga" );
+		}
+		float edgeWidth = 8.0f;
+		idWinVar *edgeVar = tab->GetWinVarByName( "buttonedgewidth", false );
+		if ( edgeVar != NULL && atof( edgeVar->c_str() ) >= 0.0f ) {
+			edgeWidth = static_cast<float>( atof( edgeVar->c_str() ) );
+		}
+		DrawRetailSegments( dc, tabRect, layout.verticalTabs, edgeWidth, startMat, middleMat, endMat, materialColor, fillColor );
+		idRectangle labelRect = tabRect;
+		labelRect.x += tab->textAlignx;
+		labelRect.y += tab->textAligny;
+		tab->SetFont();
+		if ( tab->textShadow ) {
+			idStr shadow = tab->text;
+			shadow.RemoveColors();
+			idRectangle shadowRect = labelRect;
+			shadowRect.x += tab->textShadow;
+			shadowRect.y += tab->textShadow;
+			idVec4 shadowColor = colorBlack;
+			shadowColor.w = textColor.w;
+			dc->DrawText( shadow, tab->textScale, 1, shadowColor, shadowRect, false );
+		}
+		dc->DrawText( tab->text, tab->textScale, 1, textColor, labelRect, false );
+	}
+	SetFont();
 }
 
 /*
@@ -3256,7 +4084,9 @@ bool idWindow::Parse( idParser *src, bool rebuild) {
 	idStr work;
 
 	if (rebuild) {
+		const idStr preservedWindowDefType = windowDefType;
 		CleanUp();
+		windowDefType = preservedWindowDefType;
 	}
 
 	drawWin_t dwt;
@@ -3286,8 +4116,12 @@ bool idWindow::Parse( idParser *src, bool rebuild) {
 		// track what was parsed so we can maintain it for the guieditor
 		src->SetMarker ( );
 
-		if ( token == "windowDef" || token == "animationDef" ) {
-			if (token == "animationDef") {
+		if ( !token.Icmp( "windowDef" ) || !token.Icmp( "animationDef" ) ||
+			 !token.Icmp( "buttonDef" ) || !token.Icmp( "superWindowDef" ) ||
+			 !token.Icmp( "tabContainerDef" ) || !token.Icmp( "tabDef" ) ||
+			 !token.Icmp( "keyDef" ) || !token.Icmp( "creditDef" ) || !token.Icmp( "splineDef" ) ) {
+			const idStr childDefType = token;
+			if ( !token.Icmp( "animationDef" ) ) {
 				visible = false;
 				rect = idRectangle(0,0,0,0);
 			}
@@ -3297,10 +4131,12 @@ bool idWindow::Parse( idParser *src, bool rebuild) {
 			drawWin_t *dw = FindChildByName(token2.c_str());
 			if (dw && dw->win) {
 				SaveExpressionParseState();
+				dw->win->SetWindowDefType( childDefType.c_str() );
 				dw->win->Parse(src, rebuild);
 				RestoreExpressionParseState();
 			} else {
 				idWindow *win = new idWindow(dc, gui);
+				win->SetWindowDefType( childDefType.c_str() );
 				SaveExpressionParseState();
 				win->Parse(src, rebuild);
 				RestoreExpressionParseState();
@@ -3364,7 +4200,7 @@ bool idWindow::Parse( idParser *src, bool rebuild) {
 			dwt.win = win;
 			drawWindows.Append(dwt);
 		}
-		else if ( token == "bindDef" ) {
+		else if ( !token.Icmp( "bindDef" ) || !token.Icmp( "bindKeyDef" ) ) {
 			idBindWindow *win = new idBindWindow(dc, gui);
 		  	SaveExpressionParseState();
 			win->Parse(src, rebuild);	
@@ -4696,7 +5532,7 @@ void idWindow::WriteToSaveGame( idFile *savefile ) {
 	savefile->Write( &savedTextStyle, sizeof( savedTextStyle ) );
 	savefile->Write( &savedTextSpacing, sizeof( savedTextSpacing ) );
 	savefile->Write( &textShadow, sizeof( textShadow ) );
-	savefile->Write( &shear, sizeof( shear ) );
+	shear.WriteToSaveGame( savefile );
 
 	WriteSaveGameString( name, savefile );
 	WriteSaveGameString( comment, savefile );
@@ -4853,7 +5689,7 @@ void idWindow::ReadFromSaveGame( idFile *savefile ) {
 	textstyle = static_cast<float>( savedTextStyle );
 	textspacing = savedTextSpacing;
 	OpenQ4_ReadSaveGameField( savefile, textShadow, "idWindow::ReadFromSaveGame", "text shadow" );
-	OpenQ4_ReadSaveGameField( savefile, shear, "idWindow::ReadFromSaveGame", "shear" );
+	shear.ReadFromSaveGame( savefile );
 
 	ReadSaveGameString( name, savefile );
 	ReadSaveGameString( comment, savefile );
@@ -5131,6 +5967,22 @@ void idWindow::AddChild(idWindow *win) {
 	}
 	win->SetParent( this );
 	win->childID = children.Append(win);
+}
+
+/*
+===============
+idWindow::AddChildWindow
+===============
+*/
+void idWindow::AddChildWindow(idWindow *win) {
+	if ( win == NULL ) {
+		return;
+	}
+	drawWin_t childWindow;
+	childWindow.simp = NULL;
+	childWindow.win = win;
+	AddChild( win );
+	drawWindows.Append( childWindow );
 }
 
 /*
@@ -5498,6 +6350,10 @@ void idWindow::SetDefaults ( void ) {
 
 	background = NULL;
 	backGroundName = "";
+	backgroundLeft = "";
+	backgroundRight = "";
+	backgroundTop = "";
+	backgroundBottom = "";
 }
 
 /*

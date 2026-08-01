@@ -47,7 +47,7 @@ Automated coverage:
 | `renderer-deferred-resolve-selftest` | opt-in `r_rendererModernDeferred` coverage for graph-backed deferred resolve output, G-buffer/depth/cluster buffer inputs, point/projected light accumulation, light-grid contribution, fallback accounting, deferred debug-overlay readiness, GPU timer coverage, and `gfxInfo` reporting |
 | `renderer-forward-plus-selftest` | opt-in `r_rendererForwardPlus` coverage for graph-backed scene-color/depth resources, clustered opaque/alpha-test/transparent programs, clustered-light UBO/SSBO reads, transparent sort preservation, fallback accounting, overdraw estimates, GPU timer coverage, and `gfxInfo` reporting |
 | `renderer-modern-visible-selftest` | opt-in `r_rendererModernVisible` coverage for the guarded hybrid visible-frame bridge: graph-backed depth, G-buffer, deferred resolve, forward+ source output, graph-owned `hybridSceneColor` composition, HDR/post-process handoff before SSAO/bloom/authored post, depth-copy handoff accounting, shadow-ready handoff/fallback accounting, final GUI/present overlay, GPU timer coverage, and `gfxInfo` reporting |
-| `renderer-modern-compatibility-selftest` | Phase 14 modern-visible compatibility coverage for command-category ownership inventory, modern fullscreen GUI readiness, light-grid ownership, explicit post/copy/subview/render-demo/BSE fallback buckets, deterministic render-demo accounting, and `gfxInfo` reporting |
+| `renderer-modern-compatibility-selftest` | Phase 14 modern-visible compatibility coverage for command-category ownership inventory, modern GUI readiness, light-grid ownership, explicit post/copy/subview/render-demo/dormant-BSE fallback buckets, deterministic render-demo accounting, and `gfxInfo` reporting |
 | `renderer-compatibility-gates-selftest` | Phase 15 fallback-gate coverage for missing UBO, broken MRT, missing timer query, missing buffer storage, rejected debug-context fallback, and synthetic driver-quirk downgrades |
 | `renderer-default-promotion-selftest` | Phase 8 evidence-gated default-promotion coverage for `r_glTier auto`, explicit `r_renderer arb2` escape behavior, compatibility gates, modern-executor readiness, ARB2 rollback availability, missing/incomplete/complete `r_rendererPromotionEvidence`, and `r_rendererModernAutoPromote` sign-off control |
 | `renderer-default-safety-selftest` | Phase 13 conservative-default coverage for ARB2 default visibility, `r_renderer best` or explicit `r_renderer arb2`, `r_glTier auto`, rollback availability, and default-off modern executor, visible, diagnostic, GPU-validation, bindless, shader-reload, and auto-promotion cvars |
@@ -82,7 +82,7 @@ The shader-library tier cases force `r_glTier gl33`, `gl41`, `gl43`, `gl45`, and
 Gameplay benchmark acceptance should use wall-clock sampling for FPS claims. The `--sample-msec` option emits `waitMsec` into the generated cfg so the measurement window is a real duration rather than a frame count:
 
 ```powershell
-python tools\tests\renderer_gameplay_benchmark.py --profile smoke --maxfps 0 --swap-intervals 0 --display-modes fullscreen --autoexec-delay-ms 2000 --settle-frames 1 --sample-msec 3000 --pacing-only --min-pacing-hz 120 --max-p95-ms 12 --max-p99-ms 20
+python tools\tests\renderer_gameplay_benchmark.py --profile smoke --maxfps 0 --swap-intervals 0 --display-modes windowed --autoexec-delay-ms 2000 --settle-frames 1 --sample-msec 3000 --pacing-only --min-pacing-hz 120 --max-p95-ms 12 --max-p99-ms 20
 ```
 
 ## Compatibility Gates
@@ -128,8 +128,8 @@ These image captures are the comparison set for scenes where deterministic outpu
 |---|---|---|---|
 | `capture-startup-mainmenu` | SP | main menu after logo skip | deterministic GUI composition, font/material atlas, and widescreen expansion |
 | `capture-renderer-visible-selftest` | safe startup | `rendererModernVisibleSelfTest` | synthetic modern-visible depth/G-buffer/deferred/forward+/hybrid-scene/present composition with shadow-policy handoff |
-| `capture-renderer-compatibility-selftest` | safe startup | `rendererModernCompatibilitySelfTest` | known fallback inventory for GUI/post/subview/render-demo/BSE categories |
-| `capture-sp-airdefense1-static` | SP | `game/airdefense1` fixed spawn, no input for 3 seconds | outdoor lighting, terrain decals, BSE smoke, and stock material parity |
+| `capture-renderer-compatibility-selftest` | safe startup | `rendererModernCompatibilitySelfTest` | known fallback inventory for GUI/post/subview/render-demo/dormant-BSE categories |
+| `capture-sp-roadhouse-static` | SP | `game/roadhouse` fixed spawn, no input for 3 seconds | stock Prey character, interior-lighting, material, and scripted-presentation parity |
 
 ## RenderDoc Tier Checklist
 
@@ -162,8 +162,8 @@ These are manual long-run sign-off loops. They are intentionally outside the saf
 | Case | Mode | Purpose |
 |---|---|---|
 | `longrun-vid-restart-10x` | SP | repeat `vid_restart` ten times under `r_glTier auto`, `gl33`, and the highest supported forced tier; inspect logs after each cycle |
-| `longrun-map-transition-sp` | SP | transition between `game/airdefense1`, `game/storage2`, and `game/medlabs` without restarting the process |
-| `longrun-mp-listen-reconnect` | MP | `mp/q4dm1` listen server with local client connect, disconnect, reconnect, then map restart |
+| `longrun-map-transition-sp` | SP | transition between `game/roadhouse`, `game/feedingtowera`, and `game/biolabsa` without restarting the process |
+| `longrun-mp-listen-reconnect` | MP | `game/dmroadhouse` listen server with local client connect, disconnect, reconnect, then map restart |
 
 ## Performance Regression Thresholds
 
@@ -178,17 +178,17 @@ These are manual long-run sign-off loops. They are intentionally outside the saf
 
 ## Manual Gameplay Matrix
 
-Gameplay validation remains mandatory before renderer release sign-off, but it is not run by the safe matrix by default because map loads need target-hardware supervision. Use the SP launch task for single-player maps, the MP launch task or `tools\debug\start_listen_server_client.ps1` for multiplayer, or the opt-in gameplay benchmark harness below when you want a repeatable logged capture set.
+Gameplay validation remains mandatory before renderer release sign-off, but it is not run by the safe matrix by default because map loads need target-hardware supervision. The cases below are checked against the canonical `.vscode/prey-maps.json` manifest. Use the SP launch task for single-player maps, the MP launch task or `tools\debug\start_listen_server_client.ps1` for multiplayer, or the opt-in gameplay benchmark harness below when you want a repeatable logged capture set.
 
 | Case | Mode | Map | Purpose |
 |---|---|---|---|
-| `sp-storage1` | SP | `game/storage1` | primary high-FPS renderer acceptance scene, dense indoor lighting, and early-game storage visual parity |
-| `sp-airdefense1` | SP | `game/airdefense1` | stock SP baseline, outdoor lighting, BSE smoke |
-| `sp-airdefense2` | SP | `game/airdefense2` | flashlight, projected shadows, animated characters |
-| `sp-storage2` | SP | `game/storage2` | indoor materials and post-process coverage |
-| `sp-bse-heavy` | SP | `game/medlabs` | stress BSE effects without replacement content |
-| `sp-cinematic-subview` | SP | `game/mcc_landing` | subviews, remote cameras, cinematic and GUI interaction |
-| `mp-q4dm1-listen` | MP | `mp/q4dm1` | listen-server and local-client MP parity |
+| `sp-roadhouse` | SP | `game/roadhouse` | opening-campaign characters, indoor materials, scripted sequences, mirror/glass, and GUI presentation |
+| `sp-feedingtowera` | SP | `game/feedingtowera` | gravity, wall-walk, portal traversal, sky, energy, glass, and industrial lighting |
+| `sp-biolabsa` | SP | `game/biolabsa` | dense interior materials, scan/energy effects, local lights, animated characters, and combat effects |
+| `sp-superportal` | SP | `game/superportal` | large-scale portal, translucent energy, glass, post-process, and long-view coverage |
+| `sp-shuttlea` | SP | `game/shuttlea` | shuttle view, cockpit GUI, beam/particle effects, portal views, and HUD composition |
+| `sp-lotaa` | SP | `game/lotaa` | outdoor/dreamworld sky, spirit-era gameplay, portal geometry, and Prey effects |
+| `mp-dmroadhouse-listen` | MP | `game/dmroadhouse` | unified-module listen-server and local-client renderer parity on the active stock MP smoke map |
 
 For each gameplay case, validate the matrix variants that the hardware supports:
 
@@ -198,18 +198,20 @@ For each gameplay case, validate the matrix variants that the hardware supports:
 | renderer escape | `r_renderer best`, `r_renderer arb2`, `r_glTier legacy` |
 | `r_swapInterval` | `0`, `1` |
 | `com_maxfps` | `120`, `240`, `0` |
-| display mode | windowed, fullscreen |
+| display mode | windowed only for agent validation |
 | renderer diagnostics | `r_rendererMetrics 1`, `r_rendererMetrics 2`, `r_rendererModernAutoPromote 0`, and one signed `r_rendererModernAutoPromote 1` candidate run with the complete `r_rendererPromotionEvidence` token after the other rows are clean |
 
-After each gameplay smoke, inspect the configured log file under `fs_savepath\<gameDir>\logs\openq4.log` or the case-specific log emitted by the launch tool. Fix errors and warnings, then repeat the loop until the case is clean.
+After each gameplay smoke, inspect the configured log file under `fs_savepath\basepr\logs\openprey.log` or the case-specific log emitted by the launch tool. Fix errors and warnings, then repeat the loop until the case is clean.
 
 ## Gameplay Benchmark Harness
 
 `tools\tests\renderer_gameplay_benchmark.py` is the Phase 12 map-loading runner. It launches the staged client from `.install`, uses isolated save paths under `.tmp\renderer-gameplay\`, enters SP maps or an MP listen server plus loopback client, waits for streaming, runs a fixed static spawn camera path unless a case is later extended with authored poses, captures screenshots, emits `rendererBenchmarkCapture`, `framePacingSnapshot`, and `gfxInfo`, and writes Markdown/JSON reports.
 
+A static-spawn capture proves map entry, initial-view rendering, logging, and benchmark plumbing only. Feature-specific acceptance for portals, shuttle views, spirit/deathwalk presentation, cutout geometry, and particular light arrangements requires a reviewed `setviewpos` bookmark or human navigation to the named scene before it can be claimed as visual evidence.
+
 The runner uses the SP/MP `g_autoExecAfterMapLoad` hook to execute its generated cfg after the map is active, not during loading UI. Renderer metrics are enabled only inside the gameplay capture window, which keeps load-screen logs quiet while still producing benchmark samples, GPU timing where available, frame-pacing output, and a screenshot artifact.
 
-Use `--pacing-only` for high-FPS acceptance after a diagnostic metrics pass is already clean. This keeps `r_rendererMetrics`, GL timer queries, and the FPS overlay out of the timed window, still emits `framePacingSnapshot`, and can fail the run with parsed thresholds such as `--min-pacing-hz 120 --max-p95-ms 12`. The `game/storage1` acceptance run should start sampling two seconds after the active map draw with `r_swapInterval 0` and `com_maxfps 0` so the result measures renderer throughput rather than the old low-FPS plan cap.
+Use `--pacing-only` for high-FPS acceptance after a diagnostic metrics pass is already clean. This keeps `r_rendererMetrics`, GL timer queries, and the FPS overlay out of the timed window, still emits `framePacingSnapshot`, and can fail the run with parsed thresholds such as `--min-pacing-hz 120 --max-p95-ms 12`. The `game/roadhouse` acceptance run should start sampling two seconds after the active map draw with `r_swapInterval 0` and `com_maxfps 0` so the result measures renderer throughput rather than the old low-FPS plan cap.
 
 Common runs:
 
@@ -218,7 +220,6 @@ python tools\tests\renderer_gameplay_benchmark.py --list
 python tools\tests\renderer_gameplay_benchmark.py --profile smoke
 python tools\tests\renderer_gameplay_benchmark.py --profile smoke --pacing-only --autoexec-delay-ms 2000 --min-pacing-hz 120 --max-p95-ms 12
 python tools\tests\renderer_gameplay_benchmark.py --profile required
-python tools\tests\renderer_gameplay_benchmark.py --profile campaign-split-state-transition --timeout 360
 python tools\tests\renderer_gameplay_benchmark.py --profile tiers
 python tools\tests\renderer_gameplay_benchmark.py --profile presentation
 python tools\tests\renderer_gameplay_benchmark.py --profile shadows
@@ -228,36 +229,35 @@ The runner fails a case when the process times out, no gameplay screenshot is pr
 
 | Profile | Coverage |
 |---|---|
-| `smoke` | bounded `game/storage1` SP gameplay smoke with screenshot, metrics, frame-pacing snapshot, and zero-warning log gates |
-| `required` | `game/storage1`, `game/airdefense1`, `game/airdefense2`, `game/storage2`, `game/medlabs`, `game/mcc_landing`, and `mp/q4dm1` listen server plus local client |
-| `campaign-split-state-transition` | triggers the real SP end-level targets from `game/mcc_2` through `game/storage1 first`, `game/storage2`, `game/storage1 second`, and into `game/tram1`, asserting the active `si_entityFilter` after each load |
-| `tiers` | forced `r_glTier auto`, `legacy`, `gl33`, `gl41`, `gl43`, `gl45`, and `gl46` gameplay probes |
-| `presentation` | `r_swapInterval 0/1`, `com_maxfps 0/120/240`, windowed, and fullscreen coverage for uncapped/high-refresh validation |
-| `shadows` | stencil fallback, mapped shadows, CSM, translucent moments, and debug-overlay modes `1..6` over the shadow correctness scenes |
+| `smoke` | bounded `game/roadhouse` SP gameplay smoke with screenshot, metrics, frame-pacing snapshot, and zero-warning log gates |
+| `required` | `game/roadhouse`, `game/feedingtowera`, `game/biolabsa`, `game/superportal`, `game/shuttlea`, `game/lotaa`, and a `game/dmroadhouse` listen server plus local client |
+| `tiers` | forced `r_glTier auto`, `legacy`, `gl33`, `gl41`, `gl43`, `gl45`, and `gl46` `game/roadhouse` probes |
+| `presentation` | windowed `r_swapInterval 0/1` and `com_maxfps 0/120/240` coverage for uncapped/high-refresh validation |
+| `shadows` | stencil fallback, mapped shadows, CSM, translucent moments, and debug-overlay modes `1..7`, `12..14` over the Prey shadow correctness scenes |
 Optional deterministic image comparison uses TGA references:
 
 ```powershell
 python tools\tests\renderer_gameplay_benchmark.py --profile smoke --reference-dir .tmp\renderer-references --require-references
 ```
 
-Nondeterministic BSE, cinematic, and MP scenes need human review in addition to the automated log/screenshot gates:
+Nondeterministic Prey portal/beam/particle, shuttle-view, and MP scenes need human review in addition to the automated log/screenshot gates:
 
 | Case | Focus | Checks |
 |---|---|---|
-| `sp-bse-heavy` | BSE-heavy effects in `game/medlabs` | effect sprites/trails animate at the expected cadence, no black quads, no missing additive passes, no warning spam |
-| `sp-cinematic-subview` | cinematic/subview flow in `game/mcc_landing` | remote-camera/subview content is visible, GUI overlays composite in the right order, cinematic handoff keeps frame pacing stable |
-| `mp-q4dm1-listen` | local MP listen server plus loopback client | client reaches the map, player/world lighting matches host expectations, frame pacing remains uncapped when requested |
+| `sp-superportal` | portal/translucent-energy flow in `game/superportal` | portal content remains visible, energy/glass composites in the right order, no black quads or warning spam |
+| `sp-shuttlea` | shuttle-view and cockpit flow in `game/shuttlea` | cockpit GUI and portal views render correctly after navigating to the shuttle, and frame pacing remains stable |
+| `mp-dmroadhouse-listen` | local MP listen server plus loopback client | client reaches the map, player/world lighting matches host expectations, frame pacing remains uncapped when requested |
 
 ## Shadow Correctness Matrix
 
 | Case | Mode | Map | Purpose |
 |---|---|---|---|
-| `shadow-projected-airdefense2` | SP | `game/airdefense2` | angled projected-light caster/receiver validation |
-| `shadow-point-storage2` | SP | `game/storage2` | point-light face coverage and local-light receiver validation |
-| `shadow-csm-airdefense1` | SP | `game/airdefense1` | CSM camera sweep readiness and outdoor directional coverage |
-| `shadow-cutout-storage2` | SP | `game/storage2` | hashed-alpha cutout fence/grate caster validation at distance |
-| `shadow-character-airdefense2` | SP | `game/airdefense2` | dynamic character shadow caster and receiver validation |
-| `shadow-translucent-medlabs` | SP | `game/medlabs` | optional translucent moment caster coverage where the selected tier supports it |
+| `shadow-projected-feedingtowera` | SP | `game/feedingtowera` | projected-light caster/receiver validation against energy, sky, and industrial geometry |
+| `shadow-point-biolabsa` | SP | `game/biolabsa` | dense point-light face coverage and local-light receiver validation |
+| `shadow-csm-lotaa` | SP | `game/lotaa` | CSM camera-sweep readiness across outdoor/dreamworld sky geometry |
+| `shadow-cutout-roadhouse` | SP | `game/roadhouse` | hashed-alpha chain-link/cutout caster validation at distance |
+| `shadow-character-feedingtowera` | SP | `game/feedingtowera` | dynamic character/skinned shadow caster and receiver validation |
+| `shadow-translucent-superportal` | SP | `game/superportal` | optional translucent portal/energy moment-caster coverage where supported |
 
 ## Acceptance
 

@@ -312,7 +312,7 @@ def test_modern_lighting_keeps_scene_referred_energy():
 
 def test_bloom_shader_uses_saturation_aware_brightness():
     root = Path(__file__).resolve().parents[2]
-    shader = (root / "content" / "baseoq4" / "pak0" / "glprogs" / "bloom_extract.fs").read_text(encoding="utf-8")
+    shader = (root / "content" / "basepr" / "pak0" / "glprogs" / "bloom_extract.fs").read_text(encoding="utf-8")
     draw_common = (root / "src" / "renderer" / "draw_common.cpp").read_text(encoding="utf-8")
 
     assert_true("BloomBrightness" in shader, "bloom extraction should use an explicit brightness helper")
@@ -323,8 +323,8 @@ def test_bloom_shader_uses_saturation_aware_brightness():
 
 def test_hdr_shader_uses_scene_referred_inputs():
     root = Path(__file__).resolve().parents[2]
-    composite = (root / "content" / "baseoq4" / "pak0" / "glprogs" / "bloom.fs").read_text(encoding="utf-8")
-    luminance = (root / "content" / "baseoq4" / "pak0" / "glprogs" / "hdr_luminance.fs").read_text(encoding="utf-8")
+    composite = (root / "content" / "basepr" / "pak0" / "glprogs" / "bloom.fs").read_text(encoding="utf-8")
+    luminance = (root / "content" / "basepr" / "pak0" / "glprogs" / "hdr_luminance.fs").read_text(encoding="utf-8")
     draw_common = (root / "src" / "renderer" / "draw_common.cpp").read_text(encoding="utf-8")
 
     assert_true("SceneReferredHDRColor" in composite, "HDR composite should sanitize scene-referred color before tonemap/debug")
@@ -334,7 +334,7 @@ def test_hdr_shader_uses_scene_referred_inputs():
 
 def test_weapon_wheel_dof_quality_contract():
     root = Path(__file__).resolve().parents[2]
-    shader = (root / "content" / "baseoq4" / "pak0" / "glprogs" / "blur.fs").read_text(encoding="utf-8")
+    shader = (root / "content" / "basepr" / "pak0" / "glprogs" / "blur.fs").read_text(encoding="utf-8")
 
     previous = -1.0
     for step in range(65):

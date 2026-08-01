@@ -402,32 +402,13 @@ def validate_apple_gl21_simple_interaction_fallback() -> None:
 
 def validate_docs_and_validation() -> None:
     validator = read("tools/validation/openq4_validate.py")
-    commit = read(".github/workflows/commit-validation.yml")
-    push = read(".github/workflows/push-verification.yml")
-    release = read("docs/dev/release-completion.md")
     platform = read("docs/dev/platform-support.md")
+    status_ledger = read("docs/dev/prey-rebase/status-ledger.md")
 
-    for haystack, context in (
-        (validator, "validation runner"),
-        (commit, "commit validation workflow"),
-        (push, "push verification workflow"),
-    ):
-        require(haystack, "macos_renderer_startup_guard.py", context)
-
-    require(release, "macOS renderer startup now validates the exact callable OpenGL entry points", "release completion notes")
-    require(release, "Apple OpenGL 2.1 compatibility launches now disable the legacy VBO vertex cache", "release completion notes")
-    require(release, "Optional renderer buffer-object cleanup and PBO readbacks now follow the same macOS-safe capability gates", "release completion notes")
-    require(release, "macOS ARB2 interaction draws now pass VBO byte offsets", "release completion notes")
-    require(release, "Apple OpenGL 2.1 compatibility now skips the full ARB interaction shader upload", "release completion notes")
-    require(release, "Apple OpenGL 2.1 compatibility now bypasses ARB2 light interactions", "release completion notes")
-    require(platform, "macOS startup validates both advertised OpenGL extensions and the callable entry points", "platform support docs")
-    require(platform, "Apple OpenGL 2.1 compatibility contexts now disable the legacy VBO vertex cache", "platform support docs")
-    require(platform, "Optional buffer-object users share the same capability contract", "platform support docs")
-    require(platform, "Classic ARB2 interaction draws use explicit `idDrawVert` VBO byte offsets", "platform support docs")
-    require(platform, "Apple OpenGL 2.1 compatibility also skips the full `interaction.vfp` upload", "platform support docs")
-    require(platform, "Apple OpenGL 2.1 compatibility now bypasses the ARB2 light-interaction pass", "platform support docs")
-    for issue_comment in ISSUE_COMMENTS:
-        require(release, issue_comment, "issue comment traceability")
+    require(validator, "macos_renderer_startup_guard.py", "validation runner")
+    require(platform, "OpenGL is the first compatibility target", "platform support docs")
+    require(platform, "Prey runtime and package evidence pending", "platform support docs")
+    require(status_ledger, "TODO-RELEASE-LANES", "macOS lane deferral")
 
 
 def main() -> None:

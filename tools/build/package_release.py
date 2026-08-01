@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for openQ4 release packaging."""
+"""Compatibility entry point for openPREY release packaging."""
 
 from __future__ import annotations
 

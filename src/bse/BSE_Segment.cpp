@@ -549,6 +549,7 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 		return true;
 	case SEG_EFFECT:
 		if (!GetExpired() && st->mNumEffects > 0 && game) {
+#if !defined(HUMANHEAD)
 			const int index = rvRandom::irand(0, st->mNumEffects - 1);
 			const rvDeclEffect* nested = st->mEffects[index];
 			if (nested) {
@@ -563,6 +564,7 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 					EC_IGNORE,
 					vec4_one);
 			}
+#endif
 			SetExpired(true);
 		}
 		return true;
@@ -598,6 +600,7 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 	case SEG_TUNNEL:
 	case SEG_DOUBLEVISION:
 		if (!GetExpired() && game) {
+#if !defined(HUMANHEAD)
 			int viewEffect = VIEWEFFECT_SHAKE;
 			if (st->mSegType == SEG_TUNNEL) {
 				viewEffect = VIEWEFFECT_TUNNEL;
@@ -608,6 +611,7 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 			const float finishTime = mSegStartTime + AttenuateDuration(effect, st);
 			const float scale = Max(0.0f, effect->GetOriginAttenuation(st));
 			game->StartViewEffect(viewEffect, finishTime, scale);
+#endif
 			SetExpired(true);
 		}
 		return true;

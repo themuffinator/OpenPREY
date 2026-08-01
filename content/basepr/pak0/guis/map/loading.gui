@@ -1,0 +1,123 @@
+// Level loading gui, can have a unique one for each map
+
+windowDef Desktop {
+	rect		0, 0, 640, 480
+	backcolor	0.20, 0.20, 0.40, 1
+	forecolor	1, 1, 0, 1
+	nocursor	1
+	menugui		1
+
+	onTime 0 {
+		if ( "gui::loading_bkgnd" == "" ) {
+			set "gui::loading_bkgnd" "guis/assets/loading/loading"
+			set "gui::loading_bkgnd_left" "guis/assets/loading/loading_left"
+			set "gui::loading_bkgnd_right" "guis/assets/loading/loading_right"
+			set "gui::loading_bkgnd_top" "guis/assets/loading/loading_top"
+			set "gui::loading_bkgnd_bottom" "guis/assets/loading/loading_bottom"
+		}
+	}
+
+	windowDef BackgroundWide {
+		rect		( 0 - "gui::virtual_screen_x_expand" ), ( 0 - "gui::virtual_screen_y_expand" ), ( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ), ( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		visible		( "gui::loading_bkgnd_canvasfill" == 1 )
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"gui::loading_bkgnd"
+		matcanvasfill	1
+		noclip		1
+	}
+
+	windowDef BackgroundLegacy {
+		rect		0, 0, 640, 480
+		visible		( "gui::loading_bkgnd_canvasfill" == 0 )
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"gui::loading_bkgnd"
+		backgroundLeft "gui::loading_bkgnd_left"
+		backgroundRight "gui::loading_bkgnd_right"
+		backgroundTop "gui::loading_bkgnd_top"
+		backgroundBottom "gui::loading_bkgnd_bottom"
+		noclip		1
+	}
+
+	windowDef FriendlyBack {
+		rect		0, 10, 640, 35
+		screenaligny top
+		background	"textures/gfx/colors/white"
+		matcolor	0.0, 0.0, 0, 0.55
+	}
+
+	windowDef FriendlyName {
+		rect		0, 10, 640, 30
+		screenaligny top
+		forecolor	0.65, 0.75, 1, 0.8
+		text		"gui::loading_levelname"
+		textscale	0.6
+		textalign	1
+		textaligny	-5
+		shadow		1
+		font		"fonts/menu"
+	}
+
+	windowDef AuthorName {
+		rect		0, 40, 640, 20
+		screenaligny top
+		visible		"gui::loading_author_visible"
+		forecolor	0.85, 0.85, 1, 0.75
+		text		"gui::loading_author"
+		textscale	0.3
+		textalign	1
+		textaligny	-2
+		shadow		1
+		font		"fonts/menu"
+	}
+
+	windowDef ObjectivesBack {
+		rect		20, 348, 430, 74
+		screenaligny bottom
+		background	"textures/gfx/colors/white"
+		matcolor	0.0, 0.0, 0.0, 0.45
+	}
+
+	windowDef Objectives {
+		rect		32, 356, 406, 58
+		screenaligny bottom
+		forecolor	0.86, 0.9, 1.0, 0.82
+		text		"gui::loading_objectives"
+		textscale	0.28
+		textalign	0
+		textaligny	0
+		shadow		1
+		font		"fonts/menu"
+	}
+
+	// Progress Bar
+	windowDef ProgressBarClip {
+		rect	192, 455, ("gui::map_loading" * 256), 12
+		screenaligny bottom
+		
+		windowDef ProgressBarFill {
+			rect		0, 0, 256, 12
+			background	"textures/gfx/colors/white"
+			matcolor	0.35, 0.35, 1, 0.65
+		}
+	}
+	windowDef baroutline {
+		rect		168, 443, 304, 30
+		screenaligny bottom
+		background	"guis/assets/menu/bottombar"
+		matcolor	1, 1, 1, 1
+	}
+
+	windowDef LoadingText {
+		rect		474, 445, 146, 20
+		screenaligny bottom
+		forecolor	0.75, 0.82, 1.0, 0.72
+		text		"gui::loading_message"
+		textscale	0.4
+		textalign	2
+		textaligny	-2
+		shadow		1
+		font		"fonts/menu"
+	}
+}

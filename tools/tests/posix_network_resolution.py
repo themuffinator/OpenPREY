@@ -66,18 +66,10 @@ def validate_legacy_message_format() -> None:
     require(source, "adr->type = NA_IP;", "legacy netadr read type")
 
 
-def validate_release_note() -> None:
-    source = read("docs/dev/release-completion.md")
-
-    require(source, "POSIX networking now uses modern address resolution", "release completion notes")
-    require(source, "IPv6 literals and AAAA records", "release completion notes")
-
-
 def main() -> None:
     validate_posix_resolver()
     validate_public_netadr_shape()
     validate_legacy_message_format()
-    validate_release_note()
     print("posix_network_resolution: ok")
 
 

@@ -100,6 +100,49 @@ def validate_language_reload_contract() -> None:
     require_order(init_game, "InitLanguageDict( false, false );", "fileSystem->SetIsFileLoadingAllowed( wasFileLoadingAllowed );", "file-loading flag restored after final language reload")
 
 
+def validate_config_filename_migration_contract() -> None:
+    source = read("src/framework/Common.cpp")
+    licensee = read("src/framework/licensee.h")
+    exact_name = function_body(
+        source,
+        "static bool openPREY_SavePathHasExactFilename( const char *relativeFilename ) {",
+    )
+    exec_config = function_body(
+        source,
+        "static bool openPREY_ExecConfigFromSavePath( const char *relativeFilename ) {",
+    )
+    normalize_case = function_body(
+        source,
+        "static bool openPREY_NormalizeConfigFilenameCase( const char *loadedFilename ) {",
+    )
+    init_game = function_body(source, "void idCommonLocal::InitGame( void ) {")
+
+    require(licensee, '"openPREYConfig.cfg"', "canonical config filename")
+    require(licensee, '"OpenPREYConfig.cfg"', "interim config filename")
+    require(licensee, '"OpenPreyConfig.cfg"', "legacy config filename")
+    require(exact_name, "Sys_ListFiles( directory.c_str(), \"\", entries )", "case-exact savepath probe")
+    require(exact_name, "idStr::Cmp( entries[i].c_str(), filename.c_str() ) == 0", "case-sensitive filename match")
+    require(exec_config, "openPREY_SavePathHasExactFilename( relativeFilename )", "config execution case guard")
+    require(normalize_case, "rename( loadedOSPath.c_str(), temporaryOSPath.c_str() )", "case-only migration first rename")
+    require(normalize_case, "rename( temporaryOSPath.c_str(), canonicalOSPath.c_str() )", "case-only migration canonical rename")
+    require(normalize_case, "rename( temporaryOSPath.c_str(), loadedOSPath.c_str() )", "failed migration rollback")
+    require(init_game, "legacyConfigNameToMigrate = INTERIM_CONFIG_FILE;", "interim config migration selection")
+    require(init_game, "legacyConfigNameToMigrate = LEGACY_CONFIG_FILE;", "legacy config migration selection")
+    require(init_game, "openPREY_NormalizeConfigFilenameCase( legacyConfigNameToMigrate );", "runtime filename normalization")
+    require_order(
+        init_game,
+        "cmdSystem->ExecuteCommandBuffer();",
+        "openPREY_NormalizeConfigFilenameCase( legacyConfigNameToMigrate );",
+        "legacy config executes before its filename is normalized",
+    )
+    require_order(
+        init_game,
+        "openPREY_NormalizeConfigFilenameCase( legacyConfigNameToMigrate );",
+        "WriteConfigToFile( CONFIG_FILE );",
+        "filename normalization precedes canonical config rewrite",
+    )
+
+
 def validate_ci_smoke() -> None:
     push = read(".github/workflows/push-verification.yml")
     commit = read(".github/workflows/commit-validation.yml")
@@ -115,6 +158,7 @@ def validate_ci_smoke() -> None:
 
 def main() -> None:
     validate_language_reload_contract()
+    validate_config_filename_migration_contract()
     validate_ci_smoke()
     print("startup_language_override: ok")
 

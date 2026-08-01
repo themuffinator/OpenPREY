@@ -11,13 +11,13 @@ body:
       value: |
         macOS support is experimental. Complete reports are especially useful because the maintainer may not have access to macOS hardware.
 
-        If this looks like GitHub issue #73, please attach full terminal output as text, not only a screenshot. The most useful reports include both the terminal transcript and the saved `openq4.log`.
+        If this looks like GitHub issue #73, please attach full terminal output as text, not only a screenshot. The most useful reports include both the terminal transcript and the saved `openprey.log`.
   - type: input
     id: version
     attributes:
-      label: openQ4 version
-      description: Example: 0.6.8.
-      placeholder: "0.6.8"
+      label: openPREY version
+      description: "Example: 0.0.1."
+      placeholder: "0.0.1"
     validations:
       required: true
   - type: input
@@ -25,7 +25,7 @@ body:
     attributes:
       label: Package artifact name
       description: Paste the exact downloaded file or folder name.
-      placeholder: "openq4-0.6.8-macos-arm64-metal.dmg"
+      placeholder: "local source build at 0.0.1"
     validations:
       required: true
   - type: dropdown
@@ -44,10 +44,10 @@ body:
     attributes:
       label: Launch method
       options:
-        - openQ4.app
-        - openQ4-client_arm64 from Terminal
-        - openQ4-ded_arm64 from Terminal
-        - Both openQ4.app and openQ4-client_arm64
+        - openPREY.app
+        - openPREY-client_arm64 from Terminal
+        - openPREY-ded_arm64 from Terminal
+        - Both openPREY.app and openPREY-client_arm64
         - Other
     validations:
       required: true
@@ -76,10 +76,10 @@ body:
     validations:
       required: true
   - type: textarea
-    id: openq4_log
+    id: openprey_log
     attributes:
-      label: Saved openq4.log
-      description: Attach or paste `~/Library/Application Support/openQ4/baseoq4/logs/openq4.log` when it exists.
+      label: Saved openprey.log
+      description: Attach or paste `~/Library/Application Support/openPREY/basepr/logs/openprey.log` when it exists.
       render: text
     validations:
       required: false
@@ -87,7 +87,7 @@ body:
     id: openal_vendor
     attributes:
       label: OpenAL vendor
-      description: Paste the `OpenAL vendor:` line from `openq4.log` or `logs/openal-summary.txt` when available.
+      description: Paste the `OpenAL vendor:` line from `openprey.log` or `logs/openal-summary.txt` when available.
       placeholder: "OpenAL vendor: Apple Computer Inc."
     validations:
       required: false
@@ -95,7 +95,7 @@ body:
     id: openal_renderer
     attributes:
       label: OpenAL renderer
-      description: Paste the `OpenAL renderer:` line from `openq4.log` or `logs/openal-summary.txt` when available.
+      description: Paste the `OpenAL renderer:` line from `openprey.log` or `logs/openal-summary.txt` when available.
       placeholder: "OpenAL renderer: Software"
     validations:
       required: false
@@ -103,7 +103,7 @@ body:
     id: openal_device
     attributes:
       label: OpenAL device name
-      description: Paste the `OpenAL requested device:`, `OpenAL default device:`, or `OpenAL active device:` line from `openq4.log`.
+      description: Paste the `OpenAL requested device:`, `OpenAL default device:`, or `OpenAL active device:` line from `openprey.log`.
       placeholder: "OpenAL active device: ..."
     validations:
       required: false
@@ -111,7 +111,7 @@ body:
     id: openal_efx_lines
     attributes:
       label: OpenAL EFX warnings
-      description: Paste any `OpenAL EFX ...` warning/status lines from `openq4.log` or `logs/openal-summary.txt`.
+      description: Paste any `OpenAL EFX ...` warning/status lines from `openprey.log` or `logs/openal-summary.txt`.
       render: text
     validations:
       required: false
@@ -128,12 +128,12 @@ body:
       label: Package layout
       description: The current package must stay together as one adjacent root.
       options:
-        - label: I tested `openQ4.app` after dragging it independently, or kept the whole package when testing loose client/dedicated tools.
-        - label: I moved only `openQ4.app` somewhere else, such as `/Applications`.
+        - label: I tested `openPREY.app` after dragging it independently, or kept the whole package when testing loose client/dedicated tools.
+        - label: I moved only `openPREY.app` somewhere else, such as `/Applications`.
   - type: textarea
     id: support_archive
     attributes:
       label: Support-info archive
-      description: If your package includes `collect_macos_support_info.sh`, run it from the package root and attach the generated `openq4-macos-support-*.tar.gz` after reviewing its contents. Useful files include `system/rosetta.txt`, `logs/renderer-summary.txt`, `logs/renderer-config.txt`, `package/binary-architecture.txt`, `package/dylib-dependencies.txt`, `package/signing.txt`, and `package/quarantine.txt`.
+      description: If your package includes `collect_macos_support_info.sh`, run it from the package root and attach the generated `openprey-macos-support-*.tar.gz` after reviewing its contents. Useful files include `system/rosetta.txt`, `logs/renderer-summary.txt`, `logs/renderer-config.txt`, `package/binary-architecture.txt`, `package/dylib-dependencies.txt`, `package/signing.txt`, and `package/quarantine.txt`.
     validations:
       required: false

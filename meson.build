@@ -1,7 +1,7 @@
 project(
-  'openQ4',
+  'openPREY',
   ['c', 'cpp'],
-  version: '0.1.010',
+  version: '0.0.1',
   meson_version: '>=1.6.0',
   default_options: ['c_std=c11', 'cpp_std=c++20', 'b_vscrt=static_from_buildtype'],
 )
@@ -9,7 +9,7 @@ project(
 host_system = host_machine.system()
 host_cpu_family = host_machine.cpu_family()
 if not ['windows', 'linux', 'darwin'].contains(host_system)
-  error('Unsupported host system for openQ4 Meson build: ' + host_system)
+  error('Unsupported host system for openPREY Meson build: ' + host_system)
 endif
 
 binary_arch = host_cpu_family
@@ -20,8 +20,7 @@ elif host_cpu_family == 'x86'
 elif host_cpu_family == 'aarch64'
   binary_arch = 'arm64'
 endif
-game_sp_binary_name = 'game-sp_' + binary_arch
-game_mp_binary_name = 'game-mp_' + binary_arch
+game_binary_name = 'game_' + binary_arch
 game_module_filename_suffix = '.so'
 if host_system == 'windows'
   game_module_filename_suffix = '.dll'
@@ -33,7 +32,7 @@ engine_ded_binary_name = meson.project_name() + '-ded_' + binary_arch
 
 if host_cpu_family != 'x86_64' and not (host_system == 'linux' and host_cpu_family == 'aarch64')
   warning(
-    'openQ4 currently targets x64 as the active compatibility baseline. '
+    'openPREY currently targets x64 as the active compatibility baseline. '
     + 'Non-x64 builds are considered experimental during platform bring-up.'
   )
 endif
@@ -182,18 +181,16 @@ build_game_sp = get_option('build_game_sp')
 build_game_mp = get_option('build_game_mp')
 needs_game_headers = build_engine or build_games
 install_root_dir = meson.project_source_root() / '.install'
-install_game_dir = install_root_dir / 'baseoq4'
+install_game_dir = install_root_dir / 'basepr'
 game_libs_repo_root = ''
 game_libs_source_root = ''
 game_libs_repo_summary = 'not required'
 game_stage_root = ''
 game_stage_game_root = ''
-game_stage_mpgame_root = ''
-game_stage_game_include_rel = '.tmp/gamelibs_stage/src/game'
-game_stage_mpgame_include_rel = '.tmp/gamelibs_stage/src/mpgame'
+game_stage_src_include_rel = '.tmp/openprey_gamelibs_stage/src'
+game_stage_game_include_rel = '.tmp/openprey_gamelibs_stage/src/game'
 bse_source_root = meson.project_source_root() / 'src' / 'bse'
-game_sp_module_defs_file = ''
-game_mp_module_defs_file = ''
+game_module_defs_file = ''
 
 if not build_engine and not build_games
   error('At least one build target must be enabled. Use -Dbuild_engine=true and/or -Dbuild_games=true.')
@@ -217,7 +214,7 @@ if build_engine or build_games
       meson.project_source_root() / 'tools' / 'build' / 'write_pak_manifest.py',
       meson.project_source_root(),
       'pak0.pk4',
-      'content/baseoq4/pak0',
+      'content/basepr/pak0',
       '@OUTPUT@',
     ],
     depend_files: openq4_pak_script_files + openq4_pak_manifest_script_files,
@@ -232,7 +229,7 @@ if build_engine or build_games
       meson.project_source_root() / 'tools' / 'build' / 'write_pak_manifest.py',
       meson.project_source_root(),
       'pak1.pk4',
-      'content/baseoq4/pak1',
+      'content/basepr/pak1',
       '@OUTPUT@',
     ],
     depend_files: openq4_pak_script_files + openq4_pak_manifest_script_files,
@@ -250,13 +247,13 @@ if build_engine or build_games
       '--pak-name',
       'pak0.pk4',
       '--source-dir',
-      meson.project_source_root() / 'content' / 'baseoq4' / 'pak0',
+      meson.project_source_root() / 'content' / 'basepr' / 'pak0',
       '--manifest',
       '@INPUT@',
       '--out',
       '@OUTPUT@',
       '--stage-out',
-      meson.current_build_dir() / 'baseoq4' / 'pak0.pk4',
+      meson.current_build_dir() / 'basepr' / 'pak0.pk4',
     ],
     depend_files: openq4_pak_script_files + files(
       'tools/build/build_openq4_pack.py',
@@ -275,13 +272,13 @@ if build_engine or build_games
       '--pak-name',
       'pak1.pk4',
       '--source-dir',
-      meson.project_source_root() / 'content' / 'baseoq4' / 'pak1',
+      meson.project_source_root() / 'content' / 'basepr' / 'pak1',
       '--manifest',
       '@INPUT@',
       '--out',
       '@OUTPUT@',
       '--stage-out',
-      meson.current_build_dir() / 'baseoq4' / 'pak1.pk4',
+      meson.current_build_dir() / 'basepr' / 'pak1.pk4',
     ],
     depend_files: openq4_pak_script_files + files(
       'tools/build/build_openq4_pack.py',
@@ -318,21 +315,24 @@ if needs_game_headers
   game_libs_repo_discovery = run_command(
     py,
     '-c',
-    'import os, pathlib, sys; root = pathlib.Path(sys.argv[1]); raw = os.environ.get("OPENQ4_GAMELIBS_REPO", "").strip(); repo = pathlib.Path(raw) if raw else (root / ".." / "openQ4-game"); print(repo.resolve().as_posix())',
+    'import os, pathlib, sys; root = pathlib.Path(sys.argv[1]); raw = os.environ.get("OPENPREY_GAMELIBS_REPO", "").strip() or os.environ.get("OPENQ4_GAMELIBS_REPO", "").strip(); repo = pathlib.Path(raw) if raw else (root / ".." / "OpenPrey-game"); print(repo.resolve().as_posix())',
     meson.project_source_root(),
     check: true,
   )
   game_libs_repo_root = game_libs_repo_discovery.stdout().strip()
   if game_libs_repo_root == ''
-    error('Failed to resolve the openQ4-game repository path. Set OPENQ4_GAMELIBS_REPO or place it at ../openQ4-game.')
+    error('Failed to resolve the OpenPrey-game repository path. Set OPENPREY_GAMELIBS_REPO or place it at ../OpenPrey-game.')
   endif
 
   game_libs_source_root = game_libs_repo_root / 'src'
   if not fs_mod.is_dir(game_libs_source_root / 'game')
-    error('openQ4-game source directory not found: ' + game_libs_source_root / 'game')
+    error('OpenPrey-game source directory not found: ' + game_libs_source_root / 'game')
   endif
-  if not fs_mod.is_dir(game_libs_source_root / 'mpgame')
-    error('openQ4-game multiplayer source directory not found: ' + game_libs_source_root / 'mpgame')
+  if not fs_mod.is_dir(game_libs_source_root / 'Prey')
+    error('OpenPrey-game Prey source directory not found: ' + game_libs_source_root / 'Prey')
+  endif
+  if not fs_mod.is_dir(game_libs_source_root / 'preyengine')
+    error('OpenPrey-game support source directory not found: ' + game_libs_source_root / 'preyengine')
   endif
 
   game_stage_result = run_command(
@@ -340,34 +340,30 @@ if needs_game_headers
     meson.project_source_root() / 'tools' / 'build' / 'stage_gamelibs.py',
     meson.project_source_root(),
     game_libs_repo_root,
-    meson.project_source_root() / '.tmp' / 'gamelibs_stage',
+    meson.project_build_root() / '.tmp' / 'openprey_gamelibs_stage',
     check: true,
   )
   game_stage_root = game_stage_result.stdout().strip()
   if game_stage_root == ''
-    error('Failed to stage game sources from openQ4-game.')
+    error('Failed to stage game sources from OpenPrey-game.')
   endif
 
   game_stage_game_root = game_stage_root / 'src' / 'game'
   if not fs_mod.is_dir(game_stage_game_root)
     error('Staged game source directory not found: ' + game_stage_game_root)
   endif
-  game_stage_mpgame_root = game_stage_root / 'src' / 'mpgame'
-  if not fs_mod.is_dir(game_stage_mpgame_root)
-    error('Staged multiplayer game source directory not found: ' + game_stage_mpgame_root)
+  game_stage_prey_root = game_stage_root / 'src' / 'Prey'
+  if not fs_mod.is_dir(game_stage_prey_root)
+    error('Staged Prey source directory not found: ' + game_stage_prey_root)
   endif
-  game_stage_manifest = game_stage_root / 'openq4_gamelibs_stage_manifest.json'
+  game_stage_manifest = game_stage_root / 'openprey_gamelibs_stage_manifest.json'
   if not fs_mod.is_file(game_stage_manifest)
-    error('Staged openQ4-game source manifest not found: ' + game_stage_manifest)
+    error('Staged OpenPrey-game source manifest not found: ' + game_stage_manifest)
   endif
 
-  game_sp_module_defs_file = game_stage_game_root / 'Game.def'
-  game_mp_module_defs_file = game_stage_mpgame_root / 'mpgame.def'
-  if host_system == 'windows' and not fs_mod.is_file(game_sp_module_defs_file)
-    error('Staged Game.def not found: ' + game_sp_module_defs_file)
-  endif
-  if host_system == 'windows' and not fs_mod.is_file(game_mp_module_defs_file)
-    error('Staged mpgame.def not found: ' + game_mp_module_defs_file)
+  game_module_defs_file = game_stage_game_root / 'Game.def'
+  if host_system == 'windows' and not fs_mod.is_file(game_module_defs_file)
+    error('Staged Game.def not found: ' + game_module_defs_file)
   endif
 
   game_libs_repo_summary = game_libs_repo_root
@@ -534,13 +530,11 @@ if build_engine
   openq4_engine_sources += openq4_paks_generated_header
 endif
 
-game_sp_sources = []
-game_mp_sources = []
 game_sources = []
 bse_sources = []
 game_idlib_sources = []
 if build_games
-  game_sp_source_discovery = run_command(
+  game_source_discovery = run_command(
     py,
     meson.project_source_root() / 'tools' / 'build' / 'list_sources.py',
     game_stage_root,
@@ -549,37 +543,32 @@ if build_games
     'src/game/gamesys/Callbacks.cpp',
     check: true,
   )
-  game_sp_source_paths = game_sp_source_discovery.stdout().strip().split('\n')
-  if game_sp_source_paths.length() == 0
-    error('tools/build/list_sources.py returned no single-player game source files.')
+  game_source_paths = game_source_discovery.stdout().strip().split('\n')
+  if game_source_paths.length() == 0
+    error('tools/build/list_sources.py returned no base game source files.')
   endif
 
-  game_sp_absolute_paths = []
-  foreach rel_path : game_sp_source_paths
-    game_sp_absolute_paths += [game_stage_root / rel_path]
-  endforeach
-  game_sp_sources = files(game_sp_absolute_paths)
-
-  game_mp_source_discovery = run_command(
+  prey_source_discovery = run_command(
     py,
     meson.project_source_root() / 'tools' / 'build' / 'list_sources.py',
     game_stage_root,
-    'src/mpgame',
-    'src/mpgame/Callbacks.cpp',
-    'src/mpgame/gamesys/Callbacks.cpp',
+    'src/Prey',
+    'src/Prey/ai_Navigator.cpp',
+    'src/Prey/game_events.cpp',
+    'src/Prey/particles_particles.cpp',
+    'src/Prey/prey_weapon.cpp',
     check: true,
   )
-  game_mp_source_paths = game_mp_source_discovery.stdout().strip().split('\n')
-  if game_mp_source_paths.length() == 0
-    error('tools/build/list_sources.py returned no multiplayer game source files.')
+  prey_source_paths = prey_source_discovery.stdout().strip().split('\n')
+  if prey_source_paths.length() == 0
+    error('tools/build/list_sources.py returned no Prey source files.')
   endif
 
-  game_mp_absolute_paths = []
-  foreach rel_path : game_mp_source_paths
-    game_mp_absolute_paths += [game_stage_root / rel_path]
+  game_absolute_paths = []
+  foreach rel_path : game_source_paths + prey_source_paths
+    game_absolute_paths += [game_stage_root / rel_path]
   endforeach
-  game_mp_sources = files(game_mp_absolute_paths)
-  game_sources = game_sp_sources + game_mp_sources
+  game_sources = files(game_absolute_paths)
 
   savegame_compat_header = custom_target(
     'openq4_savegame_compat_generated',
@@ -599,8 +588,7 @@ if build_games
     ),
     install: false,
   )
-  game_sp_sources += [savegame_compat_header]
-  game_mp_sources += [savegame_compat_header]
+  game_sources += [savegame_compat_header]
   if build_engine
     # Session preflights the exact GameLibs source stamp before tearing down
     # the active map, so the engine target must see the same generated header.
@@ -644,7 +632,7 @@ openq4_version_resources = []
 if host_system == 'windows' and resource_compiler.found()
   windows_mod = import('windows')
   openq4_version_resources = windows_mod.compile_resources(
-    'src/sys/win32/rc/openQ4Version.rc',
+    'src/sys/win32/rc/openprey_version.rc',
     include_directories: [root_include_dir],
   )
   openq4_engine_sources += openq4_version_resources
@@ -891,8 +879,8 @@ if build_engine and host_system == 'linux'
   ]
 endif
 
-shared_cpp_args = ['-DUSE_OPENAL', '-DGLEW_NO_GLU']
-shared_c_args = ['-DGLEW_NO_GLU']
+shared_cpp_args = ['-DUSE_OPENAL', '-DGLEW_NO_GLU', '-DHUMANHEAD=1']
+shared_c_args = ['-DGLEW_NO_GLU', '-DHUMANHEAD=1']
 shared_objcpp_args = []
 shared_objc_args = []
 engine_link_args = []
@@ -1017,7 +1005,7 @@ else
   endforeach
   # GCC/Clang default to -ffp-contract=fast, which fuses a*b+c into an FMA
   # wherever the target has one. AArch64 always does; the x86-64 SSE2 baseline
-  # openQ4 is validated against does not. That makes identical source produce
+  # openPREY's x86-64 baseline does not. That makes identical source produce
   # different float results per architecture in collision, AAS and physics
   # code, which is exactly the class of divergence behind arm64-only map and
   # savegame failures. MSVC already defaults to precise contraction.
@@ -1081,19 +1069,15 @@ game_include_dirs = [
 ]
 engine_include_dirs = [root_include_dir, src_include_dir]
 game_idlib_include_dirs = [root_include_dir, src_include_dir]
-game_idlib_mp_include_dirs = [root_include_dir, src_include_dir]
 bse_client_include_dirs = [root_include_dir, src_include_dir, src_bse_include_dir]
 
 if needs_game_headers
+  staged_game_src_include_dir = include_directories(game_stage_src_include_rel)
   staged_game_include_dir = include_directories(game_stage_game_include_rel)
-  staged_mpgame_include_dir = include_directories(game_stage_mpgame_include_rel)
-  engine_include_dirs += [staged_game_include_dir]
-  game_idlib_include_dirs += [staged_game_include_dir]
-  # the multiplayer idlib flavour resolves precompiled.h's
-  # "../mpgame/Game_local.h" through the staged mpgame tree
-  game_idlib_mp_include_dirs += [staged_mpgame_include_dir, staged_game_include_dir]
-  game_include_dirs += [staged_game_include_dir, staged_mpgame_include_dir]
-  bse_client_include_dirs += [staged_game_include_dir]
+  engine_include_dirs += [staged_game_src_include_dir, staged_game_include_dir]
+  game_idlib_include_dirs += [staged_game_src_include_dir, staged_game_include_dir]
+  game_include_dirs += [staged_game_src_include_dir, staged_game_include_dir]
+  bse_client_include_dirs += [staged_game_src_include_dir, staged_game_include_dir]
 endif
 
 engine_cpp_args = shared_cpp_args + common_header_cpp_args + ['-D__DOOM_DLL__'] + linux_cross_dso_sanitizer_cpp_args
@@ -1299,7 +1283,7 @@ endif
 
 game_common_cpp_args = shared_cpp_args + common_header_cpp_args + ['-DGAME_DLL'] + linux_cross_dso_sanitizer_cpp_args
 game_common_c_args = shared_c_args
-game_target_override_options = ['cpp_std=c++17']
+game_target_override_options = ['cpp_std=c++17', 'warning_level=0']
 game_module_link_args = []
 game_module_link_depends = []
 if host_system == 'windows'
@@ -1339,31 +1323,15 @@ elif host_system == 'linux'
 endif
 
 game_idlib_library = disabler()
-game_idlib_library_mp = disabler()
 if build_engine or build_games
-  # One archive per game flavour. src/idlib/precompiled.h includes
-  # mpgame/Game_local.h under -DGAME_MPAPI and game/Game_local.h otherwise, and
-  # every idlib translation unit includes precompiled.h. Linking one
-  # single-player-flavoured archive into both modules therefore put two
-  # different definitions of the same game types into each multiplayer binary,
-  # which is an ODR violation the linker resolves however it likes.
+  # Prey uses one unified game module for both single-player and multiplayer.
+  # Compile idlib from this engine checkout so the module never consumes the
+  # companion repository's duplicate SDK headers.
   game_idlib_library = static_library(
-    'openq4_game_idlib',
+    'openprey_game_idlib',
     game_idlib_sources,
     include_directories: game_idlib_include_dirs,
     cpp_args: game_common_cpp_args,
-    c_args: game_common_c_args,
-    cpp_pch: game_idlib_pch_headers,
-    override_options: game_target_override_options,
-    pic: host_system == 'linux',
-    gnu_symbol_visibility: host_system == 'windows' ? 'default' : 'hidden',
-    install: false,
-  )
-  game_idlib_library_mp = static_library(
-    'openq4_game_idlib_mp',
-    game_idlib_sources,
-    include_directories: game_idlib_mp_include_dirs,
-    cpp_args: game_common_cpp_args + ['-DGAME_MPAPI'],
     c_args: game_common_c_args,
     cpp_pch: game_idlib_pch_headers,
     override_options: game_target_override_options,
@@ -1490,7 +1458,7 @@ if build_renderer_vk and build_engine
     '-DOPENQ4_RENDERER_MODULE',
     '-DOPENQ4_RENDERER_VK_MODULE',
     '-DOPENQ4_RENDERER_BACKEND_NAME="vulkan"',
-    '-DOPENQ4_RENDERER_BACKEND_DESC="openQ4 native Vulkan renderer module"',
+    '-DOPENQ4_RENDERER_BACKEND_DESC="openPREY native Vulkan renderer module"',
     '-DVMA_STATIC_VULKAN_FUNCTIONS=0',
     '-DVMA_DYNAMIC_VULKAN_FUNCTIONS=1',
     # VK_KHR_portability_subset lives in vulkan_beta.h. Defined for every host so
@@ -1541,7 +1509,7 @@ if build_renderer_vk and build_engine
     # an MH_BUNDLE with -undefined dynamic_lookup, which drops the
     # undefined-symbol closure the other hosts get and breaks the otool -D /
     # install_name_tool expectations the universal2 assembler relies on.
-    # Mirrors the game modules in content/baseoq4/meson.build.
+    # Mirrors the unified game module in content/basepr/meson.build.
     renderer_vk_module_target = shared_library(
       renderer_vk_binary_name,
       renderer_vk_sources,
@@ -1579,43 +1547,22 @@ if build_renderer_vk and build_engine
   endif
 endif
 
-if build_engine or (build_games and (build_game_sp or build_game_mp))
-  subdir('content/baseoq4')
+if build_engine or build_games
+  subdir('content/basepr')
 endif
 
-if build_games and build_game_sp
+if build_games
   custom_target(
-    'openq4_stage_game_sp_direct_run',
-    input: game_sp_module_target,
-    output: 'stage-game-sp-' + binary_arch + '.stamp',
+    'openprey_stage_game_direct_run',
+    input: game_module_target,
+    output: 'stage-game-' + binary_arch + '.stamp',
     command: [
       py,
       meson.project_source_root() / 'tools' / 'build' / 'stage_direct_run_game_module.py',
       '--source',
       '@INPUT@',
       '--destination',
-      meson.current_build_dir() / 'baseoq4' / (game_sp_binary_name + game_module_filename_suffix),
-      '--stamp',
-      '@OUTPUT@',
-    ],
-    depend_files: files('tools/build/stage_direct_run_game_module.py'),
-    build_always_stale: true,
-    build_by_default: true,
-  )
-endif
-
-if build_games and build_game_mp
-  custom_target(
-    'openq4_stage_game_mp_direct_run',
-    input: game_mp_module_target,
-    output: 'stage-game-mp-' + binary_arch + '.stamp',
-    command: [
-      py,
-      meson.project_source_root() / 'tools' / 'build' / 'stage_direct_run_game_module.py',
-      '--source',
-      '@INPUT@',
-      '--destination',
-      meson.current_build_dir() / 'baseoq4' / (game_mp_binary_name + game_module_filename_suffix),
+      meson.current_build_dir() / 'basepr' / (game_binary_name + game_module_filename_suffix),
       '--stamp',
       '@OUTPUT@',
     ],
@@ -1636,20 +1583,20 @@ if host_system == 'windows' and host_cpu_family == 'x86_64'
 endif
 
 install_data(
-  'assets/icons/quake4.ico',
+  'assets/icons/prey.ico',
   install_dir: install_root_dir,
-  rename: 'openQ4.ico',
+  rename: 'openPREY.ico',
 )
 
 install_data(
-  'assets/icons/quake4.icns',
+  'assets/icons/prey.icns',
   install_dir: install_root_dir,
-  rename: 'openQ4.icns',
+  rename: 'openPREY.icns',
 )
 
 if host_system != 'windows'
   install_data(
-    'assets/splash/quake4_rt_bitmap_4001.bmp',
+    'assets/splash/prey_rt_bitmap_4001.bmp',
     install_dir: install_root_dir / 'assets' / 'splash',
   )
 endif
@@ -1664,22 +1611,22 @@ endif
 
 if host_system == 'linux'
   linux_desktop_conf = configuration_data()
-  linux_desktop_conf.set('OPENQ4_CLIENT_BINARY', engine_client_binary_name)
-  linux_desktop_conf.set('OPENQ4_PROJECT_VERSION', openq4_version_short)
-  linux_desktop_conf.set('OPENQ4_PROJECT_VERSION_FULL', openq4_version_full)
+  linux_desktop_conf.set('OPENPREY_CLIENT_BINARY', engine_client_binary_name)
+  linux_desktop_conf.set('OPENPREY_PROJECT_VERSION', openq4_version_short)
+  linux_desktop_conf.set('OPENPREY_PROJECT_VERSION_FULL', openq4_version_full)
   linux_steamdeck_launcher = configure_file(
-    input: 'assets/linux/openQ4-steamdeck.in',
-    output: 'openQ4-steamdeck',
+    input: 'assets/linux/openPREY-steamdeck.in',
+    output: 'openPREY-steamdeck',
     configuration: linux_desktop_conf,
   )
   linux_desktop_entry = configure_file(
-    input: 'assets/linux/openq4.desktop.in',
-    output: 'openq4.desktop',
+    input: 'assets/linux/openprey.desktop.in',
+    output: 'openprey.desktop',
     configuration: linux_desktop_conf,
   )
   linux_steamdeck_desktop_entry = configure_file(
-    input: 'assets/linux/openq4-steamdeck.desktop.in',
-    output: 'openq4-steamdeck.desktop',
+    input: 'assets/linux/openprey-steamdeck.desktop.in',
+    output: 'openprey-steamdeck.desktop',
     configuration: linux_desktop_conf,
   )
   install_data(
@@ -1696,22 +1643,22 @@ if host_system == 'linux'
     install_dir: install_root_dir / 'share' / 'applications',
   )
 
-  if fs_mod.is_file('assets/icons/quake4.svg')
+  if fs_mod.is_file('assets/icons/prey.svg')
     install_data(
-      'assets/icons/quake4.svg',
+      'assets/icons/prey.svg',
       install_dir: install_root_dir / 'share' / 'icons' / 'hicolor' / 'scalable' / 'apps',
-      rename: 'openq4.svg',
+      rename: 'openprey.svg',
     )
   endif
 
   icon_sizes = ['16', '20', '24', '32', '40', '48', '64', '128', '256', '512', '1024']
   foreach icon_size : icon_sizes
-    icon_png = 'assets/icons/quake4_' + icon_size + '.png'
+    icon_png = 'assets/icons/prey_' + icon_size + '.png'
     if fs_mod.is_file(icon_png)
       install_data(
         icon_png,
         install_dir: install_root_dir / 'share' / 'icons' / 'hicolor' / (icon_size + 'x' + icon_size) / 'apps',
-        rename: 'openq4.png',
+        rename: 'openprey.png',
       )
     endif
   endforeach
@@ -1757,10 +1704,10 @@ summary(
     'Integrated BSE source dir': bse_source_root,
     'Build games': build_games,
     'GameLibs source repo': game_libs_repo_summary,
-    'Build game_sp': build_games and build_game_sp,
-    'Build game_mp': build_games and build_game_mp,
-    'game_sp binary': game_sp_binary_name,
-    'game_mp binary': game_mp_binary_name,
+    'Build unified game': build_games,
+    'Unified game binary': build_games ? game_binary_name : '',
+    'Legacy build_game_sp option': build_game_sp,
+    'Legacy build_game_mp option': build_game_mp,
     'Build Vulkan renderer module': build_renderer_vk and build_engine,
     'Vulkan renderer binary': renderer_vk_binary_name,
     'Resource compiler': resource_compiler.found(),

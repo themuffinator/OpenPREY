@@ -1,0 +1,154 @@
+// forcefield.gui
+//--------------------------------------------------
+
+// gui_parm25:		if set, allows one use only
+// gui_parm26:		script to run when gui is turned on
+// gui_parm27:		script to run when gui is turned off
+// gui_parm28:		initial state (0==initially off, 1==initially on)
+
+
+windowDef desktop {
+	rect			0, 0, 640, 480
+	backcolor		0, 0, 0, 0
+	float turnedon	0
+	
+	onStartup {
+		set "desktop::turnedon" "1" ;
+		set "field::visible" "1" ;
+		set "field2::visible" "1" ;
+		set "field3::visible" "1" ;
+		set "descriptionOn::visible" "1";
+		set "descriptionOff::visible" "0";
+	}
+
+	// -------------------------------------------------------------------------------
+	// Actual visible windowDefs
+	// -------------------------------------------------------------------------------
+	windowDef bgl {
+		rect		10 ,10 ,310 ,460 
+		matcolor	0.5, 0.8, 1, 0.7 
+		background	"guis/assets/alarm/bg"
+		visible		1
+	}
+	windowDef bgr {
+		rect		320 ,10 ,-310 ,460 
+		matcolor	0.5, 0.8, 1, 0.7 
+		background	"guis/assets/alarm/bg"
+		visible		1
+	} 
+	windowDef barL {
+		rect		100, 130, -40, 300
+		matcolor	0.5, 0.8, 1, 0.7 
+		background	"guis/assets/forcefield/bar"
+	}
+	windowDef barR {
+		rect		500, 130, 40, 300
+		matcolor	0.5, 0.8, 1, 0.7 
+		background	"guis/assets/forcefield/bar"
+		visible		1
+	}
+	windowDef field {
+		rect		147, 130, 345, 295
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/forcefield/forcefield1"
+	}
+	windowDef field2 {
+		rect		147, 130, -345, -295
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/forcefield/forcefield2"
+	}
+	windowDef field3 {
+		rect		147, 130, -345, 295
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/forcefield/forcefield3"
+	}
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.05
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.002]
+
+	}
+	windowDef static {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.02
+		background	"textures/sfx/static"
+	}
+
+	windowDef Dimmer {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0.8
+		visible		1
+	}
+
+	windowDef descriptionOn {
+		text		"#str_20475"
+		rect		130, 45, 400, 200
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 0.85
+		matcolor	1, 1, 1, 1
+		textscale	0.9
+		textalign	1
+		font		"fonts/alien"
+		visible		1
+	}
+	windowDef descriptionOff {
+		text		"#str_20476"
+		rect		130, 45, 400, 200
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 0.85
+		matcolor	1, 1, 1, 1
+		textscale	0.9
+		textalign	1
+		font		"fonts/alien"
+		visible		0
+	}
+
+//-----------------------------------------
+// buttons
+//-----------------------------------------
+
+	windowDef OnButton1 {
+		rect		30, 30, 580, 420
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 0.3
+		visible		1
+		onAction {
+				set "cmd" "activate ; play console_generic_activate" ;
+		} 
+	}
+
+	
+	// -------------------------------------------------------------------------------
+	// Text
+	// -------------------------------------------------------------------------------
+
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

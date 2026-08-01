@@ -214,7 +214,7 @@ static bool Sys_GetCrashBaseName(char* outBaseName, size_t outBaseNameSize) {
 	return Sys_StringPrintf(
 		outBaseName,
 		outBaseNameSize,
-		"openq4_crash_%04u%02u%02u_%02u%02u%02u_%lu_%lu",
+		"openprey_crash_%04u%02u%02u_%02u%02u%02u_%lu_%lu",
 		(unsigned)localTime.wYear,
 		(unsigned)localTime.wMonth,
 		(unsigned)localTime.wDay,
@@ -354,7 +354,7 @@ static void Sys_WriteCrashLog(
 	Sys_StringPrintf(
 		logBuffer,
 		ARRAYSIZE(logBuffer),
-		"openQ4 crash report\r\n"
+		"openPREY crash report\r\n"
 		"Timestamp: %04u-%02u-%02u %02u:%02u:%02u.%03u\r\n"
 		"ProcessId: %lu\r\n"
 		"ThreadId: %lu\r\n"
@@ -499,7 +499,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter(LPEXCEPTION_POINTERS exceptionIn
 		Sys_StringPrintf(
 			message,
 			ARRAYSIZE(message),
-			"openQ4 encountered an unhandled exception.\n\n"
+			"openPREY encountered an unhandled exception.\n\n"
 			"Crash log:\n%s\n\n"
 			"Crash dump:\n%s\n\n"
 			"Please attach both files when reporting this issue.",
@@ -511,7 +511,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter(LPEXCEPTION_POINTERS exceptionIn
 		Sys_StringPrintf(
 			message,
 			ARRAYSIZE(message),
-			"openQ4 encountered an unhandled exception.\n\n"
+			"openPREY encountered an unhandled exception.\n\n"
 			"Crash log:\n%s\n\n"
 			"Failed to create crash dump (error 0x%08lX).",
 			logPath,
@@ -519,7 +519,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter(LPEXCEPTION_POINTERS exceptionIn
 		);
 	}
 
-	MessageBoxA(NULL, message, "openQ4 Crash", MB_ICONERROR | MB_OK | MB_SYSTEMMODAL);
+	MessageBoxA(NULL, message, "openPREY Crash", MB_ICONERROR | MB_OK | MB_SYSTEMMODAL);
 
 	return EXCEPTION_EXECUTE_HANDLER;
 }

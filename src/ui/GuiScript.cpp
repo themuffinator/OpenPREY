@@ -90,7 +90,10 @@ void Script_Set(idWindow *window, idList<idGSWinVar> *src) {
 					window && window->GetGui() ? window->GetGui()->GetSourceFile() : "<null>" );
 			}
 			return;
-		} 
+		}
+		if ( window != NULL && src->Num() > 1 && window->SetInternalVarValue( dest->c_str(), (*src)[1].var->c_str() ) ) {
+			return;
+		}
 	}
 	(*src)[0].var->Set((*src)[1].var->c_str());
 	(*src)[0].var->SetEval(false);
@@ -109,6 +112,39 @@ void Script_Set(idWindow *window, idList<idGSWinVar> *src) {
 			window ? window->GetName() : "<null>",
 			window && window->GetGui() ? window->GetGui()->GetSourceFile() : "<null>" );
 	}
+}
+
+void Script_Inc(idWindow *window, idList<idGSWinVar> *src) {
+	if ( src == NULL || src->Num() < 2 || (*src)[0].var == NULL || (*src)[1].var == NULL ) {
+		return;
+	}
+	const float value = static_cast<float>( atof( (*src)[0].var->c_str() ) );
+	const float increment = static_cast<float>( atof( (*src)[1].var->c_str() ) );
+	(*src)[0].var->Set( va( "%g", value + increment ) );
+	(*src)[0].var->SetEval( false );
+	idWinFloatPtr* floatPtr = dynamic_cast<idWinFloatPtr*>( (*src)[0].var );
+	if ( floatPtr != NULL && floatPtr->GetOwnerVec4() != NULL ) {
+		floatPtr->GetOwnerVec4()->SetEval( false );
+	}
+	(void)window;
+}
+
+void Script_ResetCapture(idWindow *window, idList<idGSWinVar> *src) {
+	if ( window == NULL || window->GetGui() == NULL || window->GetGui()->GetDesktop() == NULL ) {
+		return;
+	}
+	idWindow* desktop = window->GetGui()->GetDesktop();
+	if ( src != NULL && src->Num() > 0 ) {
+		idWinStr* name = dynamic_cast<idWinStr*>( (*src)[0].var );
+		if ( name != NULL && name->Length() > 0 ) {
+			drawWin_t* target = desktop->FindChildByName( name->c_str() );
+			if ( target != NULL && target->win != NULL ) {
+				target->win->ResetCapture();
+				return;
+			}
+		}
+	}
+	desktop->ResetCapture();
 }
 
 /*
@@ -505,6 +541,8 @@ typedef struct {
 
 guiCommandDef_t commandList[] = {
 	{ "set", Script_Set, 2, 999 },
+	{ "inc", Script_Inc, 2, 2 },
+	{ "resetCapture", Script_ResetCapture, 0, 1 },
 	{ "setFocus", Script_SetFocus, 1, 1 },
 	{ "endGame", Script_EndGame, 0, 0 },
 	{ "resetTime", Script_ResetTime, 0, 2 },
@@ -714,7 +752,7 @@ idGuiScriptList::FixupParms
 =========================
 */
 void idGuiScript::FixupParms(idWindow *win) {
-	if (handler == &Script_Set) {
+	if (handler == &Script_Set || handler == &Script_Inc) {
 		bool precacheBackground = false;
 		bool precacheSounds = false;
 		idWinStr *str = dynamic_cast<idWinStr*>(parms[0].var);

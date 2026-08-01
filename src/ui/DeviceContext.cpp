@@ -43,7 +43,7 @@ idVec4 idDeviceContext::colorWhite;
 idVec4 idDeviceContext::colorNone;
 
 
-idCVar gui_smallFontLimit( "gui_smallFontLimit", "0.30", CVAR_GUI | CVAR_ARCHIVE, "" );
+idCVar gui_smallFontLimit( "gui_smallFontLimit", "0.10", CVAR_GUI | CVAR_ARCHIVE, "" );
 idCVar gui_mediumFontLimit( "gui_mediumFontLimit", "0.60", CVAR_GUI | CVAR_ARCHIVE, "" );
 
 // Accessibility: Quake 4 draws most of its text straight over the world and over
@@ -107,6 +107,137 @@ static int openQ4_TextEscapeRepeatCount( const char *escape ) {
 		repeats = Q4_TEXT_REPEAT_ESCAPE_MAX;
 	}
 	return repeats;
+}
+
+static float openPREY_RetailSmoothStep( float t ) {
+	t = idMath::ClampFloat( 0.0f, 1.0f, t );
+	return t * t * ( 3.0f - 2.0f * t );
+}
+
+static float openPREY_RetailBezier1D( float a, float b, float c, float d, float t ) {
+	const float invT = 1.0f - t;
+	const float invT2 = invT * invT;
+	const float t2 = t * t;
+	return invT2 * invT * a + 3.0f * invT2 * t * b + 3.0f * invT * t2 * c + t2 * t * d;
+}
+
+static unsigned int openPREY_RetailHash( unsigned int value ) {
+	value ^= value >> 16;
+	value *= 0x7feb352du;
+	value ^= value >> 15;
+	value *= 0x846ca68bu;
+	value ^= value >> 16;
+	return value;
+}
+
+static float openPREY_RetailHashFloat( unsigned int seed ) {
+	return static_cast<float>( openPREY_RetailHash( seed ) & 0x00ffffffu ) * ( 1.0f / 16777215.0f );
+}
+
+static float openPREY_RetailHashSigned( unsigned int seed ) {
+	return openPREY_RetailHashFloat( seed ) * 2.0f - 1.0f;
+}
+
+static bool openPREY_IsTrueTypeFont( const fontInfo_t *font ) {
+	return font != NULL && idStr::Icmpn( font->name, "ttf/", 4 ) == 0;
+}
+
+static void openPREY_LogTTFSplineNotice() {
+	static bool warned = false;
+	if ( !warned ) {
+		warned = true;
+		common->Warning( "Retail spline text is currently available only for bitmap GUI fonts; drawing TrueType text without the effect" );
+	}
+}
+
+// Count the things that actually occupy a glyph slot in the current text
+// dialect. Colour/brightness escapes do not count; embedded icons and their
+// repeat escapes do. This keeps the scatter distribution stable when retail
+// strings mix ordinary glyphs with variable-length escape sequences.
+static int openPREY_CountRetailGlyphs( const unsigned char *text, int len ) {
+	int glyphs = 0;
+	int consumed = 0;
+	while ( text != NULL && *text != '\0' && consumed < len ) {
+		int escapeType = 0;
+		const int escapeLength = openQ4_TextEscapeLength( reinterpret_cast<const char *>( text ), &escapeType );
+		if ( escapeLength > 0 ) {
+			if ( openQ4_IsRepeatTextEscape( reinterpret_cast<const char *>( text ), escapeLength ) ) {
+				int payloadType = 0;
+				const int payloadLength = openQ4_TextEscapeLength( reinterpret_cast<const char *>( text + escapeLength ), &payloadType );
+				if ( payloadLength > 0 ) {
+					if ( payloadType == S_ESCAPE_ICON ) {
+						glyphs += openQ4_TextEscapeRepeatCount( reinterpret_cast<const char *>( text ) );
+					}
+					text += escapeLength + payloadLength;
+					consumed += escapeLength + payloadLength;
+					continue;
+				}
+			}
+			if ( escapeType == S_ESCAPE_ICON ) {
+				++glyphs;
+			}
+			text += escapeLength;
+			consumed += escapeLength;
+			continue;
+		}
+
+		++glyphs;
+		++text;
+		++consumed;
+	}
+	return glyphs;
+}
+
+struct openPreyRetailSplineGlyph_t {
+	float drawX;
+	float drawY;
+	float ghostX;
+	float ghostY;
+	float glyphAlpha;
+	float ghostAlpha;
+	bool drawGhost;
+};
+
+static openPreyRetailSplineGlyph_t openPREY_RetailSplineGlyph( float targetX, float targetY,
+		float lineStartX, float lineWidth, float lineHeight, int glyphIndex, int glyphCount,
+		unsigned int glyphCode, float effectProgress, int splinePoints ) {
+	openPreyRetailSplineGlyph_t result = {};
+	const float normalizedIndex = glyphCount > 1 ? static_cast<float>( glyphIndex ) / static_cast<float>( glyphCount - 1 ) : 0.5f;
+	const unsigned int seedBase = static_cast<unsigned int>( glyphIndex * 131 ) + glyphCode * 911u + static_cast<unsigned int>( splinePoints ) * 37u;
+	const float startDelay = 0.03f + 0.09f * openPREY_RetailHashFloat( seedBase + 0x11u );
+	const float progressDenom = Max( 0.001f, 1.0f - startDelay );
+	const float localProgress = openPREY_RetailSmoothStep( idMath::ClampFloat( 0.0f, 1.0f, ( effectProgress - startDelay ) / progressDenom ) );
+	const float scatter = 1.0f - localProgress;
+	const float pointScale = 1.0f + 0.08f * static_cast<float>( splinePoints - 3 );
+	const float cloudCenterX = lineStartX + lineWidth * ( 0.66f + 0.08f * openPREY_RetailHashFloat( seedBase + 0x23u ) );
+	const float cloudCenterY = targetY - lineHeight * ( 0.20f - 0.55f * openPREY_RetailHashSigned( seedBase + 0x29u ) );
+	const float spreadX = idMath::ClampFloat( lineHeight * 1.6f, lineWidth + lineHeight * 4.0f,
+		lineWidth * ( 0.30f + 0.02f * static_cast<float>( splinePoints ) ) + lineHeight * 2.25f );
+	const float spreadY = idMath::ClampFloat( lineHeight * 0.85f, lineHeight * 5.0f,
+		lineHeight * ( 1.45f + 0.10f * static_cast<float>( splinePoints ) ) );
+	const float lateralBias = ( 0.5f - normalizedIndex ) * lineWidth * 0.28f;
+	const float startX = cloudCenterX + lateralBias + openPREY_RetailHashSigned( seedBase + 0x31u ) * spreadX;
+	const float startY = cloudCenterY + openPREY_RetailHashSigned( seedBase + 0x37u ) * spreadY;
+	const float control1X = cloudCenterX + openPREY_RetailHashSigned( seedBase + 0x41u ) * spreadX * ( 0.55f + 0.08f * pointScale );
+	const float control1Y = cloudCenterY + openPREY_RetailHashSigned( seedBase + 0x47u ) * spreadY * ( 0.55f + 0.05f * pointScale );
+	const float control2X = targetX + lateralBias * scatter * 0.35f + openPREY_RetailHashSigned( seedBase + 0x53u ) * spreadX * scatter * 0.18f;
+	const float control2Y = targetY + openPREY_RetailHashSigned( seedBase + 0x59u ) * spreadY * scatter * 0.16f;
+
+	result.drawX = openPREY_RetailBezier1D( startX, control1X, control2X, targetX, localProgress );
+	result.drawY = openPREY_RetailBezier1D( startY, control1Y, control2Y, targetY, localProgress );
+	result.glyphAlpha = idMath::ClampFloat( 0.0f, 1.0f, 0.18f + 0.82f * idMath::Sqrt( localProgress ) );
+	result.drawGhost = scatter > 0.12f;
+	result.ghostAlpha = 0.32f * scatter;
+	if ( result.drawGhost ) {
+		const float ghostProgress = localProgress * 0.55f;
+		result.ghostX = openPREY_RetailBezier1D( startX,
+			cloudCenterX + openPREY_RetailHashSigned( seedBase + 0x5fu ) * spreadX * 0.8f,
+			control2X, result.drawX, ghostProgress );
+		result.ghostY = openPREY_RetailBezier1D( startY,
+			cloudCenterY + openPREY_RetailHashSigned( seedBase + 0x61u ) * spreadY * 0.8f,
+			control2Y, result.drawY, ghostProgress );
+	}
+	return result;
 }
 
 struct q4ScaledFont_t {
@@ -257,6 +388,13 @@ static float openQ4_GlyphClipRightPad( const fontInfo_t *font, const glyphInfo_t
 
 static bool openQ4_HasRenderableFont( const q4ScaledFont_t &scaledFont ) {
 	return scaledFont.font != NULL && scaledFont.renderScale != 0.0f;
+}
+
+static const idMaterial *openPREY_ResolveGlyphMaterial( const fontInfo_t *font, const glyphInfo_t *glyph ) {
+	if ( glyph != NULL && glyph->material != NULL ) {
+		return glyph->material;
+	}
+	return font != NULL ? font->material : NULL;
 }
 
 // How far a font's glyphs actually reach either side of the baseline, in the
@@ -544,6 +682,61 @@ static bool openQ4_CheckInt( const char *label, int actual, int expected ) {
 	return false;
 }
 
+#if defined(HUMANHEAD)
+struct openPreyRetailFontPageAudit_t {
+	int pageCount;
+	bool namesMatch;
+	bool visibleGlyphsCovered;
+	bool imagesPresent;
+};
+
+static openPreyRetailFontPageAudit_t openPREY_AuditRetailFontPages( const fontInfo_t &fontSlot,
+		const char *expectedMaterialPrefix ) {
+	openPreyRetailFontPageAudit_t result = {};
+	result.namesMatch = true;
+	result.visibleGlyphsCovered = true;
+	result.imagesPresent = true;
+
+	const idMaterial *pages[GLYPHS_PER_FONT] = {};
+	for ( int glyphIndex = 0; glyphIndex < GLYPHS_PER_FONT; ++glyphIndex ) {
+		const glyphInfo_t &glyph = fontSlot.glyphs[glyphIndex];
+		const idMaterial *material = glyph.material;
+		if ( material == NULL ) {
+			if ( glyph.width > 0.0f && glyph.height > 0.0f ) {
+				result.visibleGlyphsCovered = false;
+			}
+			continue;
+		}
+
+		const char *materialName = material->GetName();
+		if ( materialName == NULL || idStr::Icmpn( materialName, expectedMaterialPrefix,
+				idStr::Length( expectedMaterialPrefix ) ) != 0 ) {
+			result.namesMatch = false;
+		}
+
+		bool alreadyCounted = false;
+		for ( int pageIndex = 0; pageIndex < result.pageCount; ++pageIndex ) {
+			if ( pages[pageIndex] == material ) {
+				alreadyCounted = true;
+				break;
+			}
+		}
+		if ( !alreadyCounted ) {
+			pages[result.pageCount++] = material;
+		}
+	}
+
+	for ( int pageIndex = 0; pageIndex < result.pageCount; ++pageIndex ) {
+		materialImageInfo_t imageInfo;
+		if ( pages[pageIndex]->GetNumStages() < 1 ||
+				!renderSystem->GetMaterialStageImageInfo( pages[pageIndex], 0, imageInfo ) ) {
+			result.imagesPresent = false;
+		}
+	}
+	return result;
+}
+#endif
+
 struct q4GlyphClipCase_t {
 	const char *label;
 	float x;
@@ -590,14 +783,21 @@ static bool openQ4_CheckGlyphClipCase( idDeviceContext &dc, const q4GlyphClipCas
 }
 
 static void openQ4_SetGuiSortForFont( fontInfoEx_t &font ) {
-	if ( font.fontInfoSmall.material != NULL ) {
-		font.fontInfoSmall.material->SetSort( SS_GUI );
-	}
-	if ( font.fontInfoMedium.material != NULL ) {
-		font.fontInfoMedium.material->SetSort( SS_GUI );
-	}
-	if ( font.fontInfoLarge.material != NULL ) {
-		font.fontInfoLarge.material->SetSort( SS_GUI );
+	fontInfo_t *fontSlots[] = {
+		&font.fontInfoSmall,
+		&font.fontInfoMedium,
+		&font.fontInfoLarge
+	};
+	for ( int slotIndex = 0; slotIndex < 3; ++slotIndex ) {
+		fontInfo_t *fontSlot = fontSlots[slotIndex];
+		if ( fontSlot->material != NULL ) {
+			fontSlot->material->SetSort( SS_GUI );
+		}
+		for ( int glyphIndex = 0; glyphIndex < GLYPHS_PER_FONT; ++glyphIndex ) {
+			if ( fontSlot->glyphs[glyphIndex].material != NULL ) {
+				fontSlot->glyphs[glyphIndex].material->SetSort( SS_GUI );
+			}
+		}
 	}
 }
 
@@ -615,15 +815,12 @@ int idDeviceContext::FindFont( const char *name ) {
 
 	// If the font was not found, try to register it
 	idStr fileName = name;
-	if ( idStr::Icmp( fileName.c_str(), "fonts" ) == 0 ) {
-		fileName = "fonts/chain";
-	}
 	fileName.Replace("fonts", va("fonts/%s", fontLang.c_str()) );
 
 	fontInfoEx_t fontInfo;
-	int index = fonts.Append( fontInfo );
-	if ( renderSystem->RegisterFont( fileName, fonts[index] ) ) {
-		idStr::Copynz( fonts[index].name, name, sizeof( fonts[index].name ) );
+	if ( renderSystem->RegisterFont( fileName, fontInfo ) ) {
+		idStr::Copynz( fontInfo.name, name, sizeof( fontInfo.name ) );
+		const int index = fonts.Append( fontInfo );
 		return index;
 	} else {
 		common->Printf( "Could not register font %s [%s]\n", name, fileName.c_str() );
@@ -642,7 +839,7 @@ void idDeviceContext::SetupFonts() {
 	}
 
 	// Default font has to be added first.
-	FindFont( "fonts/chain" );
+	FindFont( "fonts" );
 }
 
 void idDeviceContext::SetFont( int num ) {
@@ -732,6 +929,7 @@ void idDeviceContext::RegisterIcon( const char *code, const char *shader, int x,
 }
 
 void idDeviceContext::RegisterBuiltinIcons() {
+#if !defined(HUMANHEAD)
 	static const struct {
 		const char *code;
 		const char *shader;
@@ -754,6 +952,10 @@ void idDeviceContext::RegisterBuiltinIcons() {
 	for ( int i = 0; i < static_cast<int>( sizeof( builtinIcons ) / sizeof( builtinIcons[0] ) ); ++i ) {
 		RegisterIcon( builtinIcons[i].code, builtinIcons[i].shader );
 	}
+#else
+	// These escape codes name Quake 4 HUD and server-browser images.  Prey
+	// registers its authored GUI icons through the normal RegisterIcon path.
+#endif
 }
 
 
@@ -778,8 +980,9 @@ void idDeviceContext::Init() {
 	colorWhite = idVec4(1, 1, 1, 1);
 	colorBlack = idVec4(0, 0, 0, 1);
 	colorNone = idVec4(0, 0, 0, 0);
-	cursorImages[CURSOR_ARROW] = declManager->FindMaterial("gfx/guis/guicursor_arrow");
-	cursorImages[CURSOR_HAND] = declManager->FindMaterial("gfx/guis/guicursor_hand");
+	cursorImages[CURSOR_ARROW] = declManager->FindMaterial("guis/assets/guicursor_arrow.tga");
+	cursorImages[CURSOR_HAND] = declManager->FindMaterial("guis/assets/guicursor_hand.tga");
+	cursorImages[CURSOR_MENU] = declManager->FindMaterial("guis/assets/guicursor_menu.tga");
 	scrollBarImages[SCROLLBAR_HBACK] = declManager->FindMaterial("gfx/guis/scrollbarh");
 	scrollBarImages[SCROLLBAR_VBACK] = declManager->FindMaterial("gfx/guis/scrollbarv");
 	scrollBarImages[SCROLLBAR_THUMB] = declManager->FindMaterial("gfx/guis/scrollbar_thumb");
@@ -789,6 +992,7 @@ void idDeviceContext::Init() {
 	scrollBarImages[SCROLLBAR_DOWN] = declManager->FindMaterial("gfx/guis/scrollbar_down");
 	cursorImages[CURSOR_ARROW]->SetSort( SS_GUI );
 	cursorImages[CURSOR_HAND]->SetSort( SS_GUI );
+	cursorImages[CURSOR_MENU]->SetSort( SS_GUI );
 	scrollBarImages[SCROLLBAR_HBACK]->SetSort( SS_GUI );
 	scrollBarImages[SCROLLBAR_VBACK]->SetSort( SS_GUI );
 	scrollBarImages[SCROLLBAR_THUMB]->SetSort( SS_GUI );
@@ -823,10 +1027,31 @@ void idDeviceContext::Clear() {
 	drawTextColor.Zero();
 	drawTextColorAdjust = 0.0f;
 	icons.Clear();
+	retailSplineEffectActive = false;
+	retailSplineEffectProgress = 0.0f;
+	retailSplineEffectPoints = 0;
 }
 
 idDeviceContext::idDeviceContext() {
 	Clear();
+}
+
+bool idDeviceContext::SetRetailSplineEffect( float progress, int splinePoints ) {
+	if ( cvarSystem->GetCVarBool( "r_useTrueTypeFonts" ) ) {
+		ClearRetailSplineEffect();
+		openPREY_LogTTFSplineNotice();
+		return false;
+	}
+	retailSplineEffectActive = true;
+	retailSplineEffectProgress = idMath::ClampFloat( 0.0f, 1.0f, progress );
+	retailSplineEffectPoints = idMath::ClampInt( 3, 100, splinePoints );
+	return true;
+}
+
+void idDeviceContext::ClearRetailSplineEffect() {
+	retailSplineEffectActive = false;
+	retailSplineEffectProgress = 0.0f;
+	retailSplineEffectPoints = 0;
 }
 
 void idDeviceContext::SetTransformInfo(const idVec3 &org, const idMat3 &m) {
@@ -1053,6 +1278,27 @@ void idDeviceContext::DrawMaterial(float x, float y, float w, float h, const idM
 	DrawStretchPic( x, y, w, h, s0, t0, s1, t1, mat);
 }
 
+void idDeviceContext::DrawMaterialUV( float x, float y, float w, float h, const idMaterial *mat,
+		const idVec4 &color, float s0, float t0, float s1, float t1 ) {
+	if ( mat == NULL ) {
+		return;
+	}
+	renderSystem->SetColor( color );
+	if ( w < 0.0f ) {
+		w = -w;
+		idSwap( s0, s1 );
+	}
+	if ( h < 0.0f ) {
+		h = -h;
+		idSwap( t0, t1 );
+	}
+	if ( ClippedCoords( &x, &y, &w, &h, &s0, &t0, &s1, &t1 ) ) {
+		return;
+	}
+	AdjustCoords( &x, &y, &w, &h );
+	DrawStretchPic( x, y, w, h, s0, t0, s1, t1, mat );
+}
+
 void idDeviceContext::DrawMaterialRotated(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex, float scaley, float angle) {
 	
 	renderSystem->SetColor(color);
@@ -1240,6 +1486,14 @@ void idDeviceContext::PaintGlyph( float x, float y, float scale, const fontInfo_
 	if ( glyph == NULL ) {
 		return;
 	}
+	if ( glyph->material != NULL ) {
+		hShader = glyph->material;
+	} else if ( hShader == NULL ) {
+		hShader = openPREY_ResolveGlyphMaterial( font, glyph );
+	}
+	if ( hShader == NULL ) {
+		return;
+	}
 
 	float width = glyph->width;
 	float s = glyph->s;
@@ -1323,6 +1577,17 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 		len = limit;
 	}
 
+	const bool retailSplineTTF = retailSplineEffectActive && openPREY_IsTrueTypeFont( scaledFont.font );
+	if ( retailSplineTTF ) {
+		openPREY_LogTTFSplineNotice();
+	}
+	const bool retailSplineBitmap = retailSplineEffectActive && !retailSplineTTF;
+	const float retailLineStartX = x;
+	const float retailLineWidth = retailSplineBitmap ? static_cast<float>( TextWidth( text, scale, len, static_cast<int>( adjust ) ) ) : 0.0f;
+	const float retailLineHeight = retailSplineBitmap ? static_cast<float>( MaxCharHeight( scale ) ) : 0.0f;
+	const int retailGlyphCount = retailSplineBitmap ? openPREY_CountRetailGlyphs( s, len ) : 0;
+	int retailGlyphIndex = 0;
+
 	int count = 0;
 	while ( *s != '\0' && count < len ) {
 		int escapeType = 0;
@@ -1357,11 +1622,40 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 							const float referenceHeight = referenceGlyph->height;
 							const float iconWidth = GetIconDisplayWidth( *icon, referenceHeight );
 							if ( iconWidth > 0.0f ) {
-								const float iconY = openQ4_GlyphDrawY( y, scaledFont.renderScale, referenceGlyph );
-								PaintChar( x, iconY, iconWidth, referenceHeight, scaledFont.renderScale, icon->s1, icon->t1, icon->s2, icon->t2, icon->material );
+								float iconX = x;
+								float iconY = openQ4_GlyphDrawY( y, scaledFont.renderScale, referenceGlyph );
+								if ( retailSplineBitmap && retailGlyphCount > 0 ) {
+									const unsigned int iconHash = static_cast<unsigned int>( iconCode[0] ) |
+										( static_cast<unsigned int>( iconCode[1] ) << 8 ) |
+										( static_cast<unsigned int>( iconCode[2] ) << 16 );
+									const openPreyRetailSplineGlyph_t splineGlyph = openPREY_RetailSplineGlyph(
+										iconX, iconY, retailLineStartX, retailLineWidth, retailLineHeight,
+										retailGlyphIndex, retailGlyphCount, iconHash,
+										retailSplineEffectProgress, retailSplineEffectPoints );
+									if ( splineGlyph.drawGhost ) {
+										idVec4 ghostColor = currentColor;
+										ghostColor[3] *= splineGlyph.ghostAlpha;
+										renderSystem->SetColor( ghostColor );
+										PaintChar( splineGlyph.ghostX, splineGlyph.ghostY, iconWidth, referenceHeight,
+											scaledFont.renderScale, icon->s1, icon->t1, icon->s2, icon->t2, icon->material );
+									}
+									iconX = splineGlyph.drawX;
+									iconY = splineGlyph.drawY;
+									idVec4 glyphColor = currentColor;
+									glyphColor[3] *= splineGlyph.glyphAlpha;
+									renderSystem->SetColor( glyphColor );
+								}
+								PaintChar( iconX, iconY, iconWidth, referenceHeight, scaledFont.renderScale,
+									icon->s1, icon->t1, icon->s2, icon->t2, icon->material );
+								if ( retailSplineBitmap ) {
+									renderSystem->SetColor( currentColor );
+								}
 								x += iconWidth;
 							}
 						}
+					}
+					if ( retailSplineBitmap ) {
+						++retailGlyphIndex;
 					}
 				} else {
 					switch ( payload[1] ) {
@@ -1410,8 +1704,24 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 		}
 
 		const glyphInfo_t *glyph = &scaledFont.font->glyphs[*s];
-		const float drawX = openQ4_GlyphDrawX( x, scaledFont.renderScale, glyph );
-		const float drawY = openQ4_GlyphDrawY( y, scaledFont.renderScale, glyph );
+		float drawX = openQ4_GlyphDrawX( x, scaledFont.renderScale, glyph );
+		float drawY = openQ4_GlyphDrawY( y, scaledFont.renderScale, glyph );
+		openPreyRetailSplineGlyph_t splineGlyph = {};
+		if ( retailSplineBitmap && retailGlyphCount > 0 ) {
+			splineGlyph = openPREY_RetailSplineGlyph( drawX, drawY, retailLineStartX, retailLineWidth,
+				retailLineHeight, retailGlyphIndex, retailGlyphCount, static_cast<unsigned int>( *s ),
+				retailSplineEffectProgress, retailSplineEffectPoints );
+			if ( splineGlyph.drawGhost ) {
+				idVec4 ghostColor = currentColor;
+				ghostColor[3] *= splineGlyph.ghostAlpha;
+				renderSystem->SetColor( ghostColor );
+				PaintGlyph( splineGlyph.ghostX, splineGlyph.ghostY, scaledFont.renderScale,
+					scaledFont.font, glyph, scaledFont.font->material );
+			}
+			drawX = splineGlyph.drawX;
+			drawY = splineGlyph.drawY;
+			renderSystem->SetColor( currentColor );
+		}
 
 		if ( style == Q4_TEXT_STYLE_SHADOW ) {
 			idVec4 shadowColor( 0.0f, 0.0f, 0.0f, currentColor[3] );
@@ -1434,7 +1744,16 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 			renderSystem->SetColor( currentColor );
 		}
 
+		if ( retailSplineBitmap ) {
+			idVec4 glyphColor = currentColor;
+			glyphColor[3] *= splineGlyph.glyphAlpha;
+			renderSystem->SetColor( glyphColor );
+		}
 		PaintGlyph( drawX, drawY, scaledFont.renderScale, scaledFont.font, glyph, scaledFont.font->material );
+		if ( retailSplineBitmap ) {
+			renderSystem->SetColor( currentColor );
+			++retailGlyphIndex;
+		}
 
 		if ( openQ4_TextCursorReached( cursor, count ) ) {
 			DrawEditCursor( x, y, scale );
@@ -1738,11 +2057,15 @@ void idDeviceContext::DrawEditCursor( float x, float y, float scale ) {
 	}
 	SetFontByScale(scale);
 	const float useScale = openQ4_FontRenderScale( useFont, scale );
-	if ( useFont == NULL || useScale == 0.0f || useFont->material == NULL ) {
+	if ( useFont == NULL || useScale == 0.0f ) {
 		return;
 	}
 	const glyphInfo_t *glyph = &useFont->glyphs[overStrikeMode ? Q4_OVERSTRIKE_CURSOR_GLYPH : Q4_INSERT_CURSOR_GLYPH];
-	PaintGlyph( x, openQ4_GlyphDrawY( y, useScale, glyph ), useScale, useFont, glyph, useFont->material );
+	const idMaterial *glyphMaterial = openPREY_ResolveGlyphMaterial( useFont, glyph );
+	if ( glyphMaterial == NULL ) {
+		return;
+	}
+	PaintGlyph( x, openQ4_GlyphDrawY( y, useScale, glyph ), useScale, useFont, glyph, glyphMaterial );
 }
 
 int idDeviceContext::DrawText( const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int> *breaks, int limit, int adjust, int style, bool chatWindow ) {
@@ -1909,9 +2232,9 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 bool UI_FontParity_RunSelfTest( void ) {
 	bool ok = true;
 
-	// The later cases here assert parity with the retail bitmap atlases: exact
-	// glyph advances, and that the radio font resolves to the marine atlas
-	// material.  The TrueType path deliberately rasterises its own glyphs and
+	// The later cases here assert parity with the game's retail bitmap atlases:
+	// exact glyph advances, font registration, and atlas-page resolution.  The
+	// TrueType path deliberately rasterises its own glyphs and
 	// binds its own atlas, so measuring it against the retail atlas is a
 	// category error rather than a regression.  Say so instead of failing.
 	const bool retailAtlasActive = !cvarSystem->GetCVarBool( "r_useTrueTypeFonts" );
@@ -1939,6 +2262,15 @@ bool UI_FontParity_RunSelfTest( void ) {
 	ok &= openQ4_CheckNear( "scaled glyph advance", openQ4_ScaledGlyphAdvance( 1.0f, &glyph, -1.0f ), 7.0f );
 	ok &= openQ4_CheckNear( "glyph draw x bearing", openQ4_GlyphDrawX( 20.0f, 2.0f, &glyph ), 17.0f );
 	ok &= openQ4_CheckNear( "glyph draw y bearing", openQ4_GlyphDrawY( 30.0f, 2.0f, &glyph ), 10.0f );
+	const idMaterial *fontMaterialToken = reinterpret_cast<const idMaterial *>( &font );
+	const idMaterial *glyphMaterialToken = reinterpret_cast<const idMaterial *>( &glyph );
+	font.material = fontMaterialToken;
+	glyph.material = NULL;
+	ok &= openQ4_CheckBool( "font-wide glyph material fallback",
+		openPREY_ResolveGlyphMaterial( &font, &glyph ) == fontMaterialToken, true );
+	glyph.material = glyphMaterialToken;
+	ok &= openQ4_CheckBool( "retail per-glyph material override",
+		openPREY_ResolveGlyphMaterial( &font, &glyph ) == glyphMaterialToken, true );
 
 	glyphInfo_t guardedGlyph = {};
 	guardedGlyph.width = 8.5625f;
@@ -2044,6 +2376,66 @@ bool UI_FontParity_RunSelfTest( void ) {
 	ok &= openQ4_CheckNear( "rgb escape preserves alpha", rgbEscapeCurrentColor[3], 0.42f );
 	ok &= openQ4_CheckNear( "rgb escape draw color alpha", rgbEscapeDrawColor[3], 0.42f );
 
+#if defined(HUMANHEAD)
+	idStr fontAtlasLang = cvarSystem->GetCVarString( "sys_lang" );
+	if ( fontAtlasLang == "french" || fontAtlasLang == "german" || fontAtlasLang == "spanish" || fontAtlasLang == "italian" ) {
+		fontAtlasLang = "english";
+	}
+	// These are the three bitmap families authored by retail Prey GUIs.  The
+	// exact page counts catch both a truncated .dat decode and loss of the
+	// per-glyph atlas material that Doom 3/Prey fonts require.
+	if ( retailAtlasActive ) {
+		static const struct {
+			const char *label;
+			const char *relativePath;
+			const char *atlasStem;
+			int expectedPages[3];
+		} retailFontCases[] = {
+			{ "default", "", "fontImage_", { 1, 2, 5 } },
+			{ "menu", "/menu", "menu_", { 1, 2, 5 } },
+			{ "alien", "/alien", "alien_", { 1, 1, 3 } }
+		};
+		static const int pointSizes[] = { 12, 24, 48 };
+
+		for ( int fontCaseIndex = 0; fontCaseIndex < static_cast<int>( sizeof( retailFontCases ) / sizeof( retailFontCases[0] ) ); ++fontCaseIndex ) {
+			const idStr fontPath = va( "fonts/%s%s", fontAtlasLang.c_str(), retailFontCases[fontCaseIndex].relativePath );
+			fontInfoEx_t retailFont = {};
+			const bool registered = renderSystem->RegisterFont( fontPath.c_str(), retailFont );
+			idStr label = va( "Prey %s font registered", retailFontCases[fontCaseIndex].label );
+			ok &= openQ4_CheckBool( label.c_str(), registered, true );
+			if ( !registered ) {
+				continue;
+			}
+
+			const fontInfo_t *fontSlots[] = {
+				&retailFont.fontInfoSmall,
+				&retailFont.fontInfoMedium,
+				&retailFont.fontInfoLarge
+			};
+			idStr materialPrefix = fontPath;
+			materialPrefix += "/";
+			materialPrefix += retailFontCases[fontCaseIndex].atlasStem;
+			for ( int slotIndex = 0; slotIndex < 3; ++slotIndex ) {
+				const fontInfo_t &fontSlot = *fontSlots[slotIndex];
+				idStr expectedDataName = va( "%s/fontImage_%d.dat", fontPath.c_str(), pointSizes[slotIndex] );
+				label = va( "Prey %s %d point data source", retailFontCases[fontCaseIndex].label, pointSizes[slotIndex] );
+				ok &= openQ4_CheckBool( label.c_str(), idStr::Icmp( fontSlot.name, expectedDataName.c_str() ) == 0, true );
+				label = va( "Prey %s %d point size", retailFontCases[fontCaseIndex].label, pointSizes[slotIndex] );
+				ok &= openQ4_CheckNear( label.c_str(), fontSlot.pointSize, static_cast<float>( pointSizes[slotIndex] ) );
+
+				const openPreyRetailFontPageAudit_t pageAudit = openPREY_AuditRetailFontPages( fontSlot, materialPrefix.c_str() );
+				label = va( "Prey %s %d point material page count", retailFontCases[fontCaseIndex].label, pointSizes[slotIndex] );
+				ok &= openQ4_CheckInt( label.c_str(), pageAudit.pageCount, retailFontCases[fontCaseIndex].expectedPages[slotIndex] );
+				label = va( "Prey %s %d point material page names", retailFontCases[fontCaseIndex].label, pointSizes[slotIndex] );
+				ok &= openQ4_CheckBool( label.c_str(), pageAudit.namesMatch, true );
+				label = va( "Prey %s %d point visible glyph materials", retailFontCases[fontCaseIndex].label, pointSizes[slotIndex] );
+				ok &= openQ4_CheckBool( label.c_str(), pageAudit.visibleGlyphsCovered, true );
+				label = va( "Prey %s %d point material page images", retailFontCases[fontCaseIndex].label, pointSizes[slotIndex] );
+				ok &= openQ4_CheckBool( label.c_str(), pageAudit.imagesPresent, true );
+			}
+		}
+	}
+#else
 	idDeviceContext radioFontDc;
 	radioFontDc.Init();
 	const int radioFont = radioFontDc.FindFont( "fonts/marine" );
@@ -2147,6 +2539,7 @@ bool UI_FontParity_RunSelfTest( void ) {
 			}
 		}
 	}
+#endif
 
 	q4VirtualScreenTransform_t transform;
 	openQ4_CalcVirtualScreenTransform( 640.0f, 480.0f, 640.0f, 480.0f, true, transform );
@@ -2336,7 +2729,7 @@ bool UI_FontParity_RunSelfTest( void ) {
 	ok &= openQ4_CheckNear( "expanded inside clip s2", s2, 1.0f );
 
 	if ( ok ) {
-		common->Printf( "uiFontParitySelfTest passed: retail glyph metrics, atlas upload, icon sizing, cursor handling, alignment, aspect expansion, and clipping are stable\n" );
+		common->Printf( "uiFontParitySelfTest passed: retail glyph metrics, per-glyph atlas selection, atlas upload, icon sizing, cursor handling, alignment, aspect expansion, and clipping are stable\n" );
 	}
 	return ok;
 }

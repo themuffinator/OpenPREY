@@ -1,4 +1,4 @@
-name: macOS Sanitizer
+name: DISABLED - inherited OpenQ4 reference (macOS Sanitizer)
 
 on:
   workflow_dispatch:
@@ -36,6 +36,7 @@ concurrency:
 
 jobs:
   macos-sanitizer:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: macOS ${{ matrix.bridge_label }} ASan+UBSan
     runs-on: macos-15
     timeout-minutes: 150
@@ -221,7 +222,7 @@ jobs:
             macos-sanitizer-host-${{ matrix.artifact_suffix }}.txt
             macos-sanitizer-binaries-${{ matrix.artifact_suffix }}.txt
             builddir/meson-logs
-            .tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json
+            builddir/.tmp/openprey_gamelibs_stage/openprey_gamelibs_stage_manifest.json
             .tmp/macos-sanitizer-${{ matrix.artifact_suffix }}-runtime
           if-no-files-found: warn
           retention-days: ${{ fromJSON(inputs.retention_days) }}

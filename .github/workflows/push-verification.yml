@@ -1,9 +1,7 @@
-name: Push Verification
+name: DISABLED - inherited OpenQ4 reference (Push Verification)
 
 on:
-  push:
   workflow_dispatch:
-
 permissions:
   contents: read
 
@@ -13,20 +11,21 @@ concurrency:
 
 jobs:
   script-smoke:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: Validation Script Smoke
     runs-on: ubuntu-24.04
     env:
-      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}/../openQ4-game
+      OPENPREY_GAMELIBS_REPO: ${{ github.workspace }}/../OpenPrey-game
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Fetch openQ4-game
+      - name: Fetch OpenPrey-game
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/themuffinator/openQ4-game.git "${OPENQ4_GAMELIBS_REPO}"
+          git clone --depth 1 https://github.com/themuffinator/OpenPrey-game.git "${OPENPREY_GAMELIBS_REPO}"
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -65,9 +64,14 @@ jobs:
             tools/tests/renderer_validation_matrix.py \
             tools/tests/campaign_split_state_transition.py \
             tools/tests/demo_playback.py \
+            tools/tests/module_only_render_geo_lifecycle.py \
+            tools/tests/lightgrid_bake_autoquit.py \
             tools/tests/docs_link_integrity.py \
             tools/tests/filesystem_case_segments.py \
             tools/tests/filesystem_mod_manifest.py \
+            tools/tests/openprey_filesystem_policy.py \
+            tools/tests/openprey_runtime_branding.py \
+            tools/tests/openprey_tool_branding.py \
             tools/tests/game_class_allocator_alignment.py \
             tools/tests/game_type_module_selection.py \
             tools/tests/gamelibs_staging.py \
@@ -93,6 +97,7 @@ jobs:
             tools/tests/linux_metadata_fuzz.py \
             tools/tests/linux_packaging_guidance.py \
             tools/tests/linux_sanitizer_ci.py \
+            tools/tests/linux_sanitizer_source_contract.py \
             tools/tests/linux_sdl3_glew_loader.py \
             tools/tests/linux_vsync_support.py \
             tools/tests/linux_wayland_build_contract.py \
@@ -141,6 +146,7 @@ jobs:
             tools/tests/posix_thread_shutdown.py \
             tools/tests/release_tooling_safety.py \
             tools/tests/renderer_cel_shading.py \
+            tools/tests/renderer_mp_flat_items.py \
             tools/tests/renderer_msaa_cvar_safety.py \
             tools/tests/renderer_picmip_policy.py \
             tools/tests/renderer_player_visibility.py \
@@ -170,13 +176,16 @@ jobs:
           bash -n tools/validation/validate_pr.sh
           python tools/tests/campaign_split_state_transition.py
           python tools/tests/demo_playback.py
+          python tools/tests/module_only_render_geo_lifecycle.py
+          python tools/tests/lightgrid_bake_autoquit.py
           python tools/tests/docs_link_integrity.py
           python tools/tests/filesystem_case_segments.py
           python tools/tests/filesystem_mod_manifest.py
-          python tools/tests/game_class_allocator_alignment.py
+          python tools/tests/openprey_filesystem_policy.py
+          python tools/tests/openprey_runtime_branding.py
+          python tools/tests/openprey_tool_branding.py
           python tools/tests/game_type_module_selection.py
           python tools/tests/gamelibs_staging.py
-          python tools/tests/generated_animation_cache.py
           python tools/tests/hdr_postprocess_math.py
           python tools/tests/linux_arm64_cross_compile.py
           python tools/tests/linux_arm64_ci_coverage.py
@@ -195,6 +204,7 @@ jobs:
           python tools/tests/linux_packaging_guidance.py
           python tools/tests/linux_pk4_legacy_tools.py
           python tools/tests/linux_sanitizer_ci.py
+          python tools/tests/linux_sanitizer_source_contract.py
           python tools/tests/linux_sdl3_glew_loader.py
           python tools/tests/linux_vsync_support.py
           python tools/tests/linux_wayland_build_contract.py
@@ -272,12 +282,13 @@ jobs:
           bash tools/validation/validate_push.sh --dry-run
 
   posix-builds:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: ${{ matrix.name }}
     needs: script-smoke
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
-      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}/../openQ4-game
+      OPENPREY_GAMELIBS_REPO: ${{ github.workspace }}/../OpenPrey-game
     strategy:
       fail-fast: false
       matrix:
@@ -322,11 +333,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Fetch openQ4-game
+      - name: Fetch OpenPrey-game
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/themuffinator/openQ4-game.git "${OPENQ4_GAMELIBS_REPO}"
+          git clone --depth 1 https://github.com/themuffinator/OpenPrey-game.git "${OPENPREY_GAMELIBS_REPO}"
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -416,7 +427,7 @@ jobs:
             )
             if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
               env LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEO_DRIVER=x11 SDL_VIDEODRIVER=x11 xvfb-run -a bash tools/validation/validate_push.sh "${validation_args[@]}"
-              env LIBGL_ALWAYS_SOFTWARE=1 OPENQ4_FORCE_X11=1 xvfb-run -a python tools/tests/renderer_validation_matrix.py \
+              env LIBGL_ALWAYS_SOFTWARE=1 OPENPREY_FORCE_X11=1 xvfb-run -a python tools/tests/renderer_validation_matrix.py \
                 --cases sdl3-force-x11-display-diagnostics \
                 --tiers auto \
                 --basepath "" \
@@ -486,21 +497,22 @@ jobs:
           include-hidden-files: true
 
   windows-build:
+    if: ${{ false }} # OPENPREY-GATED: split-module/OpenQ4 source contract
     name: Windows Push Verification
     needs: script-smoke
     runs-on: windows-2025-vs2026
     timeout-minutes: 90
     env:
-      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}/../openQ4-game
+      OPENPREY_GAMELIBS_REPO: ${{ github.workspace }}/../OpenPrey-game
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Fetch openQ4-game
+      - name: Fetch OpenPrey-game
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          git clone --depth 1 https://github.com/themuffinator/openQ4-game.git "$env:OPENQ4_GAMELIBS_REPO"
+          git clone --depth 1 https://github.com/themuffinator/OpenPrey-game.git "$env:OPENPREY_GAMELIBS_REPO"
 
       - name: Setup Python
         uses: actions/setup-python@v6

@@ -111,8 +111,8 @@ def validate_companion_boundary() -> None:
         'root / ".." / "openQ4-game"',
         "OPENQ4_GAMELIBS_REPO",
         "stage_gamelibs.py",
-        "gamelibs_stage",
-        "openq4_gamelibs_stage_manifest.json",
+        "openprey_gamelibs_stage",
+        "openprey_gamelibs_stage_manifest.json",
     ):
         require(meson, token, "openQ4 Meson GameLibs staging contract")
 

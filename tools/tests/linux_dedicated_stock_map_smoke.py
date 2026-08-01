@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Validate a packaged Linux dedicated server with a native-Wayland client.
 
-This opt-in hardware/runtime test requires the retail Quake 4 PK4s. It starts
-the staged dedicated executable on ``mp/q4dm1``, waits until the server has
-loaded the staged MP game module and map, connects the separately staged client
+This opt-in hardware/runtime test requires retail Prey (2006) PK4s. It starts
+the staged dedicated executable on ``game/dmroadhouse``, waits until the server
+has loaded the staged unified game module and map, connects the staged client
 through native Wayland, captures active gameplay, and preserves an evidence
 report under ``.tmp``.
 """
@@ -34,11 +34,11 @@ from linux_physical_host_evidence import (
 ROOT = Path(__file__).resolve().parents[2]
 REPORT_SCHEMA_VERSION = 1
 REPORT_TYPE = "linux-wayland-stock-dedicated"
-MAP_NAME = "mp/q4dm1"
+MAP_NAME = "game/dmroadhouse"
 SCREENSHOT_REL = "screenshots/linux-stock-dedicated/client.tga"
 SERVER_LOG_NAME = "linux-stock-dedicated-server.log"
 CLIENT_LOG_NAME = "linux-stock-dedicated-client.log"
-SERVER_VIDEO_DRIVER_CANARY = "openq4-dedicated-must-not-init-video"
+SERVER_VIDEO_DRIVER_CANARY = "openprey-dedicated-must-not-init-video"
 
 FATAL_PATTERNS = {
     "error": re.compile(r"^(?:\^[0-9])?ERROR:", re.MULTILINE),
@@ -145,8 +145,8 @@ def read_text(path: Path | None) -> str:
 
 def find_log(savepath: Path, name: str) -> Path | None:
     for candidate in (
-        savepath / "baseoq4" / "logs" / name,
-        savepath / "q4base" / "logs" / name,
+        savepath / "basepr" / "logs" / name,
+        savepath / "base" / "logs" / name,
         savepath / "logs" / name,
     ):
         if candidate.is_file():
@@ -256,7 +256,7 @@ def write_client_autoexec(savepath: Path, settle_frames: int, sample_msec: int) 
             "r_rendererMetrics 0",
             "framePacingSnapshot",
             "gfxInfo",
-            f'echo OPENQ4_STOCK_DEDICATED_CLIENT_CAPTURE "{MAP_NAME}"',
+            f'echo OPENPREY_STOCK_DEDICATED_CLIENT_CAPTURE "{MAP_NAME}"',
             f'screenshot "{SCREENSHOT_REL}"',
             "wait 5",
             "quit",
@@ -264,7 +264,7 @@ def write_client_autoexec(savepath: Path, settle_frames: int, sample_msec: int) 
         )
     )
     screenshot_rel = Path(SCREENSHOT_REL)
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr", "base"):
         cfg_path = savepath / game_dir / Path(cfg_rel)
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(payload, encoding="utf-8")
@@ -274,7 +274,7 @@ def write_client_autoexec(savepath: Path, settle_frames: int, sample_msec: int) 
 
 def find_screenshot(savepath: Path) -> Path | None:
     rel = Path(SCREENSHOT_REL)
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr", "base"):
         candidate = savepath / game_dir / rel
         if candidate.is_file():
             return candidate
@@ -348,7 +348,7 @@ def benchmark_capture_has_samples(text: str) -> bool:
 
 def expected_module_marker(game_module: Path, arch: str) -> str:
     return (
-        f"Selected game module: logical='game_mp' binary='game-mp_{arch}' "
+        f"Selected game module: logical='game' binary='game_{arch}' "
         f"path='{game_module}'"
     )
 
@@ -400,15 +400,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--dedicated-executable",
         type=Path,
         default=None,
-        help="Override the packaged openQ4 dedicated-server executable.",
+        help="Override the packaged openPREY dedicated-server executable.",
     )
     parser.add_argument(
         "--client-executable",
         type=Path,
         default=None,
-        help="Override the packaged openQ4 client executable.",
+        help="Override the packaged openPREY client executable.",
     )
-    parser.add_argument("--basepath", type=Path, required=True, help="Quake 4 install root containing q4base retail PK4s.")
+    parser.add_argument("--basepath", type=Path, required=True, help="Prey (2006) install root containing base retail PK4s.")
     parser.add_argument(
         "--output-root",
         type=Path,
@@ -464,21 +464,25 @@ def main(argv: list[str]) -> int:
     install_root = args.install_root.resolve()
     basepath = args.basepath.resolve()
     game_libs_repo = args.game_libs_repo.resolve() if args.game_libs_repo else None
-    dedicated = (args.dedicated_executable or install_root / f"openQ4-ded_{arch}").resolve()
-    client = (args.client_executable or install_root / f"openQ4-client_{arch}").resolve()
-    game_module = install_root / "baseoq4" / f"game-mp_{arch}.so"
-    mod_manifest = install_root / "baseoq4" / "mod.json"
-    openq4_pak0 = install_root / "baseoq4" / "pak0.pk4"
-    openq4_pak1 = install_root / "baseoq4" / "pak1.pk4"
-    retail_pak = basepath / "q4base" / "pak001.pk4"
+    dedicated = (args.dedicated_executable or install_root / f"openPREY-ded_{arch}").resolve()
+    client = (args.client_executable or install_root / f"openPREY-client_{arch}").resolve()
+    game_module = install_root / "basepr" / f"game_{arch}.so"
+    mod_manifest = install_root / "basepr" / "mod.json"
+    openprey_pak0 = install_root / "basepr" / "pak0.pk4"
+    openprey_pak1 = install_root / "basepr" / "pak1.pk4"
+    retail_candidates = (
+        basepath / "base" / "pak000.pk4",
+        basepath / "base" / "pak_data.pk4",
+    )
+    retail_pak = next((path for path in retail_candidates if path.is_file()), retail_candidates[0])
     for description, path in (
         ("packaged dedicated server", dedicated),
         ("packaged client", client),
-        ("packaged MP game module", game_module),
-        ("packaged openQ4 mod manifest", mod_manifest),
-        ("packaged openQ4 pak0.pk4", openq4_pak0),
-        ("packaged openQ4 pak1.pk4", openq4_pak1),
-        ("retail Quake 4 pak001.pk4", retail_pak),
+        ("packaged unified game module", game_module),
+        ("packaged openPREY mod manifest", mod_manifest),
+        ("packaged openPREY pak0.pk4", openprey_pak0),
+        ("packaged openPREY pak1.pk4", openprey_pak1),
+        ("retail Prey base PK4", retail_pak),
     ):
         if not path.is_file():
             raise RuntimeError(f"{description} not found: {path}")
@@ -486,16 +490,16 @@ def main(argv: list[str]) -> int:
         if not os.access(executable, os.X_OK):
             raise RuntimeError(f"packaged executable is not executable: {executable}")
 
-    packaged_q4base = install_root / "q4base"
-    if packaged_q4base.is_dir() and any(path.is_file() for path in packaged_q4base.rglob("*")):
+    packaged_retail_base = install_root / "base"
+    if packaged_retail_base.is_dir() and any(path.is_file() for path in packaged_retail_base.rglob("*")):
         raise RuntimeError(
-            f"refusing stock-map evidence because the staged package contains q4base overrides: {packaged_q4base}"
+            f"refusing stock-map evidence because the staged package contains retail base overrides: {packaged_retail_base}"
         )
 
     elf_metadata = {
         "dedicated": validate_native_elf(dedicated, arch),
         "client": validate_native_elf(client, arch),
-        "gameMp": validate_native_elf(game_module, arch),
+        "game": validate_native_elf(game_module, arch),
     }
 
     if not args.wayland_display or Path(args.wayland_display).name != args.wayland_display:
@@ -515,7 +519,7 @@ def main(argv: list[str]) -> int:
     run_dir = Path(tempfile.mkdtemp(prefix=f"{arch}-", dir=args.output_root.resolve()))
     server_home = run_dir / "server-home"
     client_home = run_dir / "client-home"
-    server_runtime_context = tempfile.TemporaryDirectory(prefix=f"openq4-ded-xdg-{arch}-")
+    server_runtime_context = tempfile.TemporaryDirectory(prefix=f"openprey-ded-xdg-{arch}-")
     server_runtime = Path(server_runtime_context.name)
     server_home.mkdir()
     client_home.mkdir()
@@ -523,8 +527,8 @@ def main(argv: list[str]) -> int:
     if len(os.fsencode(str(server_runtime / "wayland-0"))) >= 108:
         raise RuntimeError(f"private dedicated XDG runtime socket path would exceed the Linux limit: {server_runtime}")
     for home in (server_home, client_home):
-        (home / ".config" / "openq4").mkdir(parents=True)
-        (home / ".local" / "share" / "openq4").mkdir(parents=True)
+        (home / ".config" / "openprey").mkdir(parents=True)
+        (home / ".local" / "share" / "openprey").mkdir(parents=True)
     cfg_rel = write_client_autoexec(client_home, args.settle_frames, args.sample_msec)
 
     server_stdout = run_dir / "server.stdout.txt"
@@ -544,13 +548,13 @@ def main(argv: list[str]) -> int:
         ("fs_homepath", server_home),
         ("fs_savepath", server_home),
         ("fs_devpath", install_root),
-        ("fs_game", "baseoq4"),
+        ("fs_game", "basepr"),
         ("net_serverDedicated", "1"),
         ("net_port", args.port),
         ("si_pure", "0"),
         ("net_serverAllowServerMod", "1"),
         ("sv_cheats", "1"),
-        ("si_gameType", "DM"),
+        ("si_gameType", "deathmatch"),
         ("s_noSound", "1"),
     ):
         append_set(server_command, name, value)
@@ -567,7 +571,7 @@ def main(argv: list[str]) -> int:
         ("fs_homepath", client_home),
         ("fs_savepath", client_home),
         ("fs_devpath", install_root),
-        ("fs_game", "baseoq4"),
+        ("fs_game", "basepr"),
         ("r_ignoreGLErrors", "0"),
         ("r_fullscreen", "0"),
         ("r_mode", "3"),
@@ -604,6 +608,7 @@ def main(argv: list[str]) -> int:
     for name in (
         "DISPLAY",
         "WAYLAND_DISPLAY",
+        "OPENPREY_FORCE_X11",
         "OPENQ4_FORCE_X11",
         "GDK_BACKEND",
     ):
@@ -626,6 +631,7 @@ def main(argv: list[str]) -> int:
         }
     )
     client_environment.pop("DISPLAY", None)
+    client_environment.pop("OPENPREY_FORCE_X11", None)
     client_environment.pop("OPENQ4_FORCE_X11", None)
 
     started = time.monotonic()
@@ -730,10 +736,10 @@ def main(argv: list[str]) -> int:
     }
     client_markers = {
         "native Wayland active": "SDL3: native Wayland active" in client_text,
-        "client selected packaged game_mp": expected_module_marker(game_module, arch) in client_text,
+        "client selected packaged unified game": expected_module_marker(game_module, arch) in client_text,
         "client decl checksum": bool(client_checksum),
         "client received connect response": "received connect response from" in client_text,
-        "client entered mp/q4dm1": f"Map: {MAP_NAME}" in client_text,
+        "client entered game/dmroadhouse": f"Map: {MAP_NAME}" in client_text,
         "client SpawnPlayer": re.search(r"SpawnPlayer:\s*\d+", client_text) is not None,
         "client first active draw": "AutoExecAfterMapLoad: first active draw observed" in client_text,
         "client capture cfg executed": f"AutoExecAfterMapLoad: executed {cfg_rel}" in client_text,
@@ -750,7 +756,7 @@ def main(argv: list[str]) -> int:
     server_sequence_failures = ordered_pattern_failures(
         server_log_text,
         (
-            ("server selected packaged game_mp", re.compile(re.escape(expected_module))),
+            ("server selected packaged unified game", re.compile(re.escape(expected_module))),
             ("server opened socket", re.compile(re.escape(f"Server spawned on port {args.port}."))),
             ("server declaration checksum", re.compile(r"Server decl checksum:\s*0x[0-9A-Fa-f]+")),
             ("server map load started", re.compile(re.escape(f"Map: {MAP_NAME}"))),
@@ -763,7 +769,7 @@ def main(argv: list[str]) -> int:
     client_sequence_failures = ordered_pattern_failures(
         client_log_text,
         (
-            ("client selected packaged game_mp in order", re.compile(re.escape(expected_module))),
+            ("client selected packaged unified game in order", re.compile(re.escape(expected_module))),
             ("client declaration checksum in order", re.compile(r"Client decl checksum:\s*0x[0-9A-Fa-f]+")),
             ("client connect response in order", re.compile(re.escape("received connect response from"))),
             ("client map load in order", re.compile(re.escape(f"Map: {MAP_NAME}"))),
@@ -797,8 +803,8 @@ def main(argv: list[str]) -> int:
     binary_hashes = {
         "dedicated": sha256_file(dedicated),
         "client": sha256_file(client),
-        "gameMp": sha256_file(game_module),
-        "retailPak001": sha256_file(retail_pak),
+        "game": sha256_file(game_module),
+        "retailPreyPak": sha256_file(retail_pak),
     }
     report: dict[str, Any] = {
         "reportSchemaVersion": REPORT_SCHEMA_VERSION,
@@ -845,8 +851,8 @@ def main(argv: list[str]) -> int:
         "missingMarkers": missing,
         "fatalMarkers": fatal,
         "elapsedSeconds": round(elapsed, 3),
-        "openQ4Commit": git_commit(install_root.parent),
-        "openQ4GameCommit": git_commit(game_libs_repo),
+        "openPREYCommit": git_commit(install_root.parent),
+        "OpenPreyGameCommit": git_commit(game_libs_repo),
         "sha256": binary_hashes,
         "elf": elf_metadata,
         "paths": {

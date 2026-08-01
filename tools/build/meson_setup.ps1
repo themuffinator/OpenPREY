@@ -62,6 +62,9 @@ function Get-openQ4VsProcessArch {
 }
 
 function Get-openQ4VsTargetArch {
+    if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_VS_TARGET_ARCH)) {
+        return $env:OPENPREY_VS_TARGET_ARCH.Trim().ToLowerInvariant()
+    }
     if (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_VS_TARGET_ARCH)) {
         return $env:OPENQ4_VS_TARGET_ARCH.Trim().ToLowerInvariant()
     }
@@ -70,6 +73,9 @@ function Get-openQ4VsTargetArch {
 }
 
 function Get-openQ4VsHostArch {
+    if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_VS_HOST_ARCH)) {
+        return $env:OPENPREY_VS_HOST_ARCH.Trim().ToLowerInvariant()
+    }
     if (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_VS_HOST_ARCH)) {
         return $env:OPENQ4_VS_HOST_ARCH.Trim().ToLowerInvariant()
     }
@@ -250,7 +256,7 @@ function Ensure-WindowsStaticCRTSetupArgs {
         if ($arg -like "-Db_vscrt=*") {
             $found = $true
             if ($arg -ne $requiredArg) {
-                Write-Host "Overriding Meson b_vscrt option to '$requiredValue' to satisfy openQ4 Windows static CRT policy."
+                Write-Host "Overriding Meson b_vscrt option to '$requiredValue' to satisfy openPREY Windows static CRT policy."
             }
             $updatedArgs += $requiredArg
             continue
@@ -399,7 +405,7 @@ function Get-openQ4GameLibsRepoPath {
         return [System.IO.Path]::GetFullPath($ConfiguredRepo)
     }
 
-    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot "..\openQ4-game"))
+    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot "..\OpenPrey-game"))
 }
 
 function Test-GamelibsStageRefreshNeeded {
@@ -420,13 +426,36 @@ function Test-GamelibsStageRefreshNeeded {
     }
 
     $resolvedGameLibsRepo = Get-openQ4GameLibsRepoPath -RepoRoot $RepoRoot -ConfiguredRepo $GameLibsRepo
+    $stageRoot = Join-Path $BuildDir ".tmp\openprey_gamelibs_stage"
     $sourceGameDirs = @(
         (Join-Path $resolvedGameLibsRepo "src\game"),
-        (Join-Path $resolvedGameLibsRepo "src\mpgame")
+        (Join-Path $resolvedGameLibsRepo "src\Prey"),
+        (Join-Path $resolvedGameLibsRepo "src\preyengine"),
+        (Join-Path $RepoRoot "src\idlib"),
+        (Join-Path $RepoRoot "src\framework"),
+        (Join-Path $RepoRoot "src\renderer"),
+        (Join-Path $RepoRoot "src\ui"),
+        (Join-Path $RepoRoot "src\sys"),
+        (Join-Path $RepoRoot "src\bse"),
+        (Join-Path $RepoRoot "src\MayaImport"),
+        (Join-Path $RepoRoot "src\cm"),
+        (Join-Path $RepoRoot "src\sound"),
+        (Join-Path $RepoRoot "src\tools\compilers")
     )
     $stagedGameDirs = @(
-        (Join-Path $RepoRoot ".tmp\gamelibs_stage\src\game"),
-        (Join-Path $RepoRoot ".tmp\gamelibs_stage\src\mpgame")
+        (Join-Path $stageRoot "src\game"),
+        (Join-Path $stageRoot "src\Prey"),
+        (Join-Path $stageRoot "src\preyengine"),
+        (Join-Path $stageRoot "src\idlib"),
+        (Join-Path $stageRoot "src\framework"),
+        (Join-Path $stageRoot "src\renderer"),
+        (Join-Path $stageRoot "src\ui"),
+        (Join-Path $stageRoot "src\sys"),
+        (Join-Path $stageRoot "src\bse"),
+        (Join-Path $stageRoot "src\MayaImport"),
+        (Join-Path $stageRoot "src\cm"),
+        (Join-Path $stageRoot "src\sound"),
+        (Join-Path $stageRoot "src\tools\compilers")
     )
 
     if (@($sourceGameDirs | Where-Object { -not (Test-Path $_) }).Count -ne 0) {
@@ -509,7 +538,7 @@ function Remove-NonRuntimeInstallArtifacts {
         }
     }
 
-    $installGameDir = Join-Path $InstallRoot "baseoq4"
+    $installGameDir = Join-Path $InstallRoot "basepr"
     if (-not (Test-Path $installGameDir)) {
         return
     }
@@ -521,8 +550,7 @@ function Remove-NonRuntimeInstallArtifacts {
         "*.map",
         "*.so",
         "*.dylib",
-        "game-sp_x86.dll",
-        "game-mp_x86.dll"
+        "game_x86.dll"
     )
 
     foreach ($pattern in $gameDirPatterns) {
@@ -553,8 +581,8 @@ function Copy-WindowsDiagnosticSymbols {
     }
 
     $rootPatterns = @(
-        "openQ4-client_*.pdb",
-        "openQ4-ded_*.pdb"
+        "openPREY-client_*.pdb",
+        "openPREY-ded_*.pdb"
     )
 
     foreach ($pattern in $rootPatterns) {
@@ -566,17 +594,16 @@ function Copy-WindowsDiagnosticSymbols {
         }
     }
 
-    $installGameDir = Join-Path $InstallRoot "baseoq4"
+    $installGameDir = Join-Path $InstallRoot "basepr"
     New-Item -Path $installGameDir -ItemType Directory -Force | Out-Null
     $stagedGameSymbols = @{}
 
     $gameBuildDirs = @(
-        (Join-Path $BuildDir "content\baseoq4"),
-        (Join-Path $BuildDir "baseoq4")
+        (Join-Path $BuildDir "content\basepr"),
+        (Join-Path $BuildDir "basepr")
     )
     $gamePatterns = @(
-        "game-sp_*.pdb",
-        "game-mp_*.pdb"
+        "game_*.pdb"
     )
 
     foreach ($gameBuildDir in $gameBuildDirs) {
@@ -604,18 +631,12 @@ function Stop-openQ4RuntimeProcesses {
     param()
 
     $processNames = @(
-        "openQ4-client_x64",
-        "openQ4-client_x86",
-        "openQ4-client_arm64",
-        "openQ4-ded_x64",
-        "openQ4-ded_x86",
-        "openQ4-ded_arm64",
-        "openQ4-client_x64",
-        "openQ4-client_x86",
-        "openQ4-client_arm64",
-        "openQ4-ded_x64",
-        "openQ4-ded_x86",
-        "openQ4-ded_arm64"
+        "openPREY-client_x64",
+        "openPREY-client_x86",
+        "openPREY-client_arm64",
+        "openPREY-ded_x64",
+        "openPREY-ded_x86",
+        "openPREY-ded_arm64"
     )
 
     $running = @(Get-Process -Name $processNames -ErrorAction SilentlyContinue)
@@ -623,7 +644,7 @@ function Stop-openQ4RuntimeProcesses {
         return $false
     }
 
-    Write-Host "Stopping running openQ4 processes before install: $($running.ProcessName -join ', ')"
+    Write-Host "Stopping running openPREY processes before install: $($running.ProcessName -join ', ')"
 
     foreach ($proc in $running) {
         try {
@@ -642,7 +663,7 @@ function Stop-openQ4RuntimeProcesses {
         try {
             $stillRunning | Stop-Process -Force -ErrorAction Stop
         } catch {
-            throw "Failed to stop running openQ4 processes. Close them manually and retry install. Details: $($_.Exception.Message)"
+            throw "Failed to stop running openPREY processes. Close them manually and retry install. Details: $($_.Exception.Message)"
         }
     }
 
@@ -674,7 +695,7 @@ if ($effectiveArgs.Count -eq 0) {
 }
 
 $commandName = $effectiveArgs[0].ToLowerInvariant()
-$gameLibsRepo = if ([string]::IsNullOrWhiteSpace($env:OPENQ4_GAMELIBS_REPO)) { "" } else { $env:OPENQ4_GAMELIBS_REPO }
+$gameLibsRepo = if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_GAMELIBS_REPO)) { $env:OPENPREY_GAMELIBS_REPO } elseif (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_GAMELIBS_REPO)) { $env:OPENQ4_GAMELIBS_REPO } else { "" }
 $buildGameLibsScript = Join-Path $scriptDir "build_gamelibs.ps1"
 $stageWindowsRuntimeScript = Join-Path $scriptDir "stage_windows_runtime.py"
 $syncIconsScript = Join-Path $scriptDir "sync_icons.py"
@@ -698,8 +719,9 @@ if ($commandName -eq "setup" -and ($effectiveArgs -contains "--reconfigure")) {
     }
 }
 
-$buildGameLibs = $env:OPENQ4_BUILD_GAMELIBS -eq "1"
-if ($commandName -eq "compile" -and $buildGameLibs -and $env:OPENQ4_SKIP_GAMELIBS_BUILD -ne "1") {
+$buildGameLibs = $env:OPENPREY_BUILD_GAMELIBS -eq "1" -or $env:OPENQ4_BUILD_GAMELIBS -eq "1"
+$skipGameLibsBuild = $env:OPENPREY_SKIP_GAMELIBS_BUILD -eq "1" -or $env:OPENQ4_SKIP_GAMELIBS_BUILD -eq "1"
+if ($commandName -eq "compile" -and $buildGameLibs -and -not $skipGameLibsBuild) {
     if (-not (Test-Path $buildGameLibsScript)) {
         throw "GameLibs build script not found: '$buildGameLibsScript'."
     }
@@ -766,14 +788,14 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
         if ([string]::IsNullOrWhiteSpace([string]$configuredCRT)) {
             $configuredCRT = "unset"
         }
-        Write-Host "Meson build directory '$($buildInfo.BuildDir)' uses b_vscrt='$configuredCRT'. Reconfiguring for openQ4's required Windows static CRT policy..."
+        Write-Host "Meson build directory '$($buildInfo.BuildDir)' uses b_vscrt='$configuredCRT'. Reconfiguring for openPREY's required Windows static CRT policy..."
         $reconfigureReasons += "Windows static CRT policy"
     }
 
     $needsGameLibsRefresh = Test-GamelibsStageRefreshNeeded -BuildDir $buildInfo.BuildDir -RepoRoot $repoRoot -GameLibsRepo $gameLibsRepo
     if ($needsGameLibsRefresh) {
-        Write-Host "openQ4-game sources changed since the last staged snapshot. Reconfiguring '$($buildInfo.BuildDir)'..."
-        $reconfigureReasons += "staged openQ4-game refresh"
+        Write-Host "OpenPrey-game sources changed since the last staged snapshot. Reconfiguring '$($buildInfo.BuildDir)'..."
+        $reconfigureReasons += "staged OpenPrey-game refresh"
     }
 
     if ($reconfigureReasons.Count -gt 0) {
@@ -804,11 +826,11 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
     }
 }
 
-if ($commandName -eq "install" -and $env:OPENQ4_INSTALL_CLOSE_RUNNING -ne "0") {
+if ($commandName -eq "install" -and $env:OPENPREY_INSTALL_CLOSE_RUNNING -ne "0" -and $env:OPENQ4_INSTALL_CLOSE_RUNNING -ne "0") {
     Stop-openQ4RuntimeProcesses | Out-Null
 }
 
-if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKIP_ICON_SYNC -ne "1") {
+if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENPREY_SKIP_ICON_SYNC -ne "1" -and $env:OPENQ4_SKIP_ICON_SYNC -ne "1") {
     if (-not (Test-Path $syncIconsScript)) {
         throw "Icon sync script not found: '$syncIconsScript'."
     }
@@ -835,8 +857,8 @@ if ($commandName -eq "install") {
 Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
 $exitCode = [int]$LASTEXITCODE
 
-if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
-    Write-Host "Meson install failed; retrying once after ensuring openQ4 processes are stopped..."
+if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENPREY_INSTALL_RETRY_ON_FAILURE -ne "0" -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
+    Write-Host "Meson install failed; retrying once after ensuring openPREY processes are stopped..."
     Stop-openQ4RuntimeProcesses | Out-Null
     Start-Sleep -Milliseconds 500
     Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch

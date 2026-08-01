@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the openQ4 runtime PK4 integrity header."""
+"""Generate the openPREY runtime PK4 integrity header."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from openq4_pak import PAK0_NAME, PAK1_NAME, format_openq4_paks_header, inspect_
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate openQ4 PK4 checksum macros.")
+    parser = argparse.ArgumentParser(description="Generate openPREY PK4 checksum macros.")
     parser.add_argument("--pak0", required=True, help="Built pak0.pk4 path.")
     parser.add_argument("--pak1", required=True, help="Built pak1.pk4 path.")
     parser.add_argument("--header-out", required=True, help="Generated C/C++ header path.")

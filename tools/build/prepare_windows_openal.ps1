@@ -205,8 +205,8 @@ Remove-WorkspaceDirectory -Path $buildDir -RepoRoot $repoRoot
 Remove-WorkspaceDirectory -Path $outputRootFull -RepoRoot $repoRoot
 New-Item -ItemType Directory -Path $outputRootFull -Force | Out-Null
 
-$vsTargetArch = if ([string]::IsNullOrWhiteSpace($env:OPENQ4_VS_TARGET_ARCH)) { $Architecture } else { $env:OPENQ4_VS_TARGET_ARCH.Trim().ToLowerInvariant() }
-$vsHostArch = if ([string]::IsNullOrWhiteSpace($env:OPENQ4_VS_HOST_ARCH)) { Get-ProcessArch } else { $env:OPENQ4_VS_HOST_ARCH.Trim().ToLowerInvariant() }
+$vsTargetArch = if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_VS_TARGET_ARCH)) { $env:OPENPREY_VS_TARGET_ARCH.Trim().ToLowerInvariant() } elseif (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_VS_TARGET_ARCH)) { $env:OPENQ4_VS_TARGET_ARCH.Trim().ToLowerInvariant() } else { $Architecture }
+$vsHostArch = if (-not [string]::IsNullOrWhiteSpace($env:OPENPREY_VS_HOST_ARCH)) { $env:OPENPREY_VS_HOST_ARCH.Trim().ToLowerInvariant() } elseif (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_VS_HOST_ARCH)) { $env:OPENQ4_VS_HOST_ARCH.Trim().ToLowerInvariant() } else { Get-ProcessArch }
 $preparationSource = "source-build"
 try {
     if (-not (Test-Path $downloadPath)) {

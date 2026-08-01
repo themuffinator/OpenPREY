@@ -116,7 +116,7 @@ static const char *Posix_InstanceLockPath( void ) {
 		runtimeDir = "/tmp";
 	}
 
-	idStr::snPrintf( lockPath, sizeof( lockPath ), "%s/openq4-%u.lock", runtimeDir, static_cast<unsigned int>( geteuid() ) );
+	idStr::snPrintf( lockPath, sizeof( lockPath ), "%s/openprey-%u.lock", runtimeDir, static_cast<unsigned int>( geteuid() ) );
 	return lockPath;
 }
 
@@ -849,7 +849,7 @@ int Sys_GetDriveFreeSpace( const char *path ) {
 /*
 ================
 Sys_AlreadyRunning
-return true if there is a copy of openQ4 running already
+return true if there is a copy of openPREY running already
 ================
 */
 bool Sys_AlreadyRunning( void ) {
@@ -880,7 +880,7 @@ bool Sys_AlreadyRunning( void ) {
 
 		Posix_ReleaseInstanceLock();
 		if ( lockError == EACCES || lockError == EAGAIN ) {
-			common->Printf( "another openQ4 instance is already running\n" );
+			common->Printf( "another openPREY instance is already running\n" );
 			return true;
 		}
 

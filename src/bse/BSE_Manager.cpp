@@ -86,7 +86,9 @@ bool rvBSEManagerLocal::Init(void) {
 
 	declManager->FindEffect("_default");
 	declManager->FindMaterial("_default");
+#if !defined(HUMANHEAD)
 	declManager->FindMaterial("gfx/effects/particles_shapes/motionblur");
+#endif
 	declManager->FindType(DECL_TABLE, "halfsintable", true);
 	renderModelManager->FindModel("_default");
 	pauseTime = -1.0f;

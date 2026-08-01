@@ -75,6 +75,7 @@ ID_INLINE float idMath_FloatXorBits( const float f, const unsigned int bits ) {
 
 #define	FLOAT_IS_NAN(x)			((idMath_FloatBits(x) & 0x7f800000u) == 0x7f800000u)
 #define FLOAT_IS_INF(x)			((idMath_FloatBits(x) & 0x7fffffffu) == 0x7f800000u)
+#define FLOAT_IS_INVALID(x)		( FLOAT_IS_NAN( x ) || FLOAT_IS_INF( x ) )
 #define FLOAT_IS_IND(x)			(idMath_FloatBits(x) == 0xffc00000u)
 #define	FLOAT_IS_DENORMAL(x)	((idMath_FloatBits(x) & 0x7f800000u) == 0x00000000u && \
 								 (idMath_FloatBits(x) & 0x007fffffu) != 0x00000000u )

@@ -1758,6 +1758,16 @@ static void VK_CreateSingleDrawInteractions( const drawSurf_t *surf ) {
 					inter.vertexColor = surfaceStage->vertexColor;
 					break;
 				}
+				case SL_INTERACTION: {
+					if ( surfaceRegs[ surfaceStage->conditionRegister ] != 0.0f ) {
+						static bool warnedUnsupportedPreyInteraction = false;
+						if ( !warnedUnsupportedPreyInteraction ) {
+							common->Warning( "Vulkan: custom Prey ARB interaction stages are unsupported; use renderer-gl" );
+							warnedUnsupportedPreyInteraction = true;
+						}
+					}
+					break;
+				}
 			}
 		}
 

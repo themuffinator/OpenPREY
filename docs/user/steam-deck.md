@@ -1,18 +1,22 @@
 # Steam Deck
 
-openQ4 supports Steam Deck through the dedicated `openQ4-steamdeck` launcher shipped in Linux packages as of March 30, 2026.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
+openPREY includes a dedicated `openPREY-steamdeck` launcher in staged Linux packages.
 
 ## Launching
 
-- Use `openQ4-steamdeck` instead of `openQ4-client_x64`.
-- The launcher adds `+set com_platformProfile steamdeck`, exports `OPENQ4_STEAMDECK=1`, and preserves any extra command-line arguments you pass.
-- Native Wayland is the default SDL choice when available. To force the old XWayland fallback path, launch with `OPENQ4_FORCE_X11=1`; the dedicated launcher and direct client launches both honor it unless an explicit SDL video-driver override is already set.
-- If native Wayland hits a libdecor startup or window-decoration issue on a specific compositor stack, launch with `OPENQ4_WAYLAND_DISABLE_LIBDECOR=1`.
-- If you launch `openQ4-client_x64` directly on a Steam Deck or SteamOS host, openQ4 auto-selects the `steamdeck` platform profile when `com_platformProfile` is still `default`. Set `OPENQ4_NO_STEAMDECK_AUTODETECT=1` or `OPENQ4_DISABLE_STEAMDECK_AUTODETECT=1` to disable that fallback.
+- Use `openPREY-steamdeck` instead of `openPREY-client_x64`.
+- The launcher adds `+set com_platformProfile steamdeck`, exports `OPENPREY_STEAMDECK=1`, and preserves any extra command-line arguments you pass.
+- Native Wayland is the default SDL choice when available. To force the old XWayland fallback path, launch with `OPENPREY_FORCE_X11=1`; the dedicated launcher and direct client launches both honor it unless an explicit SDL video-driver override is already set.
+- If native Wayland hits a libdecor startup or window-decoration issue on a specific compositor stack, launch with `OPENPREY_WAYLAND_DISABLE_LIBDECOR=1`.
+- If you launch `openPREY-client_x64` directly on a Steam Deck or SteamOS host, openPREY auto-selects the `steamdeck` platform profile when `com_platformProfile` is still `default`. Set `OPENPREY_NO_STEAMDECK_AUTODETECT=1` or `OPENPREY_DISABLE_STEAMDECK_AUTODETECT=1` to disable that fallback.
 
 ## Controls
 
-Default gameplay bindings shipped by the stock openQ4 config:
+Default gameplay bindings shipped by the stock openPREY config:
 
 - `JOY15` = attack
 - `JOY16` = zoom
@@ -39,7 +43,7 @@ Menu behavior:
 
 Tuning and haptics:
 
-- Controller rumble is driven from Quake 4 sound shake/rumble metadata during gameplay.
+- Controller rumble is driven from Prey (2006) sound shake/rumble metadata during gameplay.
 - Use `in_joystickRumble 0` to disable motor output, or tune strength with `in_joystickRumbleScale`.
 - The Steam Deck profile sets `in_joystickLowBatteryRumbleThreshold 20` and `in_joystickLowBatteryRumbleScale 0.75`, which caps effective rumble output while SDL reports a controller battery at or below 20 percent. This does not rewrite your configured rumble strength.
 - The Steam Deck profile enables native SDL gyro aiming with a conservative `in_gyroSensitivity 0.20`; raise or lower that cvar if gyro aim feels slow or fast.
@@ -50,7 +54,7 @@ Tuning and haptics:
 
 ## Steam Input and Diagnostics
 
-For native Steam Deck testing, use a Steam Input profile that exposes the Deck as a gamepad with its gyro and touchpad capabilities available to SDL. Steam-level gyro-to-mouse or touchpad-to-mouse mappings can still be useful for users, but they hide those inputs from openQ4's native `in_gyro` and `in_touchpadMode` paths.
+For native Steam Deck testing, use a Steam Input profile that exposes the Deck as a gamepad with its gyro and touchpad capabilities available to SDL. Steam-level gyro-to-mouse or touchpad-to-mouse mappings can still be useful for users, but they hide those inputs from openPREY's native `in_gyro` and `in_touchpadMode` paths.
 
 If a build expects native touchscreen or multi-touch events, enable Touch API pass-through in the Steamworks/partner configuration. Without that partner-side setting, Steam may deliver touch as mouse emulation instead of SDL touchscreen events.
 
@@ -83,7 +87,7 @@ With the update budget set, the renderer spends each frame's shadow renders on t
 
 Linux Steam auto-discovery checks these roots and then expands any additional library folders from `libraryfolders.vdf`:
 
-- `OPENQ4_STEAM_ROOT` / `OPENQ4_STEAM_ROOTS`
+- `OPENPREY_STEAM_ROOT` / `OPENPREY_STEAM_ROOTS`
 - `STEAM_COMPAT_CLIENT_INSTALL_PATH`
 - `$XDG_DATA_HOME/Steam`
 - `~/.steam/steam`
@@ -91,14 +95,14 @@ Linux Steam auto-discovery checks these roots and then expands any additional li
 - `~/.local/share/Steam`
 - `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`
 
-openQ4 then looks for `steamapps/common/Quake 4` under each Steam library root.
+openPREY then looks for `steamapps/common/Prey` under each Steam library root.
 
-For deterministic testing, set `OPENQ4_QUAKE4_PATH` or `OPENQ4_QUAKE4_ROOT` to the Quake 4 install root directly, or set `OPENQ4_STEAM_LIBRARY` / `OPENQ4_STEAM_LIBRARIES` to Steam library roots that contain `steamapps/common/Quake 4`. On Linux, multiple roots may be separated with `:` or `;`.
+For deterministic testing, set `OPENPREY_PREY_PATH` or `OPENPREY_PREY_ROOT` to the Prey (2006) install root directly, or set `OPENPREY_STEAM_LIBRARY` / `OPENPREY_STEAM_LIBRARIES` to Steam library roots that contain `steamapps/common/Prey`. On Linux, multiple roots may be separated with `:` or `;`.
 
 ## Notes
 
 - Steam Deck support is still profile-driven, but the engine now has a Deck/SteamOS fallback detector for direct client launches.
 - Suspend/resume and foreground/background SDL events release captured input, stop rumble, write the current config, and reacquire controllers when the app returns.
-- Native Wayland is supported through the SDL3 backend; XWayland remains available through `OPENQ4_FORCE_X11=1` or explicit SDL video-driver environment variables.
-- `OPENQ4_WAYLAND_DISABLE_LIBDECOR=1` is available as a native Wayland troubleshooting switch for compositor/libdecor problems.
+- Native Wayland is supported through the SDL3 backend; XWayland remains available through `OPENPREY_FORCE_X11=1` or explicit SDL video-driver environment variables.
+- `OPENPREY_WAYLAND_DISABLE_LIBDECOR=1` is available as a native Wayland troubleshooting switch for compositor/libdecor problems.
 - The developer-facing Deck QA checklist lives in [../dev/steam-deck-qa.md](../dev/steam-deck-qa.md).

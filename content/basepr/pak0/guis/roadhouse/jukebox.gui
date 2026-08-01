@@ -1,0 +1,571 @@
+#define BARMETER_LEFT_X		35
+#define BARMETER_LEFT_Y		140
+#define BARMETER_RIGHT_X	490
+#define BARMETER_RIGHT_Y	140
+
+#define BARMETER_WIDTH		25
+#define BARMETER_HEIGHT		100
+#define BARMETER_STEPX		12
+#define BARMETER_STEPY		15
+
+#define BARMETER_CAGEHEIGHT		235			//BARMETER_HEIGHT+BARMETER_STEPY*9
+#define BARMETER_CAGEWIDTH		133			//BARMETER_WIDTH+BARMETER_STEPX*9
+
+#define SELECTIONS_X		0
+#define SELECTIONS_Y		35
+
+#define ALBUMCOVER_X		187		//210
+#define ALBUMCOVER_Y		120		//255
+#define ALBUMCOVER_WIDTH	270		//180
+#define ALBUMCOVER_HEIGHT	260		//160
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+	float incingvol		0
+	float decingvol		0
+	cursor		2		// Earth cursor
+
+	//--------------------------------------------------------------------
+	//			On/Off logic
+	//--------------------------------------------------------------------
+	onNamedEvent TurnOff {
+		resettime "PowerOffAnim" "0";
+		set "cmd" "turnoff" ;
+	}
+	onNamedEvent TurnOn {
+		resettime "PowerOnAnim" "0";
+		set "cmd" "turnon" ;
+	}
+	onNamedEvent TurnOnRoadhouse {
+		resettime "PowerOnAnimRoadhouse" "0";
+		set "cmd" "turnon" ;
+	}
+	onNamedEvent SetNonInteractive {
+		set "desktop::noninteractive" "1" ;
+	}
+
+	windowDef BlackOut {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 1
+		visible		0
+	}
+
+	windowDef PowerOffAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "desktop::noninteractive" "1" ;
+			set "AlbumCovers::visible" "0" ;
+			set "Selections::visible" "0" ;
+			set "BarMeterL1::visible" "0" ;
+			set "BarMeterL2::visible" "0" ;
+			set "BarMeterR1::visible" "0" ;
+			set "BarMeterR2::visible" "0" ;
+			set "VolumeControls::visible" "0" ;
+			transition "theBackground::rect" "15 10 613 460" "320 240 0 0" "300";
+		}
+	}
+	
+	windowDef PowerOnAnim {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			transition "BlackOut::rect" "320 240 0 0" "0 0 640 480" "300";
+		}
+		onTime 300 {
+			set "desktop::noninteractive" "0" ;
+			set "AlbumCovers::visible" "1" ;
+			set "Selections::visible" "1" ;
+			set "BarMeterL1::visible" "1" ;
+			set "BarMeterL2::visible" "1" ;
+			set "BarMeterR1::visible" "1" ;
+			set "BarMeterR2::visible" "1" ;
+			set "VolumeControls::visible" "1" ;
+			transition "theBackground::rect" "320 240 0 0" "15 10 613 460" "300";
+		}
+	}
+
+	windowDef PowerOnAnimRoadhouse {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "desktop::noninteractive" "1" ;	// Never turn interactivity back on
+			transition "BlackOut::rect" "320 240 0 0" "0 0 640 480" "300";
+		}
+		onTime 300 {
+			set "AlbumCovers::visible" "1" ;
+			set "Selections::visible" "1" ;
+			set "BarMeterL1::visible" "1" ;
+			set "BarMeterL2::visible" "1" ;
+			set "BarMeterR1::visible" "1" ;
+			set "BarMeterR2::visible" "1" ;
+			set "VolumeControls::visible" "1" ;
+			transition "theBackground::rect" "320 240 0 0" "15 10 613 460" "300";
+		}
+	}
+
+	windowDef theBackground {
+		rect		15, 10, 613, 460
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/jukebox/screen.tga"
+	}
+
+
+	// ------------------------------------------------------------
+	// ------------------------------------------------------------
+	// Left side meters
+	// ------------------------------------------------------------
+	// ------------------------------------------------------------
+
+	windowDef BarMeterL1 {
+		rect		BARMETER_LEFT_X, BARMETER_LEFT_Y, BARMETER_CAGEWIDTH, BARMETER_CAGEHEIGHT
+		backcolor	0, 0, 0, 0
+		
+		// Right to left
+		windowDef Meter1 {
+			rect		8*BARMETER_STEPX, 0*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude1"), BARMETER_WIDTH, "gui::amplitude1"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude1", 0.2, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter2 {
+			rect		7*BARMETER_STEPX, 1*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude2"), BARMETER_WIDTH, "gui::amplitude2"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude2", 0.3, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter3 {
+			rect		6*BARMETER_STEPX, 2*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude3"), BARMETER_WIDTH, "gui::amplitude3"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude3", 0.4, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter4 {
+			rect		5*BARMETER_STEPX, 3*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude4"), BARMETER_WIDTH, "gui::amplitude4"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude4", 0.5, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter5 {
+			rect		4*BARMETER_STEPX, 4*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude5"), BARMETER_WIDTH, "gui::amplitude5"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude5", 0.6, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter6 {
+			rect		3*BARMETER_STEPX, 5*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude6"), BARMETER_WIDTH, "gui::amplitude6"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude6", 0.7, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter7 {
+			rect		2*BARMETER_STEPX, 6*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude7"), BARMETER_WIDTH, "gui::amplitude7"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude7", 0.8, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter8 {
+			rect		1*BARMETER_STEPX, 7*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude8"), BARMETER_WIDTH, "gui::amplitude8"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude8", 0.9, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter9 {
+			rect		0*BARMETER_STEPX, 8*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude9"), BARMETER_WIDTH, "gui::amplitude9"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude9", 1, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+	}
+
+	windowDef BarMeterL2 {
+		rect		BARMETER_LEFT_X+20, BARMETER_LEFT_Y, BARMETER_CAGEWIDTH, BARMETER_CAGEHEIGHT
+		backcolor	0, 0, 0, 0
+		
+		windowDef Meter1 {
+			rect		8*BARMETER_STEPX, 0*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude1"), BARMETER_WIDTH, "gui::amplitude1"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude1", 0.2, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter2 {
+			rect		7*BARMETER_STEPX, 1*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude2"), BARMETER_WIDTH, "gui::amplitude2"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude2", 0.3, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter3 {
+			rect		6*BARMETER_STEPX, 2*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude3"), BARMETER_WIDTH, "gui::amplitude3"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude3", 0.4, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter4 {
+			rect		5*BARMETER_STEPX, 3*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude4"), BARMETER_WIDTH, "gui::amplitude4"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude4", 0.5, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter5 {
+			rect		4*BARMETER_STEPX, 4*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude5"), BARMETER_WIDTH, "gui::amplitude5"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude5", 0.6, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter6 {
+			rect		3*BARMETER_STEPX, 5*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude6"), BARMETER_WIDTH, "gui::amplitude6"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude6", 0.7, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter7 {
+			rect		2*BARMETER_STEPX, 6*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude7"), BARMETER_WIDTH, "gui::amplitude7"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude7", 0.8, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter8 {
+			rect		1*BARMETER_STEPX, 7*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude8"), BARMETER_WIDTH, "gui::amplitude8"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude8", 0.9, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter9 {
+			rect		0*BARMETER_STEPX, 8*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude9"), BARMETER_WIDTH, "gui::amplitude9"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude9", 1, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+	}
+	
+
+
+	// ------------------------------------------------------------
+	// ------------------------------------------------------------
+	// Right side meters
+	// ------------------------------------------------------------
+	// ------------------------------------------------------------
+	windowDef BarMeterR1 {
+		rect		BARMETER_RIGHT_X, BARMETER_RIGHT_Y, BARMETER_CAGEWIDTH, BARMETER_CAGEHEIGHT
+		backcolor	0, 0, 0, 0
+		
+		windowDef Meter1 {
+			rect		0*BARMETER_STEPX, 0*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude1"), BARMETER_WIDTH, "gui::amplitude1"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude1", 0.2, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter2 {
+			rect		1*BARMETER_STEPX, 1*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude2"), BARMETER_WIDTH, "gui::amplitude2"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude2", 0.3, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter3 {
+			rect		2*BARMETER_STEPX, 2*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude3"), BARMETER_WIDTH, "gui::amplitude3"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude3", 0.4, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter4 {
+			rect		3*BARMETER_STEPX, 3*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude4"), BARMETER_WIDTH, "gui::amplitude4"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude4", 0.5, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter5 {
+			rect		4*BARMETER_STEPX, 4*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude5"), BARMETER_WIDTH, "gui::amplitude5"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude5", 0.6, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter6 {
+			rect		5*BARMETER_STEPX, 5*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude6"), BARMETER_WIDTH, "gui::amplitude6"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude6", 0.7, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter7 {
+			rect		6*BARMETER_STEPX, 6*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude7"), BARMETER_WIDTH, "gui::amplitude7"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude7", 0.8, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter8 {
+			rect		7*BARMETER_STEPX, 7*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude8"), BARMETER_WIDTH, "gui::amplitude8"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude8", 0.9, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter9 {
+			rect		8*BARMETER_STEPX, 8*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude9"), BARMETER_WIDTH, "gui::amplitude9"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude9", 1, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+	}
+
+	windowDef BarMeterR2 {
+		rect		BARMETER_RIGHT_X-20, BARMETER_RIGHT_Y, BARMETER_CAGEWIDTH, BARMETER_CAGEHEIGHT
+		backcolor	0, 0, 0, 0
+		
+		windowDef Meter1 {
+			rect		0*BARMETER_STEPX, 0*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude1"), BARMETER_WIDTH, "gui::amplitude1"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude1", 0.2, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter2 {
+			rect		1*BARMETER_STEPX, 1*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude2"), BARMETER_WIDTH, "gui::amplitude2"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude2", 0.3, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter3 {
+			rect		2*BARMETER_STEPX, 2*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude3"), BARMETER_WIDTH, "gui::amplitude3"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude3", 0.4, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter4 {
+			rect		3*BARMETER_STEPX, 3*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude4"), BARMETER_WIDTH, "gui::amplitude4"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude4", 0.5, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter5 {
+			rect		4*BARMETER_STEPX, 4*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude5"), BARMETER_WIDTH, "gui::amplitude5"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude5", 0.6, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter6 {
+			rect		5*BARMETER_STEPX, 5*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude6"), BARMETER_WIDTH, "gui::amplitude6"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude6", 0.7, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter7 {
+			rect		6*BARMETER_STEPX, 6*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude7"), BARMETER_WIDTH, "gui::amplitude7"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude7", 0.8, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter8 {
+			rect		7*BARMETER_STEPX, 7*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude8"), BARMETER_WIDTH, "gui::amplitude8"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude8", 0.9, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+		windowDef Meter9 {
+			rect		8*BARMETER_STEPX, 8*BARMETER_STEPY + BARMETER_HEIGHT * (1 - "gui::amplitude9"), BARMETER_WIDTH, "gui::amplitude9"*BARMETER_HEIGHT
+			matcolor	"gui::amplitude9", 1, 0, 1
+			background	"guis/assets/meter/testtubefull"
+		}
+	}
+
+	//--------------------------------------------------------------------
+	//			Interface
+	//--------------------------------------------------------------------
+
+	windowDef AlbumCovers {
+		rect		ALBUMCOVER_X, ALBUMCOVER_Y, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+		backcolor	0, 0, 0, 0
+
+		windowDef Pane1 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/edgarwinter.tga"
+			visible		("gui::track" == 1)
+		}
+		windowDef Pane2 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/heart.tga"
+			visible		("gui::track" == 2)
+		}
+		windowDef Pane3 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/judas.tga"
+			visible		("gui::track" == 3)
+		}
+		windowDef Pane4 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/nugent.tga"
+			visible		("gui::track" == 4)
+		}
+		windowDef Pane5 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/railer.tga"
+			visible		("gui::track" == 5)
+		}
+		windowDef Pane6 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/scotchgreens.tga"
+			visible		("gui::track" == 6)
+		}
+		windowDef Pane7 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/7mary3.tga"
+			visible		("gui::track" == 7)
+		}
+		windowDef Pane8 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/sheepondrugs.tga"
+			visible		("gui::track" == 8)
+		}
+		windowDef Pane9 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/halifax.tga"
+			visible		("gui::track" == 9)
+		}
+		windowDef Pane10 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/countdown.tga"
+			visible		("gui::track" == 10)
+		}
+		windowDef Pane11 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/soil.tga"
+			visible		("gui::track" == 11)
+		}
+		windowDef Pane12 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/clutch.tga"
+			visible		("gui::track" == 12)
+		}
+		windowDef Pane13 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/mxpx.tga"
+			visible		("gui::track" == 13)
+		}
+		windowDef Pane14 {
+			rect		0, 0, ALBUMCOVER_WIDTH, ALBUMCOVER_HEIGHT
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/blue_oyster_cult.tga"
+			visible		("gui::track" == 14)
+		}
+	}
+
+	windowDef Selections {
+		rect		SELECTIONS_X, SELECTIONS_Y, 640, 80
+		backcolor	0, 0, 0, 0
+
+		windowDef Previousbg {
+			rect		200, 0, -120, 65
+			matcolor	1, 1, 1, 0.4
+			background	"guis/assets/jukebox/button1.tga"
+			
+		}
+		windowDef Previous {
+			rect		180, 10, 100, 50
+			forecolor	1, 1, 1, 1
+			onMouseEnter {
+				transition "Previousbg::matcolor" "1 1 1 1" "0 1 0 1" "500" ;
+			} 
+			onMouseExit {
+				transition "Previousbg::matcolor" "0 1 0 1" "1 1 1 0.4" "500" ;
+			} 
+			onAction {
+				localSound "console_game_insertcredit" ;
+				set "cmd" "prevtrack" ;
+			}
+		}
+		windowDef Nextbg {
+			rect		320, 0, 120, 65
+			backcolor	0.2, 0.4, 0.8, 0
+			matcolor	1, 1, 1, 0.4
+			background	"guis/assets/jukebox/button1.tga"
+			
+		}
+		windowDef Next{
+			rect		370, 10, 100, 50
+			forecolor	1, 1, 1, 1
+			onMouseEnter {
+				transition "Nextbg::matcolor" "1 1 1 1" "0 1 0 1" "500" ;
+			} 
+			onMouseExit {
+				transition "Nextbg::matcolor" "0 1 0 1" "1 1 1 0.4" "500" ;
+			} 
+			onAction {
+				localSound "console_game_insertcredit" ;
+				set "cmd" "nexttrack" ;
+			}
+		}
+
+		windowDef Playbg {
+			rect		263, 5, 110, 55
+			matcolor	1, 1, 1, 0.4
+			background	"guis/assets/jukebox/button2.tga"
+			
+		}
+		windowDef Play {
+			rect		295, 10, 60, 50
+			backcolor	0.2, 0.4, 0.8, 0
+			forecolor	1, 1, 1, 1
+			onMouseEnter {
+				transition "Playbg::matcolor" "1 1 1 1" "0 1 0 1" "500" ;
+			} 
+			onMouseExit {
+				transition "Playbg::matcolor" "0 1 0 1" "1 1 1 0.4" "500" ;
+			} 
+			onAction {
+				localSound "console_game_insertcredit" ;
+				set "cmd" "selecttrack";
+			}
+		}
+	}
+
+	windowDef VolumeControls {
+		rect		0, 380, 640, 90
+
+		windowDef VolumeDown {
+			rect	118, 0, 80, 80
+			background "guis/assets/jukebox/left_driver"
+			matcolor	1, 1, 1, 1
+
+			onAction {
+				set "cmd" "volumedown";
+				set "desktop::decingvol" "1" ;
+				resetTime "0" ;
+			}
+			onMouseEnter {
+				set	"matcolor" "1 1 1 1" ; 
+			} 
+			onMouseExit {
+				set	"matcolor" "1 1 1 1" ; 
+				set "desktop::decingvol" "0" ;
+			} 
+			onActionRelease {
+				set "desktop::decingvol" "0" ;
+			}
+			onDeactivate {
+				set "desktop::decingvol" "0" ;
+			}
+			onTime 300 {
+				if ("desktop::decingvol") {
+					set "cmd" "volumedown" ;
+					resetTime "250" ;
+				}
+			}
+		}
+		
+		windowDef VolumeUp {
+			rect	170+275, 0, 80, 80
+			background "guis/assets/jukebox/driver"
+			matcolor	1, 1, 1, 1
+
+			onAction {
+				set "cmd" "volumeup";
+				set "desktop::incingvol" "1" ;
+				resetTime "0" ;
+			}
+			onMouseEnter {
+				set	"driver_amp::matcolor" "1 1 1 1" ; 
+			} 
+			onMouseExit {
+				set	"driver_amp::matcolor" "1 1 1 0" ; 
+				set "desktop::incingvol" "0" ;
+			} 
+			onActionRelease {
+				set "desktop::incingvol" "0" ;
+			}
+			onDeactivate {
+				set "desktop::incingvol" "0" ;
+			}
+			onTime 300 {
+				if ("desktop::incingvol") {
+					set "cmd" "volumeup" ;
+					resetTime "250" ;
+				}
+			}
+		}
+		windowDef Volume {
+			rect		210, 32, 220 * "gui::volume", 15
+			backcolor	1, 0, 0, 0.8
+		}
+		windowDef Volumeholder {
+			rect		202, 28, 238, 25
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/jukebox/meterholder"
+		}
+	}
+	
+}

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=openPREY (Steam Deck)
+GenericName=First-person shooter
+Comment=Launch openPREY with the Steam Deck platform profile
+Exec=openPREY-steamdeck
+Icon=openprey
+Terminal=false
+Categories=Game;ActionGame;Shooter;
+Keywords=prey;idtech;fps;multiplayer;steamdeck;
+StartupNotify=true
+X-openPREY-Version=@OPENPREY_PROJECT_VERSION_FULL@

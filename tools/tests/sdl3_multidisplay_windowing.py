@@ -225,7 +225,7 @@ def validate_ci_hooks() -> None:
 
     require(renderer, '"id": "sdl3-wayland-display-diagnostics"', "Wayland display diagnostics runtime case")
     require(renderer, '"id": "sdl3-wayland-window-stress"', "Wayland window stress runtime case")
-    require(renderer, "native Wayland SDL3 repeated window/fullscreen transition stress", "Wayland window stress runtime case")
+    require(renderer, "native Wayland SDL3 repeated windowed-resize stress", "Wayland window stress runtime case")
     require(renderer, '"id": "sdl3-x11-display-diagnostics"', "X11 display diagnostics runtime case")
     require(renderer, '"+listDisplays"', "Wayland display diagnostics runtime command")
     require(renderer, '"r_windowWidth",\n                "1280"', "Wayland window stress size change")

@@ -1,6 +1,6 @@
 # Display Settings and Multi-Screen Guide
 
-This guide covers openQ4 display/window settings for end users, including multi-monitor behavior and modern fullscreen/window handling.
+This guide covers openPREY display/window settings for end users, including multi-monitor behavior and modern fullscreen/window handling.
 
 ## Quick Start
 
@@ -14,7 +14,7 @@ This guide covers openQ4 display/window settings for end users, including multi-
 ## Performance Presets
 
 The `com_performancePreset` cvar stores the selected preset. Use the Settings menu dropdown, or run `applyPerformancePreset [name]` from the console.
-Running `applyPerformancePreset` without a name applies the stored `com_performancePreset`; if that stored value is invalid, openQ4 falls back to `balanced`. Explicit unknown names are rejected without changing the current preset.
+Running `applyPerformancePreset` without a name applies the stored `com_performancePreset`; if that stored value is invalid, openPREY falls back to `balanced`. Explicit unknown names are rejected without changing the current preset.
 
 | Preset | Display and AA | Texture and audio profile | Intended use |
 |---|---|---|---|
@@ -25,11 +25,11 @@ Running `applyPerformancePreset` without a name applies the stored `com_performa
 | `quality` | 100% scale, 4x MSAA, SMAA medium, 144 FPS cap | 8x anisotropy, DDS replacements enabled, larger upload budget, surround/EAX restored | Strong desktop GPUs. |
 | `ultra` | 100% scale, 8x MSAA, SMAA medium, 240 FPS cap | 16x anisotropy, source textures preferred over DDS replacements, high-end benchmark tag, surround/EAX restored | Explicit high-end choice; Auto-Detect does not select this automatically. |
 
-All presets keep optional shadow maps and subjective/modern post effects disabled, so the authored Quake 4 look remains the baseline. Enable shadow maps, bloom, SSAO, tone mapping, motion blur, or CRT filtering separately after choosing a preset if you want those effects.
+All presets keep optional shadow maps and subjective/modern post effects disabled, so the authored Prey (2006) look remains the baseline. Enable shadow maps, bloom, SSAO, tone mapping, motion blur, or CRT filtering separately after choosing a preset if you want those effects.
 
 Performance presets write video, texture-allocation, texture-sampling, and audio backend cvars. Anisotropy is capped to the maximum supported by the active GPU. Run `vid_restart` after applying one so renderer, texture allocation, and sampler changes take effect; run `s_restart` as well if you want speaker/EAX/emitter-budget changes to rebuild the active sound backend immediately.
 
-`autoDetectPerformancePreset` takes no arguments. It selects a conservative preset from platform signals, CPU architecture, system RAM, video RAM, and renderer capability flags, then applies it. Missing or implausible memory telemetry is treated as a conservative fallback instead of promoting the system to a higher preset. On Raspberry Pi hosts or explicit `OPENQ4_LOWPOWER=1` / `OPENQ4_RASPBERRYPI=1` signals, it chooses `lowpower`.
+`autoDetectPerformancePreset` takes no arguments. It selects a conservative preset from platform signals, CPU architecture, system RAM, video RAM, and renderer capability flags, then applies it. Missing or implausible memory telemetry is treated as a conservative fallback instead of promoting the system to a higher preset. On Raspberry Pi hosts or explicit `OPENPREY_LOWPOWER=1` / `OPENPREY_RASPBERRYPI=1` signals, it chooses `lowpower`.
 
 For package or platform validation, `performancePresetSelfTest` checks that the preset commands are registered, every preset is known to the menu-facing cvar and command completion lists, auto-detect returns and applies a supported non-`ultra` preset, command arguments behave correctly, all preset targets are registered and covered by backup/restore, rejected target normalization rolls back atomically, the preset progression stays coherent, the preset cvar mappings apply correctly, and the test restores touched cvar values, flags, and modified-state bookkeeping before finishing.
 
@@ -52,14 +52,14 @@ For package or platform validation, `performancePresetSelfTest` checks that the 
 
 ## Texture Quality (Picmip and Downsizing)
 
-openQ4 has two independent ways to spend less memory and bandwidth on textures.
+openPREY has two independent ways to spend less memory and bandwidth on textures.
 
-**`image_downSize*`** is retail Quake 4's ceiling: no texture of that kind is
+**`image_downSize*`** is retail Prey (2006)'s ceiling: no texture of that kind is
 allowed to exceed a given size. Performance presets drive these.
 
 **`image_picmip`** is the Quake 3 style relative reduction familiar from
 `r_picmip`: it drops whole mip levels, so every step halves a texture no matter
-how large it started. Unlike the Quake 3 version, openQ4 applies it **only to the
+how large it started. Unlike the Quake 3 version, openPREY applies it **only to the
 diffuse layer of materials** — the color texture of a `diffusemap` stage. Normal
 maps, specular maps, lighting, skies, decals, fonts, and every 2D/HUD surface
 keep their authored resolution, so surfaces stay correctly lit and the interface
@@ -79,7 +79,7 @@ The ceiling is applied first and `image_picmip` reduces from there, so raising
 `image_picmip` always halves the result even when a preset has already clamped a
 texture. A material that declares `nopicmip` opts out of both.
 
-These settings change the pixels a texture is built from, so openQ4 reloads
+These settings change the pixels a texture is built from, so openPREY reloads
 images automatically when you change one — no `vid_restart` needed. The generated
 texture cache is keyed by the active reduction, so switching back and forth does
 not leave stale sizes behind.
@@ -87,7 +87,7 @@ not leave stale sizes behind.
 One limitation applies to DDS replacement packs. Compressed data can only be
 reduced by discarding mip levels the file already contains, so a `.dds` exported
 without a full mip chain stays larger than the same texture would on the normal
-path. Set `image_showPrecompressedTextures 1` to have openQ4 name any replacement
+path. Set `image_showPrecompressedTextures 1` to have openPREY name any replacement
 that could not reach the requested size.
 
 ```
@@ -100,7 +100,7 @@ the HUD, and menus untouched.
 
 ## Renderer Backend (OpenGL default; Vulkan is experimental)
 
-openQ4 ships with an **OpenGL renderer as the default and only supported
+openPREY ships with an **OpenGL renderer as the default and only supported
 backend** on every platform. A **Vulkan renderer is included but is
 experimental and opt-in** — it is under active development, not feature-complete
 or performance-validated, and can show visual artifacts or instability. Do not
@@ -120,23 +120,23 @@ use it for normal play; OpenGL remains the recommended renderer.
 | `vulkan` | `vk` | The experimental Vulkan renderer module. |
 | `gl-module` | — | Always loads the OpenGL renderer as a module instead of using a statically linked copy. This is a diagnostic option; it renders identically to `gl`. |
 
-Anything else is rejected with a warning, and openQ4 uses `gl`.
+Anything else is rejected with a warning, and openPREY uses `gl`.
 
 Notes:
 
 - The `vulkan` selection is archived to your config and applied at the next
-  engine start; restart openQ4 fully (not just `vid_restart`) to switch.
+  engine start; restart openPREY fully (not just `vid_restart`) to switch.
 - If Vulkan cannot initialize (no compatible driver/GPU, or a module error),
-  openQ4 logs a warning and renders with OpenGL so you are never left with a
+  openPREY logs a warning and renders with OpenGL so you are never left with a
   black screen. Check `r_actualRenderApi` or `gfxInfo` to see the active
   backend.
 - Experimental status means known issues are expected; please only file
-  Vulkan-specific reports with `openq4.log` and `gfxInfo`, and note that it is
+  Vulkan-specific reports with `openprey.log` and `gfxInfo`, and note that it is
   not yet a release-supported path.
 
 ### Vulkan on macOS (through MoltenVK)
 
-Apple does not ship a Vulkan driver. On macOS, openQ4's Vulkan renderer runs on
+Apple does not ship a Vulkan driver. On macOS, openPREY's Vulkan renderer runs on
 top of **MoltenVK**, a Vulkan-on-Metal translation layer that is bundled inside
 both macOS packages. It is a translation layer, not a Metal renderer, and it
 does not replace or remove the OpenGL renderer.
@@ -146,7 +146,7 @@ does not replace or remove the OpenGL renderer.
 - Vulkan is a **runtime option, not a separate download**. There is no third
   macOS package to install and nothing to enable at install time.
 - To try it: open the console, run `r_renderApi vulkan`, then quit and relaunch
-  openQ4. Check `r_actualRenderApi` or `gfxInfo` afterwards to confirm what
+  openPREY. Check `r_actualRenderApi` or `gfxInfo` afterwards to confirm what
   actually started.
 - **Expect problems.** macOS support is experimental, the Vulkan renderer is
   experimental, and this combination has no accepted testing on real Apple
@@ -154,12 +154,12 @@ does not replace or remove the OpenGL renderer.
   to start are all plausible.
 - **To go back:** run `r_renderApi gl` and restart. The setting is saved to your
   config, so it stays on OpenGL after that.
-- **If it cannot start**, you do not need to do anything. openQ4 logs the
+- **If it cannot start**, you do not need to do anything. openPREY logs the
   reason and renders with OpenGL instead, so a failed attempt never leaves you
   without a picture. Common reasons on a Mac are a GPU that does not meet the
   renderer's Vulkan 1.3 feature floor, or a package whose bundled translation
   layer is missing or was stripped by a copy.
-- When reporting a macOS Vulkan problem, include `openq4.log` (it records which
+- When reporting a macOS Vulkan problem, include `openprey.log` (it records which
   translation-layer library was loaded), the `gfxInfo` output, and your Mac
   model and macOS version.
 
@@ -201,7 +201,7 @@ Notes:
 - `r_multiSamples` is hardware-limited and may be clamped by the driver/GPU.
 - Unsupported `r_multiSamples` values are normalized to the supported ladder before video startup (`1` becomes off; odd/intermediate values step up to `2`, `4`, `8`, or `16`).
 - On SDL3 builds, video startup retries lower MSAA requests if the window or GL context rejects the requested sample count (`16 -> 8 -> 4 -> 2 -> off`) and logs the requested, selected, and driver-reported multisample attributes.
-- The game scene target is validated separately from the window framebuffer. If a driver rejects the RGBA8 + depth/stencil offscreen target at the selected sample count, openQ4 retries lower samples down to `0`; if even the single-sample target is unavailable, it keeps running through the direct-render fallback and logs the exact framebuffer status and attachment details.
+- The game scene target is validated separately from the window framebuffer. If a driver rejects the RGBA8 + depth/stencil offscreen target at the selected sample count, openPREY retries lower samples down to `0`; if even the single-sample target is unavailable, it keeps running through the direct-render fallback and logs the exact framebuffer status and attachment details.
 - `gfxInfo` reports the active AA summary, including requested/effective MSAA, `GL_MAX_SAMPLES`, alpha-to-coverage, post AA mode, screen fraction, and supersampling state.
 - The Post AA startup/runtime log records the active SMAA edge mode, threshold, search steps, and local contrast scale so quality captures can be compared without guessing which shader contract was active.
 - Changing `r_multiSamples` should be followed by `vid_restart`.
@@ -294,7 +294,7 @@ The Display menu exposes curated presets: `10%`, `25%`, `50%`, `75%`, `85%`, `10
 - The console `listModes` command shows the expanded legacy `r_mode` preset catalog for configs and command-line use, covering common desktop, laptop, ultrawide, HiDPI, 4K, 5K, 6K, and 8K resolutions. The Settings dropdown still hides static presets that the selected display does not report.
 - **Refresh Rate** lists Auto plus SDL3-reported refresh rates for the currently selected fullscreen resolution. Leave it on Auto unless you specifically need an exclusive-mode refresh request.
 - On Windows, fullscreen windows minimize on focus loss so system UI such as Alt+Tab and the Snipping Tool overlay can take foreground cleanly.
-- On Windows, `PrintScreen` yields to the system snipping UI by default (`win_printScreenToSystemTool 1`). Use `F12` for the built-in openQ4 screenshot command, or set that cvar to `0` if you explicitly want `PrintScreen` available for in-engine binds again.
+- On Windows, `PrintScreen` yields to the system snipping UI by default (`win_printScreenToSystemTool 1`). Use `F12` for the built-in openPREY screenshot command, or set that cvar to `0` if you explicitly want `PrintScreen` available for in-engine binds again.
 
 Notes:
 - When `r_fullscreenDesktop 1`, `r_mode` and `r_custom*` are ignored for fullscreen sizing (they still exist for legacy configs and exclusive mode). Use `r_screenFraction` for below-native scaling or supersampling while staying in desktop-native fullscreen.
@@ -306,8 +306,8 @@ Notes:
 - New Windows installs, and legacy Windows configs migrated from the old default, use borderless windowed presentation when `r_fullscreen 0` to avoid OpenGL bordered-window frame pacing stalls. Set `r_borderless 0` and run `vid_restart` if you specifically want a resizable bordered window.
 - When bordered windowed mode is active (`r_fullscreen 0`, `r_borderless 0`), resizing updates `r_windowWidth`/`r_windowHeight` automatically.
 - Moving the window updates `win_xpos`/`win_ypos` automatically.
-- When switching fullscreen -> windowed, openQ4 restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
-- If you unplug/rearrange monitors and the saved window position becomes off-screen, openQ4 will recover by clamping/recentering the window back onto a valid display.
+- When switching fullscreen -> windowed, openPREY restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
+- If you unplug/rearrange monitors and the saved window position becomes off-screen, openPREY will recover by clamping/recentering the window back onto a valid display.
 - If you set `r_screen` to an explicit display index (`0..N`), window placement is constrained to that display's usable area. With `r_screen -1`, placement is respected unless it becomes invalid/off-screen.
 - SDL3 tip: hold `Shift` while resizing to snap the window aspect ratio to common targets (4:3, 16:9, 16:10, 21:9, etc.).
 
@@ -337,7 +337,7 @@ Notes:
 - `cl_gunfov` values above `0` are clamped to a safe range internally for weapon projection.
 - Weapon projection is handled in renderer weapon-depth path, so narrow/wide aspect changes are handled consistently.
 - `cl_gun_x/y/z` are additive with legacy `g_gunX/Y/Z` offsets. Prefer `cl_gun_*` for user config.
-- openQ4's legacy baseline keeps `g_gunX` at `1` and `g_gunZ` at `-1` so the default widescreen viewmodel framing stays out of the viewport edge.
+- openPREY's legacy baseline keeps `g_gunX` at `1` and `g_gunZ` at `-1` so the default widescreen viewmodel framing stays out of the viewport edge.
 
 ## UI Aspect Correction (New)
 
@@ -382,7 +382,7 @@ falls back to the original bitmap fonts automatically.
 
 ## Text Background (Accessibility)
 
-Quake 4 draws much of its text directly over the world and over busy panel
+Prey (2006) draws much of its text directly over the world and over busy panel
 artwork, which can leave very little contrast. This draws a solid black backing
 behind each line of menu and HUD text, so the text stays readable regardless of
 what is behind it.
@@ -493,6 +493,6 @@ vid_restart
 - If a display change does not apply, run `vid_restart`.
 - If monitor targeting looks wrong, run `listDisplays`, then set `r_screen` to the correct index and restart video.
 - If UI appears too centered/boxed on wide displays, set `ui_aspectCorrection 0`.
-- If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; openQ4 will also attempt to recover automatically.
+- If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; openPREY will also attempt to recover automatically.
 - If AA settings seem unchanged, check values with `r_multiSamples`, `r_postAA`, and `r_msaaAlphaToCoverage`, then run `vid_restart`.
-- If enabling `r_postAA 1` turns the 3D viewport black on an older build, set `r_postAA 0`, run `vid_restart`, and attach `openq4.log` plus the output of `gfxInfo`. Current builds use a three-pass GLSL SMAA path and should no longer hit the old feedback-loop failure. RenderDoc capture is not yet supported on the current openQ4 renderer.
+- If enabling `r_postAA 1` turns the 3D viewport black on an older build, set `r_postAA 0`, run `vid_restart`, and attach `openprey.log` plus the output of `gfxInfo`. Current builds use a three-pass GLSL SMAA path and should no longer hit the old feedback-loop failure. RenderDoc capture is not yet supported on the current openPREY renderer.

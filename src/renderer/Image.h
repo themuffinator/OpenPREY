@@ -388,6 +388,8 @@ public:
 	idImage* scratchImage;
 	idImage* scratchImage2;
 	idImage* accumImage;
+	idImage* glowScreenImage;
+	idImage* glowCompositeImage;
 	idImage* currentRenderImage;				// FP16 scene copy for SS_POST_PROCESS shaders
 	idImage* currentDepthImage;				// for motion blur
 	idImage* originalCurrentRenderImage;		// currentRenderImage before any changes for stereo rendering

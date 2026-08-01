@@ -4,29 +4,29 @@ Use this checklist before publishing or regression-testing a Steam Deck package.
 
 ## Partner and Steam Input Setup
 
-- [ ] Steam shortcut or partner launch option starts `openQ4-steamdeck`, not the raw `openQ4-client_x64` binary.
+- [ ] Steam shortcut or partner launch option starts `openPREY-steamdeck`, not the raw `openPREY-client_x64` binary.
 - [ ] Steam Input profile exposes normal gamepad controls, rear paddles, gyro, and touchpad without translating every Deck-specific input into keyboard/mouse events.
 - [ ] Gyro is exposed to the game when testing native `in_gyro 1`; disable Steam-level gyro-to-mouse emulation for this pass.
 - [ ] Touchpad is exposed as gamepad touchpad input when testing `in_touchpadMode 1` or `2`.
 - [ ] Touch API pass-through is enabled in Steamworks/partner configuration for builds that expect native touchscreen events.
-- [ ] Store or release notes mention `OPENQ4_FORCE_X11=1` as the fallback for users who hit native Wayland issues.
+- [ ] Store or release notes mention `OPENPREY_FORCE_X11=1` as the fallback for users who hit native Wayland issues.
 
 ## Launch and Profile
 
-- [ ] Launch through `openQ4-steamdeck`; confirm the log shows `com_platformProfile steamdeck`.
+- [ ] Launch through `openPREY-steamdeck`; confirm the log shows `com_platformProfile steamdeck`.
 - [ ] Launch the raw client on Deck/SteamOS; confirm auto-detection selects the Steam Deck profile when `com_platformProfile` is still `default`.
-- [ ] Launch with `OPENQ4_NO_STEAMDECK_AUTODETECT=1`; confirm the raw client stays on the default profile.
-- [ ] Launch with `OPENQ4_FORCE_X11=1`; confirm SDL uses the X11/XWayland driver.
+- [ ] Launch with `OPENPREY_NO_STEAMDECK_AUTODETECT=1`; confirm the raw client stays on the default profile.
+- [ ] Launch with `OPENPREY_FORCE_X11=1`; confirm SDL uses the X11/XWayland driver.
 - [ ] Launch without SDL video overrides in a normal Deck session; confirm SDL selects native Wayland when available.
 
 ## Asset Discovery
 
 - [ ] Stock internal-storage Steam install is found automatically.
 - [ ] microSD or secondary Steam library is found through `libraryfolders.vdf`.
-- [ ] `OPENQ4_QUAKE4_PATH` or `OPENQ4_QUAKE4_ROOT` points directly to a Quake 4 install and wins deterministically.
-- [ ] `OPENQ4_STEAM_ROOT` / `OPENQ4_STEAM_ROOTS` points to a relocated Steam client root and expands its libraries.
-- [ ] `OPENQ4_STEAM_LIBRARY` / `OPENQ4_STEAM_LIBRARIES` points directly to library roots containing `steamapps/common/Quake 4`.
-- [ ] Startup logs list Steam roots, library roots, and Quake 4 install candidates clearly enough to diagnose failures.
+- [ ] `OPENPREY_PREY_PATH` or `OPENPREY_PREY_ROOT` points directly to a Prey install and wins deterministically.
+- [ ] `OPENPREY_STEAM_ROOT` / `OPENPREY_STEAM_ROOTS` points to a relocated Steam client root and expands its libraries.
+- [ ] `OPENPREY_STEAM_LIBRARY` / `OPENPREY_STEAM_LIBRARIES` points directly to library roots containing `steamapps/common/Prey`.
+- [ ] Startup logs list Steam roots, library roots, and Prey install candidates clearly enough to diagnose failures.
 
 ## Input Diagnostics
 
@@ -59,7 +59,7 @@ Use this checklist before publishing or regression-testing a Steam Deck package.
 - [ ] `listDisplays` shows the expected Deck panel and selected display.
 - [ ] `listDisplayModes` reports expected fullscreen modes.
 - [ ] Native Wayland fullscreen, desktop fullscreen, and windowed modes behave correctly.
-- [ ] XWayland fallback behaves correctly with `OPENQ4_FORCE_X11=1`.
+- [ ] XWayland fallback behaves correctly with `OPENPREY_FORCE_X11=1`.
 - [ ] On a fresh config, the Steam Deck profile applies a `com_maxfps` cap from the detected refresh rate while preserving any non-default user cap.
 - [ ] On battery below `in_joystickLowBatteryRumbleThreshold`, rumble output is capped without rewriting `in_joystickRumbleScale`.
 

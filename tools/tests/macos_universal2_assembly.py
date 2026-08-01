@@ -39,12 +39,12 @@ def write_file(path: Path, data: bytes, mode: int = 0o644) -> None:
 
 def populate_staging(root: Path, arch: str, *, shared_value: bytes = b"same\n") -> None:
     shared = {
-        "openQ4.icns": shared_value,
+        "openPREY.icns": shared_value,
         "collect_macos_support_info.sh": b"#!/bin/sh\n",
-        "assets/splash/quake4_rt_bitmap_4001.bmp": b"bmp\n",
-        "baseoq4/mod.json": b"{}\n",
-        "baseoq4/pak0.pk4": b"pak0\n",
-        "baseoq4/pak1.pk4": b"pak1\n",
+        "assets/splash/prey_rt_bitmap_4001.bmp": b"bmp\n",
+        "basepr/mod.json": b"{}\n",
+        "basepr/pak0.pk4": b"pak0\n",
+        "basepr/pak1.pk4": b"pak1\n",
         # libMoltenVK.dylib is third-party and already universal upstream, so both
         # thin trees stage the SAME bytes and it flows through as ordinary shared
         # payload rather than as a lipo-merged code key. The literal is deliberately
@@ -110,12 +110,10 @@ def test_tree_classification_and_shared_matching() -> None:
         populate_staging(x64_root, "x64")
         arm_code, arm_shared = ASSEMBLER.classify_staged_tree(arm_root, "arm64")
         x64_code, x64_shared = ASSEMBLER.classify_staged_tree(x64_root, "x64")
-        # POLICY UPDATE: the required code set grew from four to five when the
-        # Vulkan renderer module (renderer-vk) became a macOS build product. The
-        # check itself is still driven by CODE_KEYS, so only the message needed to
-        # catch up.
+        # The unified Prey module plus client, dedicated, and Vulkan renderer
+        # make up the four code artifacts fused into universal2.
         if set(arm_code) != set(ASSEMBLER.CODE_KEYS) or set(x64_code) != set(ASSEMBLER.CODE_KEYS):
-            raise AssertionError("thin staging classifier did not find the five required binaries")
+            raise AssertionError("thin staging classifier did not find the four required binaries")
         if arm_shared != x64_shared:
             raise AssertionError("byte-identical shared payloads did not normalize equally")
 
@@ -131,7 +129,7 @@ def test_tree_classification_and_shared_matching() -> None:
         )
         x64_manifest["graphicsBridge"] = "metal"
 
-        write_file(x64_root / "openQ4.icns", b"different\n")
+        write_file(x64_root / "openPREY.icns", b"different\n")
         _, changed_shared = ASSEMBLER.classify_staged_tree(x64_root, "x64")
         expect_error(
             "shared payloads are not identical",
@@ -139,7 +137,7 @@ def test_tree_classification_and_shared_matching() -> None:
             "mismatched shared payloads",
         )
 
-        write_file(arm_root / "openQ4-client_x64", b"stale\n", 0o755)
+        write_file(arm_root / "openPREY-client_x64", b"stale\n", 0o755)
         expect_error(
             "stale or mismatched code file",
             lambda: ASSEMBLER.classify_staged_tree(arm_root, "arm64"),
@@ -177,7 +175,7 @@ def test_thin_manifest_metadata_reinspection_contract() -> None:
             ASSEMBLER.validate_exact_arches = lambda path, expected: None
             ASSEMBLER.validate_recorded_tree(arm_root, "arm64", manifest)
 
-            inspected["game-sp"]["minimumOS"] = "12.0"
+            inspected["game"]["minimumOS"] = "12.0"
             expect_error(
                 "Mach-O metadata changed after recording",
                 lambda: ASSEMBLER.validate_recorded_tree(arm_root, "arm64", manifest),
@@ -254,22 +252,21 @@ def make_universal_symbol_manifest() -> bytes:
     version_tag = "universal2-ci"
     arch = "universal2"
     suffix = "-opengl"
-    runtime_archive = "openq4-universal2-ci-macos-universal2-opengl.tar.xz"
-    symbol_archive = "openq4-universal2-ci-macos-universal2-opengl-symbols.tar.xz"
+    runtime_archive = "openprey-universal2-ci-macos-universal2-opengl.tar.xz"
+    symbol_archive = "openprey-universal2-ci-macos-universal2-opengl-symbols.tar.xz"
     records = (
-        ("openQ4.app/Contents/MacOS/openQ4", "openQ4.app.dSYM"),
-        ("openQ4-client_universal2", "openQ4-client_universal2.dSYM"),
-        ("openQ4-ded_universal2", "openQ4-ded_universal2.dSYM"),
-        ("openQ4.app/Contents/Frameworks/game-sp_universal2.dylib", "game-sp_universal2.dylib.dSYM"),
-        ("openQ4.app/Contents/Frameworks/game-mp_universal2.dylib", "game-mp_universal2.dylib.dSYM"),
-        # The fused renderer module gets a dSYM like any other openQ4-built code.
+        ("openPREY.app/Contents/MacOS/openPREY", "openPREY.app.dSYM"),
+        ("openPREY-client_universal2", "openPREY-client_universal2.dSYM"),
+        ("openPREY-ded_universal2", "openPREY-ded_universal2.dSYM"),
+        ("openPREY.app/Contents/Frameworks/game_universal2.dylib", "game_universal2.dylib.dSYM"),
+        # The fused renderer module gets a dSYM like any other openPREY-built code.
         # libMoltenVK.dylib rides in the same Frameworks directory but has no
         # record here: it is third-party, ships no DWARF, and the packager's
         # expected-binary set excludes it.
-        ("openQ4.app/Contents/Frameworks/renderer-vk_universal2.dylib", "renderer-vk_universal2.dylib.dSYM"),
+        ("openPREY.app/Contents/Frameworks/renderer-vk_universal2.dylib", "renderer-vk_universal2.dylib.dSYM"),
     )
     lines = [
-        "openQ4 macOS symbols",
+        "openPREY macOS symbols",
         "format=1",
         f"version={version}",
         f"version_tag={version_tag}",
@@ -303,8 +300,8 @@ def test_universal_symbol_manifest_contract() -> None:
         "version_tag": "universal2-ci",
         "arch": "universal2",
         "package_suffix": "-opengl",
-        "runtime_archive_name": "openq4-universal2-ci-macos-universal2-opengl.tar.xz",
-        "symbol_archive_name": "openq4-universal2-ci-macos-universal2-opengl-symbols.tar.xz",
+        "runtime_archive_name": "openprey-universal2-ci-macos-universal2-opengl.tar.xz",
+        "symbol_archive_name": "openprey-universal2-ci-macos-universal2-opengl-symbols.tar.xz",
     }
     PACKAGER.validate_macos_symbol_manifest_bytes(data, "universal2 symbol manifest", **kwargs)
     bad_data = data.replace(b"(x86_64)", b"(arm64)")
@@ -325,11 +322,11 @@ def test_universal_dsym_uuid_pair_contract() -> None:
     original_platform = PACKAGER.sys.platform
     original_which = PACKAGER.shutil.which
     original_command = PACKAGER.run_macos_command
-    binary = Path("/tmp/openQ4-client_universal2")
-    dsym = Path("/tmp/openQ4-client_universal2.dSYM")
+    binary = Path("/tmp/openPREY-client_universal2")
+    dsym = Path("/tmp/openPREY-client_universal2.dSYM")
     binary_output = (
-        "UUID: 00000000-0000-0000-0000-000000000001 (arm64) /tmp/openQ4-client_universal2\n"
-        "UUID: 00000000-0000-0000-0000-000000000002 (x86_64) /tmp/openQ4-client_universal2\n"
+        "UUID: 00000000-0000-0000-0000-000000000001 (arm64) /tmp/openPREY-client_universal2\n"
+        "UUID: 00000000-0000-0000-0000-000000000002 (x86_64) /tmp/openPREY-client_universal2\n"
     )
     try:
         PACKAGER.sys.platform = "darwin"

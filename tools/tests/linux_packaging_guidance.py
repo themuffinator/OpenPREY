@@ -21,50 +21,39 @@ def require(haystack: str, needle: str, context: str) -> None:
 def validate_building_packager_notes() -> None:
     source = read("BUILDING.md")
 
-    require(source, "### Linux Packager Notes", "BUILDING Linux packager section")
-    require(source, "Meson 1.6.0 or newer", "BUILDING Meson floor")
-    require(source, "SDL3 `>=3.4.4`", "BUILDING SDL3 floor")
-    require(source, "libopengl-dev", "BUILDING native OpenGL development dependency")
-    require(source, "Ubuntu 24.04-class userspace", "BUILDING Linux userspace floor")
-    require(source, "SDL_VIDEODRIVER=wayland", "BUILDING Wayland driver toggle")
-    require(source, "SDL_VIDEO_DRIVER=wayland", "BUILDING Wayland driver toggle")
-    require(source, "SDL_VIDEODRIVER=x11", "BUILDING X11 driver toggle")
-    require(source, "SDL_VIDEO_DRIVER=x11", "BUILDING X11 driver toggle")
-    require(source, "OPENQ4_FORCE_X11=1", "BUILDING project XWayland fallback")
-    require(source, "OPENQ4_WAYLAND_DISABLE_LIBDECOR=1", "BUILDING libdecor opt-out")
-    require(source, "OPENQ4_WAYLAND_PREFER_LIBDECOR=1", "BUILDING libdecor preference")
-    require(source, "OPENQ4_WAYLAND_SYNC_WINDOW_OPS=1", "BUILDING sync window diagnostics")
-    require(source, "openq4-<version>-linux-<arch>-debugsymbols.tar.xz", "BUILDING Linux debug symbols")
-    require(source, "OPENQ4_GAMELIBS_REPO", "BUILDING GameLibs source-input path")
-    require(source, "openq4_gamelibs_stage_manifest.json", "BUILDING GameLibs staging manifest")
-    require(source, "validate_push.sh --install", "BUILDING package validation command")
-    require(source, "validate_pr.sh --runtime", "BUILDING runtime validation command")
-    require(source, "docs/dev/linux-arm64-cross-compilation.md", "BUILDING ARM64 cross-build guidance")
+    require(source, "## Building on Linux / macOS", "BUILDING Linux build section")
+    require(source, "1.2.0 or newer", "BUILDING Meson floor")
+    require(source, "libglew-dev", "BUILDING OpenGL development dependency")
+    require(source, "libopenal-dev", "BUILDING OpenAL development dependency")
+    require(source, "OPENPREY_FORCE_X11=1", "BUILDING project XWayland fallback")
+    require(source, "OPENPREY_GAMELIBS_REPO", "BUILDING GameLibs source-input path")
+    require(source, "`src/game`, `src/Prey`, and `src/preyengine`", "BUILDING GameLibs staging inputs")
+    require(source, "tools/build/meson_setup.sh", "BUILDING canonical Linux wrapper")
+    require(source, "install -C builddir --no-rebuild --skip-subprojects", "BUILDING package staging command")
+    require(source, "openprey-<version-tag>-linux.tar.xz", "BUILDING Linux archive identity")
+    require(source, "openprey-<version-tag>-x86_64.AppImage", "BUILDING Linux AppImage identity")
+    require(source, "basepr/game_<arch>.(dll|so|dylib)", "BUILDING unified game module layout")
 
 
 def validate_platform_support() -> None:
     source = read("docs/dev/platform-support.md")
 
-    require(source, "Linux packaged compatibility floor", "platform support Linux floor")
-    require(source, "Ubuntu 24.04", "platform support Linux floor")
-    require(source, "desktop OpenGL plus EGL/Wayland or X11/GLX", "platform support display stack")
-    require(source, "Linux ARM64 currently means", "platform support ARM64 graphics boundary")
-    require(source, "OPENQ4_FORCE_X11=1", "platform support XWayland fallback")
-    require(source, "OPENQ4_WAYLAND_DISABLE_LIBDECOR=1", "platform support libdecor fallback")
+    require(source, "Linux x64", "platform support Linux lane")
+    require(source, "Retail gameplay validation pending", "platform support runtime boundary")
+    require(source, "SDL3 may use Wayland or X11", "platform support display stack")
+    require(source, "OPENPREY_FORCE_X11=1", "platform support XWayland fallback")
+    require(source, "OPENPREY_WAYLAND_DISABLE_LIBDECOR=1", "platform support libdecor fallback")
+    require(source, "Legacy `OPENQ4_*` names remain temporary migration aliases only", "platform support migration boundary")
 
 
 def validate_plan_status() -> None:
-    source = read("docs/dev/plans/2026-06-20-linux.md")
+    source = read("docs/dev/prey-rebase/status-ledger.md")
 
-    require(source, "## Implementation status (June 20, 2026)", "Linux audit status appendix")
-    require(source, "Native Wayland runtime CI", "Linux audit status appendix")
-    require(source, "Linux hardening", "Linux audit status appendix")
-    require(source, "openQ4-game source-input contract", "Linux audit status appendix")
-    require(source, "Linux sanitizer build lane", "Linux audit status appendix")
-    require(source, "Downstream Linux packager guidance", "Linux audit status appendix")
-    require(source, "Still outstanding", "Linux audit outstanding list")
-    require(source, "real Linux hardware and compositor families", "Linux audit outstanding list")
-    require(source, "libFuzzer or AFL++", "Linux audit outstanding list")
+    require(source, "## Explicit deferral register", "rebase status ledger")
+    require(source, "TODO-RELEASE-LANES", "rebase release-lane deferral")
+    require(source, "OpenPrey-game", "rebase release-lane companion contract")
+    require(source, "basepr", "rebase release-lane runtime layout")
+    require(source, "one `game_<arch>` module", "rebase release-lane module contract")
 
 
 def validate_ci_wiring() -> None:
@@ -82,9 +71,9 @@ def validate_ci_wiring() -> None:
 def validate_release_note() -> None:
     source = read("docs/dev/release-completion.md")
 
-    require(source, "Linux packager guidance is clearer", "release completion notes")
-    require(source, "SDL3 floor", "release completion notes")
-    require(source, "debug-symbol archive", "release completion notes")
+    require(source, "Archive/AppImage tooling is rebranded for openPREY", "release completion notes")
+    require(source, "Wayland/X11 runtime boundaries", "release completion notes")
+    require(source, "publication lanes", "release completion notes")
 
 
 def main() -> None:

@@ -70,7 +70,7 @@ def validate_macos_sdl3_source_selection() -> None:
         require(display, token, "macOS SDL3 display fallback")
 
     require(openq4_main, "argc > 1 && argv != NULL", "macOS SDL3 app argument guard")
-    require(entrypoint, 'static char emptyArg0[] = "openQ4";', "macOS SDL3 app argument guard")
+    require(entrypoint, 'static char emptyArg0[] = "openPREY";', "macOS SDL3 app argument guard")
     require(entrypoint, "char *emptyArgv[] = { emptyArg0, NULL };", "macOS SDL3 app argument guard")
     require(entrypoint, "if (argc <= 0 || argv == NULL)", "macOS SDL3 app argument guard")
     require(entrypoint, "argc = 1;", "macOS SDL3 app argument guard")

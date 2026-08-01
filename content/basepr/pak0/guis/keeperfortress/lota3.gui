@@ -1,0 +1,241 @@
+//LOTA INVASION GUI
+
+
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+
+	windowDef bgshot {
+		rect		90 ,60 ,460 ,345  
+		backcolor	1, 0, 0, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 0.7 
+		background	"guis/assets/generator/lota2big"
+		visible		1
+		
+		onTime 0 {
+			transition "bgshot::matcolor"	"1 0.1 0.1 0.5"   "1 1 1 1" "500" ;
+		}
+		onTime 1000 {
+			transition "bgshot::matcolor"	"1 1 1 1"   "1 0.1 0.1 0.5" "500" ;
+		}
+		onTime 2000 {
+			resetTime "0";
+		}
+	} 
+
+
+
+
+
+
+
+	windowDef bgl {
+		rect		5 ,5 ,315 ,470 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generator/bg"
+		visible		1
+		
+		onTime 0 {
+			transition "bgl::matcolor"	"1 1 1 1"   "1 0.1 0.1 1" "500" ;
+		}
+		onTime 1000 {
+			transition "bgl::matcolor"	"1 0.1 0.1 1"   "1 1 1 1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+
+	}
+	windowDef bgr {
+		rect		320 ,5 ,-315 ,470 
+		backcolor	1, 0, 0, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/generator/bg"
+		visible		1
+		
+		onTime 0 {
+			transition "bgr::matcolor"	"1 1 1 1"   "1 0.1 0.1 1" "500" ;
+		}
+		onTime 1000 {
+			transition "bgr::matcolor"	"1 0.1 0.1 1"   "1 1 1 1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+
+	} 
+	
+
+	
+	
+	
+
+//========================================
+//TEXT!
+//========================================
+
+	windowDef textl {
+		rect		89 ,40 ,222 ,45 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/text"
+		visible		1
+
+	}
+	
+	
+	windowDef text2 {
+		rect		329 ,40 ,-222 ,45 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/text"
+		visible		1
+
+	}
+	windowDef text3 {
+		rect		216 ,400 ,208 ,25 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/text"
+		visible		1
+
+	}
+
+	
+	windowDef text4 {
+		rect		90 ,100 ,-108 ,115 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/frame2"
+		visible		0
+		
+		onTime 0 {
+			set "text4::visible"	"1"   "0" "500" ;
+		}
+		onTime 1200 {
+			set "text4::visible"	"0"   "1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+	windowDef text5 {
+		rect		443 ,100 ,108 ,115 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/frame2"
+		visible		0
+		
+		onTime 0 {
+			set "text5::visible"	"1"   "0" "500" ;
+		}
+		onTime 1200 {
+			set "text5::visible"	"0"   "1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+	windowDef text6 {
+		rect		114 ,278 ,-108, -115 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/frame2"
+		visible		0
+		
+		onTime 0 {
+			set "text6::visible"	"1"   "0" "500" ;
+		}
+		onTime 1200 {
+			set "text6::visible"	"0"   "1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+	windowDef text7 {
+		rect		417 ,278 ,108, -115 
+		backcolor	1, 1, 1, 0 
+		forecolor	1, 1, 1, 1 
+		matcolor	1, 1, 1, 1
+		background	"textures/hologram/frame2"
+		visible		0
+		
+		onTime 0 {
+			set "text7::visible"	"1"   "0" "500" ;
+		}
+		onTime 1200 {
+			set "text7::visible"	"0"   "1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+	windowDef invasion {
+		rect		165, 165, 300, 350
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		shadow		2
+		textalign	1
+		textscale	0.9
+		text 		"#str_41123"
+		font		"fonts/alien"
+		onTime 0 {
+			transition "invasion::forecolor"	"1 0.8 0.5 1"   "1 0.1 0.1 1" "500" ;
+		}
+		onTime 1000 {
+			transition "invasion::forecolor"	"1 0.1 0.1 1"   "1 0.8 0.5 1" "500" ;
+		}
+		onTime 2000 {
+			resettime "0";
+		}
+	}
+
+
+
+
+	windowDef scan {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan2 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+
+	
+	
+	// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	} 
+
+
+
+
+}

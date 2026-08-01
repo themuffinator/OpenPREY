@@ -427,9 +427,17 @@ int idCollisionModelManagerLocal::PointContents( const idVec3 p, idCollisionMode
 	cm_brush_t *b;
 	idPlane *plane;
 
-	// If model is NULL, assume we are wanting the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	// Legacy game code may pass NULL to indicate the current map's world model.
+	if ( model == NULL ) {
+		model = GetWorldModel();
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no current world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		return 0;
 	}
 
 	node = idCollisionModelManagerLocal::PointNode( p, (idCollisionModelLocal *)model );
@@ -645,9 +653,16 @@ int idCollisionModelManagerLocal::Contents( const idVec3 &start,
 											idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
 	trace_t results;
 
-	// If the model is NULL then assume we are checking the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+	if ( model == NULL ) {
+		model = GetWorldModel();
+	}
+	if ( model == NULL ) {
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr and no current world model is available", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		return 0;
 	}
 
 	return ContentsTrm( &results, start, trm, trmAxis, contentMask, (idCollisionModelLocal *)model, modelOrigin, modelAxis );

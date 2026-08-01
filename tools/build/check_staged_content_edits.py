@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prune stale loose baseoq4 content before staged installs."""
+"""Prune stale loose basepr content before staged installs."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ STALE_LOOSE_SUBDIRS = (
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Remove stale loose baseoq4 content that is now compiled into openQ4 PK4s "
+            "Remove stale loose basepr content that is now compiled into openPREY PK4s "
             "before Meson stages a fresh install."
         )
     )
@@ -85,7 +85,7 @@ def remove_stale_path(path: Path, staged_game_dir: Path) -> bool:
 
 
 def prune_stale_loose_content(source_root: Path) -> list[Path]:
-    staged_game_dir = source_root / ".install" / "baseoq4"
+    staged_game_dir = source_root / ".install" / "basepr"
     if staged_game_dir.is_symlink():
         raise RuntimeError(f"refusing to prune symlinked staged game directory: {staged_game_dir}")
     if not staged_game_dir.is_dir():
@@ -128,7 +128,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     for relative_path in removed:
-        print(f"Removing stale loose staged content '.install/baseoq4/{relative_path.as_posix()}'")
+        print(f"Removing stale loose staged content '.install/basepr/{relative_path.as_posix()}'")
     return 0
 
 

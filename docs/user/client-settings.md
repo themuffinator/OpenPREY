@@ -1,10 +1,14 @@
 # Client Settings Guide
 
-This guide helps players find the most useful openQ4 settings without digging through every advanced option.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
+This guide helps players find the most useful openPREY settings without digging through every advanced option.
 
 ## Best Places to Start
 
-If you are setting up openQ4 for the first time, these are the areas most players adjust first:
+If you are setting up openPREY for the first time, these are the areas most players adjust first:
 
 - **Display** for fullscreen mode, resolution, monitor selection, and image quality
 - **Controls** for keyboard, mouse, controller, and bindings

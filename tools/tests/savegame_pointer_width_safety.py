@@ -20,15 +20,19 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT.parent / "openQ4-game")).resolve()
+GAME_LIBS_ROOT = Path(
+    os.environ.get(
+        "OPENPREY_GAMELIBS_REPO",
+        os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT.parent / "OpenPrey-game"),
+    )
+).resolve()
 
 SCRIPT_PROGRAM_SOURCES = (
     "src/game/script/Script_Program.cpp",
-    "src/mpgame/script/Script_Program.cpp",
 )
 
 # Directories whose save/restore code the check sweeps.
-SWEPT_GAME_DIRS = ("src/game", "src/mpgame")
+SWEPT_GAME_DIRS = ("src/game", "src/Prey", "src/preyengine")
 
 # Casting a fixed-width read onto a reference is only width-safe when the cast
 # type is itself that width.  Anything wider (or pointer-sized) silently leaves

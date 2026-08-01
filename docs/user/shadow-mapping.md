@@ -1,6 +1,10 @@
 # Shadow Mapping and Transparency Shadowing Guide
 
-This guide covers openQ4's user-facing shadow-map settings, including projected-light shadow maps, experimental point-light shadow maps, cascaded shadow maps (CSM), alpha-tested transparency shadows, and the current experimental translucent-shadow path.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
+This guide covers openPREY's user-facing shadow-map settings, including projected-light shadow maps, experimental point-light shadow maps, cascaded shadow maps (CSM), alpha-tested transparency shadows, and the current experimental translucent-shadow path.
 
 ## Quick Start
 
@@ -25,17 +29,17 @@ vid_restart
 
 Notes:
 - `r_shadows` must stay enabled for any shadow path to render.
-- If the shadow-map path is unavailable or fails for a light, openQ4 falls back to the legacy shadow path instead of leaving the light unshadowed.
-- Point lights shadow-map by default (`r_shadowMapPointLights 1`); they are the dominant light class in Quake 4 content. Set `r_shadowMapPointLights 0` to fall back to stencil shadows for point lights only.
+- If the shadow-map path is unavailable or fails for a light, openPREY falls back to the legacy shadow path instead of leaving the light unshadowed.
+- Point lights shadow-map by default (`r_shadowMapPointLights 1`); they are the dominant light class in Prey (2006) content. Set `r_shadowMapPointLights 0` to fall back to stencil shadows for point lights only.
 - Lights touching animated, deformed, or packed character receivers can also fall back to the legacy stencil path so stock character lighting, mirrored seams, and eye materials retain retail-style interaction behavior.
 - Modern renderer diagnostics keep lighting visible when shadow-map receiver sampling is not ready, but full modern visible-frame replacement stays fail-closed so the legacy path continues to provide the actual shadowed frame.
 - Most shadow cvars can be changed live, but `vid_restart` is the safest way to apply large changes such as map resolution, cascade layout, or switching the shadow pipeline on/off.
 
 ## What the System Does
 
-openQ4 currently supports:
+openPREY currently supports:
 - Projected-light shadow maps for regular projected lights.
-- Point-light cubemap shadow maps for omni/point lights (the dominant Quake 4 light class), on by default.
+- Point-light cubemap shadow maps for omni/point lights (the dominant Prey (2006) light class), on by default.
 - Optional projected-light cascaded shadow maps (CSM).
 - Alpha-tested transparency shadows for cutout materials such as fences, grates, and foliage cards.
 - Optional experimental translucent-shadow accumulation for some blended materials.
@@ -145,7 +149,7 @@ vid_restart
 | `r_shadowMapDepthCompare` | `1` | `0..1` | Uses hardware comparison sampling (with hardware-filtered PCF taps) for projected depth maps. Selecting PCSS-lite (`r_shadowMapFilterMode 2`) automatically uses the manual raw-depth path instead. Set `0` if a driver has trouble with GLSL shadow samplers. |
 | `r_shadowMapPointDepthCompare` | `1` | `0..1` | Uses hardware comparison sampling for point-light depth cubemaps when GLSL 1.30 support is available. |
 | `r_shadowMapPointHighPrecision` | `0` | `0..1` | Stores point-light shadow depth in an fp16 color cubemap instead of packed RGBA8. The packed path quantizes finer at half the memory, and the default hardware-compare path samples the depth cubemap directly, so this only affects the manual fallback. |
-| `r_shadowMapPointLights` | `1` | `0..1` | Shadow-maps point lights when `r_useShadowMap 1` is enabled. Point lights are the dominant light class in Quake 4 content, so disabling this makes shadow mapping nearly a no-op; set `0` to fall back to stencil shadows for point lights only. |
+| `r_shadowMapPointLights` | `1` | `0..1` | Shadow-maps point lights when `r_useShadowMap 1` is enabled. Point lights are the dominant light class in Prey (2006) content, so disabling this makes shadow mapping nearly a no-op; set `0` to fall back to stencil shadows for point lights only. |
 | `r_shadowMapPointSize` | `512` | `128..2048` | Point-light cube face resolution, separate from `r_shadowMapSize`: each cached point light stores six faces of color and depth, so cube resolution dominates shadow VRAM. |
 | `r_shadowMapHashedAlpha` | `1` | `0..1` | Uses hashed alpha testing for perforated/alpha-tested casters when supported. |
 | `r_shadowMapStableAlphaHash` | `1` | `0..1` | Seeds hashed alpha from world-space caster coordinates to reduce atlas/camera-space dither drift. |
@@ -159,7 +163,7 @@ vid_restart
 
 ## Residency and Update Budgeting
 
-openQ4 can keep static-only shadow maps resident and reuse them across backend views. This is enabled by default for regular projected and point lights. Dynamic casters, translucent caster passes, and view-fitted CSM/global passes are conservative by default and continue to update normally unless explicitly opted in.
+openPREY can keep static-only shadow maps resident and reuse them across backend views. This is enabled by default for regular projected and point lights. Dynamic casters, translucent caster passes, and view-fitted CSM/global passes are conservative by default and continue to update normally unless explicitly opted in.
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
@@ -189,7 +193,7 @@ These are materials with holes cut by alpha test, such as:
 Behavior:
 - They cast cutout shadows in both projected and point shadow-map paths.
 - `r_shadowMapHashedAlpha 1` is the recommended mode and is enabled by default.
-- If a perforated stage uses explicit texture coordinates, openQ4 can render it with either hashed alpha or hard alpha-test shadowing; unsupported animated texgen cutouts cast conservative solid depth instead of dropping the shadow.
+- If a perforated stage uses explicit texture coordinates, openPREY can render it with either hashed alpha or hard alpha-test shadowing; unsupported animated texgen cutouts cast conservative solid depth instead of dropping the shadow.
 - Translucent shadow coverage stages preserve the same material alpha-test mode, so blended foliage/glass masks stay consistent with opaque cutouts.
 
 Hashed alpha notes:
@@ -211,15 +215,15 @@ Behavior:
 
 Current limits:
 - Supported stages currently include old-style alpha and premultiplied-alpha stages with explicit ST texture coordinates, plus common additive `blend add` / `GL_ONE, GL_ONE` stages.
-- When a translucent shell/tint stage is layered on top of a separate explicit-ST coverage stage, openQ4 now reuses that coverage stage, including its alpha-test threshold when present, so layered pickup-orb and similar materials can cast shaped transmitted shadows instead of only uniform blobs.
+- When a translucent shell/tint stage is layered on top of a separate explicit-ST coverage stage, openPREY now reuses that coverage stage, including its alpha-test threshold when present, so layered pickup-orb and similar materials can cast shaped transmitted shadows instead of only uniform blobs.
 - Supported translucent casters now derive colored transmission from the material inputs available to that stage: texture alpha, sampled texture RGB, stage color, and applicable vertex color.
 - View-dependent reflection cubemaps are treated as tinted transmissive shells instead of using the reflected sample directly, so pickup orbs can tint transmitted light without camera-dependent shadow color shifts.
 - The current high-quality path stores separate translucent shadow moments for red, green, and blue, so each channel resolves blocker depth independently instead of sharing one grayscale depth distribution.
 - GUI/subview materials are skipped.
-- BSE/FX particles, unusual custom stage setups, and many effect-style materials are intentionally not forced into the translucent shadow pass.
+- Inherited effect/FX particles, unusual custom stage setups, and many effect-style materials are intentionally not forced into the translucent shadow pass.
 - Colored transmission is still approximate rather than a full deep-shadow solution, but it is materially closer to real tinted transmission than the earlier scalar/grayscale model.
 - This path adds extra GPU work because eligible lights render an additional translucent caster pass.
-- The feature now expects enough hardware for 3 translucent MRT attachments and 3 extra texture samplers in the receiver path; if that is unavailable, openQ4 disables this experimental translucent-shadow feature.
+- The feature now expects enough hardware for 3 translucent MRT attachments and 3 extra texture samplers in the receiver path; if that is unavailable, openPREY disables this experimental translucent-shadow feature.
 
 Controls:
 
@@ -248,7 +252,7 @@ Shadow artifacts are usually one of two classes:
 
 Projected-light tuning:
 
-Projected shadow maps store Quake 4's authored light falloff depth directly, so the projected defaults are intentionally small. Raise them only when you see acne or speckling.
+Projected shadow maps store Prey (2006)'s authored light falloff depth directly, so the projected defaults are intentionally small. Raise them only when you see acne or speckling.
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|

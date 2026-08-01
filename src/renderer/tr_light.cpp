@@ -30,9 +30,21 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+
+static ID_INLINE float R_CalcViewAndEntityDistance( const viewDef_t *viewDef, const renderEntity_t *entity ) {
+	return ( viewDef->renderView.vieworg - entity->origin ).LengthFast();
+}
+
+static ID_INLINE float R_CalcViewAndLightDistance( const viewDef_t *viewDef, const renderLight_t *light ) {
+	return ( viewDef->renderView.vieworg - light->origin ).LengthFast();
+}
 #include "../sound/sound.h"
 
-static ID_INLINE idSoundEmitter *R_GetShaderSoundEmitter( int soundEmitterHandle ) {
+static ID_INLINE idSoundEmitter *R_GetShaderSoundEmitter( idSoundEmitter *referenceSound, int soundEmitterHandle ) {
+	if ( referenceSound != NULL ) {
+		return referenceSound;
+	}
+
 	if ( soundEmitterHandle == 0 || soundSystem == NULL ) {
 		return NULL;
 	}
@@ -847,8 +859,9 @@ viewEntity_t *R_SetEntityDefViewEntity( idRenderEntityLocal *def ) {
 	// we may not have a viewDef if we are just creating shadows at entity creation time
 	if ( tr.viewDef ) {
 		myGlMultMatrix( vModel->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vModel->modelViewMatrix );
-		vModel->weaponDepthHack = ( def->parms.weaponDepthHackInViewID != 0
-			&& def->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID );
+		vModel->weaponDepthHack = def->parms.weaponDepthHack ||
+			( def->parms.weaponDepthHackInViewID != 0
+			&& def->parms.weaponDepthHackInViewID == R_EffectiveViewIDForSubview() );
 		vModel->distanceToCamera = ( def->parms.origin - tr.viewDef->renderView.vieworg ).LengthSqr();
 
 		vModel->next = tr.viewDef->viewEntitys;
@@ -1019,7 +1032,7 @@ void idRenderWorldLocal::CreateLightDefInteractions( idRenderLightLocal *ldef ) 
 				}
 				// if we are suppressing its shadow in this view, skip
 				if ( !r_skipSuppress.GetBool() ) {
-					if ( edef->parms.suppressShadowInViewID && edef->parms.suppressShadowInViewID == tr.viewDef->renderView.viewID ) {
+					if ( edef->parms.suppressShadowInViewID && edef->parms.suppressShadowInViewID == R_EffectiveViewIDForSubview() ) {
 						continue;
 					}
 					if ( edef->parms.suppressShadowInLightID && edef->parms.suppressShadowInLightID == ldef->parms.lightId ) {
@@ -1622,7 +1635,8 @@ void R_AddLightSurfaces( void ) {
 		}
 
 		// see if we are suppressing the light in this view
-		if ( R_ShouldSuppressViewLightForLevelshot( tr.viewDef->renderView.viewID, light->parms.allowLightInViewID ) ) {
+		const int effectiveViewID = R_EffectiveViewIDForSubview();
+		if ( R_ShouldSuppressViewLightForLevelshot( effectiveViewID, light->parms.allowLightInViewID ) ) {
 			*ptr = vLight->next;
 			light->viewCount = -1;
 			continue;
@@ -1630,13 +1644,13 @@ void R_AddLightSurfaces( void ) {
 
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( light->parms.suppressLightInViewID
-			&& light->parms.suppressLightInViewID == tr.viewDef->renderView.viewID ) {
+			&& light->parms.suppressLightInViewID == effectiveViewID ) {
 				*ptr = vLight->next;
 				light->viewCount = -1;
 				continue;
 			}
 			if ( light->parms.allowLightInViewID 
-			&& light->parms.allowLightInViewID != tr.viewDef->renderView.viewID ) {
+			&& light->parms.allowLightInViewID != effectiveViewID ) {
 				*ptr = vLight->next;
 				light->viewCount = -1;
 				continue;
@@ -1645,8 +1659,9 @@ void R_AddLightSurfaces( void ) {
 
 		// evaluate the light shader registers
 		float *lightRegs =(float *)R_FrameAlloc( lightShader->GetNumRegisters() * sizeof( float ) );
-		idSoundEmitter *lightSoundEmitter = R_GetShaderSoundEmitter( light->parms.referenceSoundHandle );
+		idSoundEmitter *lightSoundEmitter = R_GetShaderSoundEmitter( light->parms.referenceSound, light->parms.referenceSoundHandle );
 		vLight->shaderRegisters = lightRegs;
+		light->parms.shaderParms[SHADERPARM_DISTANCE] = R_CalcViewAndLightDistance( tr.viewDef, &light->parms );
 		lightShader->EvaluateRegisters( lightRegs, light->parms.shaderParms, tr.viewDef, lightSoundEmitter );
 
 		// if this is a purely additive light and no stage in the light shader evaluates
@@ -1975,19 +1990,26 @@ const float *R_SetupDrawSurfShaderRegisters( const viewEntity_t *space, const re
 
 	if ( renderEntity != NULL ) {
 		shaderParms = renderEntity->shaderParms;
-		soundEmitter = R_GetShaderSoundEmitter( renderEntity->referenceSoundHandle );
+		soundEmitter = R_GetShaderSoundEmitter( renderEntity->referenceSound, renderEntity->referenceSoundHandle );
 	} else if ( space != NULL && space->entityDef != NULL ) {
 		shaderParms = space->entityDef->parms.shaderParms;
-		soundEmitter = R_GetShaderSoundEmitter( space->entityDef->parms.referenceSoundHandle );
+		soundEmitter = R_GetShaderSoundEmitter( space->entityDef->parms.referenceSound, space->entityDef->parms.referenceSoundHandle );
+	}
+
+	const renderEntity_t *distanceEntity = renderEntity != NULL ? renderEntity :
+		( space != NULL && space->entityDef != NULL ? &space->entityDef->parms : NULL );
+	if ( distanceEntity != NULL ) {
+		memcpy( generatedShaderParms, shaderParms, sizeof( generatedShaderParms ) );
+		generatedShaderParms[SHADERPARM_DISTANCE] = R_CalcViewAndEntityDistance( tr.viewDef, distanceEntity );
+		shaderParms = generatedShaderParms;
 	}
 
 	if ( renderEntity != NULL && renderEntity->referenceShader != NULL ) {
 		const shaderStage_t *pStage;
 
-		renderEntity->referenceShader->EvaluateRegisters( refRegs, renderEntity->shaderParms, tr.viewDef, soundEmitter );
+		renderEntity->referenceShader->EvaluateRegisters( refRegs, shaderParms, tr.viewDef, soundEmitter );
 		pStage = renderEntity->referenceShader->GetStage( 0 );
 
-		memcpy( generatedShaderParms, renderEntity->shaderParms, sizeof( generatedShaderParms ) );
 		generatedShaderParms[0] = refRegs[ pStage->color.registers[0] ];
 		generatedShaderParms[1] = refRegs[ pStage->color.registers[1] ];
 		generatedShaderParms[2] = refRegs[ pStage->color.registers[2] ];
@@ -2079,7 +2101,22 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 	tr.viewDef->numDrawSurfs++;
 
 	// Keep shadow-caster and main draw-surf material evaluation on the same code path.
+	// Prey can place an entity in an independently scaled time group; only material
+	// register evaluation observes that alternate clock.
+	const float oldFloatTime = tr.viewDef->floatTime;
+	const int oldRenderTime = tr.viewDef->renderView.time;
+	if ( renderEntity != NULL && renderEntity->timeGroup != 0 ) {
+#ifdef OPENQ4_RENDERER_MODULE
+		const int groupTime = R_RendererGetTimeGroupTime( renderEntity->timeGroup, oldRenderTime );
+#else
+		const int groupTime = game != NULL ? game->GetTimeGroupTime( renderEntity->timeGroup ) : oldRenderTime;
+#endif
+		tr.viewDef->floatTime = groupTime * 0.001f;
+		tr.viewDef->renderView.time = groupTime;
+	}
 	drawSurf->shaderRegisters = R_SetupDrawSurfShaderRegisters( space, renderEntity, shader );
+	tr.viewDef->floatTime = oldFloatTime;
+	tr.viewDef->renderView.time = oldRenderTime;
 	drawSurf->area = tr.viewDef->skipDrawSurfAreaResolve ? R_FallbackDrawSurfArea( space ) : R_ResolveDrawSurfArea( tri, space );
 
 	R_FinalizeDrawSurf( drawSurf );
@@ -2618,17 +2655,18 @@ void R_AddEffectSurfaces(void) {
 			}
 		}
 
-		if ( R_ShouldSuppressViewModelForLevelshot( tr.viewDef->renderView.viewID, def->parms.allowSurfaceInViewID, def->parms.weaponDepthHackInViewID ) ) {
+		const int effectiveViewID = R_EffectiveViewIDForSubview();
+		if ( R_ShouldSuppressViewModelForLevelshot( effectiveViewID, def->parms.allowSurfaceInViewID, def->parms.weaponDepthHackInViewID ) ) {
 			++dropViewSuppress;
 			continue;
 		}
 
 		if (!r_skipSuppress.GetBool()) {
-			if (def->parms.suppressSurfaceInViewID && def->parms.suppressSurfaceInViewID == tr.viewDef->renderView.viewID) {
+			if (def->parms.suppressSurfaceInViewID && def->parms.suppressSurfaceInViewID == effectiveViewID) {
 				++dropViewSuppress;
 				continue;
 			}
-			if (def->parms.allowSurfaceInViewID && def->parms.allowSurfaceInViewID != tr.viewDef->renderView.viewID) {
+			if (def->parms.allowSurfaceInViewID && def->parms.allowSurfaceInViewID != effectiveViewID) {
 				++dropViewSuppress;
 				continue;
 			}
@@ -2679,7 +2717,8 @@ void R_AddEffectSurfaces(void) {
 
 		viewEntity_t* vEffect = (viewEntity_t*)R_ClearedFrameAlloc(sizeof(*vEffect));
 		vEffect->entityDef = NULL;
-		vEffect->weaponDepthHack = (def->parms.weaponDepthHackInViewID != 0 && def->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID);
+		vEffect->weaponDepthHack = def->parms.weaponDepthHackInViewID != 0
+			&& def->parms.weaponDepthHackInViewID == effectiveViewID;
 		vEffect->modelDepthHack = def->parms.modelDepthHack;
 		R_AxisToModelMatrix(def->parms.axis, def->parms.origin, vEffect->modelMatrix);
 		myGlMultMatrix(vEffect->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vEffect->modelViewMatrix);
@@ -2911,19 +2950,20 @@ static bool R_ThroughWorldOutlineEntityAllowed( const idRenderEntityLocal *def )
 	if ( r_singleEntity.GetInteger() >= 0 && r_singleEntity.GetInteger() != def->index ) {
 		return false;
 	}
+	const int effectiveViewID = R_EffectiveViewIDForSubview();
 	// The same view-id suppression the portal walk honours. Without it a player
 	// whose own body is suppressed in their own view would ring themselves.
 	if ( !r_skipSuppress.GetBool() ) {
 		if ( def->parms.suppressSurfaceInViewID
-				&& def->parms.suppressSurfaceInViewID == tr.viewDef->renderView.viewID ) {
+				&& def->parms.suppressSurfaceInViewID == effectiveViewID ) {
 			return false;
 		}
 		if ( def->parms.allowSurfaceInViewID
-				&& def->parms.allowSurfaceInViewID != tr.viewDef->renderView.viewID ) {
+				&& def->parms.allowSurfaceInViewID != effectiveViewID ) {
 			return false;
 		}
 	}
-	if ( R_ShouldSuppressViewModelForLevelshot( tr.viewDef->renderView.viewID,
+	if ( R_ShouldSuppressViewModelForLevelshot( effectiveViewID,
 			def->parms.allowSurfaceInViewID, def->parms.weaponDepthHackInViewID ) ) {
 		return false;
 	}

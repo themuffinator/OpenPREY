@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the source snapshot stamp used by openQ4 savegames."""
+"""Generate the source snapshot stamp used by openPREY savegames."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ PROJECT_ALWAYS_FILES = (
 
 GAME_SCAN_DIRS = (
     "src/game",
-    "src/mpgame",
+    "src/Prey",
+    "src/preyengine",
 )
 
 RELEVANCE_TOKENS = (

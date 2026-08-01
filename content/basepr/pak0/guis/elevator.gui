@@ -1,0 +1,187 @@
+// Elevator.gui
+
+// Available gui vars:
+//	floor				current floor of elevator
+//	damaged				bool of whether the gui is currently damaged
+
+
+windowDef Desktop {
+	rect		0 ,0 ,640 ,480 
+	backcolor	0 ,0 ,0 ,0.2
+	visible		1
+	
+	windowDef backg {
+		rect		10, 10, 620, 460
+		backcolor	1, 1, 1, 0
+		matcolor	1, 1, 1, 0.9
+		background	"guis/assets/elevator/bg"
+		visible		1
+	}
+
+	windowDef FloorIndicator3 {
+		rect		451, 138, 100, 80
+		backcolor	1, 1, 1, 0
+		matcolor	1, 0.3, 0, 0.9
+		background	"guis/assets/elevator/elevator"
+		visible		("gui::floor" == 3)
+	}
+	
+	windowDef FloorIndicator2 {
+		rect		451, 247, 100, 80
+		backcolor	1, 1, 1, 0
+		matcolor	1, 0.3, 0, 0.9
+		background	"guis/assets/elevator/elevator"
+		visible		("gui::floor" == 2)
+	}
+	
+	windowDef FloorIndicator1 {
+		rect		451, 353, 100, 80
+		backcolor	1, 1, 1, 0
+		matcolor	1, 0.3, 0, 0.9
+		background	"guis/assets/elevator/elevator"
+		visible		("gui::floor" == 1)
+	}
+	
+	
+
+	
+
+	
+	windowDef button3 {
+		rect		52, 127, 343, 100
+		backcolor	0, 0, 0, 0
+		matcolor	0.8, 0.9, 1, 0.5
+		background	"guis/assets/elevator/button"
+		visible		1
+	}
+	windowDef button2 {
+		rect		52, 235, 343, 100
+		backcolor	0, 0, 0, 0
+		matcolor	0.8, 0.9, 1, 0.5
+		background	"guis/assets/elevator/button"
+		visible		1
+	}
+	windowDef button1 {
+		rect		52, 345, 343, 100
+		backcolor	0, 0, 0, 0
+		matcolor	0.8, 0.9, 1, 0.5
+		background	"guis/assets/elevator/button"
+		visible		1
+	}
+	windowDef floor3 {
+		rect		70, 130, 300, 100
+		text		"#str_20466"
+		textalign	1
+		textscale	1.5
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+	}
+	windowDef floor2 {
+		rect		70, 240, 300, 100
+		text		"#str_20467"
+		textalign	1
+		textscale	1.5
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+	}
+	windowDef floor1 {
+		rect		70, 350, 300, 100
+		text		"#str_20468"
+		textalign	1
+		textscale	1.5
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+	}
+	windowDef elevatortext {
+		rect		0, 24, 640, 80
+		text		"#str_20469"
+		textalign	1
+		textscale	1.25
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+		visible		("gui::floor" != 0)
+	}
+	windowDef TempText2 {
+		rect		0, 35, 640, 60
+		text		"#str_20470"
+		textalign	1
+		textscale	1
+		forecolor	1, 1, 1, 0.7
+		backcolor	0, 0, 0, 0
+		font		"fonts/alien"
+		visible		("gui::floor" == 0)
+	}
+	windowDef TriggerButton3 {
+		rect		50, 95, 350, 120
+		backcolor 	1, 1, 1, 0
+		matcolor	1, 1, 1, 0.1
+		cursor		1
+
+		onMouseEnter {
+			transition	"button3::matcolor" "0.8 0.9 1 0.1" "1 0.2 0 0.6" "200" ; 
+		} 		
+		onMouseExit {
+			transition	"button3::matcolor" "1 0.2 0 0.1" "0.8 0.9 1 0.5" "200" ; 
+		} 
+		onAction {
+			set	"cmd"	"changefloor 3 ; play console_generic_activate" ; 
+			ResetTime	"Text2a" "0" ;
+		} 
+	}
+
+	windowDef TriggerButton2 {
+		rect	50, 235, 350, 100
+		backcolor 	1, 1, 1, 0
+		matcolor	1, 1, 1, 0.1
+		cursor		1
+
+		onMouseEnter {
+			transition	"button2::matcolor" "0.8 0.9 1 0.1" "1 0.2 0 0.6" "200" ; 
+		} 		
+		onMouseExit {
+			transition	"button2::matcolor" "1 0.2 0 0.1" "0.8 0.9 1 0.5" "200" ; 
+		} 
+		onAction {
+			set	"cmd"	"changefloor 2 ; play console_generic_activate" ; 
+			transition	"matcolor" "1 1 1 0.5" "1 1 1 0.3" "300" ; 
+			ResetTime	"Text2b" "0" ;
+		} 
+	}
+
+	windowDef TriggerButton1 {
+		rect	50, 350, 350, 120
+		backcolor 	1, 1, 1, 0
+		matcolor	1, 1, 1, 0.1
+		cursor		1
+
+		onMouseEnter {
+			transition	"button1::matcolor" "0.8 0.9 1 0.1" "1 0.2 0 0.6" "200" ; 
+		} 		
+		onMouseExit {
+			transition	"button1::matcolor" "1 0.2 0 0.1" "0.8 0.9 1 0.5" "200" ; 
+		} 
+		onAction {
+			set	"cmd"	"changefloor 1 ; play console_generic_activate" ; 
+			transition	"matcolor" "1 1 1 0.5" "1 1 1 0.3" "300" ; 
+			ResetTime	"Text2c" "0" ;
+		} 
+	}
+// Damage overlays, visible when console has been damaged
+	windowDef damageOverlayStatic {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayStatic"
+		visible		"gui::damaged"
+	}
+
+	windowDef damageOverlayVHold {
+		rect		0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/damageOverlayVHold"
+		visible		"gui::damaged"
+	}
+}

@@ -13,6 +13,10 @@
 */
 
 class idDemoFile;
+class idSoundEmitter;
+class hhDeclBeam;
+class idMapFile;
+class idDeclParticle;
 
 // RAVEN BEGIN
 // jscott: new proc format
@@ -41,6 +45,37 @@ const int SHADERPARM_TIMEOFFSET		= 4;
 const int SHADERPARM_DIVERSITY		= 5;	// random between 0.0 and 1.0 for some effects (muzzle flashes, etc)
 const int SHADERPARM_MODE			= 7;	// for selecting which shader passes to enable
 const int SHADERPARM_TIME_OF_DEATH	= 7;	// for the monster skin-burn-away effect enable and time offset
+
+// Human Head material parameters used by Prey's retail declarations.
+const int SHADERPARM_MISC				= 6;
+const int SHADERPARM_ANY_DEFORM			= 9;
+const int SHADERPARM_ANY_DEFORM_PARM1	= 10;
+const int SHADERPARM_ANY_DEFORM_PARM2	= 11;
+const int SHADERPARM_DISTANCE			= 12;
+
+enum {
+	DEFORMTYPE_NONE = 0,
+	DEFORMTYPE_SCALE,
+	DEFORMTYPE_VERTEXCOLOR,
+	DEFORMTYPE_SPHERE,
+	DEFORMTYPE_RIPPLE,
+	DEFORMTYPE_PLANTSWAYX,
+	DEFORMTYPE_PLANTSWAYY,
+	DEFORMTYPE_FLATTEN,
+	DEFORMTYPE_VIBRATE,
+	DEFORMTYPE_SQUISH,
+	DEFORMTYPE_TURBULENT,
+	DEFORMTYPE_RAYS,
+	DEFORMTYPE_ALPHAGLOW,
+	DEFORMTYPE_FATTEN,
+	DEFORMTYPE_RIPPLECENTER,
+	DEFORMTYPE_MELT,
+	DEFORMTYPE_POD,
+	DEFORMTYPE_DEATHEFFECT,
+	DEFORMTYPE_WINDBLAST,
+	DEFORMTYPE_PINCHPOINT,
+	DEFORMTYPE_PORTAL
+};
 
 // model parms
 const int SHADERPARM_MD5_SKINSCALE	= 8;	// for scaling vertex offsets on md5 models (jack skellington effect)
@@ -103,6 +138,11 @@ enum {
 struct renderEntity_s;
 struct renderView_s;
 typedef bool(*deferredEntityCallback_t)( renderEntity_s *, const renderView_s * );
+
+#define MAX_BEAM_NODES 32
+typedef struct hhBeamNodes_s {
+	idVec3 nodes[ MAX_BEAM_NODES ];
+} hhBeamNodes_t;
 
 enum {
 	// Draw the outline through whatever geometry is in front of the entity. Only
@@ -225,9 +265,15 @@ typedef struct renderEntity_s {
 
 	float					modelDepthHack;			// squash depth range so particle effects don't clip into walls
 
+	const hhDeclBeam *		declBeam;				// Prey beam declaration data
+	hhBeamNodes_t *			beamNodes;				// per-beam node data
+
 	// options to override surface shader flags (replace with material parameters?)
 	bool					noSelfShadow;			// cast shadows onto other objects,but not self
 	bool					noShadow;				// no shadow at all
+#if defined( _HH_RENDERDEMO_HACKS ) && _HH_RENDERDEMO_HACKS
+	bool					notInRenderDemos;		// do not record this entity in render demos
+#endif
 
 	bool					noDynamicInteractions;	// don't create any light / shadow interactions after
 													// the level load is completed.  This is a performance hack
@@ -236,9 +282,15 @@ typedef struct renderEntity_s {
 
 // RAVEN BEGIN
 	bool					forceUpdate;			// force an update
+	bool					weaponDepthHack;		// Prey first-person depth-range override
+	bool					onlyVisibleInSpirit;	// visible only during spirit/deathwalk views
+	bool					onlyInvisibleInSpirit;	// hidden during spirit/deathwalk views
+	bool					lowSkippable;			// may be culled by low-detail settings
 
 // bdube: weapon depth hack only in a given view id
 	int						weaponDepthHackInViewID;// squash depth range so view weapons don't poke into walls
+	float					eyeDistance;			// stereo/parallax eye-distance override
+	int						timeGroup;				// grouped game-time selection
 // RAVEN END	
 													// this automatically implies noShadow
 												
@@ -249,7 +301,7 @@ typedef struct renderEntity_s {
 // RAVEN END
 
 // jmarshall
-	int						referenceSound;
+	idSoundEmitter *		referenceSound;
 // jmarshall end
 } renderEntity_t;
 
@@ -280,6 +332,7 @@ typedef struct renderLight_s {
 // ddynerman: no dynamic shadows - allows dmap to create optimized static shadows, but prevents dynamic shadows
 	bool					noDynamicShadows;	
 // RAVEN END
+	bool					lowSkippable;			// may be culled by low-detail settings
 
 	bool					pointLight;			// otherwise a projection light (should probably invert the sense of this, because points are way more common)
 	bool					parallel;			// lightCenter gives the direction to the light at infinity
@@ -317,7 +370,7 @@ typedef struct renderLight_s {
 // RAVEN END
 
 // jmarshall
-	int						referenceSound;
+	idSoundEmitter *		referenceSound;
 // jmarshall end
 } renderLight_t;
 
@@ -366,6 +419,7 @@ typedef struct renderView_s {
 
 	bool					cramZNear;			// for cinematics, we want to set ZNear much lower
 	bool					forceUpdate;		// for an update 
+	bool					viewSpiritEntities;	// include spirit-only entities in this view
 
 	// time in milliseconds for shader effects and other time dependent rendering issues
 	int						time;
@@ -387,14 +441,18 @@ typedef struct {
 	const idWinding	*	w;				// winding points have counter clockwise ordering seen from areas[0]
 	int					blockingBits;	// PS_BLOCK_VIEW, PS_BLOCK_AIR, etc
 	qhandle_t			portalHandle;
+	float				frac;				// fraction used by Prey game-portal traversal
 } exitPortal_t;
 
 
 // guiPoint_t is returned by idRenderWorld::GuiTrace()
 typedef struct {
 	float				x, y;			// 0.0 to 1.0 range if trace hit a gui, otherwise -1
+	union {
+		float			frac;			// Prey name: fraction of trace before the hit
+		float			fraction;		// upstream compatibility name
+	};
 	int					guiId;			// id of gui ( 0, 1, or 2 ) that the trace happened against
-	float				fraction;		// fraction of trace completed before hitting the gui surface
 } guiPoint_t;
 
 
@@ -426,9 +484,10 @@ typedef enum {
 	PS_BLOCK_AIR = 4,			// windows between pressurized and unpresurized areas
 // RAVEN BEGIN
 // abahr
-	PS_BLOCK_GRAVITY = 8,		// PS_BLOCK_ALL does not block gravity.  Must use info_gravityseperator
+	PS_BLOCK_SOUND = 8,			// Prey sound propagation through game portals
+	PS_BLOCK_GRAVITY = PS_BLOCK_SOUND,	// compatibility alias for Q4 code
 
-	PS_BLOCK_ALL = PS_BLOCK_VIEW|PS_BLOCK_LOCATION|PS_BLOCK_AIR
+	PS_BLOCK_ALL = ( 1 << NUM_PORTAL_ATTRIBUTES ) - 1
 // RAVEN END
 } portalConnection_t;
 
@@ -561,6 +620,9 @@ public:
 	// If this isn't called, they will all be dynamically generated
 	virtual	void			GenerateAllInteractions( void ) = 0;
 
+	// returns true if this area model needs portal sky to draw
+	virtual bool			CheckAreaForPortalSky( int areaNum ) = 0;
+
 	//-------------- Decals and Overlays  -----------------
 
 	// Creates decals on all world surfaces that the winding projects onto.
@@ -603,6 +665,23 @@ public:
 
 	//-------------- Portal Area Information -----------------
 
+	// Prey game-portal and sound-area compatibility surface. Backends may
+	// progressively override these; defaults preserve upstream portal behavior.
+	virtual qhandle_t		FindGamePortal( const char *name ) { (void)name; return 0; }
+	virtual void			RegisterGamePortals( idMapFile *mapFile ) { (void)mapFile; }
+	virtual void			DrawGamePortals( int mode, const idMat3 &viewAxis ) { (void)mode; (void)viewAxis; }
+	virtual idVec3			GetGamePortalSrc( qhandle_t handle ) { (void)handle; return vec3_origin; }
+	virtual idVec3			GetGamePortalDst( qhandle_t handle ) { (void)handle; return vec3_origin; }
+	virtual bool			IsGamePortal( qhandle_t handle ) { (void)handle; return false; }
+	virtual int				NumSoundPortalsInArea( int areaNum ) { return NumPortalsInArea( areaNum ); }
+	virtual void			LevelInitSoundAreas( void ) {}
+	virtual void			LevelShutdownSoundAreas( void ) {}
+	virtual void			PrecalculateValidSoundAreas( const idVec3 listenerPosition, const int listenerArea ) { (void)listenerPosition; (void)listenerArea; }
+	virtual bool			ValidSoundArea( const int area ) { (void)area; return true; }
+	virtual float			DistanceToSoundArea( const int area ) { (void)area; return 0.0f; }
+	virtual float			MaxSoundAreaExtents( const int area ) { (void)area; return 0.0f; }
+	virtual void			DrawValidSoundAreas( const idVec3 &source, const idMat3 &viewAxis ) { (void)source; (void)viewAxis; }
+
 	// returns the number of portals
 	virtual int				NumPortals( void ) const = 0;
 
@@ -635,11 +714,13 @@ public:
 
 	// Used by the sound system to do area flowing
 	virtual	int				NumPortalsInArea( int areaNum ) = 0;
+	int						NumGamePortalsInArea( int areaNum ) { return NumPortalsInArea( areaNum ); }
 
 	// returns one portal from an area
 	//virtual void			GetPortals( int areaNum, exitPortal_t *ret, int size ) = 0;
 	//virtual void			GetPortal( int areaNum, int portalNum, exitPortal_t *ret ) = 0;
 	virtual exitPortal_t	GetPortal( int areaNum, int portalNum ) = 0;
+	virtual exitPortal_t	GetSoundPortal( int areaNum, int portalNum ) { return GetPortal( areaNum, portalNum ); }
 
 	//-------------- Tracing  -----------------
 
@@ -648,6 +729,10 @@ public:
 	// This doesn't do any occlusion testing, simply ignoring non-gui surfaces.
 	// start / end are in global world coordinates.
 	virtual guiPoint_t		GuiTrace( qhandle_t entityHandle, const idVec3 start, const idVec3 end ) const = 0;
+	virtual guiPoint_t		GuiTrace( qhandle_t entityHandle, const idVec3 start, const idVec3 end, int interactiveMask ) const {
+		(void)interactiveMask;
+		return GuiTrace( entityHandle, start, end );
+	}
 
 	// Traces vs the render model, possibly instantiating a dynamic version, and returns true if something was hit
 	virtual bool			ModelTrace( modelTrace_t &trace, qhandle_t entityHandle, const idVec3 &start, const idVec3 &end, const float radius ) const = 0;
@@ -681,6 +766,8 @@ public:
 
 	// Line drawing for debug visualization
 	virtual void			DebugClear(int time) = 0;		// a time of 0 will clear all lines and text
+	virtual void			DebugClearLines( int time ) { DebugClear( time ); }
+	virtual void			DebugClearPolygons( int time ) { (void)time; }
 	virtual void			DebugLine(const idVec4& color, const idVec3& start, const idVec3& end, const int lifetime = 0, const bool depthTest = false) { }
 	virtual void			DebugArrow( const idVec4 &color, const idVec3 &start, const idVec3 &end, int size, const int lifetime = 0 ) = 0;
 	virtual void			DebugWinding( const idVec4 &color, const idWinding &w, const idVec3 &origin, const idMat3 &axis, const int lifetime = 0, const bool depthTest = false ) = 0;
@@ -708,6 +795,16 @@ public:
 
 	// Text drawing for debug visualization.
 	virtual void			DrawText( const char *text, const idVec3 &origin, float scale, const idVec4 &color, const idMat3 &viewAxis, const int align = 1, const int lifetime = 0, bool depthTest = false ) = 0;
+
+#if defined( _HH_RENDERDEMO_HACKS ) && _HH_RENDERDEMO_HACKS
+	virtual void			DemoSmokeEvent( const idDeclParticle *smoke, const int systemTimeOffset, const float diversity, const idVec3 &origin, const idMat3 &axis ) {
+		(void)smoke;
+		(void)systemTimeOffset;
+		(void)diversity;
+		(void)origin;
+		(void)axis;
+	}
+#endif
 };
 
 #endif /* !__RENDERWORLD_H__ */

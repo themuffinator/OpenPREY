@@ -34,6 +34,16 @@ If you have questions concerning this license or the applicable additional terms
 #include "UserInterfaceLocal.h"
 #include "SliderWindow.h"
 
+static const float SLIDER_SCROLLBAR_THUMB_RANGE_DIVISOR = 15.0f;
+
+static float SliderVolumeToDB( float value ) {
+	return value <= 0.0f ? -60.0f : ( value >= 1.0f ? 0.0f : idMath::Log( value ) * ( 6.0f / 0.693147181f ) );
+}
+
+static float SliderDBToVolume( float db ) {
+	return db <= -60.0f ? 0.0f : ( db >= 0.0f ? 1.0f : idMath::Pow( 2.0f, db * ( 1.0f / 6.0f ) ) );
+}
+
 /*
 ============
 idSliderWindow::CommonInit
@@ -55,6 +65,8 @@ void idSliderWindow::CommonInit() {
 	scrollbar = false;
 
 	verticalFlip = false;
+	volumeSlider = false;
+	lastValue = 0.0f;
 }
 
 idSliderWindow::idSliderWindow(idDeviceContext *d, idUserInterfaceLocal *g) : idWindow(d, g) {
@@ -91,6 +103,10 @@ bool idSliderWindow::ParseInternalVar(const char *_name, idParser *src) {
 	}
 	if (idStr::Icmp(_name, "verticalflip") == 0) {
 		verticalFlip = src->ParseBool();
+		return true;
+	}
+	if (idStr::Icmp(_name, "volumeslider") == 0) {
+		volumeSlider = src->ParseBool();
 		return true;
 	}
 	if (idStr::Icmp(_name, "scrollbar") == 0) {
@@ -259,6 +275,31 @@ void idSliderWindow::SetValue(float _value) {
 	value = ClampAndSnapValue( _value );
 }
 
+void idSliderWindow::UpdateThumbMetrics( const idRectangle& sliderRect ) {
+	if ( thumbMat == NULL ) {
+		thumbWidth = thumbHeight = 0.0f;
+		return;
+	}
+	const float baseWidth = Max( 0.0f, static_cast<float>( thumbMat->GetImageWidth() ) );
+	const float baseHeight = Max( 0.0f, static_cast<float>( thumbMat->GetImageHeight() ) );
+	thumbWidth = baseWidth;
+	thumbHeight = baseHeight;
+	if ( !scrollbar ) {
+		return;
+	}
+	const float axisLength = vertical ? sliderRect.h : sliderRect.w;
+	if ( axisLength <= 0.0f ) {
+		if ( vertical ) { thumbHeight = 0.0f; } else { thumbWidth = 0.0f; }
+		return;
+	}
+	const float baseSize = idMath::ClampFloat( 0.0f, axisLength, vertical ? baseHeight : baseWidth );
+	const float sizingRange = axisLength / SLIDER_SCROLLBAR_THUMB_RANGE_DIVISOR;
+	const float range = idMath::ClampFloat( 0.0f, sizingRange, Max( high - low, 0.0f ) );
+	const float thumbSize = sizingRange > 0.0f ?
+		idMath::ClampFloat( baseSize, axisLength, baseSize + ( axisLength - baseSize ) * ( 1.0f - range / sizingRange ) ) : baseSize;
+	if ( vertical ) { thumbHeight = thumbSize; } else { thumbWidth = thumbSize; }
+}
+
 void idSliderWindow::Draw(int time, float x, float y) {
 	idVec4 color = foreColor;
 
@@ -266,10 +307,7 @@ void idSliderWindow::Draw(int time, float x, float y) {
 		return;
 	}
 
-	if ( !thumbWidth || !thumbHeight ) {
-		thumbWidth = thumbMat->GetImageWidth();
-		thumbHeight = thumbMat->GetImageHeight();
-	}
+	UpdateThumbMetrics( drawRect );
 
 	UpdateCvar( true );
 	value = ClampAndSnapValue( value );
@@ -323,6 +361,7 @@ void idSliderWindow::DrawBackground(const idRectangle &_drawRect) {
 	if ( high - low <= 0.0f ) {
 		return;
 	}
+	UpdateThumbMetrics( _drawRect );
 
 	idRectangle r = _drawRect;
 	if (!scrollbar) {
@@ -354,6 +393,7 @@ const char *idSliderWindow::RouteMouseCoords(float xd, float yd) {
 	idRectangle r = drawRect;
 	r.x = actualX;
 	r.y = actualY;
+	UpdateThumbMetrics( r );
 
 	if (vertical) {
 		r.y += thumbHeight / 2;
@@ -426,6 +466,7 @@ float idSliderWindow::GetPageStep( void ) const {
 
 void idSliderWindow::CommitValue( void ) {
 	value = ClampAndSnapValue( value );
+	const bool changed = idMath::Fabs( static_cast<float>( value ) - lastValue ) > 0.0001f;
 	if ( buddyWin ) {
 		buddyWin->HandleBuddyUpdate( this );
 	} else {
@@ -434,6 +475,10 @@ void idSliderWindow::CommitValue( void ) {
 		if ( scrollbar ) {
 			RunScript( ON_ACTION );
 		}
+	}
+	lastValue = value;
+	if ( changed ) {
+		RunScript( ON_SLIDERCHANGE );
 	}
 }
 
@@ -496,16 +541,18 @@ void idSliderWindow::UpdateCvar( bool read, bool force ) {
 		return;
 	}
 	if ( force || liveUpdate ) {
-		value = cvar->GetFloat();
-		value = ClampAndSnapValue( value );
-		if ( value != gui->State().GetFloat( cvarStr ) ) {
-			if ( read ) {
+		if ( read ) {
+			value = ClampAndSnapValue( volumeSlider ? SliderDBToVolume( cvar->GetFloat() ) : cvar->GetFloat() );
+			lastValue = value;
+			if ( force || idMath::Fabs( static_cast<float>( value ) - gui->State().GetFloat( cvarStr ) ) > 0.0001f ) {
 				gui->SetStateFloat( cvarStr, value );
-			} else {
-				value = gui->State().GetFloat( cvarStr );
-				value = ClampAndSnapValue( value );
-				gui->SetStateFloat( cvarStr, value );
-				cvar->SetFloat( value );
+			}
+		} else {
+			value = ClampAndSnapValue( gui->State().GetFloat( cvarStr ) );
+			gui->SetStateFloat( cvarStr, value );
+			const float cvarValue = volumeSlider ? SliderVolumeToDB( value ) : static_cast<float>( value );
+			if ( force || idMath::Fabs( cvarValue - cvar->GetFloat() ) > 0.0001f ) {
+				cvar->SetFloat( cvarValue );
 			}
 		}
 	}

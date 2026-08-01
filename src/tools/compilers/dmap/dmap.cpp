@@ -392,7 +392,6 @@ Dmap_f
 ============
 */
 void Dmap_f( const idCmdArgs &args ) {
-
 	// bind the offline shadow optimizer into the shared render-geometry
 	// library; only the SG_OFFLINE path (dmap shadow optimization) uses it
 	RenderGeo_SetShadowOptimizer( SuperOptimizeOccluders, CleanupOptimizedShadowTris );

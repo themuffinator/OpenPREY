@@ -29,6 +29,13 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __ASYNCSERVER_H__
 #define __ASYNCSERVER_H__
 
+// OPENPREY-GATED(D9): upstream bot slots depend on game API callbacks that are
+// not part of Prey's v7 contract. Keep the implementation available for a
+// future, explicitly versioned reintroduction, but compile it out by default.
+#ifndef OPENPREY_ENABLE_BOTS
+#define OPENPREY_ENABLE_BOTS 0
+#endif
+
 /*
 ===============================================================================
 
@@ -179,10 +186,11 @@ public:
 
 	void				PrintLocalServerInfo( void );
 
-// jmarshall
+#if OPENPREY_ENABLE_BOTS
+// OPENPREY-GATED(D9): engine-only bot entry points; not exported to game API v7.
 	int					AllocOpenClientSlotForAI(const char* botName, int maxPlayersOnServer);
 	int 				ServerSetBotUserCommand(int clientNum, int frameNum, const usercmd_t& cmd);
-// jmarshall end
+#endif
 
 private:
 	bool				active;						// true if server is active

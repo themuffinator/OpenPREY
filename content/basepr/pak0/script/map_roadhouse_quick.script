@@ -1,0 +1,4034 @@
+namespace map_roadhouse {
+	float gAbducting = 0; //set to 1 once the abduction starts taking place
+	float gPlayerCanSpeak = 1;
+	float gChuckDaltonBusy = 0;
+	float gFansSpin = 1;
+	float gDaltonID;
+	float gChuckID;
+	float gTruckID;
+	float gCameraTrack = 1; //intro camera tracking
+	float g_CasinoMode = 0; //Games only, no dialog, can't progress
+			
+	//returns a free light cone "ship guide"
+	entity GetShipGuide() {
+		float i;
+		entity currentEnt;
+		
+		for ( i = 1; i <= 10; i++ ) {
+			if ( currentEnt = sys.getEntity( "rhShipGuideCone" + i ) ) {
+				if ( !currentEnt.getFloatKey( "busy" ) ) {
+					return currentEnt;
+				}
+			}
+		}
+		
+		return $null_entity;
+	}
+	
+	//Additional light cone that tracks objects as they're picked up
+	void ShipGuideTrack( entity target, float isNPC, vector offset ) {
+		entity lightSource = GetShipGuide();
+		
+		if ( lightSource == $null_entity ) {
+			return;
+		}
+		
+		vector lightSourceColor = lightSource.getVectorKey( "_color" );
+		float targetID = sys.getEntitySpawnId( target );
+		
+		if ( target == $player1 ) {
+			lightSourceColor *= 4;
+		}
+		
+		lightSource.setKey( "busy", 1 );
+		
+		lightSource.time( sys.getFrameTime() );
+		thread fadeInEnt( lightSource, lightSourceColor, 2 );
+		lightSource.show();
+		
+		vector vecToTarget,
+			   targetAngle,
+			   targetOrigin,
+			   sourceOrigin = lightSource.getVectorKey( "origin" );
+		
+		while ( CheckSpawnId( target, targetID ) ) {
+			if ( !isNPC ) {
+				targetOrigin = target.getWorldOrigin() + offset;
+			} else {
+				targetOrigin = target.getJointPos( target.getJointHandle( "waist" ) ) + offset;
+			}
+			vecToTarget = VecSubtract( targetOrigin, sourceOrigin );
+			targetAngle = sys.VecToAngles( vecToTarget );
+			targetAngle_x -= 90;
+			targetAngle = anglemod360( targetAngle );
+			
+			lightSource.rotateTo_world( targetAngle );
+			sys.waitFrame();
+		}
+		
+		fadeOutEnt( lightSource, lightSourceColor, 1 );
+		lightSource.hide();
+		lightSource.setKey( "busy", 0 );
+	}
+	
+	//Stops sound and removes entity after X seconds
+	void DelayedRemove( entity entityToRemove ) {
+		sys.wait( 4.45 );
+		entityToRemove.stopSound( SND_CHANNEL_ANY, 1 );
+		entityToRemove.remove();
+	}
+	
+	//Sets shader parms for dissolving entity and plays sound
+	void DissolveEntity( entity entityToDissolve ) {
+		float count;
+		string currentDissolve;
+		
+		while ( true ) { //loop to dissolve additional entities referenced by the key dissolve1-dissolve<x>
+			if ( entityToDissolve ) {
+				entityToDissolve.setShaderParm( 4, -sys.getTime() );
+				entityToDissolve.setShaderParm( 5, 1 );
+			
+				if ( entityToDissolve.getKey( "snd_dissolve" ) != "" ) {
+					entityToDissolve.startSound( "snd_dissolve", SND_CHANNEL_ANY, 1 );
+				}
+			}
+			
+			count++;
+			//add dissolve1-dissolve<x> key to entity that's dissolving to dissolve other entities
+			currentDissolve = entityToDissolve.getKey( "dissolve" + count );
+					
+			thread DelayedRemove( entityToDissolve );
+					
+			if ( currentDissolve != "" ) {
+				entityToDissolve = sys.getEntity( currentDissolve );
+			} else {
+				return;
+			}
+		}
+	}
+	
+	//Pulses main ship lights/
+	void ShipLightPulse( entity light, entity source, entity flare, float offset ) {
+		float fadeTime = 0.75,
+			  multiplier = 0.1,
+			  waitTime = 0.75;
+			
+		vector lightColor = light.getVectorKey( "_color" ),
+			   sourceColor = source.getVectorKey( "_color" ),
+			   flareColor = source.getVectorKey( "_color" );
+		
+		light.On();
+		
+		thread crossFadeEnt( light, lightColor * multiplier, lightColor, fadeTime );
+		thread crossFadeEnt( source, sourceColor * multiplier, sourceColor, fadeTime );
+		thread crossFadeEnt( flare, flareColor * multiplier, flareColor, fadeTime );
+		if ( offset > 0 ) {
+			sys.wait( offset );
+		}
+		
+		while ( true ) {
+			thread crossFadeEnt( light, lightColor * multiplier, lightColor, fadeTime );
+			thread crossFadeEnt( source, sourceColor * multiplier, sourceColor, fadeTime );
+			thread crossFadeEnt( flare, flareColor * multiplier, flareColor, fadeTime );
+			sys.wait( waitTime );
+			thread crossFadeEnt( light, lightColor, lightColor * multiplier, fadeTime );
+			thread crossFadeEnt( source, sourceColor, sourceColor * multiplier, fadeTime );
+			thread crossFadeEnt( flare, flareColor, flareColor * multiplier, fadeTime );
+			sys.wait( waitTime );
+		}
+	}
+	
+	//Ship light pulse main function
+	void ShipPulseLights() {
+		thread ShipLightPulse( $rhShipLight1, $rhShipLight1Source, $rhShipLight1Flare, 0.0 );
+		thread ShipLightPulse( $rhShipLight2, $rhShipLight2Source, $rhShipLight2Flare, 0.1 );
+		thread ShipLightPulse( $rhShipLight3, $rhShipLight3Source, $rhShipLight3Flare, 0.2 );
+		thread ShipLightPulse( $rhShipLight4, $rhShipLight4Source, $rhShipLight4Flare, 0.3 );
+		thread ShipLightPulse( $rhShipLight5, $rhShipLight5Source, $rhShipLight5Flare, 0.4 );
+		thread ShipLightPulse( $rhShipLight6, $rhShipLight6Source, $rhShipLight6Flare, 0.5 );
+		thread ShipLightPulse( $rhShipLight7, $rhShipLight7Source, $rhShipLight7Flare, 0.6 );
+		thread ShipLightPulse( $rhShipLight8, $rhShipLight8Source, $rhShipLight8Flare, 0.7 );
+		thread ShipLightPulse( $rhShipLight9, $rhShipLight9Source, $rhShipLight9Flare, 0.8 );
+		thread ShipLightPulse( $rhShipLight10, $rhShipLight10Source, $rhShipLight10Flare, 0.9 );
+		$rhShipLight11.On();
+		$rhShipLight12.On();
+		$rhShipLight13.On();
+		$rhShipLight14.On();
+		$rhShipLight15.On();
+		$rhShipLight16.On();
+	}
+	
+	//Pulses green ship lights
+	void ShipGreenLightPulse( entity light, float offset ) {
+		float fadeTime = 0.5,
+			  multiplier = 0.2,
+			  waitTime = 0.5;
+			  
+		vector lightColor = light.getVectorKey( "_color" );
+			   
+		light.On();
+		
+		thread crossFadeEnt( light, lightColor * multiplier, lightColor, fadeTime );
+		if ( offset > 0 ) {
+			sys.wait( offset );
+		}
+		
+		while ( true ) {
+			thread crossFadeEnt( light, lightColor, lightColor * multiplier, fadeTime );
+			sys.wait( waitTime );
+			thread crossFadeEnt( light, lightColor * multiplier, lightColor, fadeTime );
+			sys.wait( waitTime );
+		}
+	}
+	
+	//Ship green light pulse main function
+	void ShipPulseGreenLights() {
+		thread ShipGreenLightPulse( $rhShipGreenLight1, 0.0 );
+		thread ShipGreenLightPulse( $rhShipGreenLight2, 0.0 );
+		thread ShipGreenLightPulse( $rhShipGreenLight3, 0.5 );
+		thread ShipGreenLightPulse( $rhShipGreenLight4, 0.5 );
+	}
+	
+	//Plays random roof wood shake sound
+	void BuildingCrackSounds() {
+		float currentSpeaker;
+		
+		while ( true ) {
+			sys.wait( 1 + sys.random( 2 ) );
+			
+			currentSpeaker = int( sys.random( 5 ) );
+			if ( currentSpeaker == 0 ) {
+				$rhRoofWoodShake1.On();
+			}
+			else if ( currentSpeaker == 1 ) {
+				$rhRoofWoodShake2.On();
+			}
+			else if ( currentSpeaker == 2 ) {
+				$rhRoofWoodShake3.On();
+			}
+			else if ( currentSpeaker == 3 ) {
+				$rhRoofWoodShake4.On();
+			}
+			else {
+				$rhRoofWoodShake5.On();
+			}
+		}
+	}
+	
+	//Randomly plays dog bark sound
+	void DogBarkRun() {	
+		while ( !gAbducting ) {
+			sys.wait( 30 + sys.random( 10 ) );
+			$rhDogBarkSpeaker.On();
+		}
+	}
+	
+	//Randomly plays wolf howl sound
+	void WolfHowlRun() {
+		entity currentHowl;
+		float howlNum;
+		
+		while ( !gAbducting ) {
+			sys.wait( 30 + sys.random( 10 ) );
+			
+			howlNum = int( sys.random( 5 ) ) + 1;
+			
+			currentHowl = sys.getEntity( "rhWolfHowlSpeaker" + howlNum );
+			currentHowl.On();
+		}
+	}
+	
+	void PassBySoundPlay( entity carCtrlP, entity destNode ) {
+		float soundNum = int( sys.random( 6 ) ) + 1;
+		float soundPlayCheck = int( sys.random( 3 ) );
+		
+		if ( soundPlayCheck == 1 ) {
+			if ( soundNum == 1 ) {
+				$carPassBy1Speaker.On();
+				TimeTweak( carCtrlP, 0.25, 0, 7 );
+			}
+			else if ( soundNum == 2 ) {
+				$carPassBy2Speaker.On();
+				TimeTweak( carCtrlP, 0, 3, 6 );
+			}
+			else if ( soundNum == 3 ) {
+				$carPassBy3Speaker.On();
+				TimeTweak( carCtrlP, 0, 0, 7 );
+			}
+			else if ( soundNum == 4 ) {
+				$carPassBy4Speaker.On();
+				TimeTweak( carCtrlP, 0.5, 0, 10 );
+			}
+			else if ( soundNum == 5 ) {
+				$carPassBy5Speaker.On();
+				TimeTweak( carCtrlP, 0, 0, 7 );
+			}
+			else if ( soundNum == 6 ) {
+				$carPassBy6Speaker.On();
+				TimeTweak( carCtrlP, 0, 0.25, 10 );
+			}
+		}
+		
+		carCtrlP.moveTo( destNode );
+		sys.waitFor( carCtrlP );
+		sys.wait( 1 );
+	}
+	
+	void CarPassBy() {
+		entity carCtrlP = $carPassBy1CtrlP;
+		
+		TimeTweak( carCtrlP, 0, 0, 10 );
+		
+		while ( carCtrlP.getFloatKey( "isRunning" ) ) {
+			PassBySoundPlay( carCtrlP, $carPassByNode2 );
+			PassBySoundPlay( carCtrlP, $carPassByNode1 );
+		}
+	}
+	
+	//Randomly players the thundersoft sound
+	void ThunderSoftStart() {
+		while ( true ) {
+			sys.wait( 12.5 + sys.random( 11 ) );
+			$rhThunderSoft.On();
+		}
+	}
+	
+	//Randomly players the thunderloud sound
+	void ThunderLoudStart() {
+		while ( true ) {
+			sys.wait( 6.5 + sys.random( 11 ) );
+			$rhThunderLoud.On();
+		}
+	}
+	
+	//Spins a fan until gFansSpin is set to 0
+	void FanSpin( entity blades, float delay ) {
+		TimeTweak( blades, 0, 0, 1 );
+		
+		if ( delay > 0.0 ) {
+			sys.wait( delay );
+		}
+		
+		while ( gFansSpin ) {
+			blades.rotateOnce( '0 360 0' );
+			sys.waitFor( blades );
+			sys.waitPVS( blades );
+		}
+		
+		float fanDecelTime = 7.5 + delay; //adds delay for an offset
+		TimeTweak( blades, 0, fanDecelTime, fanDecelTime );
+		blades.rotateOnce( '0 1440 0' );
+		sys.waitFor( blades );
+	}
+	
+	//Used in the roadhouse light pulsate sequence to change a lights color
+	void LightColorChange( float newColorMultiplier, float fadeTime ) {
+		float i,
+		      j,
+		      relayNumTargets;
+		      			   
+		entity lightRelay,
+			   currentSwitch,
+			   currentEnt;
+		
+		vector originalColor,
+			   newColor;
+			   
+		string className;
+		
+		for ( i = 1; i <= 11; i++ ) {
+			if ( currentSwitch = sys.getEntity( "rhLightSwitch" + i ) ) {
+				if ( currentSwitch.getKey( "currentState" ) == "on" ) {
+					lightRelay = sys.getEntity( "rhLightSwitch" + i + "Relay" );
+					
+					relayNumTargets = lightRelay.numTargets();
+					for ( j = 0; j < relayNumTargets; j++ ) {
+						if ( currentEnt = lightRelay.getTarget( j ) ) {
+							className = currentEnt.getKey( "classname" );
+							
+							if ( className == "light" || className == "func_static" || className == "env_hanglight_bar" || className == "func_emitter" ) {
+								originalColor = currentEnt.getVectorKey( "_color" );
+								newColor = Vec3Set( originalColor_x * newColorMultiplier, originalColor_y * newColorMultiplier, originalColor_z * newColorMultiplier );
+								thread crossFadeEnt( currentEnt, originalColor, newColor, fadeTime );
+							}
+						}
+						
+						if ( i == 1 || i == 8 ) {
+							sys.waitFrame();
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	//Pulsates/flickers the lights in roadhouse main bar area
+	void LightPulsate1() {
+		thread LightColorChange( 0.5, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.5 );
+		sys.wait( 0.5 );
+		thread LightColorChange( 0.1, 0.3 );
+		sys.wait( 0.3 );
+		thread LightColorChange( 0.5, 0.1 );
+		sys.wait( 0.1 );
+		thread LightColorChange( 0.3, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1.5, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.2 );
+		sys.wait( 0.7 );
+		thread LightColorChange( 0.5, 0.1 );
+		sys.wait( 0.1 );
+		thread LightColorChange( 0.3, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.2 );
+	}
+	
+	void LightPulsateTruck() {
+		thread LightColorChange( 0.5, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.5 );
+		sys.wait( 0.5 );
+		thread LightColorChange( 0.1, 0.3 );
+		sys.wait( 0.3 );
+		thread LightColorChange( 1, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 0.3, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1.5, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 1, 0.2 );
+		sys.wait( 0.7 );
+		thread LightColorChange( 0.5, 0.1 );
+		sys.wait( 0.1 );
+		thread LightColorChange( 0.3, 0.2 );
+		sys.wait( 0.2 );
+		thread LightColorChange( 0.6, 0.2 );
+	}
+	
+	//Smashes ceiling just before truck comes through
+	void TruckCeilingSmash() {
+		sys.trigger( $rhLightBulb10_1Sparks );
+		$rhTruckCeilingBoards.show();
+		sys.trigger( $rhTruckCeilingChunkStatic1 );
+		sys.trigger( $rhTruckCeilingChunkStatic2 );
+		sys.trigger( $rhTruckCeilingChunkStatic3 );
+		sys.trigger( $rhTruckCeilingChunkStatic4 );
+		sys.trigger( $rhTruckCeilingChunkStatic5 );
+		sys.waitFrame();
+		$rhLightBulb10_1.remove();
+		$rhLightBulb10_1b.remove();
+		$rhLightFlare10_1.remove();
+		$rhLight10_1.On();
+		$rhLight10_1.setColor( 2, 2, 2 );
+		sys.wait( 0.2 );
+		$rhLight10_1.setColor( 0, 0, 0 );
+		sys.wait( 0.2 );
+		$rhLight10_1.setColor( 2, 2, 2 );
+		sys.wait( 0.3 );
+		$rhLight10_1.remove();
+		sys.waitFrame();
+		$rhLightSwitch10Relay.findTargets();
+	}
+	
+	//Smashes floor when truck hits
+	void TruckFloorSmash() {
+		$rhTruckFloorBroke1.show();
+		$rhTruckFloorBroke2.show();
+		$rhTruckFloorBroke3.show();
+		$rhTruckFloorBroke4.show();
+		sys.waitFrame();
+		$rhTruckFloorPieceSolid1.hide();
+		$rhTruckFloorPieceSolid2.hide();
+	}
+	
+	//Truck smashes through roadhouse roof and floor
+	void TruckSmash() {
+		sys.trigger( $rhTruckClip );
+				
+		TimeTweak( $rhTruck2, 0, 0, 0.001 );
+		$rhTruck2.rotateTo( '50 -15 -5' );
+		sys.waitFor( $rhTruck2 );
+		$rhTruck2.show();
+		TimeTweak( $rhTruck2, 0.55, 0.05, 0.8 );
+		$rhTruck2.moveTo( $rhTruckCrashNode2 );
+		
+		sys.wait( 0.2 );
+		
+		$rhTruckCrashSpeaker1.On();
+		
+		sys.wait( 0.1 );
+		thread TruckCeilingSmash();
+		thread LightPulsateTruck();
+		sys.wait( 0.45 );
+		thread TruckFloorSmash();
+		sys.wait( 0.05 );
+		sys.waitFor( $rhTruck2 );
+		
+		//fall
+		$rhGirlfriend.allowMovement( 1 );
+		thread SpeechTransition_Blend( $rhGirlfriend, "cower", "cower_idle", 8 );
+		thread SpeechTransition_Blend( $rhGrandfather, "takecover", "coweridle", 24 );
+		
+		TimeTweak( $rhTruck2, 0.1, 0.0, 0.2 );
+		$rhTruck2.rotateOnce( '25 0 0' );
+				
+		sys.trigger( $rhSwingDoor1Moveable1 );
+		sys.trigger( $rhSwingDoor1Moveable2 );
+		sys.trigger( $rhSwingDoor1Moveable3 );
+		sys.trigger( $rhSwingDoor1Moveable4 );
+		sys.trigger( $rhSwingDoor2Moveable1 );
+		sys.trigger( $rhSwingDoor2Moveable2 );
+		sys.trigger( $rhSwingDoor2Moveable3 );
+		sys.trigger( $rhSwingDoor2Moveable4 );
+		
+		sys.waitFrame();
+		
+		$rhSwingDoor1.remove();
+		$rhSwingDoor2.remove();
+		
+		sys.waitFor( $rhTruck2 );
+		
+		sys.trigger( $rhTruckForcefield );
+		
+		sys.trigger( $rhTruckDust1 );
+		sys.trigger( $rhTruckDust2 );
+		sys.trigger( $rhTruckDust3 );
+		sys.trigger( $rhTruckDust4 );
+		$rhTruckCrashSpeaker2.On();
+		$rhTruckAlarmSpeaker.Off();
+				
+		sys.waitFor( $rhTruck2 );
+		
+		sys.trigger( $rhTruckDoorFrame1_2 );
+		sys.trigger( $rhTruckDoorFrame1_3 );
+		sys.trigger( $rhTruckDoorFrame1_4 );
+		
+		sys.trigger( $rhTruckDoorTrim1_2 );
+		
+		sys.waitFrame();
+		sys.trigger( $rhTruckDoorTrim1_1 );
+		sys.trigger( $rhTruckDoorFrame1_1 );
+		
+		sys.trigger( $rhTruckShelf1_1 );
+		sys.trigger( $rhTruckShelf1_2 );
+		
+		TimeTweak( $rhTruck2, 0.0, 0.4, 0.4 );
+		$rhTruck2.rotateOnce( '-5 2 2' );
+	}
+	
+	//Moves truck alarm sound over to second truck
+	void TruckAlarmSoundMove() {
+		TimeTweak( $rhTruckAlarmSpeakerCtrlP, 1.5, 1.5, 3 );
+		$rhTruckAlarmSpeakerCtrlP.unbind();
+		$rhTruckAlarmSpeakerCtrlP.moveTo( $rhTruck2 );
+		sys.waitFor( $rhTruckAlarmSpeakerCtrlP );
+		$rhTruckAlarmSpeakerCtrlP.bind( $rhTruck2 );
+	}
+	
+	//Flashes truck lights when truck is picked up
+	void TruckLightFlash() {
+		$rhTruckHeadlightL.On();
+		$rhTruckHeadlightR.On();
+		
+		while ( true ) {
+			if ( !CheckSpawnId( $rhTruck, gTruckID ) ) return;
+			thread fadeInEnt( $rhTruck, '1 1 1', 0.05 );
+			thread fadeInEnt( $rhTruckHeadlightL, '2 2 2', 0.05 );
+			thread fadeInEnt( $rhTruckHeadlightR, '2 2 2', 0.05 );
+			sys.wait( 0.25 );
+			if ( !CheckSpawnId( $rhTruck, gTruckID ) ) return;
+			thread fadeOutEnt( $rhTruck, '1 1 1', 0.2 );
+			thread fadeOutEnt( $rhTruckHeadlightL, '2 2 2', 0.2 );
+			thread fadeOutEnt( $rhTruckHeadlightR, '2 2 2', 0.2 );
+			sys.wait( 0.25 );
+		}	
+	}
+	
+	//Picks up truck and moves it out of view
+	void TruckRemove() {
+		thread PlayMapMusic( "snd_roadhouse_abduction_b", false, MUS_TRANSITION_OVERLAP );
+		
+		TimeTweak( $rhShipProjLightTruckCtrlP, 10, 0, 11 );
+		
+		$rhShipProjLightTruckCone.show();
+		thread fadeInEnt( $rhShipProjLightTruckCone, '1.09 2 1.5294', 1 );
+		$rhShipProjLightTruck.On();
+		thread fadeInEnt( $rhShipProjLightTruck, '1.09 2 1.5294', 1 );
+		
+		sys.trigger( $rhShipProjLightTruckConeBeamSpeaker );
+			
+		thread TruckLightFlash();
+		$rhTruckAlarmSpeaker.On();
+		sys.wait( 1 );
+		
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "abduct_truck", 24 );
+		$rhGirlfriend.overrideAnim( ANIMCHANNEL_HEAD );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "abduct_truck", 24 );
+				
+		sys.trigger( $rhShipProjLightTruckConeBeamSpeaker2 );
+		
+		TimeTweak( $rhShipProjLightTruckCtrlP2, 2, 4, 10 );
+		$rhShipProjLightTruckCtrlP2.rotateOnce( '20 -64 0' );
+		$rhShipProjLightTruckCone2.show();
+		thread fadeInEnt( $rhShipProjLightTruckCone2, '1.09 2 1.5294', 1 );
+		
+		sys.trigger( $rhShipProjLightTruckConeBeamGrabSpeaker );
+		$rhShipProjLightTruckCtrlP.rotateOnce( '90 0 0' );
+		
+		TimeTweak( $rhTruckCtrlP1, 2, 2, 5 );
+		$rhTruckCtrlP1.rotateOnce( '20 60 180' );
+		
+		TimeTweak( $rhTruckCtrlP2, 2, 1, 4 );
+		$rhTruckCtrlP2.moveTo( $rhTruckNode1 );
+		
+		sys.wait( 1 );
+			
+		sys.waitFor( $rhTruckCtrlP2 );
+			
+		thread TruckAlarmSoundMove();
+		
+		TimeTweak( $rhTruckCtrlP2, 2, 0, 2 );
+		$rhTruckCtrlP2.moveTo( $rhTruckNode2 );
+		sys.waitFor( $rhTruckCtrlP2 );
+		$rhTruck.remove();
+		
+		thread fadeOutEnt( $rhShipProjLightTruckCone2, '1.09 2 1.5294', 1 );
+		
+		sys.waitFor( $rhShipProjLightTruckCtrlP );
+		$rhShipProjLightTruckCone.hide();
+		$rhShipProjLightTruck.Off();
+	}
+	
+	void RoofShakePlaySounds() {
+		$rhRoofShake2.On();
+		sys.wait( 1 );
+		$rhRoofShake1.On();
+		sys.wait( 1 );
+		$rhRoofShake3.On();
+		sys.wait( 1 );
+		$rhRoofShake2.On();
+		sys.wait( 1 );
+		$rhRoofShake1.On();
+	}
+	
+	void RoofCrackPlaySounds() {
+		$rhRoofCrack2.On();
+		sys.wait( 1 );
+		$rhRoofCrack3.On();
+		sys.wait( 1 );
+		$rhRoofCrack1.On();
+	}
+	
+	void RoofBreakPlaySounds() {
+		$rhChaos.On();
+		$rhRoofBreak3.On();
+		sys.wait( 1 );
+		$rhRoofBreak1.On();
+		sys.wait( 1 );
+		$rhRoofBreak2.On();
+	}
+	
+	//Stops a roofplank from rattling and blows it off
+	void RoofPlankStopRemove( entity roofPlank, entity roofPlankCtrlP, entity roofPlankBottom ) {
+		thread DissolveEntity( roofPlank );
+		
+		sys.wait( 1.25 );
+		
+		if ( roofPlankBottom != $null_entity ) {
+			roofPlankBottom.show();
+		}
+		
+		vector linearVelocity = Vec3Set( sys.random( 50 ) + 650, sys.random( 10 ) - 5, sys.random( 150 ) + 800 ),
+			   angularVelocity = Vec3Set( sys.random( 20 ) - 5, sys.random( 80 ) - 25, sys.random( 20 ) - 05 );
+		  
+		roofPlank.unbind();
+	  	
+	  	TimeTweak( roofPlank, 0.1, 0.5, 1.25 );
+	  	roofPlank.moveToPos( roofPlank.getOrigin() + linearVelocity );
+	  	roofPlank.rotate( angularVelocity );
+		
+	  	roofPlankCtrlP.rotateOnce( Vec3Set( sys.random( 90 ) - 90, 0, 0 ) );
+	}
+	
+	float gRoofPlanksRattle = 1;
+	
+	//Rattles a roofplank control point
+	void RoofPlankRattle( entity roofPlankCtrlP, float rotAmount, entity crackLight ) {
+		float currentRot = 1;
+		vector crackLightColor = crackLight.getVectorKey( "_color" ) * 0.2,
+			   fadeColor;
+			   
+		crackLight.show();
+		
+		while ( gRoofPlanksRattle ) {
+			fadeColor = crackLightColor * ( currentRot / rotAmount );
+			
+			TimeTweak( roofPlankCtrlP, 0.1, 0.05, 0.15 );
+			fadeInEnt( crackLight, fadeColor, 0.15 );
+			roofPlankCtrlP.rotateOnce( Vec3Set( -currentRot, 0, 0 ) );
+			sys.wait( 0.15 );
+			
+			TimeTweak( roofPlankCtrlP, 0.075, 0.0, 0.075 );
+			fadeOutEnt( crackLight, fadeColor, 0.075 );
+			roofPlankCtrlP.rotateOnce( Vec3Set( currentRot, 0, 0 ) );
+			sys.wait( 0.075 );
+			
+			if ( currentRot < rotAmount ) {
+				currentRot += 1;
+			}
+			sys.wait( sys.getFrameTime() + sys.random( 0.1 ) );
+		}
+		
+		crackLight.hide();
+	}
+	
+	//rattles roof planks up and down
+	void RoofRattlePlanks() {
+		float rattleDelay = 0.054;
+		
+		thread RoofPlankRattle( $rhRoofPlank11CtrlP, 4, $rhRoofPlank11CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank29CtrlP, 5, $rhRoofPlank29CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank25CtrlP, 3, $rhRoofPlank25CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank22CtrlP, 5, $rhRoofPlank22CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank15CtrlP, 4, $rhRoofPlank15CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank16CtrlP, 6, $rhRoofPlank16CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank21CtrlP, 3, $rhRoofPlank21CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank8CtrlP, 3, $rhRoofPlank8CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank27CtrlP, 4, $rhRoofPlank27CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank23CtrlP, 4, $rhRoofPlank23CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank12CtrlP, 6, $rhRoofPlank12CrackLight );
+		sys.wait( rattleDelay );
+		thread RoofPlankRattle( $rhRoofPlank14CtrlP, 3, $rhRoofPlank14CrackLight );
+		sys.wait( rattleDelay );
+	}
+	
+	//planks fly in the air and dissolve
+	void RoofRemovePlanks() {
+		thread RoofPlankStopRemove( $rhRoofPlank25, $rhRoofPlank25CtrlP, $rhRoofPlank25Bottom );
+		sys.wait( 0.5 );
+		thread RoofPlankStopRemove( $rhRoofPlank12, $rhRoofPlank12CtrlP, $null_entity );
+		sys.wait( 0.5 );
+		thread RoofPlankStopRemove( $rhRoofPlank22, $rhRoofPlank22CtrlP, $null_entity );
+		sys.wait( 0.3 );
+		thread RoofPlankStopRemove( $rhRoofPlank15, $rhRoofPlank15CtrlP, $null_entity );
+		sys.wait( 0.2 );
+		thread RoofPlankStopRemove( $rhRoofPlank16, $rhRoofPlank16CtrlP, $rhRoofPlank16Bottom );
+		sys.wait( 0.2 );
+		thread RoofPlankStopRemove( $rhRoofPlank14, $rhRoofPlank14CtrlP, $null_entity );
+		sys.wait( 0.1 );
+		thread RoofPlankStopRemove( $rhRoofPlank17, $rhRoofPlank17CtrlP, $rhRoofPlank17Bottom );
+		sys.wait( 0.05 );
+	
+		//start wind and open roof rain speaker, start heaver rain particles and drops
+		$rhRainOutsideSpeaker.On();
+		$rhWindSpeaker.On();
+		sys.trigger( $rhRain5 );
+		sys.trigger( $rhRain6 );
+		sys.trigger( $rhRain7 );
+		sys.trigger( $rhInteriorDrops );
+		
+		thread RoofPlankStopRemove( $rhRoofPlank13, $rhRoofPlank13CtrlP, $rhRoofPlank13Bottom );
+		sys.wait( 0.1 );
+		thread RoofPlankStopRemove( $rhRoofPlank18, $rhRoofPlank18CtrlP, $rhRoofPlank18Bottom );
+		sys.wait( 0.05 );
+		thread RoofPlankStopRemove( $rhRoofPlank21, $rhRoofPlank21CtrlP, $rhRoofPlank21Bottom );
+		sys.wait( 0.2 );
+		thread RoofPlankStopRemove( $rhRoofPlank11, $rhRoofPlank11CtrlP, $rhRoofPlank11Bottom );
+		sys.wait( 0.15 );
+		thread RoofPlankStopRemove( $rhRoofPlank9, $rhRoofPlank9CtrlP, $null_entity );
+		sys.wait( 0.1 );
+		thread RoofPlankStopRemove( $rhRoofPlank23, $rhRoofPlank23CtrlP, $null_entity );
+		sys.wait( 0.15 );
+		thread RoofPlankStopRemove( $rhRoofPlank8, $rhRoofPlank8CtrlP, $null_entity );
+		sys.wait( 0.1 );
+		thread RoofPlankStopRemove( $rhRoofPlank24, $rhRoofPlank24CtrlP, $rhRoofPlank24Bottom );
+		sys.wait( 0.15 );
+		thread RoofPlankStopRemove( $rhRoofPlank7, $rhRoofPlank7CtrlP, $null_entity );
+		sys.wait( 0.15 );
+		thread RoofPlankStopRemove( $rhRoofPlank26, $rhRoofPlank26CtrlP, $null_entity );
+		sys.wait( 0.2 );
+		thread RoofPlankStopRemove( $rhRoofPlank27, $rhRoofPlank27CtrlP, $rhRoofPlank27Bottom );
+		sys.wait( 0.2 );
+		thread RoofPlankStopRemove( $rhRoofPlank29, $rhRoofPlank29CtrlP, $null_entity );
+	}
+	
+	//Main function for ripping the roof off roadhouse
+	void RoofRip() {
+		sys.trigger( $rhShipFuncPortal );
+		
+		sys.trigger( $rhRoofPlanksShow );
+		sys.waitFrame(); //needed because planks aren't shown immediately
+		$rhRoofSolid.hide();
+		
+		thread ThunderLoudStart();
+		thread BuildingCrackSounds();
+		
+		thread RoofCrackPlaySounds();
+				
+		RoofRattlePlanks();
+		
+		sys.wait( 1.5 );
+		thread RoofBreakPlaySounds();
+		
+		//turn on ship lights just before removing planks
+		thread ShipPulseLights();
+		thread ShipPulseGreenLights();
+		RoofRemovePlanks();
+		
+		gRoofPlanksRattle = 0;
+	}
+	
+	//Moves ship lights that pick items up
+	void ShipLightMove( entity target, float isNPC, float lightNumber ) {
+		entity lightSource = sys.getEntity( "rhShipProjLightMiddleSource" + lightNumber );
+		entity beamGrabSpeaker = sys.getEntity( "rhShipProjLightMiddleBeamGrab" + lightNumber );
+		
+		vector vecToTarget,
+			   targetAngle,
+			   targetOrigin,
+			   sourceOrigin = lightSource.getVectorKey( "origin" );
+			   
+		if ( !isNPC ) {
+			targetOrigin = target.getWorldOrigin();
+		} else {
+			targetOrigin = target.getJointPos( target.getJointHandle( "waist" ) );		
+		}
+			   		
+		vecToTarget = VecSubtract( targetOrigin, sourceOrigin );
+		targetAngle = sys.VecToAngles( vecToTarget );
+		targetAngle = anglemod360( targetAngle );
+		
+		lightSource.rotateTo_world( targetAngle );
+		sys.waitFor( lightSource );
+		
+		beamGrabSpeaker.On();
+	}
+	
+	//Changes colors briefly for lights picking up items
+	void ShipLightChangeColors( float lightNumber, float fadeFromBlack ) {
+		entity cone = sys.getEntity( "rhShipProjLightMiddleCone" + lightNumber ),
+			   coneVFP = sys.getEntity( "rhShipProjLightMiddleCone" + lightNumber + "VFP" ),
+			   light = sys.getEntity( "rhShipProjLightMiddle" + lightNumber );
+		
+		vector color1 = '0.3 0.53 0.41',
+			   color2 = '1.09 2 1.5294',
+			   color3 = color1;
+			   
+		if ( fadeFromBlack ) {
+			color1 = '0 0 0';
+		}
+		
+		thread crossFadeEnt( cone, color1, color2, 0.2 );
+		thread interpolateShaderParm( coneVFP, 6, 1, 18, 0.2 );
+		thread crossFadeEnt( light, color1, color2, 0.2 );
+		sys.wait( 0.5 );
+		thread crossFadeEnt( cone, color2, color3, 1.0 );
+		thread interpolateShaderParm( coneVFP, 6, 18, 1, 1.0 );
+		thread crossFadeEnt( light, color2, color3, 1.0 );
+	}
+	
+	//updates angles so the particle effect for abduction always faces towards the ship
+	void AbductionEffectSetAngles() {
+		vector vecToTarget,
+			   targetAngle,
+			   viewAngles;
+		
+		while ( true ) {	
+			vecToTarget = VecSubtract( $rhShipCollectorNode.getWorldOrigin(), $rhAbductEmitter.getWorldOrigin() );
+			targetAngle = sys.VecToAngles( vecToTarget );
+			targetAngle = anglemod360( targetAngle );
+			targetAngle_x += 90; //$rhAbductEmitter faces up by default
+						
+			$rhAbductEmitter.setAngles( targetAngle );
+			sys.waitFrame();
+		}
+	}
+	
+	//starts screen effect and particles for abduction
+	void AbductionScreenEffect() {
+		$player1.setOverlayMaterial( "textures/special/abduction_screenfx", false );
+		thread CrossFadeOverlayColor( $player1, '0 0 0', 0, '0 0 0', 1, 4 );
+				
+		sys.fadeOut( '1 1 1', 8 );
+		
+		thread AbductionEffectSetAngles();
+		$rhAbductEmitter.setOrigin( $player1.getOrigin() );
+		$rhAbductEmitter.bindPosition( $player1 );
+		sys.trigger( $rhAbductEmitter );
+		fadeInEnt( $rhAbductEmitter, '1 1 1', 8 );
+		sys.fadeOut( '0 0 0', 0.5 );
+	}
+	
+	void ShipRemovePlayer() {
+		ShipLightMove( $player1, 0, 2 );
+		thread ShipLightChangeColors( 2, FALSE );
+		TimeTweak( $rhTommyBindCtrlP, 4, 0, 8 );
+		
+		thread ShipGuideTrack( $player1, 0, '0 0 64' );
+		$rhTommyBind.bindattach( $player1, TRUE );
+		
+		sys.wait( 0.5 );		
+		sys.trigger( $rhShipHunter2 );
+		sys.wait( 0.2 );
+		sys.trigger( $rhShipHunter1 );
+		sys.wait( 0.3 );
+		sys.trigger( $rhShipHunter3 );
+		sys.wait( 1.0 );
+		
+		$rhTommyBindCtrlP.moveTo( $rhShipCollectorNode );
+		
+		thread AbductionScreenEffect();
+		sys.wait( 1 );
+		$player1.startSoundShader( "rh_player_scream", SND_CHANNEL_VOICE );
+		sys.wait( 2 );
+		sys.trigger( $rhLevelEndSoundFade );
+		thread FadeMapMusic( MUS_SILENCE_DB, 4.5 );
+		sys.setcvar( "g_roadhouseCompleted", 1 );
+		sys.wait( 4.5 );
+		sys.trigger( $rhEndLevel );
+	}
+	
+	//Moves moveable from the bar to ship collector
+	void ShipRemove1Node( string prefix, vector timeData1, float delay, float lightNumber ) {		
+		entity entityToRemove = sys.getEntity( prefix ),
+			   bindcontroller = sys.getEntity( prefix + "Bind" ),
+			   ctrlP = sys.getEntity( prefix + "BindCtrlP" );
+			   			   
+		thread ShipGuideTrack( entityToRemove, 0, '0 0 0' );
+		
+		ShipLightMove( entityToRemove, 0, lightNumber );
+		
+		thread ShipLightChangeColors( lightNumber, FALSE );
+		
+		thread DissolveEntity( entityToRemove );
+		
+		if ( entityToRemove.getKey( "snd_remove" ) != "" ) {
+			entityToRemove.startSound( "snd_remove", SND_CHANNEL_ANY, 1 );
+		}
+		sys.trigger( entityToRemove );
+		bindcontroller.bindattach( entityToRemove, TRUE );
+		sys.wait( delay );
+		TimeTweak( ctrlP, timeData1_x, timeData1_y, timeData1_z );
+		ctrlP.moveTo( $rhShipCollectorNode );	
+		sys.waitFor( ctrlP );
+	}
+	
+	//Moves moveable from the bar to a node, then to the ship collector
+	void ShipRemove2Node( string prefix, entity node1, vector timeData1, vector timeData2, float delay, float lightNumber ) {
+		entity entityToRemove = sys.getEntity( prefix ),
+			   bindcontroller = sys.getEntity( prefix + "Bind" ),
+			   ctrlP = sys.getEntity( prefix + "BindCtrlP" );
+			   
+		thread ShipGuideTrack( entityToRemove, 0, '0 0 0' );
+		
+		ShipLightMove( entityToRemove, 0, lightNumber );
+		
+		thread ShipLightChangeColors( lightNumber, FALSE );
+		
+		thread DissolveEntity( entityToRemove );
+		
+		if ( entityToRemove.getKey( "snd_remove" ) != "" ) {
+			entityToRemove.startSound( "snd_remove", SND_CHANNEL_ANY, 1 );
+		}
+		sys.trigger( entityToRemove );
+		bindcontroller.bindattach( entityToRemove, TRUE );
+		sys.wait( delay );
+		TimeTweak( ctrlP, timeData1_x, timeData1_y, timeData1_z );
+		ctrlP.moveTo( node1 );
+		sys.waitFor( ctrlP );
+		
+		TimeTweak( ctrlP, timeData2_x, timeData2_y, timeData2_z );
+		ctrlP.moveTo( $rhShipCollectorNode );
+		sys.waitFor( ctrlP );
+		entityToRemove.remove();
+	}
+	
+	//Makes arcadeGame nonsolid, then calls appropriate remove function
+	void ArcadeGameRemove( entity arcadeGame, entity arcadeGameConsole, float lightNumber ) {
+		arcadeGame.becomeNonSolid();
+		thread ShipRemove2Node( arcadeGame.getName(), $rhGameNode1, '0.5 0.5 1.5', '2 2 6', 0.5, lightNumber );
+		sys.wait( 2 );
+		thread DissolveEntity( arcadeGameConsole );
+	}
+	
+	//Ship Removes NPCs from bar
+	void RemoveNPCs() {
+		thread ShipGuideTrack( $rhGrandfather, 1, '0 0 0' );
+		ShipLightMove( $rhGrandfather, 1, 1 );
+		thread ShipLightChangeColors( 1, FALSE );
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "gf_roadhouse_suckedout", 24 );
+		
+		sys.wait( 2 );
+		
+		//Tommy "Grandfather!"
+		$player1.startSoundShader( "rh_conv8_tom08", SND_CHANNEL_VOICE );
+		
+		ShipLightMove( $rhGirlfriend, 1, 1 );
+		thread ShipLightChangeColors( 1, FALSE );
+				
+		thread DissolveEntity( $rhGrandfather );
+		
+		thread ShipGuideTrack( $rhGirlfriend, 1, '0 0 0' );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "suckedup",34 );
+		sys.trigger( $rhGirlfriend );
+		sys.wait( 5 );
+		
+		thread DissolveEntity( $rhGirlfriend );
+	}
+	
+	//First lights item removal
+	void ShipLight1Remove() {
+		thread ArcadeGameRemove( $rhGameSlots, $rhGameSlotsConsole, 1 );
+		sys.wait( 2.25 );
+		
+		thread ArcadeGameRemove( $rhGamePoker, $rhGamePokerConsole, 1 );
+		sys.wait( 2.25 );
+		
+		$rhStool1Top.bind( $rhStool1 );
+		$rhStool1Clip.remove();
+		thread ShipRemove1Node( "rhStool1", '2 2 6', 0.5, 1 );
+		sys.wait( 2.25 );
+		
+		thread RemoveNPCs();
+		sys.wait( 6.5 );
+		
+		thread ArcadeGameRemove( $rhGameArcade, $rhGameArcadeConsole, 1 );
+		sys.wait( 2.25 );
+		
+		$rhStool2Top.bind( $rhStool2 );
+		$rhStool2Clip.remove();
+		thread ShipRemove1Node( "rhStool2", '2 2 6', 0.5, 1 );
+		sys.wait( 2.25 );
+		
+		thread ArcadeGameRemove( $rhGameBlackJack, $rhGameBlackJackConsole, 1 );
+		sys.wait( 2.25 );
+		
+		$rhStool10Top.bind( $rhStool10 );
+		$rhStool10Clip.remove();
+		thread ShipRemove1Node( "rhStool10", '2 2 6', 0.5, 1 );
+	}
+	
+	//Removes window2 wood when barrel breaks it out, window break is based on a delay so it will break
+	//regardless if the barrel is there at the right moment or not
+	void Window2Remove() {
+		sys.wait( 2.5 );
+		sys.trigger( $window2Remove );
+		sys.trigger( $window2Speaker );
+		sys.trigger( $rhWindow2Wood );
+		sys.trigger( $rhGlassBreakEmitter );
+	}
+	
+	//Second lights item removal
+	void ShipLight2Remove() {
+		sys.wait( 1.2 );
+		
+		$rhStool3Top.bind( $rhStool3 );
+		$rhStool3Clip.remove();
+		thread ShipRemove1Node( "rhStool3", '2 2 6', 0.5, 2 );
+		sys.wait( 2.25 );
+		
+		$rhStool6Top.bind( $rhStool6 );
+		thread ShipRemove1Node( "rhStool6", '2 2 6', 0.5, 2 );
+		sys.wait( 2.25 );
+		
+		$rhStool5Top.bind( $rhStool5 );
+		thread ShipRemove1Node( "rhStool5", '2 2 6', 0.5, 2 );
+		sys.wait( 2.25 );
+		
+		sys.trigger( $rhAirConditionerDrops );
+		sys.trigger( $rhAirConditionerLowerPipe1 );
+		sys.trigger( $rhAirConditionerLowerPipe1Broke );
+		sys.trigger( $rhAirConditionerUpperPipe1 );
+		sys.trigger( $rhAirConditionerUpperPipe1Broke );
+		thread ShipRemove1Node( "rhAirConditioner", '2 2 6', 0.5, 2 );
+		sys.wait( 2.25 );
+		
+		thread Window2Remove();
+		thread ShipRemove2Node( "rhBarrel1", $rhBarrel1Node1, '0.025 0.025 0.05', '2 2 6', 0.8, 2 );
+		sys.wait( 2.25 );
+		
+		$rhStool7Top.bind( $rhStool7 );
+		$rhStool7Clip.remove();
+		thread ShipRemove1Node( "rhStool7", '2 2 6', 0.5, 2 );
+		sys.wait( 2.25 );
+		
+		thread ShipRemovePlayer();
+		sys.wait( 2.25 );
+	}
+	
+	//dissolves beer bottles, mugs, cans, ashtrays, etc
+	void DissolveSmallMovables() {
+		float i,
+			  numMovables = $rhSmallMovablesToDissolve.numTargets();
+		
+		for ( i = 0; i < numMovables; i++ ) {
+			thread DissolveEntity( $rhSmallMovablesToDissolve.getTarget( i ) );
+			sys.wait( 0.3 );
+		}
+	}
+	
+	//Main function for ship dissolving items in bar that aren't picked up
+	void ShipDissolve() {
+		//hang lights
+		thread DissolveEntity( $rhLightBulb1_2 );
+		thread DissolveEntity( $rhLightBulb1_1 );
+		thread DissolveEntity( $rhLightBulb1_3 );
+		sys.wait( 0.5 );
+		
+		//dissolve vent and lights attached to it
+		thread DissolveEntity( $rhLightBulb8_3 );
+		thread DissolveEntity( $rhLightBulb1_10 );
+		thread DissolveEntity( $rhLightBulb2_20 );
+		thread DissolveEntity( $rhLightBulb2_21 );
+		thread DissolveEntity( $rhMainVent );		
+		sys.wait( 1.5 );
+		thread DissolveEntity( $rhSupportBeam1 );
+		sys.wait( 0.5 );
+		thread DissolveEntity( $rhRoofPlank19 );
+		sys.wait( 0.5 );
+		thread DissolveEntity( $rhRoofPlank20 );
+		sys.wait( 3.0 );
+		thread DissolveEntity( $rhPayPhoneHandle );
+		sys.wait( 0.5 );
+		thread DissolveEntity( $rhPayPhoneBase );
+		sys.wait( 0.5 );
+		thread DissolveEntity( $rhCashRegister );
+		sys.wait( 0.5 );
+		$rhTV.setSkin( "skins/consoles/bar_tvglass_off" );
+		thread DissolveEntity( $rhTV );
+		sys.wait( 2.0 );
+		thread DissolveSmallMovables();
+		sys.wait( 1.0 );
+		thread DissolveEntity( $fan1Base );
+		thread DissolveEntity( $fan1Blades );
+		sys.wait( 1.0 );
+		sys.trigger( $fan1Clip );//disable fan 1 player clip
+		thread DissolveEntity( $fan2Base );
+		thread DissolveEntity( $fan2Blades );
+	}
+	
+	//turns on lights that pick up objects
+	void ShipGrabLightTurnOn( float lightNumber ) {
+		entity cone = sys.getEntity( "rhShipProjLightMiddleCone" + lightNumber ),
+			   coneVFP = sys.getEntity( "rhShipProjLightMiddleCone" + lightNumber + "VFP" ),
+			   light = sys.getEntity( "rhShipProjLightMiddle" + lightNumber ),
+			   source = sys.getEntity( "rhShipProjLightMiddelSource" + lightNumber ),
+			   flare = sys.getEntity( "rhShipProjLightMiddleCone" + lightNumber + "Flare" ),
+			   beamSound = sys.getEntity( "rhShipProjLightMiddleBeam" + lightNumber );
+
+		light.On();
+		beamSound.On();
+		cone.show();
+		coneVFP.show();
+		flare.show();
+		
+		thread fadeInEnt( source, source.getVectorKey( "_color" ), 0.5 );
+		thread fadeInEnt( flare, flare.getVectorKey( "_color" ), 0.5 );
+		
+		thread ShipLightChangeColors( lightNumber, TRUE );
+	}
+	
+	//Removes all moveables from the bar
+	void ShipRemoveAll() {
+		ShipGrabLightTurnOn( 1 );
+		ShipGrabLightTurnOn( 2 );
+				
+		sys.wait( 1.5 );
+		
+		thread ShipLight1Remove();
+		thread ShipLight2Remove();
+	}
+	
+	//toggle light state
+	void RHLightSwitchTypeLight( entity light, float currentState ) {
+		float flicker = light.getFloatKey( "rhFlicker" );
+		
+		vector colorToSet = light.getVectorKey( "_color" );
+				
+		if ( currentState ) {
+			if ( !flicker ) {
+				light.setLightParm( 7, 0 );
+			}
+		} else { //dims light down, doesn't turn off fully
+			light.setLightParm( 7, 1 );
+				
+			if ( !light.getFloatKey( "rhNoDim" ) ) {
+				colorToSet *= 0.1;
+			} else {
+				colorToSet = '0 0 0';
+			}
+		}
+		
+		light.setColor( colorToSet_x, colorToSet_y, colorToSet_z );
+		
+		if ( currentState && !flicker ) {
+			sys.wait( 0.5 );
+			
+			//lessens the amount the light reacts to sound
+			//the light flickers a decent amount when first turned on
+			light.setLightParm( 7, 1 );
+		}
+	}
+	
+	//toggle light source state
+	void RHLightSwitchTypeSource( entity source, float currentState ) {
+		float flicker = source.getFloatKey( "rhFlicker" );		
+		
+		if ( !flicker ) {
+			if ( currentState ) {
+				source.setShaderParm( 7, 0 );
+				sys.wait( 0.5 );
+				source.setShaderParm( 7, 1 );
+			} else {
+				source.setShaderParm( 7, 2 );
+			}
+		}
+	}
+	
+	//toggle light flare state
+	void RHLightSwitchTypeFlare( entity flare, float currentState ) {
+		if ( currentState ) {
+			thread fadeInEnt( flare, flare.getVectorKey( "_color" ), 1 );
+		} else {
+			thread fadeOutEnt( flare, flare.getVectorKey( "_color" ), 0.25 );
+		}
+	}
+	
+	//toggle light speaker state
+	void RHLightSwitchTypeSpeaker( entity speaker, float currentState ) {
+		if ( currentState ) {
+			speaker.On();
+		} else {
+			speaker.Off();
+		}
+	}
+	
+	//toggle light particle state
+	void RHLightSwitchTypeParticle( entity particle, float currentState ) {
+		sys.trigger( particle );
+	}
+		
+	void RHLightSwitchMisc( entity switch ) {
+		if ( switch.getFloatKey( "triggerGames" ) ) {
+			string gameGuiEvent;
+			
+			if ( switch.getKey( "currentState" ) == "on" ) {
+				gameGuiEvent = "TurnOn";
+			} else {
+				gameGuiEvent = "TurnOff";
+			}
+			
+			$rhGameBlackJackConsole.guiEvent( gameGuiEvent );
+			$rhGamePokerConsole.guiEvent( gameGuiEvent );
+			$rhGameSlotsConsole.guiEvent( gameGuiEvent );
+			$rhGameArcadeConsole.guiEvent( gameGuiEvent );
+		}
+	}
+	
+	//Rotates a light switch and triggers / fades all appropriate entities
+	//lights that don't flicker should have shaderparm7 set to 1, along with the light source
+	void RHLightSwitch( entity switch, entity console ) {
+		if ( !switch.getFloatKey( "isRunning" ) ) {
+			switch.setKey( "isRunning", 1 );
+			
+			float currentState; //switches current state, 0 = off, 1 = on
+			
+			//swap gui hand press anim
+			if ( console.getKey( "pressAnim" ) == "press_down" ) {
+				console.setKey( "pressAnim", "press_up" );
+			} else {
+				console.setKey( "pressAnim", "press_down" );
+			}
+			
+			//rotate switch
+			if ( switch.getKey( "currentState" ) == "on" ) {
+				switch.rotateOnce( '48 0 0' );
+				switch.setKey( "currentState", "off" );
+				currentState = 0;
+			} else {
+				switch.rotateOnce( '-48 0 0' );
+				switch.setKey( "currentState", "on" );
+				currentState = 1;
+			}
+			switch.startSound( "snd_switch", SND_CHANNEL_ANY, 0 );
+			sys.waitFor( switch );
+			
+			//"disabled" is set on the switch when the lights in roadhouse go out, lights turning off is handled elsewhere
+			if ( !switch.getFloatKey( "disabled" ) ) {				
+				entity lightRelay = sys.getEntity( switch.getKey( "target" ) ),
+					   currentEnt;
+				
+				float relayNumTargets = lightRelay.numTargets(),
+					  i;
+					  
+				string className;
+				
+				for ( i = 0; i < relayNumTargets; i++ ) {
+					if ( currentEnt = lightRelay.getTarget( i ) ) {
+						className = currentEnt.getKey( "classname" );
+				
+						if ( className == "light" ) {
+							thread RHLightSwitchTypeLight( currentEnt, currentState );
+						}
+						else if ( className == "func_static" || className == "env_hanglight_bar" ) {
+							if ( currentEnt.getFloatKey( "rhFlare" ) == 0 ) {
+								thread RHLightSwitchTypeSource( currentEnt, currentState );
+							} else {
+								thread RHLightSwitchTypeFlare( currentEnt, currentState );
+							}
+						}
+						else if ( className == "speaker" ) {
+							thread RHLightSwitchTypeSpeaker( currentEnt, currentState );							
+						}
+						else if ( className == "func_emitter" ) {
+							thread RHLightSwitchTypeParticle( currentEnt, currentState );							
+						}
+						else {
+							sys.println( currentEnt.getName() + "RHLightSwitch unknown type - classname: " + className );
+						}
+					}
+				}				
+				
+				RHLightSwitchMisc( switch );
+			}
+
+			sys.wait( 0.5 );
+			
+			switch.setKey( "isRunning", 0 );			
+		}
+	}
+	
+	//Light switch functions for gui calls	
+	void RHLightSwitch2() {
+		RHLightSwitch( $rhLightSwitch2, $rhLightSwitch2Base );
+	}
+	
+	void RHLightSwitch3() {
+		RHLightSwitch( $rhLightSwitch3, $rhLightSwitch3Base );
+	}
+	
+	void RHLightSwitch4() {
+		RHLightSwitch( $rhLightSwitch4, $rhLightSwitch4Base );
+	}
+	
+	void RHLightSwitch5() {
+		RHLightSwitch( $rhLightSwitch5, $rhLightSwitch5Base );
+	}
+	
+	void RHLightSwitch6() {
+		RHLightSwitch( $rhLightSwitch6, $rhLightSwitch6Base );
+	}
+	
+	void RHLightSwitch8() {		
+		RHLightSwitch( $rhLightSwitch8, $rhLightSwitch8Base );
+	}
+	
+	void RHLightSwitch9() {
+		RHLightSwitch( $rhLightSwitch9, $rhLightSwitch9Base );
+	}
+	
+	void RHLightSwitch10() {
+		RHLightSwitch( $rhLightSwitch10, $rhLightSwitch10Base );
+	}
+	
+	//Snaps a lightswitch to the on position
+	void RHLightSwitchSnapOn( entity switch ) {
+		switch.setAngles( switch.getAngles() + '-24 0 0' );
+		switch.setKey( "currentState", "on" );
+		TimeTweak( switch, 0.025, 0, 0.1 );
+	}
+	
+	//Snaps a lightswitch to the off position and turns off lights
+	void RHLightSwitchSnapOff( entity switch ) {
+		switch.setAngles( switch.getAngles() + '24 0 0' );
+		switch.setKey( "currentState", "off" );
+		
+		sys.trigger( sys.getEntity( switch.getKey( "target" ) ) ); //lights on by default, trigger switch target to turn off
+		
+		TimeTweak( switch, 0.025, 0, 0.1 );
+	}
+	
+	//sets all lights, sources, and flares parm7 appropriately based on whether or not they flicker
+	void RHLightParm7Setup( entity lightRelay ) {
+		entity currentEnt;
+				
+		float relayNumTargets = lightRelay.numTargets(),
+			  i;
+		
+		string className;
+		
+		for ( i = 0; i < relayNumTargets; i++ ) {
+			if ( currentEnt = lightRelay.getTarget( i ) ) {
+				className = currentEnt.getKey( "classname" );
+				
+				if ( className == "light" ) {
+					if ( currentEnt.getFloatKey( "rhFlicker" ) ) {
+						currentEnt.setLightParm( 7, 0 );
+					} else {
+						currentEnt.setLightParm( 7, 1 );
+					}
+				} else if ( className == "func_static" && currentEnt.getFloatKey( "rhFlare" ) == 0 ) {
+					if ( currentEnt.getFloatKey( "rhFlicker" ) ) {
+						currentEnt.setShaderParm( 7, 0 );
+					} else {
+						currentEnt.setShaderParm( 7, 1 );
+					}
+				}
+			}
+		}
+	}
+	
+	//Main light switch setup
+	void RHLightSetup() {
+		RHLightSwitchSnapOn( $rhLightSwitch2 );
+		RHLightSwitchSnapOn( $rhLightSwitch2b );
+		RHLightSwitchSnapOn( $rhLightSwitch3 );
+		RHLightSwitchSnapOn( $rhLightSwitch4 );
+		RHLightSwitchSnapOn( $rhLightSwitch5 );
+		RHLightSwitchSnapOn( $rhLightSwitch6 );
+		RHLightSwitchSnapOn( $rhLightSwitch8 );
+		RHLightSwitchSnapOn( $rhLightSwitch9 );
+		RHLightSwitchSnapOn( $rhLightSwitch10 );
+		
+		RHLightParm7Setup( $rhLightSwitch1Relay );
+		RHLightParm7Setup( $rhLightSwitch2Relay );
+		RHLightParm7Setup( $rhLightSwitch3Relay );
+		RHLightParm7Setup( $rhLightSwitch4Relay );
+		RHLightParm7Setup( $rhLightSwitch5Relay );
+		RHLightParm7Setup( $rhLightSwitch6Relay );
+		RHLightParm7Setup( $rhLightSwitch8Relay );
+		RHLightParm7Setup( $rhLightSwitch9Relay );
+		RHLightParm7Setup( $rhLightSwitch10Relay );
+		RHLightParm7Setup( $rhLightSwitch11Relay );
+		
+		$rhLightSwitch10Base.guiEvent( "TurnOff" ); //disable light switch near grandfather
+	}
+	
+	//disables all light switches and turns off all lights, sources, particles, sounds, and speakers
+	void DisableLightSwitches() {
+		float i,
+		      j,
+		      relayNumTargets;
+		      			   
+		entity lightRelay,
+			   currentSwitch,
+			   currentEnt;
+			   
+		string className;
+		
+		for ( i = 1; i <= 12; i++ ) {
+			if ( currentSwitch = sys.getEntity( "rhLightSwitch" + i ) ) {
+				currentSwitch.setKey( "disabled", 1 );
+			}
+			
+			lightRelay = sys.getEntity( "rhLightSwitch" + i + "Relay" );
+			
+			relayNumTargets = lightRelay.numTargets();
+			for ( j = 0; j < relayNumTargets; j++ ) {
+				if ( currentEnt = lightRelay.getTarget( j ) ) {
+					className = currentEnt.getKey( "classname" );
+					
+					if ( className == "light" || className == "speaker" ) {
+						currentEnt.Off();
+					}
+					else if ( className == "func_static" || className == "env_hanglight_bar" || className == "func_emitter" ) {
+						currentEnt.setColor( 0, 0, 0 );
+					}
+				}
+			}
+		}
+	}
+	
+	void AppliancesTurnOff() {
+		$rhFridgeLeft.setColor( 0.0, 0.0, 0.0 );
+		$rhFridgeLeftTop.setColor( 0.0, 0.0, 0.0 );
+		$rhFridgeRight.setColor( 0.0, 0.0, 0.0 );
+		$rhFridgeRightTop.setColor( 0.0, 0.0, 0.0 );
+		
+		$rhClock.setSkin( "skins/consoles/guitoflatblack" );
+		
+		$rhExitSign.setShaderParm( 7, 1 );
+		$rhExitSignLight.Off();
+		$rhExitSignSpeaker.Off();
+				
+		$rhTV.stopSound( SND_CHANNEL_ANY, 0 ); //stop static sound
+		$rhTV.guiEvent( "TurnOff" );
+		$rhTV.stopSound( SND_CHANNEL_ANY, 1 );
+	}
+		
+	void HangLightSpark( float lightNum ) {
+		entity sparkRelay = sys.getEntity( "rhLight1_" + lightNum + "SparkRelay" ),
+			   lightSource = sys.getEntity( "rhLightBulb1_" + lightNum ),
+			   light = sys.getEntity( "rhLight1_" + lightNum );
+		
+		sys.trigger( sparkRelay );
+		lightSource.startSound( "snd_blowout", SND_CHANNEL_ANY, 1 );
+		light.On();
+		light.setColor( 2.0, 2.0, 2.0 );
+		lightSource.setColor( 2.0, 2.0, 2.0 );
+		sys.wait( 0.075 );
+		light.Off();
+		lightSource.setColor( 0.0, 0.0, 0.0 );
+		sys.wait( 0.05 );
+		light.On();
+		lightSource.setColor( 2.0, 2.0, 2.0 );
+		sys.wait( 0.05 );
+		light.Off();
+		lightSource.setColor( 0.0, 0.0, 0.0 );
+		sys.wait( 0.025 );
+		light.On();
+		lightSource.setColor( 2.0, 2.0, 2.0 );
+		sys.wait( 0.04 );
+		light.Off();
+		lightSource.setColor( 0.0, 0.0, 0.0 );
+		
+	}
+	
+	void PowerOutage() {
+		DisableLightSwitches();
+		
+		AppliancesTurnOff();
+		
+		//dim windows environment map
+		sys.trigger( $window1Dim );
+		sys.trigger( $window2Dim );
+		sys.trigger( $window3Dim );
+				
+		sys.waitFrame();
+		HangLightSpark( 1 );
+		HangLightSpark( 2 );
+		HangLightSpark( 3 );
+	}
+		
+	//Move ship down toward roadhouse
+	void ShipMoveDown() {		
+		$rhShipArriveSpeaker.On();
+		TimeTweak( $rhShipZController, 4, 2, 6 );
+		$rhShipZController.move( DOWN, 1024 );
+		sys.waitFor( $rhShipZController );
+	}
+	
+	void RemoveStoolGUIs() {
+		$rhStool1GUI.hide();
+		$rhStool2GUI.hide();
+		$rhStool3GUI.hide();
+		$rhStool4GUI.hide();
+		$rhStool5GUI.hide();
+		$rhStool6GUI.hide();
+		$rhStool7GUI.hide();
+		$rhStool8GUI.hide();
+		$rhStool9GUI.hide();
+		$rhStool10GUI.hide();
+	}
+	
+	void JukeBoxPlayAbduction() {
+		$rhJukeBox.setvolume( 1 );
+		$rhJukeBox.setNumTracks( 14 );
+		$rhJukeBox.setTrack( 14 );
+		$rhJukeBox.playSelected();
+		$rhJukeBox.guiEvent( "TurnOnRoadhouse" );	// This call never turns interactivity back on
+		$rhJukeBoxLight.On();
+		fadeInEnt( $rhJukeBoxLight, $rhJukeBoxLight.getVectorKey( "_color" ), 1 );
+	}
+	
+	void ShipDustStart() {
+		sys.trigger( $rhShipDust1 );
+		sys.trigger( $rhShipDust2 );
+		sys.trigger( $rhShipDust3 );
+		sys.trigger( $rhShipDust4 );
+		thread fadeInEnt( $rhShipDust1, '1 1 1', 5 );
+		thread fadeInEnt( $rhShipDust2, '1 1 1', 5 );
+		thread fadeInEnt( $rhShipDust3, '1 1 1', 5 );
+		thread fadeInEnt( $rhShipDust4, '1 1 1', 5 );		
+	}
+	
+	void ShipShow() {		
+		$rhShipHoverSpeaker.On();
+		$rhShipHoverSpeaker2.On();
+		
+		$rhShip.show();
+		$rhShipProjLightLeftSource.show();
+		$rhShipProjLightRightSource.show();
+		$rhShipProjLightMiddleSource1.show();
+		$rhShipProjLightMiddleSource2.show();
+		
+		sys.trigger( $rhShipExhaustLeft );
+		sys.trigger( $rhShipExhaustLeftTop );
+		sys.trigger( $rhShipExhaustRight );
+		sys.trigger( $rhShipExhaustRightTop );
+		
+		$rhShipProjLightLeftCone.show();
+		thread fadeInEnt( $rhShipProjLightLeftCone, $rhShipProjLightLeftCone.getVectorKey( "_color" ), 2 );
+		thread fadeInEnt( $rhShipProjLightLeftSource, $rhShipProjLightLeftSource.getVectorKey( "_color" ), 2 );
+		thread LightSweep( $rhShipProjLightLeftSource );
+		$rhShipProjLightRightCone.show();
+		thread fadeInEnt( $rhShipProjLightRightCone, $rhShipProjLightRightCone.getVectorKey( "_color" ), 2 );
+		thread fadeInEnt( $rhShipProjLightRightSource, $rhShipProjLightRightSource.getVectorKey( "_color" ), 2 );
+		thread LightSweep( $rhShipProjLightRightSource );
+		sys.trigger( $rhShipProjLightLeft );
+		sys.trigger( $rhShipProjLightRight );
+		
+		$rhShipProjLightMiddleSource1.setAngles( '75 240 0' );
+		$rhShipProjLightMiddleSource2.setAngles( '80 200 0' );
+	}
+	
+	void AbductionStart() {
+		gAbducting = 1; //set global abducting so unnecessary threads end
+		
+		$player1.dialogStart( true, false, false );
+		
+		JukeBoxPlayAbduction();
+		sys.wait( 2 );
+		
+		thread TruckRemove();
+		sys.wait( 9 );
+		$rhShipEntryTrigger.enable();
+	}
+	
+	void ShipEntryDialog() {
+		//Jenny "We've got to get out of here!"
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_wevegot", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 1 );
+		
+		//Tommy "Enisi?"
+		$player1.startSoundShader( "rh_conv8_tom06", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, 1 );
+		
+		//Grandfather "They come to cleanse the  land of all living things."
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_theycome", 6 );
+	}
+	
+	//Main ship entry function
+	void ShipEntry() {
+		thread PlayMapMusic( "snd_roadhouse_abduction_c", false, MUS_TRANSITION_OVERLAP );
+		
+		thread TruckSmash();
+		
+		thread RoofShakePlaySounds();
+		sys.wait( 4 );
+				
+		thread PowerOutage();		
+		sys.wait( 1.5 );
+		
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_screamwhat", 6 );
+		sys.wait( 0.5 );
+
+		thread RoofRip();
+		ShipShow();
+		ShipDustStart();
+		RemoveStoolGUIs();
+		
+		//fade in ambient light for abduction
+		$rhShipAmbientLight1.On();
+		thread fadeInEnt( $rhShipAmbientLight1, $rhShipAmbientLight1.getVectorKey( "_color" ), 4 );
+		
+		thread ShipDissolve();
+		
+		sys.wait( 2 );
+		
+		thread ShipMoveDown();
+	
+		sys.wait( 5 );
+		
+		thread ShipEntryDialog();
+	
+		ShipRemoveAll();
+	}
+	
+	void ShipSetup() {
+		vector shipZControllerOrigin;	
+		shipZControllerOrigin = $rhShipZController.getOrigin();
+		shipZControllerOrigin_z += 1024;
+		$rhShipZController.setOrigin( shipZControllerOrigin );
+		
+		//ship search lights
+		TimeTweak( $rhShipProjLightLeftSource, 2, 2, 4 );
+		TimeTweak( $rhShipProjLightRightSource, 2.5, 2.5, 5 );
+		
+		//lights that pick movables up
+		TimeTweak( $rhShipProjLightMiddleSource1, 0.75, 0.5, 1.5 );
+		TimeTweak( $rhShipProjLightMiddleSource2, 0.75, 0.5, 1.5 );
+		
+		$rhShipProjLightMiddleSource1.setColor( 0, 0, 0 );
+		$rhShipProjLightMiddleSource2.setColor( 0, 0, 0 );
+		
+		//start ship lights off
+		float i;
+		entity currentEnt;
+		
+		for ( i = 1; i <= 16; i++ ) {
+			if ( currentEnt = sys.getEntity( "rhShipLight" + i ) ) {
+				currentEnt.Off();
+			}
+			
+			if ( currentEnt = sys.getEntity( "rhShipLight" + i + "Source" ) ) {
+				currentEnt.setColor( 0, 0, 0 );
+			}
+			
+			if ( currentEnt = sys.getEntity( "rhShipLight" + i + "Flare" ) ) {
+				currentEnt.setColor( 0, 0, 0 );
+			}
+		}
+		
+		$rhShipGreenLight1.Off();
+		$rhShipGreenLight2.Off();
+		$rhShipGreenLight3.Off();
+		$rhShipGreenLight4.Off();
+	}
+	
+	void BathroomSetup() {
+		TimeTweak( $rhBathMUrinalHandle, 0.05, 0.025, 0.2 );
+		TimeTweak( $rhBathMUrinal2Handle, 0.05, 0.025, 0.2 );
+			
+		TimeTweak( $rhBathFToiletHandle, 0.15, 0.15, 0.3 );
+		TimeTweak( $rhBathFToilet2Handle, 0.15, 0.15, 0.3 );
+		TimeTweak( $rhBathMToiletHandle, 0.15, 0.15, 0.3 );
+		
+		TimeTweak( $rhBathFSinkColdKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathFSinkHotKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathFSink2ColdKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathFSink2HotKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathMSinkColdKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathMSinkHotKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathMSink2ColdKnob, 0.1, 0.25, 0.35 );
+		TimeTweak( $rhBathMSink2HotKnob, 0.1, 0.25, 0.35 );
+		
+		TimeTweak( $rhBathMAutoDryerKnob, 0, 0, 0.1 );
+		TimeTweak( $rhBathFAutoDryerKnob, 0, 0, 0.1 );
+		
+		TimeTweak( $rhBathCondomKnob1, 0.05, 0.1, 0.15 );
+		TimeTweak( $rhBathCondomKnob2, 0.05, 0.1, 0.15 );
+		TimeTweak( $rhBathCondomKnob3, 0.05, 0.1, 0.15 );
+		TimeTweak( $rhBathCondomKnob4, 0.05, 0.1, 0.15 );
+	}
+	
+	float gSink1_1WaterDir = DOWN,
+		  gSink1_2WaterDir = DOWN,
+		  gSink2_1WaterDir = DOWN,
+		  gSink2_2WaterDir = DOWN;
+	
+	void BathSinkSetWaterDir( float index0, float index1, float value ) {
+		if ( index0 == 1 ) {
+			if ( index1 == 1 ) { gSink1_1WaterDir = value; }
+			else if ( index1 == 2 ) { gSink1_2WaterDir = value; }
+		}
+		else if ( index0 == 2 ) {
+			if ( index1 == 1 ) { gSink2_1WaterDir = value; }
+			else if ( index1 == 2 ) { gSink2_2WaterDir = value; }
+		}
+	}
+	
+	float BathSinkGetWaterDir( float index0, float index1 ) {
+		if ( index0 == 1 ) {
+			if ( index1 == 1 ) { return gSink1_1WaterDir; }
+			else if ( index1 == 2 ) { return gSink1_2WaterDir; }
+		}
+		else if ( index0 == 2 ) {
+			if ( index1 == 1 ) { return gSink2_1WaterDir; }
+			else if ( index1 == 2 ) { return gSink2_2WaterDir; }
+		}
+	}
+	
+	float gSink1_1ThreadRunning = 0,
+		  gSink1_2ThreadRunning = 0,
+		  gSink2_1ThreadRunning = 0,
+		  gSink2_2ThreadRunning = 0;
+	
+	void BathSinkSetThreadRunning( float index0, float index1, float value ) {
+		if ( index0 == 1 ) {
+			if ( index1 == 1 ) { gSink1_1ThreadRunning = value; }
+			else if ( index1 == 2 ) { gSink1_2ThreadRunning = value; }
+		}
+		else if ( index0 == 2 ) {
+			if ( index1 == 1 ) { gSink2_1ThreadRunning = value; }
+			else if ( index1 == 2 ) { gSink2_2ThreadRunning = value; }
+		}
+	}
+	
+	float BathSinkGetThreadRunning( float index0, float index1 ) {
+		if ( index0 == 1 ) {
+			if ( index1 == 1 ) { return gSink1_1ThreadRunning; }
+			else if ( index1 == 2 ) { return gSink1_2ThreadRunning; }
+		}
+		else if ( index0 == 2 ) {
+			if ( index1 == 1 ) { return gSink2_1ThreadRunning; }
+			else if ( index1 == 2 ) { return gSink2_2ThreadRunning; }
+		}
+	}
+	
+	entity BathSinkGetWater( float index0, float index1 ) {
+		if ( index0 == 1 ) {
+			if ( index1 == 1 ) { return $rhBathMSinkWaterBasin; }
+			else if ( index1 == 2 ) { return $rhBathMSink2WaterBasin; }
+		}
+		else if ( index0 == 2 ) {
+			if ( index1 == 1 ) { return $rhBathFSinkWaterBasin; }
+			else if ( index1 == 2 ) { return $rhBathFSink2WaterBasin; }
+		}
+	}
+	
+	//Updates bathroom water level for sinks
+	void BathSinkUpdateWaterLevel( float index0, float index1 ) {
+		entity water = BathSinkGetWater( index0, index1 );
+		
+		float waitTime = 0.1,
+			  waterDirection,
+			  distance = 0.005;
+		
+		vector waterPos = water.getOrigin();
+		
+		float waterPosLowest = waterPos_z,
+			  waterPosDrainTop = waterPos_z + 1.625,
+			  waterPosLowerBowlTop = waterPos_z + 2.45,
+			  waterPosHighest = waterPos_z + 5;
+			  											
+		while ( true ) {
+			waterDirection = BathSinkGetWaterDir( index0, index1 );
+			
+			if ( waterDirection == DOWN && waterPos_z == waterPosLowest ) { //water at lowest position
+				break;
+			} else {
+				if ( waterPos_z >= waterPosLowest && waterPos_z < waterPosDrainTop ) { //water in drain
+					distance = 0.75 * sys.getFrameTime();
+				} else if ( waterPos_z >= waterPosDrainTop && waterPos_z < waterPosLowerBowlTop ) { //water in lower part of bowl
+					distance = 0.125 * sys.getFrameTime();
+				} else { //water above lower part of bowl
+					distance = 0.375 * sys.getFrameTime();
+				}
+				
+				//cap so water doesn't go above waterPosHighest
+				if ( waterDirection == UP && ( waterPos_z + distance ) > waterPosHighest ) {
+					distance = waterPosHighest - waterPos_z;
+				} else if ( waterDirection == DOWN && ( waterPos_z - distance ) < waterPosLowest ) {
+					distance = waterPos_z - waterPosLowest;
+				}
+				
+				if ( distance > 0 ) {				
+					if ( waterDirection == UP ) {
+						waterPos_z += distance;
+					} else {
+						waterPos_z -= distance;
+					}
+					
+					water.setOrigin( waterPos );
+				}
+			}
+
+			sys.waitFrame();
+		}
+		
+		BathSinkSetThreadRunning( index0, index1, FALSE );
+	}
+	
+	//Rotates bathroom knobs and controls water particles / sounds
+	//knob is the knob currently being used.
+	void BathSinkKnobToggle( entity gui, entity knob, entity knob2, entity waterFaucet, entity sound, float index0, float index1 ) {		
+		if ( knob.getFloatKey( "isRunning" ) == 0 ) {
+			knob.setKey( "isRunning", 1 );
+			
+			//swap gui hand press anim
+			if ( gui.getKey( "pressAnim" ) == "press_left" ) {
+				gui.setKey( "pressAnim", "press_right" );
+			} else {
+				gui.setKey( "pressAnim", "press_left" );
+			}
+						
+			if ( knob.getKey( "currentState" ) == "off" ) {				
+				knob.startSound( "snd_turn", SND_CHANNEL_ANY, 1 );
+				if ( knob.getKey( "reverseRot" ) ) {
+					knob.rotateOnce( '0 60 0' );
+				} else {
+					knob.rotateOnce( '0 -60 0' );
+				}
+				knob.setKey( "currentState", "on" );
+				
+				if ( knob2.getKey( "currentState" ) == "off" ) { //check that the other handle isn't turned on
+					BathSinkSetWaterDir( index0, index1, UP );
+					
+					thread interpolateShaderParm( waterFaucet, 5, 0, 1.25, 0.1 ); //fade in water stream
+					thread fadeInEnt( waterFaucet, '0.2 0.2 0.225', 0.1 );
+				}
+				
+				sound.On();
+				
+				//run update water level thread if not running
+				if ( BathSinkGetThreadRunning( index0, index1 ) == FALSE ) {
+					BathSinkSetThreadRunning( index0, index1, TRUE );
+					thread BathSinkUpdateWaterLevel( index0, index1 );
+				}
+				
+				sys.waitFor( knob );
+			} else { //currentState == "on"
+				knob.startSound( "snd_turn", SND_CHANNEL_ANY, 1 );
+				if ( knob.getKey( "reverseRot" ) ) {
+					knob.rotateOnce( '0 -60 0' );
+				} else {
+					knob.rotateOnce( '0 60 0' );
+				}
+				sys.waitFor( knob );
+				knob.setKey( "currentState", "off" );
+				
+				if ( knob2.getKey( "currentState" ) == "off" ) { //check that the other handle isn't turned on
+					BathSinkSetWaterDir( index0, index1, DOWN );
+					
+					thread interpolateShaderParm( waterFaucet, 5, 1.25, 0, 0.1 ); //fade out water stream
+					thread fadeOutEnt( waterFaucet, '0.2 0.2 0.225', 0.1 );
+				}
+				
+				sound.Off();
+				
+				sys.wait( 0.1 );
+			}
+			
+			knob.setKey( "isRunning", 0 );
+		}
+	}
+	
+	//Functions for gui's to call
+	void BathFSinkColdKnobToggle() {
+		BathSinkKnobToggle( $rhBathFSinkColdGui, $rhBathFSinkColdKnob, $rhBathFSinkHotKnob, $rhBathFSinkWaterFaucet, $rhBathFSinkColdSound, 2, 1 );
+	}
+	
+	void BathFSinkHotKnobToggle() {
+		BathSinkKnobToggle( $rhBathFSinkHotGui, $rhBathFSinkHotKnob, $rhBathFSinkColdKnob, $rhBathFSinkWaterFaucet, $rhBathFSinkHotSound, 2, 1 );
+	}
+	
+	void BathFSink2ColdKnobToggle() {
+		BathSinkKnobToggle( $rhBathFSink2ColdGui, $rhBathFSink2ColdKnob, $rhBathFSink2HotKnob, $rhBathFSink2WaterFaucet, $rhBathFSink2ColdSound, 2, 2 );
+	}
+	
+	void BathFSink2HotKnobToggle() {
+		BathSinkKnobToggle( $rhBathFSink2HotGui, $rhBathFSink2HotKnob, $rhBathFSink2ColdKnob, $rhBathFSink2WaterFaucet, $rhBathFSink2HotSound, 2, 2 );
+	}
+	
+	void BathMSinkColdKnobToggle() {
+		BathSinkKnobToggle( $rhBathMSinkColdGui, $rhBathMSinkColdKnob, $rhBathMSinkHotKnob, $rhBathMSinkWaterFaucet, $rhBathMSinkColdSound, 1, 1 );
+	}
+	
+	void BathMSinkHotKnobToggle() {
+		BathSinkKnobToggle( $rhBathMSinkHotGui, $rhBathMSinkHotKnob, $rhBathMSinkColdKnob, $rhBathMSinkWaterFaucet, $rhBathMSinkHotSound, 1, 1 );
+	}
+	
+	void BathMSink2ColdKnobToggle() {
+		BathSinkKnobToggle( $rhBathMSink2ColdGui, $rhBathMSink2ColdKnob, $rhBathMSink2HotKnob, $rhBathMSink2WaterFaucet, $rhBathMSink2ColdSound, 1, 2 );
+	}
+	
+	void BathMSink2HotKnobToggle() {
+		BathSinkKnobToggle( $rhBathMSink2HotGui, $rhBathMSink2HotKnob, $rhBathMSink2ColdKnob, $rhBathMSink2WaterFaucet, $rhBathMSink2HotSound, 1, 2 );
+	}
+	
+	//Random toilet sounds
+	void ToiletBlow() {
+		float currentToilet;
+		
+		while ( !gAbducting ) {
+			sys.wait( 20 + sys.random( 20 ) );
+			
+			currentToilet = int( sys.random( 3 ) );
+			if ( currentToilet == 0 ) {
+				$rhBathFToiletBlow.On();
+			}
+			else if ( currentToilet == 1 ) {
+				$rhBathFToilet2Blow.On();
+			}
+			else {
+				$rhBathMToiletBlow.On();
+			}
+		}
+	}
+	
+	//Handles the water and sound for flushing so the handle can be independent
+	void BathToiletFlushWater( entity handle, entity flushSound, entity waterCtrlP, entity water ) {
+		if ( handle.getFloatKey( "isFlushing" ) == 0 ) {
+			handle.setKey( "isFlushing", 1 );
+			flushSound.On();
+			TimeTweak( waterCtrlP, 1, 1, 7 );
+			waterCtrlP.move( DOWN, 6 );
+			
+			thread interpolateShaderParm( water, 5, 0.25, 1.5, 4 );
+			thread crossFadeEnt( water, '0.15 0.15 0.15', '0.35 0.35 0.35', 4 );
+			thread interpolateShaderParm( water, 6, 0, -3, 7 );
+			
+			sys.waitFor( waterCtrlP );
+			sys.wait( 0.5 );
+			TimeTweak( waterCtrlP, 1, 3, 6 );
+			waterCtrlP.move( UP, 6 );
+			
+			thread interpolateShaderParm( water, 5, 1.5, 0.25, 6 );
+			thread crossFadeEnt( water, '0.35 0.35 0.35', '0.15 0.15 0.15', 4 );
+			
+			sys.waitFor( waterCtrlP );
+			handle.setKey( "isFlushing", 0 );
+		}
+	}
+	
+	//Toilet flush sounds / movement
+	void BathToiletFlush( entity handle, entity handleSound, entity flushSound, entity waterCtrlP, entity water ) {		
+		if ( handle.getFloatKey( "isRunning" ) == 0 ) {
+			handle.setKey( "isRunning", 1 );
+			
+			thread BathToiletFlushWater( handle, flushSound, waterCtrlP, water );
+		
+			handleSound.On();
+			handle.rotateOnce( '0 0 45' );
+			sys.waitFor( handle );
+			handle.rotateOnce( '0 0 -45' );
+			
+			sys.waitFor( handle );
+			handle.setKey( "isRunning", 0 );
+		}
+	}
+	
+	//functions for gui calls
+	void BathFToiletFlush() {
+		BathToiletFlush( $rhBathFToiletHandle, $rhBathFToiletHandleSound, $rhBathFToiletSound, $rhBathFToiletWaterCtrlP, $rhBathFToiletWater );
+	}
+	
+	void BathFToilet2Flush() {
+		BathToiletFlush( $rhBathFToilet2Handle, $rhBathFToilet2HandleSound, $rhBathFToilet2Sound, $rhBathFToilet2WaterCtrlP, $rhBathFToilet2Water );
+	}
+	
+	void BathMToiletFlush() {
+		BathToiletFlush( $rhBathMToiletHandle, $rhBathMToiletHandleSound, $rhBathMToiletSound, $rhBathMToiletWaterCtrlP, $rhBathMToiletWater );
+	}
+	
+	//Toggles bathroom toilet lid up and down
+	void BathToiletLidToggle( entity gui, entity lid ) {
+		if ( lid.getFloatKey( "isRunning" ) == 0 ) {
+			lid.setKey( "isRunning", 1 );
+			
+			//swap gui hand press anim
+			if ( gui.getKey( "pressAnim" ) == "press_down" ) {
+				gui.setKey( "pressAnim", "press_up" );
+			} else {
+				gui.setKey( "pressAnim", "press_down" );
+			}
+			
+			if ( lid.getKey( "currentState" ) == "closed" ) {
+				TimeTweak( lid, 0.35, 0.1, 0.75 );
+				lid.rotateOnce( '-87 0 0' );
+				lid.setKey( "currentState", "open" );
+				sys.waitFor( lid );
+				lid.startSound( "snd_lidup", SND_CHANNEL_ANY, 1 );
+			}
+			else {
+				TimeTweak( lid, 0.45, 0.05, 0.65 );
+				lid.rotateOnce( '87 0 0' );
+				lid.setKey( "currentState", "closed" );
+				sys.waitFor( lid );
+				lid.startSound( "snd_liddown", SND_CHANNEL_ANY, 1 );
+			}
+			
+			lid.setKey( "isRunning", 0 );
+		}
+	}
+	
+	//functions for gui calls
+	void BathFToiletLidToggle() {
+		BathToiletLidToggle( $rhBathFToiletGui, $rhBathFToiletLid );
+	}
+	
+	void BathFToilet2LidToggle() {
+		BathToiletLidToggle( $rhBathFToilet2Gui, $rhBathFToilet2Lid );
+	}
+	
+	void BathMToiletLidToggle() {
+		BathToiletLidToggle( $rhBathMToiletGui, $rhBathMToiletLid );
+	}
+	
+	//Handles the air particles and sound for flushing so the handle can be independent
+	void BathAutoDryerCycleAir( entity knob, entity sound, entity emitter ) {
+		if ( knob.getFloatKey( "isDrying" ) == 0 ) {
+			knob.setKey( "isDrying", 1 );
+			
+			sound.On();
+			sys.trigger( emitter );
+			
+			sys.wait( 8.5 );
+			
+			sys.trigger( emitter );
+			
+			knob.setKey( "isDrying", 0 );
+		}
+	}
+	
+	//Cycles the hand dryer
+	void BathAutoDryerCycle( entity knob, entity sound, entity pushOnSound, entity emitter ) {		
+		if ( knob.getFloatKey( "isRunning" ) == 0 ) {
+			knob.setKey( "isRunning", 1 );
+			
+			pushOnSound.On();
+			
+			knob.move( SOUTH, 0.5 );
+			sys.waitFor( knob );
+			
+			thread BathAutoDryerCycleAir( knob, sound, emitter );
+			
+			knob.move( NORTH, 0.5 );
+			sys.waitFor( knob );
+					
+			knob.setKey( "isRunning", 0 );
+		}
+	}
+	
+	void BathMAutoDryerCycle() {
+		BathAutoDryerCycle( $rhBathMAutoDryerKnob, $rhBathMAutoDryerSound, $rhBathMAutoDryerPushOnSound, $rhBathMAutoDryerEmitter );
+	}
+	
+	void BathFAutoDryerCycle() {
+		BathAutoDryerCycle( $rhBathFAutoDryerKnob, $rhBathFAutoDryerSound, $rhBathFAutoDryerPushOnSound, $rhBathFAutoDryerEmitter );
+	}
+	
+	void BathTileFix() {
+		TimeTweak( $rhBathTile, 0.1, 0.1, 0.45 );
+		$rhBathTile.rotateOnce( '0 0 10' );
+		$rhBathTile.startSound( "snd_turn", SND_CHANNEL_ANY, 0 );
+	}
+	
+	//Turns a condom dispenser knob
+	void BathCondomKnobCycle( entity knob ) {
+		if ( knob.getFloatKey( "isRunning" ) == 0 ) {
+			knob.setKey( "isRunning", 1 );
+			
+			knob.startSound( "snd_turn", SND_CHANNEL_ANY, 0 );
+			
+			knob.rotateOnce( '0 0 20' );		
+			sys.waitFor( knob );
+			
+			knob.rotateOnce( '0 0 -20' );		
+			sys.waitFor( knob );
+			
+			knob.setKey( "isRunning", 0 );
+		}
+	}
+	
+	//Functions for gui calls to turn a condom dispenser knob
+	void BathCondomKnob1Cycle() {
+		BathCondomKnobCycle( $rhBathCondomKnob1 );
+	}
+	
+	void BathCondomKnob2Cycle() {
+		BathCondomKnobCycle( $rhBathCondomKnob2 );
+	}
+	
+	void BathCondomKnob3Cycle() {
+		BathCondomKnobCycle( $rhBathCondomKnob3 );
+	}
+	
+	void BathCondomKnob4Cycle() {
+		BathCondomKnobCycle( $rhBathCondomKnob4 );
+	}
+	
+	//Handles flushing of the water to stay independent of the handle
+	void BathUrinalFlushWater( entity handle, entity urinal, entity flushSound ) {
+		if ( handle.getFloatKey( "isFlushing" ) == 0 ) {
+			handle.setKey( "isFlushing", 1 );
+			
+			flushSound.On();
+			thread fadeInEnt( urinal, '1 1 1', 1 );
+			thread interpolateShaderParm( urinal, 6, 0, 1, 1 );
+			sys.wait( 3 );
+			thread interpolateShaderParm( urinal, 6, 1, 0, 1 );
+			fadeOutEnt( urinal, '1 1 1', 1 );
+			sys.wait( 1 );
+			
+			handle.setKey( "isFlushing", 0 );
+		}
+	}
+	
+	//handle movement, calls water flush
+	void BathUrinalFlush( entity handle, entity urinal, entity flushSound, entity handleSound ) {		
+		if ( handle.getFloatKey( "isRunning" ) == 0 ) {
+			handle.setKey( "isRunning", 1 );
+			
+			handleSound.On();
+			handle.rotateOnce( '0 0 -15' );
+			sys.waitFor( handle );
+			
+			thread BathUrinalFlushWater( handle, urinal, flushSound );
+			
+			handle.rotateOnce( '0 0 15' );
+			sys.waitFor( handle );
+			
+			handle.setKey( "isRunning", 0 );
+		}
+	}
+	
+	//movement / sounds for urinal flush
+	void BathMUrinalFlush() {
+		BathUrinalFlush( $rhBathMUrinalHandle, $rhBathMUrinal, $rhBathMUrinalFlushSound, $rhBathMUrinalHandleSound );
+	}
+	
+	void BathMUrinal2Flush() {
+		BathUrinalFlush( $rhBathMUrinal2Handle, $rhBathMUrinal2, $rhBathMUrinal2FlushSound, $rhBathMUrinal2HandleSound );
+	}
+	
+	void WaterHeaterSetup() {
+		TimeTweak( $rhWaterHeater, 0.025, 0.025, 0.075 );
+	}
+	
+	float gWaterHeaterState = 1;
+	
+	void WaterHeaterShake() {
+		while ( gWaterHeaterState == 1 && $rhWaterHeater.getKey( "powerCycle" ) == "on" ) {
+			$rhWaterHeater.rotateOnce( '0 0.2 0.1' );
+			sys.wait( 0.075 );
+			$rhWaterHeater.rotateOnce( '0 -0.2 -0.1' );
+			sys.wait( 0.075 );
+		}
+	}
+	
+	//movement / sound for water heater on
+	void WaterHeaterTurnOn() {
+		if ( gWaterHeaterState == 1 ) {
+			thread WaterHeaterShake();
+			$rhWaterHeater.startSound( "snd_running", SND_CHANNEL_ANY, 1 );
+		}
+	}
+	
+	//stops movement / sound
+	void WaterHeaterTurnOff() {
+		$rhWaterHeater.stopSound( SND_CHANNEL_ANY, 1 );
+	}
+	
+	//Main water heater controlling function
+	void WaterHeaterRun() {
+		while ( !gAbducting ) {
+			$rhWaterHeater.setKey( "powerCycle", "on" );
+			WaterHeaterTurnOn();
+			sys.wait( 60 );
+			
+			$rhWaterHeater.setKey( "powerCycle", "off" );
+			WaterHeaterTurnOff();
+			sys.wait( 30 );
+		}
+	}
+	
+	//Toggles water heater on/off state
+	void WaterHeaterToggle() {
+		if ( $rhWaterHeaterFlare.getFloatKey( "isRunning" ) == 0 ) {
+			$rhWaterHeaterFlare.setKey( "isRunning", 1 );
+			
+			$rhWaterHeaterSpeaker.On();
+			
+			vector colorValue = $rhWaterHeaterFlare.getVectorKey( "_color" ),
+				   sourceColorValue = $rhWaterHeaterSource.getVectorKey( "_color" );
+								
+			if ( gWaterHeaterState == 1 ) {
+				gWaterHeaterState = 0;
+				$rhWaterHeaterLight.Off();
+				thread fadeOutEnt( $rhWaterHeaterFlare, colorValue, 0.1 );
+				thread fadeOutEnt( $rhWaterHeaterSource, sourceColorValue, 0.1 );
+				WaterHeaterTurnOff();
+			}
+			else {
+				gWaterHeaterState = 1;
+				$rhWaterHeaterLight.On();
+				thread fadeInEnt( $rhWaterHeaterFlare, colorValue, 0.1 );
+				thread fadeInEnt( $rhWaterHeaterSource, sourceColorValue, 0.1 );
+				if ( $rhWaterHeater.getKey( "powerCycle" ) == "on" ) {
+					WaterHeaterTurnOn();
+				}
+			}
+			
+			sys.wait( 0.25 );
+			$rhWaterHeaterFlare.setKey( "isRunning", 0 );
+		}
+	}
+	
+	//Called when player uses soap dispenser
+	void BathSoapUse( entity handle, entity emitter, entity speaker ) {		
+		if ( !handle.getFloatKey( "isRunning" ) ) {
+			handle.setKey( "isRunning", 1 );
+		
+			speaker.On();
+			TimeTweak( handle, 0.05, 0.1, 0.15 );
+			handle.rotateOnce( '17 0 0' );
+			sys.trigger( emitter );
+			sys.waitFor( handle );
+			sys.wait( 0.05 );
+			TimeTweak( handle, 0.05, 0.1, 0.35 );
+			handle.rotateOnce( '-17 0 0' );
+			sys.waitFor( handle );
+			sys.wait( 0.5 );
+			
+			handle.setKey( "isRunning", 0 );
+		}
+	}
+	
+	void BathMSoapUse() {
+		BathSoapUse( $rhBathMSoapHandle, $rhBathMSoapEmitter, $rhBathMSoapSpeaker );
+	}
+	
+	void BathFSoapUse() {
+		BathSoapUse( $rhBathFSoapHandle, $rhBathFSoapEmitter, $rhBathFSoapSpeaker );
+	}
+	
+	void StoolSetNextRot( entity gui ) {		
+		if ( int( sys.random( 2 ) ) ) {
+			gui.setKey( "nextRot", Vec3Set( 0, sys.random( 135 ) + 360, 0 ) );
+			gui.setKey( "pressAnim", "press_right" );
+		} else {
+			gui.setKey( "nextRot", Vec3Set( 0, sys.random( 135 ) - 360, 0 ) );
+			gui.setKey( "pressAnim", "press_left" );
+		}
+	}
+	
+	//sets time for stool spins
+	void StoolSetup() {
+		float rotAccel = 0.1,
+			  rotDecel = 1.4,
+			  rotTime = 1.5;
+			  		
+		TimeTweak( $rhStool1Top, rotAccel, rotDecel, rotTime );
+		TimeTweak( $rhStool2Top, rotAccel, rotDecel, rotTime );
+		TimeTweak( $rhStool3Top, rotAccel, rotDecel, rotTime );
+		TimeTweak( $rhStool7Top, rotAccel, rotDecel, rotTime );
+		TimeTweak( $rhStool10Top, rotAccel, rotDecel, rotTime );
+		StoolSetNextRot( $rhStool1GUI );
+		StoolSetNextRot( $rhStool2GUI );
+		StoolSetNextRot( $rhStool3GUI );
+		StoolSetNextRot( $rhStool7GUI );
+		StoolSetNextRot( $rhStool10GUI );
+	}
+	
+	void StoolSpin( entity gui, entity stoolTop ) {
+		if ( !stoolTop.getFloatKey( "isRunning" ) ) {
+			stoolTop.setKey( "isRunning", 1 );
+			
+			stoolTop.startSound( "snd_squeek", SND_CHANNEL_ANY, 1 );
+			
+			vector rotVec;
+			rotVec = gui.getVectorKey( "nextRot" );
+						
+			stoolTop.rotateOnce( rotVec );
+			sys.waitFor( stoolTop );
+			
+			StoolSetNextRot( gui );
+			
+			sys.waitFrame();
+			
+			stoolTop.setKey( "isRunning", 0 );
+		}
+	}
+	
+	void Stool1Spin() {
+		StoolSpin( $rhStool1GUI, $rhStool1Top );
+	}
+	
+	void Stool2Spin() {
+		StoolSpin( $rhStool2GUI, $rhStool2Top );
+	}
+	
+	void Stool3Spin() {
+		StoolSpin( $rhStool3GUI, $rhStool3Top );
+	}
+	
+	void Stool4Spin() {
+		StoolSpin( $rhStool4GUI, $rhStool4Top );
+	}
+	
+	void Stool7Spin() {
+		StoolSpin( $rhStool7GUI, $rhStool7Top );
+	}
+	
+	void Stool10Spin() {
+		StoolSpin( $rhStool10GUI, $rhStool10Top );
+	}
+	
+	void ArcadeGamesTurnOff() {
+		$rhLightSwitch8.setKey( "triggerGames", 0 );
+				
+		$rhGameBlackJackConsole.guiEvent( "TurnOff" );
+		$rhGamePokerConsole.guiEvent( "TurnOff" );
+		$rhGameSlotsConsole.guiEvent( "TurnOff" );
+		$rhGameArcadeConsole.guiEvent( "TurnOff" );
+		
+		$rhGameArcadeConsole.setSkin( "skins/consoles/guitonodraw" );
+		$rhGamePokerConsole.setSkin( "skins/consoles/guitonodraw" );
+		$rhGameSlotsConsole.setSkin( "skins/consoles/guitonodraw" );
+		$rhGameBlackJackConsole.setSkin( "skins/consoles/guitonodraw" );
+		
+		$rhGameArcadeConsole.setColor( 0.0, 0.0, 0.0 );
+		$rhGamePokerConsole.setColor( 0.0, 0.0, 0.0 );
+		$rhGameSlotsConsole.setColor( 0.0, 0.0, 0.0 );
+		$rhGameBlackJackConsole.setColor( 0.0, 0.0, 0.0 );
+	}
+	
+	void UFOFlyBy1() {
+		gFansSpin = 0;
+		
+		$ufoPassBy1CtrlP.moveTo( $ufoPassByNode1 );
+		$ufoPassBy1Speaker.On();
+		sys.wait( 3 );
+		
+		thread LightPulsate1();
+		$rhRoadhouseShake1.On();
+		$rhJukeBox.guiEvent( "TurnOff" );
+		ArcadeGamesTurnOff();
+		sys.trigger( $rhRoofDust1 );
+		sys.waitFor( $ufoPassBy1CtrlP );
+		$rhWolfWhineSpeaker1.setKey( "isRunning", 0 );
+	}
+	
+	void TVNewsFlash() {
+		$rhTV.guiEvent( "NewsFlash" );
+		
+		float soundLength;
+				
+		// Play all the sounds in here rather than on gui so they are audible even if player isn't at tv
+		soundLength = $rhTV.startSound( "snd_news", SND_CHANNEL_ANY, 0 );
+		
+		if ( soundLength > 0 ) {
+			sys.wait( soundLength );
+		}
+		
+		$rhTV.startSound( "snd_static", SND_CHANNEL_ANY, 1 );
+	}
+	
+	void GrandfatherBeerGrabThread() {
+		$rhGrandfatherBeer.moveToJoint( $rhGrandfather, "Rattach_gun" );
+		$rhGrandfatherBeer.bindToJoint( $rhGrandfather, "Rattach_gun", 1 );
+	}
+	
+	void GrandfatherBeerGrab() {
+		thread GrandfatherBeerGrabThread();
+	}
+	
+	void GrandfatherBeerReleaseThread() {
+		$rhGrandfatherBeer.unbind();
+	}
+	
+	void GrandfatherBeerRelease() {
+		thread GrandfatherBeerReleaseThread();
+	}
+	
+	void DaltonBeerReleaseThread() {
+		$rhDaltonBeer1.unbind();
+	}
+	
+	void DaltonBeerRelease() {
+		thread DaltonBeerReleaseThread();
+	}
+
+	void ChuckBeerReleaseThread() {
+		$rhChuckBeer1.unbind();
+	}
+	
+	void ChuckBeerRelease() {
+		thread ChuckBeerReleaseThread();
+	}
+	
+	void BeerDoorsOpenThread() {
+		TimeTweak( $rhBeerDoorL, 0, 1.25, 1.25 );
+		TimeTweak( $rhBeerDoorR, 0, 1.25, 1.25 );
+		$rhBeerDoorL.rotateOnce( '0 -90 0' );
+		$rhBeerDoorR.rotateOnce( '0 75 0' );
+	}
+	
+	void BeerDoorsOpen() {
+		thread BeerDoorsOpenThread();
+	}
+	
+	void BeerDoorsCloseThread() {
+		TimeTweak( $rhBeerDoorL, 0.5, 0.0, 0.5 );
+		TimeTweak( $rhBeerDoorR, 0.5, 0.0, 0.5 );
+		$rhBeerDoorL.rotateOnce( '0 90 0' );
+		$rhBeerDoorR.rotateOnce( '0 -75 0' );
+	}
+
+	void BeerDoorsClose() {
+		thread BeerDoorsCloseThread();
+	}
+	
+	void GirlfriendBeerLGrabThread() {
+		$rhBeerBottleL.moveToJoint( $rhGirlfriend, "Lattach_gun" );
+		$rhBeerBottleL.bindToJoint( $rhGirlfriend, "Lattach_gun", 1 );
+	}
+	
+	void GirlfriendBeerLGrab() {
+		thread GirlfriendBeerLGrabThread();
+	}
+
+	void GirlfriendBeerRGrabThread() {
+		$rhBeerBottleR.moveToJoint( $rhGirlfriend, "Rattach_gun" );
+		$rhBeerBottleR.bindToJoint( $rhGirlfriend, "Rattach_gun", 1 );
+	}
+
+	void GirlfriendBeerRGrab() {
+		thread GirlfriendBeerRGrabThread();
+	}
+
+	void GirlfriendBeerLDropThread() {
+		$rhBeerBottleL.unbind();
+	}
+
+	void GirlfriendBeerLDrop() {
+		thread GirlfriendBeerLDropThread();
+	}
+	
+	void GirlfriendBeerRDropThread() {
+		$rhBeerBottleR.unbind();
+	}
+
+	void GirlfriendBeerRDrop() {
+		thread GirlfriendBeerRDropThread();
+	}
+	
+	void GirlfriendRagGrabThread() {
+		$rhRag.moveToJoint( $rhGirlfriend, "Rattach_gun" );
+		$rhRag.bindToJoint( $rhGirlfriend, "Rattach_gun", 1 );
+	}
+
+	void GirlfriendRagGrab() {
+		thread GirlfriendRagGrabThread();
+	}
+	
+	void GirlfriendRagDropThread() {
+		$rhRag.unbind();
+		$rhRag.time( 0.2 );
+		$rhRag.moveToPos( $rhRagPos2.getOrigin() );
+		sys.waitFor( $rhRag );
+		$rhRag.remove();
+	}
+
+	void GirlfriendRagDrop() {
+		thread GirlfriendRagDropThread();
+	}
+	
+	//waits for player1 to finish speaking, starts dialog mode
+	//if instant is set to TRUE the line is not guaranteed to be spoken
+	boolean TommyQuiet( float instant ) {
+		float maxWaitTime = 20,
+			  maxWaitTimeFrames,
+			  i;
+					  
+		if ( !instant ) {
+			maxWaitTimeFrames = int( ( maxWaitTime / sys.getFrameTime() ) );
+		
+			for ( i = 0; i < maxWaitTimeFrames; i++ ) {
+				if ( gPlayerCanSpeak ) {
+					break;
+				}
+				sys.waitFrame();
+			}
+		} else {
+			if ( !gPlayerCanSpeak ) {
+				return false;
+			}
+		}
+		gPlayerCanSpeak = 0;
+		$player1.dialogStart( true, true, false );
+		
+		return true;
+	}
+
+	//ends dialog mode and adds delay between speaking
+	void TommyCanSpeak() {
+		$player1.dialogStop();
+				
+		sys.wait( 0.25 ); //min delay for sound ducking
+		
+		gPlayerCanSpeak = 1;
+	}
+	
+	float DistanceToXY( vector ent1, vector ent2 ) {
+		float lengthX = ent1_x - ent2_x,
+			  lengthY = ent1_y - ent2_y;
+		
+		return sys.sqrt( ( lengthX * lengthX ) + ( lengthY * lengthY ) );
+	}
+	
+	boolean CheckDistance( entity npc, entity distanceNull, float distance ) {
+		float waistJointHandle,
+			  distanceNullIsValid = 0;
+			  
+		vector distanceNullPos = '0 0 0';
+		
+		if ( !( !distanceNull ) ) {
+			distanceNullIsValid = 1;
+		}
+		
+		if ( !distanceNullIsValid ) { 
+			waistJointHandle = npc.getJointHandle( "waist" );
+			if ( DistanceToXY( $player1.getOrigin(), npc.getJointPos( waistJointHandle ) ) < distance ) {
+				return true;
+			}
+		} else {
+			distanceNullPos = distanceNull.getOrigin();
+			if ( DistanceToXY( $player1.getOrigin(), distanceNullPos ) < distance ) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	void WaitDistance( entity npc, entity distanceNull, float checkCanSee, string assetPrefix, float numAssets, float assetsAreSounds, float preDelay, float affectPlayerCanSpeak, float continueRange, float resumeRange, float callbackRange ) {
+		float assetNum = 1 + int( sys.random( numAssets ) ),
+			  count = 1,
+			  nextBeckonTime = sys.getTime() + preDelay,
+			  waistJointHandle,
+			  currentDistance,
+			  soundLength,
+			  distanceNullIsValid = 0;
+			  
+		vector distanceNullPos = '0 0 0';
+			  
+		if ( !( !distanceNull ) ) {
+			distanceNullIsValid = 1;
+		}
+		
+		if ( !distanceNullIsValid ) {  
+			waistJointHandle = npc.getJointHandle( "waist" );
+			currentDistance = DistanceToXY( $player1.getOrigin(), npc.getJointPos( waistJointHandle ) );
+		} else {
+			distanceNullPos = distanceNull.getOrigin();
+			currentDistance = DistanceToXY( $player1.getOrigin(), distanceNullPos );
+		}
+		
+		if ( currentDistance < continueRange ) { //if within continueRange distance continue conversation without callbacks
+			if ( checkCanSee ) {
+				if ( npc.getHead().playerCanSee() ) {
+					return;
+				}
+			} else {
+				return;
+			}
+		}
+		
+		if ( affectPlayerCanSpeak ) {
+			TommyCanSpeak();
+		}
+		
+		npc.lookAt( $player1, -1 );
+				
+		while ( true ) {			
+			sys.wait( 0.1 );
+			
+			if ( !distanceNullIsValid ) {  
+				currentDistance = DistanceToXY( $player1.getOrigin(), npc.getJointPos( waistJointHandle ) );
+			} else {
+				currentDistance = DistanceToXY( $player1.getOrigin(), distanceNullPos );
+			}
+			
+			if ( currentDistance < resumeRange ) { //if within resume range, end callbacks and continue conversation
+				if ( checkCanSee ) {
+					if ( !npc.getHead().playerCanSee() ) {
+						continue;
+					}
+				}
+				if ( affectPlayerCanSpeak ) {
+					TommyQuiet( FALSE );
+				}
+				return;
+			} else if ( currentDistance < callbackRange ) { //if player is still in callback range continue callbacks
+				if ( sys.getTime() > nextBeckonTime ) {
+					if ( TommyQuiet( TRUE ) ) {
+						if ( assetsAreSounds ) {
+							soundLength = npc.startSoundShader( assetPrefix + assetNum, SND_CHANNEL_VOICE );
+							if ( soundLength > 0 ) {
+								sys.wait( soundLength );
+							}
+						} else {
+							PlayAnim_Blend( npc, ANIMCHANNEL_HEAD, assetPrefix + assetNum, 6 );
+							sys.waitForSilence( npc.getHead(), 0 );
+						}
+						nextBeckonTime = sys.getTime() + ( ( FClamp( count, 1, 30 ) * 10 ) + sys.random( 6 ) );
+						count++;
+						assetNum++;
+						if ( assetNum > numAssets ) {
+							assetNum -= numAssets;
+						}
+						
+						TommyCanSpeak();
+					}
+				}
+			}
+		}
+	}
+	
+	//Grandfather at bar
+	void WaitDistanceGF( float checkCanSee, float preDelay, float affectPlayerCanSpeak ) {
+		WaitDistance( $rhGrandfather, $rhGrandfatherDistanceNull, checkCanSee, "lotaa_callback_gf0", 5, 1, preDelay, affectPlayerCanSpeak, 75, 65, 375 );
+	}
+	
+	boolean CheckDistanceGF() {
+		return CheckDistance( $rhGrandfather, $rhGrandfatherDistanceNull, 75 );
+	}
+	
+	//Grandfather in hallway
+	void WaitDistanceGFHallway( float checkCanSee, float preDelay, float affectPlayerCanSpeak ) {
+		WaitDistance( $rhGrandfather, $null_entity, checkCanSee, "lotaa_callback_gf0", 5, 1, preDelay, affectPlayerCanSpeak, 140, 100, 375 );
+	}
+	
+	boolean CheckDistanceGFHallway() {
+		return CheckDistance( $rhGrandfather, $null_entity, 140 );
+	}
+
+	//Jen
+	void WaitDistanceJen( float checkCanSee, float preDelay, float affectPlayerCanSpeak ) {
+		WaitDistance( $rhGirlfriend, $rhGirlfriendDistanceNull, checkCanSee, "rh_jen_callback0", 5, 1, preDelay, affectPlayerCanSpeak, 115, 95, 375 );
+	}
+	
+	boolean CheckDistanceJen() {
+		return CheckDistance( $rhGirlfriend, $rhGirlfriendDistanceNull, 115 );
+	}
+
+	//Tools
+	void WaitDistanceTools( float preDelay, float affectPlayerCanSpeak ) {
+		WaitDistance( $rhGirlfriend, $rhTools, 0, "jn_roadhouse_tommytools", 2, 0, preDelay, affectPlayerCanSpeak, 60, 60, 375 );
+	}
+	
+	void WaitPlayerInBar( float affectPlayerCanSpeak ) {
+		vector playerOrigin = $player1.getOrigin();
+		
+		if ( playerOrigin_x > 64 ) {
+			return;
+		}
+		
+		if ( affectPlayerCanSpeak ) {
+			TommyCanSpeak();
+		}
+		
+		sys.wait( 0.1 );
+		
+		while ( true ) {
+			playerOrigin = $player1.getOrigin();
+			
+			if ( playerOrigin_x > 64 ) {
+				if ( affectPlayerCanSpeak ) {
+					TommyQuiet( FALSE );
+				}
+				return;
+			}
+			
+			sys.wait( 0.1 );
+		}
+	}
+	
+	void WaitPlayerNearBar( float affectPlayerCanSpeak ) {
+		vector nearBarOrigin = $rhNearBar.getOrigin();
+		float currentDistance = DistanceToXY( $player1.getOrigin(), nearBarOrigin );
+		
+		if ( currentDistance < 312 ) {
+			return;
+		}
+		
+		if ( affectPlayerCanSpeak ) {
+			TommyCanSpeak();
+		}
+		
+		sys.wait( 0.1 );
+		
+		while ( true ) {
+			currentDistance = DistanceToXY( $player1.getOrigin(), nearBarOrigin );
+			if ( currentDistance < 312 ) {
+				if ( affectPlayerCanSpeak ) {
+					TommyQuiet( FALSE );
+				}
+				return;
+			}
+			
+			sys.wait( 0.1 );
+		}
+	}
+		
+	void DisableAllComments() {
+		$rh_tom01.disable();
+		$rh_tom02.disable();
+		$rh_tom03.disable();
+		$rh_tom04.disable();
+		$rh_tom05.disable();
+		$rh_tom06.disable();
+		$rh_tom07.disable();
+		$rh_tom08.disable();
+		$rh_tom09.disable();
+		$rh_tom10.disable();
+		$rh_tom11.disable();
+		$rh_tom12.disable();
+		$rh_tom13.disable();
+		$rh_jen01.disable();
+		$rh_jen02.disable();
+		$rh_chuck01.disable();
+		$rh_chuck02.disable();
+		$rh_chuck03.disable();
+		$rh_dalton02.disable();
+	}
+	
+	//Called when player tried to use phone
+	void PayphoneOffhook() {
+		sys.wait( 0.2 );
+		$rhPayPhoneUnhookSpeaker.On();
+		$rhPayPhoneOffhookSpeaker.On();
+		sys.trigger( $rhPayPhoneHandle );
+		sys.wait( 0.25 );
+		if ( TommyQuiet( TRUE ) ) {
+			$player1.startSoundShader( "rh_tom11", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 1 );
+			TommyCanSpeak();
+		}
+	}
+	
+	void DaltonPush() {
+		$rhDaltonPlayerPush.time( 2.375 );
+		$rhDaltonPlayerPush.move( EAST, 42 );
+		
+		$rhDaltonMovablePush.time( 2.375 );
+		$rhDaltonMovablePush.move( EAST, 42 );
+	}
+	
+	void DaltonFight() {
+		$rhDaltonClip.remove(); //remove player clip
+				
+		thread DaltonPush();
+		$rhDalton.lookAt( $player1, -1 );
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_LEGS, "rh_standtofight_dalton", 24 );
+		sys.wait( 1 );
+		//Dalton "All right then, chief. You want it?  Come get it!"
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_allright", 6 );
+		sys.wait( 1 );
+		sys.wait( $rhDalton.animLength( ANIMCHANNEL_LEGS, "rh_standtofight_dalton" ) - 2 );
+		$rhDalton.killbox(); //kill all movables in area
+		sys.waitFrame();
+		$rhDaltonPlayerPush.remove(); //remove player push clip
+		$rhDaltonMovablePush.remove(); //remove movable push clip
+		$rhDalton.becomeSolid();
+		$rhDalton.allowMovement( 1 );
+		
+		if ( CheckSpawnId( $rhDalton, gDaltonID ) ) {			
+			if ( EntIsAlive( $rhDalton ) ) {
+				$rhDalton.followPath( "pathAttackPlayer" );
+			}
+		}
+		
+		TommyCanSpeak();
+	
+		$player1.unlockWeapon( 1 );
+	}
+	
+	void ChuckPush() {
+		$rhChuckPlayerPush.time( 1.8 );
+		$rhChuckPlayerPush.decelTime( 1 );
+		$rhChuckPlayerPush.move( EAST, 60 );
+		
+		$rhChuckMovablePush.time( 1.8 );
+		$rhChuckMovablePush.decelTime( 1 );
+		$rhChuckMovablePush.move( EAST, 60 );
+	}	
+	
+	void ChuckFight() {
+		PlayAnim_Blend( $rhChuck, ANIMCHANNEL_LEGS, "rh_standtofight_chuck", 24 );
+		sys.wait( 2 );
+		thread ChuckPush();
+		$rhChuck.lookAt( $player1, -1 );
+		PlayAnim_Blend( $rhChuck, ANIMCHANNEL_HEAD, "rh_chuck_fight01", 6 );
+		sys.wait( 1 );
+		$rhChuckClip.remove();
+		sys.wait( $rhChuck.animLength( ANIMCHANNEL_LEGS, "rh_standtofight_chuck" ) - 4.8 );		
+		$rhChuck.killbox(); //kill all movables in area
+		sys.waitFrame();
+		$rhChuckPlayerPush.remove(); //remove player push clip
+		$rhChuckMovablePush.remove(); //remove movable push clip
+		$rhChuck.becomeSolid();
+		$rhChuck.allowMovement( 1 );
+		
+		if ( CheckSpawnId( $rhChuck, gChuckID ) ) {			
+			if ( EntIsAlive( $rhChuck ) ) {
+				$rhChuck.followPath( "pathAttackPlayer" );
+			}
+		}
+	}
+	
+	void ShowSubtitles() {
+		sys.wait( 2 );
+		sys.trigger( $rhIntroSub1 );
+		sys.wait( 5 );
+		sys.trigger( $rhIntroSub2 );
+		sys.wait( 5 );
+		sys.trigger( $rhIntroSub3 );
+	}
+	
+	void StartPlayerControl() {
+		sys.wait( 2.2 );
+		
+		gCameraTrack = 0; //end camera tracking
+		
+		vector endPos = '-282 -340 68.25',
+			   returnAngles = '9.72 -147.3 0.2';
+		
+		TimeTweak( $rhIntroCameraCtrlP, 1, 1.5, 3 );
+		$rhIntroCameraCtrlP.rotateOnce( returnAngles );
+		$rhIntroCameraCtrlP.moveToPos( endPos );
+		$rhIntroCamera.setfov( 90, 1.5, 1.5, 3 );
+		sys.waitFor( $rhIntroCameraCtrlP );
+		
+		$player1.setPrivateCameraView( $null_entity, 0 );
+	
+		$player1.cinematic( 0, 0 );
+	}
+	
+	void ConversationMirrorFrom() {
+		PlayAnim_Blend( $player1, ANIMCHANNEL_TORSO, "rh_mirror_from_tommy", 48 );
+		PlayAnim_Blend( $player1, ANIMCHANNEL_LEGS, "rh_mirror_from_tommy", 48 );
+		sys.wait( $player1.animLength( ANIMCHANNEL_TORSO, "rh_mirror_from_tommy" ) );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_TORSO, "roadhouse_idle", 48 );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_LEGS, "roadhouse_idle", 48 );
+	}
+	
+	void IntroSinkTurnOff() {
+		thread BathMSinkHotKnobToggle();
+		sys.wait( 0.25 );
+		$rhBathMSinkTrail.On();
+		sys.wait( 4.7 );
+		$rhBathMSinkDrain.On();
+	}
+	
+	void ConversationMirror() {
+		sys.wait( 9.0 );
+		$player1.disableEyeFocus();
+		
+		$rhGirlfriend.startSoundShader( "rh_jen_callback02", SND_CHANNEL_VOICE );
+		sys.wait( 2.2 );
+		PlayAnim_Blend( $player1, ANIMCHANNEL_TORSO, "rh_mirror_idle_tommy", 6 );
+		PlayAnim_Blend( $player1, ANIMCHANNEL_LEGS, "rh_mirror_idle_tommy", 6 );
+		thread IntroSinkTurnOff();
+		sys.wait( 1.85 );
+		
+		sys.fadeIn( '0 0 0', 3 );
+        sys.wait( 8.15 );
+
+		TommyQuiet( FALSE );
+		//Tommy "What are you looking at?"
+		//Tommy "Real tough guy."
+		//Tommy "Can't even tell her you love her."
+		//Tommy "I gotta get off this damn reservation."
+		//Tommy "If she�d just come with me, it'd all be different. It'd all be�"
+		//Tommy "Listen to yourself. Who do you think you're kidding?"
+		$player1.startSoundShader( "rh_tom_mirror1", SND_CHANNEL_VOICE );
+		sys.wait( $player1.animLength( ANIMCHANNEL_LEGS, "rh_mirror_idle_tommy" ) - 10 );
+		
+		//Girlfriend "Tommy, get your ass out here!"
+		$rhGirlfriend.startSoundShader( "rh_jen03", SND_CHANNEL_VOICE );
+								
+		$player1.enableEyeFocus();
+		
+		thread StartPlayerControl();
+		
+		sys.wait( 2.75 );
+		
+		TommyCanSpeak();
+		
+		thread ConversationMirrorFrom();
+		
+		//start ambient triggered sounds
+		thread ThunderSoftStart();
+		thread WolfHowlRun();
+		thread DogBarkRun();
+		thread CarPassBy();
+		thread ToiletBlow();						
+	}
+	
+	void Conversation8() {		
+		WaitPlayerInBar( 0 );
+		TommyQuiet( FALSE );
+		
+		//Jenny "Tommy! Are you crazy? You could  have killed them!"
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_abduct_to", "abduct_idle1", 8 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_tommyare", 6 );
+		$rhGirlfriend.lookAt( $player1, -1 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0 );
+				
+		//Tommy "Maybe I should!"
+		$player1.startSoundShader( "rh_conv8_tom02", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, -0.75 );
+		
+		WaitPlayerInBar( 1 );
+		
+		thread UFOFlyBy1();
+		
+		sys.wait( 1 );
+		
+		thread PlayMapMusic( "snd_roadhouse_abduction_a", false, MUS_TRANSITION_OVERLAP );
+		
+		//Jenny "That's not what I meant! Tommy, did  you have to-"
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_thatsnot", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.25 );
+						
+		//Jenny "What the hell...?"
+		PlayCycle_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "abduct_idle_still", 12 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_whatthe", 6 );
+		$rhGirlfriend.lookAt( $null_entity, 0 );
+		$rhGirlfriend.disableEyeFocus();
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.25 );
+		
+		WaitPlayerInBar( 1 );
+		TVNewsFlash();
+		
+		TommyCanSpeak();
+		
+		thread AbductionStart();
+	}
+	
+	void BarCounterOpenThread() {
+		$rhBarCounter.startSound( "snd_open", SND_CHANNEL_ANY, 0 );
+		
+		entity target = $rhGrandfather,
+			   source = $rhBarCounter;
+		
+		vector vecToTarget,
+			   targetAngle,
+			   targetOrigin,
+			   sourceOrigin;
+			   
+		float targetJointHandle = target.getJointHandle( "Lattach_gun" ),
+			  numFrames = 2.048 / sys.getFrameTime(),
+			  i;
+			   		
+		for ( i = 0; i < numFrames; i++ ) {	
+			targetOrigin = target.getJointPos( targetJointHandle ) + '6 0 8';
+			sourceOrigin = source.getWorldOrigin();
+			
+			vecToTarget = VecSubtract( targetOrigin, sourceOrigin );
+			targetAngle = sys.VecToAngles( vecToTarget );
+			targetAngle = anglemod360( targetAngle );
+			
+			source.setAngles( Vec3Set( -targetAngle_x, 0, 0 ) );
+			sys.waitFrame();
+		}
+		
+		TimeTweak( $rhBarCounter, 0, 0.5, 0.5 );
+		$rhBarCounter.rotateOnce( '5 0 0' );
+		sys.waitFor( $rhBarCounter );
+		TimeTweak( $rhBarCounter, 0.375, 0.375, 0.75 );
+		$rhBarCounter.rotateOnce( '-5 0 0' );
+	}
+	
+	void BarCounterOpen() {
+		thread BarCounterOpenThread();
+	}
+	
+	void BarCounterCloseThread() {
+		TimeTweak( $rhBarCounter, 0.8, 0.0, 0.8 );
+		$rhBarCounter.rotateTo( '0 0 0' );
+		sys.waitFor( $rhBarCounter );
+		$rhBarCounter.startSound( "snd_close", SND_CHANNEL_ANY, 0 );
+		
+		TimeTweak( $rhBarCounter, 0.1, 0.0, 0.1 );
+		$rhBarCounter.rotateOnce( '2 0 0' );
+		sys.waitFor( $rhBarCounter );
+		$rhBarCounter.rotateOnce( '-2 0 0' );
+	}
+	
+	void BarCounterClose() {
+		thread BarCounterCloseThread();
+	}
+	
+	void DaltonArmKnock() {
+		sys.trigger( $movable_ashtray2_5 );
+		sys.trigger( $movable_beerbottle_9 );
+	}
+	
+	void Conversation7JennyWalkToDrunks() {
+		sys.wait( 0.25 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_walktodrunks_jenny", 12 );
+		sys.wait( $rhGirlfriend.animLength( ANIMCHANNEL_LEGS, "rh_walktodrunks_jenny" ) - 8.0 );
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_leanforward_jenny", "rh_leanforward_idle_jenny", 12 );
+	}
+	
+	void Conversation7() {		
+		DisableAllComments();
+		
+		WaitPlayerNearBar( 1 );
+				
+		thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+		
+		//Dalton "Hey, Cleans-With-Rag! Let's  have two more cold ones over here!"		
+		thread SpeechTransition_Blend( $rhDalton, "rh_heycleans_dalton", "rh_idle_dalton", 24 );
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_heycleans", 6 );
+		
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		thread Conversation7JennyWalkToDrunks();
+		sys.waitForSilence( $rhDalton.getHead(), -0.5 );
+		
+		//Jenny "Last call, boys."
+		sys.wait( 0.5 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_lastcall", 2 );
+		$rhGirlfriend.lookAt( $rhDalton, 5 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.25 );
+		
+		//Dalton "Already?"
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_already", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhDalton.getHead(), 0 );
+		
+		//Chuck "Hell no, that ain't right!"
+		thread SpeechTransition_Blend( $rhChuck, "rh_keepm_chuck", "rh_idle_chuck", 24 );
+		PlayAnim_Blend( $rhChuck, ANIMCHANNEL_HEAD, "ch_roadhouse_hellno", 6 );
+		$rhChuck.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhChuck.getHead(), -0.35 );
+		
+		WaitPlayerInBar( 1 );
+		
+		//Jenny "Time for you boys to leave."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_timefor", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.25 );
+		
+		//Dalton "After you been wagging that pretty little ass at us? I don't think so."
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_afteryou", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhDalton.getHead(), -1.25 );
+		thread SpeechTransition_Blend( $rhDalton, "rh_grab_arm_dalton", "rh_idle_dalton", 6 );
+		sys.wait( 0.75 );
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_grab_arm_jenny", "rh_grab_arm_idle_jenny", 12 );
+				
+		sys.wait( 0.4 );
+		
+		//Jenny "Hands off."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_handsoff", 6 );
+		$rhGirlfriend.lookAt( $rhDalton, 5 );
+		sys.wait( 0.5 );
+		//Grandfather "Tommy! Do something!"
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_BBwalk_grandfather", "rh_BBidle_grandfather", 6 );
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_tommydo", 2 );
+		sys.trigger( $rhGrandfatherClip3 ); //turn off grandfather bar player clip
+		sys.trigger( $rhGrandfatherClip4 ); //turn off grandfather bar movable clip
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.25 ); //jn_roadhouse_handsoff
+		
+		WaitPlayerInBar( 1 );
+		
+		//Dalton "Come on, one little kiss. Where's  the harm in that?"
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_comeon", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhDalton.getHead(), -0.75 );
+		
+		WaitPlayerInBar( 1 );
+				
+		//Jenny "Fuck off."
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_grab_arm_release_jenny", "rh_bbar_idle_jenny", 12 );
+		sys.wait( 1 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_fuckoff", 2 );
+		$rhGirlfriend.lookAt( $rhDalton, 5 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0 );
+				
+		//Dalton "Where's that famous injun hospitality?"
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_wheresthat", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhDalton.getHead(), -0.25 );
+		
+		WaitPlayerNearBar( 1 );
+		
+		//Tommy "Don't touch her."
+		$player1.startSoundShader( "rh_conv7_tom12", SND_CHANNEL_VOICE );
+		
+		sys.wait( 1 );
+		thread DaltonFight();
+		sys.wait( 2.5 );		
+		thread ChuckFight();
+	}
+	
+	void Conversation6() {
+		WaitDistanceJen( 1, 0, 0 );
+		
+		TommyQuiet( FALSE );
+								
+		//Tommy "So... did you think about what I  said?"
+		$player1.startSoundShader( "rh_conv6_tom01", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, 0 );
+		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_idled_grandfather", "rh_idle_grandfather", 36 ); //grandfather kicking bar
+		
+		WaitDistanceJen( 0, 2, 1 );
+		
+		//Jenny "Tommy, not this again..."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_tommynot", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 1 );
+		
+		WaitDistanceJen( 0, 2, 1 );
+		
+		thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+		
+		//Tommy "Come away with me. Just for a  few days. Off the reservation. "
+		$player1.startSoundShader( "rh_conv6_tom03", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, -1.3 );
+		
+		WaitDistanceJen( 0, 2, 1 );
+		
+		//Jenny "Why can't we just be together here?"
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_whycant", 6 );
+		sys.wait( 1.5 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_armsfolded_questioning_jenny", 12 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), -0.25 );
+		
+		if ( CheckDistanceJen() ) {
+			thread SpeechTransition_Blend( $rhDalton, "rh_drink_beer_dalton", "rh_idle_dalton", 12 );
+		
+			//Tommy "You know why. I hate this place.  It's like a god-damn cage. It's no way to live."
+			$player1.startSoundShader( "rh_conv6_tom04", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 0 );
+		}
+				
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_idleb_grandfather", "rh_idle_grandfather", 36 ); //grandfather drinking
+				
+		WaitDistanceJen( 0, 2, 1 );
+		
+		//Jenny ""This place" is my home. My job is   here, my family is here. Do you think you're  saving me by taking me away?"
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_thisplace", 6 );
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_armsfolded_fingerdown_jenny", "rh_armsfolded_idle_jenny", 12 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 1 );
+		
+		thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+		
+		//Jenny "I'm Cherokee, Tommy. Just like you.  You should be proud of that."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_imcherokee", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0 );
+		
+		WaitDistanceJen( 0, 2, 1 );
+		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_idleb_grandfather", "rh_idle_grandfather", 36 ); //grandfather drinking
+		
+		//Tommy "Look, I know the tribe's important  to you. It's just... it's never meant anything to me."
+		$player1.startSoundShader( "rh_conv6_tom07", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, 0 );
+						
+		thread Conversation7();
+	}
+	
+	void Conversation5JenExit() {		
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_ringout_to_jenny", 12 );
+		sys.wait( $rhGirlfriend.animLength( ANIMCHANNEL_LEGS, "rh_ringout_to_jenny" ) );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_ringout_idle_jenny", 12 );
+		sys.wait( $rhGirlfriend.animLength( ANIMCHANNEL_LEGS, "rh_ringout_idle_jenny" ) );
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_armsfolded_to_jenny", "rh_armsfolded_idle_jenny", 12 );
+		
+		//Jen "Wolves.  Something spooked them."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_wolves", 6 );
+		$rhGirlfriend.lookAt( $rhChuck, 5 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.0 );
+		
+		TommyCanSpeak();
+		
+		$rhGirlfriend.lookAt( $player1, -1 );
+		
+		sys.wait( 1 );
+		thread Conversation6();
+	}
+	
+	void Conversation5() {
+		sys.wait( 2 );
+		WaitPlayerNearBar( 0 );
+		TommyQuiet( FALSE );
+		thread Conversation5JenExit();
+		$rhWolfWhineSpeaker1.On();
+		sys.wait( 6 );
+		
+		thread SpeechTransition_Blend( $rhDalton, "rh_drink_beer_dalton", "rh_idle_dalton", 12 );
+		
+		//Grandfather "The Ani-Waya sense the coming of the storm."
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_theaniwaya", 6 );
+		sys.waitForSilence( $rhGrandfather.getHead(), 0.25 );
+		
+		//Chuck "Ani-what?"
+		thread SpeechTransition_Blend( $rhChuck, "rh_keepm_chuck", "rh_idle_chuck", 24 );
+		PlayAnim_Blend( $rhChuck, ANIMCHANNEL_HEAD, "ch_roadhouse_aniwhat", 6 );
+		$rhChuck.lookAt( $rhGrandfather, 5 );
+		sys.waitForSilence( $rhChuck.getHead(), 0.65 );
+	}
+	
+	void Conversation4() {
+		TommyQuiet( FALSE );
+		
+		PlayCycle_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "rh_idle_talk_grandfather", 32 );
+		
+		//Grandfather "Jen loves you, you know."
+		$rhGrandfather.lookAt( $player1, -1 );
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_jenloves", 6 );
+		sys.waitForSilence( $rhGrandfather.getHead(), 0.25 );
+		
+		if ( CheckDistanceGF() ) {
+			//Tommy "She has a helluva way of showing it."
+			$player1.startSoundShader( "rh_conv4_tom02", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 0.25 );
+		}
+		
+		WaitDistanceGF( 0, 2, 1 );
+		
+		//Grandfather "She is Cherokee. She is  bound to this land. Asking her to leave is  asking her to give up a part of her soul."
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_sheis", 6 );
+		sys.wait( 0.25 );
+		$rhGrandfather.lookAt( $player1, 0 );
+		$rhGrandfather.disableEyelook();
+		sys.wait( 1.75 );
+		$rhGrandfather.lookAt( $player1, -1 );
+		$rhGrandfather.enableEyelook();
+		sys.waitForSilence( $rhGrandfather.getHead(), 0 );
+		
+		if ( CheckDistanceGF() ) {
+			//Tommy "But doesn't she want something better than this?"
+			$player1.startSoundShader( "rh_conv4_tom04", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 0.1 );
+		}
+		
+		WaitDistanceGF( 0, 2, 1 );
+				
+		//Grandfather "To be among one's own  people, to truly know where you belong... if  there is something better in this life, I have  not seen it. "
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_tobe", 6 );
+		sys.waitForSilence( $rhGrandfather.getHead(), 0.25 );
+		
+		if ( CheckDistanceGF() ) {
+			//Tommy "That's because you never left."
+			$player1.startSoundShader( "rh_conv4_tom06", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 0 );
+		}
+		
+		TommyCanSpeak();
+		
+		PlayCycle_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "rh_idle_grandfather", 32 );
+		
+		$rhGrandfather.lookAt( $null_entity, 0 );
+		
+		thread Conversation5();
+	}
+	
+	void Conversation4Distance() {				
+		float startTime = sys.getTime();
+		
+		while ( $rhGrandfather.distanceTo( $player1 ) > 96 ) {
+			sys.wait( 0.1 );
+			if ( sys.getTime() - startTime > 50 ) {
+				thread Conversation5();
+				return;
+			}
+		}
+		
+		thread Conversation4();
+	}
+		
+	void PickUpTools() {
+		$rhTools.hide();
+		$rhWrenchPickup.On();
+		
+		string gShowHud = sys.getcvar( "g_showHud" );
+		sys.setcvar( "g_showHud", 0 );
+		$player1.unlockWeapon( -1 ); //wrench raise
+		sys.wait( 1 );
+		$player1.lockWeapon( 1 ); //wrench lower
+		sys.wait( 1 );
+		sys.setcvar( "g_showHud", gShowHud );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_TORSO, "roadhouse_idle", 12 );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_LEGS, "roadhouse_idle", 12 );
+	}
+	
+	void Conversation3() {		
+		WaitDistanceJen( 1, 0, 0 );
+		
+		TommyQuiet( FALSE );
+				
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_lean_to_armsfolded_jenny", "rh_lean_idle_jenny", 24 );
+		
+		//Tommy "What's up babe?"
+		$player1.startSoundShader( "rh_conv3_tom01", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, 0 );
+		
+		WaitDistanceJen( 0, 2, 1 );
+		
+		//Girlfriend "Did you come in here for a drink, or to dump your dirty tools on my nice clean bar?"
+		$rhGirlfriend.lookAt( $player1, -1 );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_didyou", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), -0.1 );
+		
+		//wait for player to pickup tools	
+		WaitDistanceTools( 2, 1 );
+		thread PickUpTools();
+		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		//thread SpeechTransition_Blend( $rhGrandfather, "rh_idlec_grandfather", "rh_idle_grandfather", 36 ); //grandfather looking around
+		
+		//Tommy "Sorry, babe."
+		$player1.startSoundShader( "rh_conv3_tom03", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, 0 );
+		
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_armsfolded_from_jenny", "rh_wipe_idle_jenny", 12 );
+		
+		TommyCanSpeak();
+		
+		sys.wait( 4 );
+		
+		WaitPlayerNearBar( 0 );
+		TommyQuiet( FALSE );
+		
+		//Dalton "Hey, Pocahontas!  How about a couple more beers over here?"
+		thread SpeechTransition_Blend( $rhDalton, "rh_heypoc_dalton", "rh_idle_dalton", 24 );
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_heypocahontas", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.wait( 0.5 );		
+		$rhGirlfriend.lookAt( $rhDalton, 0 );
+		sys.waitForSilence( $rhDalton.getHead(), -2.75 );
+		
+		$rhGirlfriend.lookAt( $player1, 2 );
+		
+		//Jenny "Sigh" gets new beers
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_sighs", 2 );
+		thread SpeechTransition_Blend( $rhGirlfriend, "rh_servebeers_jenny", "rh_wash_idle_jenny", 12 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 1 );
+				
+		//Chuck "Keep'em coming, girl."
+		thread SpeechTransition_Blend( $rhChuck, "rh_keepm_chuck", "rh_idle_chuck", 24 );
+		PlayAnim_Blend( $rhChuck, ANIMCHANNEL_HEAD, "ch_roadhouse_keepem", 6 );
+		$rhChuck.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhChuck.getHead(), 0 );
+				
+		TommyCanSpeak();
+		
+		sys.wait( 2 );
+		
+		thread Conversation4Distance();
+		
+		sys.wait( 1 );
+		
+		if ( !gChuckDaltonBusy ) {
+			gChuckDaltonBusy = 1;
+			thread SpeechTransition_Blend( $rhChuck, "rh_idlecheers_chuck", "rh_idle_chuck", 24 );
+			SpeechTransition_Blend( $rhDalton, "rh_idlecheers_dalton", "rh_idle_dalton", 24 );
+			gChuckDaltonBusy = 0;
+		}
+	}
+	
+	void Conversation2JenExit() {
+		sys.wait( 2.25 );
+		
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_ringout_to_jenny", 12 );
+		sys.wait( $rhGirlfriend.animLength( ANIMCHANNEL_LEGS, "rh_ringout_to_jenny" ) );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_ringout_idle_jenny", 12 );
+		sys.wait( $rhGirlfriend.animLength( ANIMCHANNEL_LEGS, "rh_ringout_idle_jenny" ) );
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_LEGS, "rh_armsfolded_to_jenny", 12 );
+		
+		//Girlfriend "Nothing either of you could afford.  Drink up, boys."	
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_nothing", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0 );
+		TommyCanSpeak();
+		
+		$rhGirlfriend.lookAt( $player1, 15 );
+		
+		sys.wait( 1 );
+		thread Conversation3();
+	}
+	
+	void Conversation2() {
+		sys.wait( 8 );
+		
+		WaitPlayerNearBar( 0 );
+		
+		TommyQuiet( FALSE );
+				
+		thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+		
+		sys.wait( 0.5 );
+		
+		//Dalton "Slow night tonight, huh sugar?"
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_slownight", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhDalton.getHead(), -0.15 );
+						
+		//Girlfriend "Not since you two studs showed up."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_notsince", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0.25 );
+		
+		WaitPlayerNearBar( 1 );
+		
+		//Chuck "Hey, you sell any of that red indian shit?  My wife loves that turquoise crap."
+		thread SpeechTransition_Blend( $rhChuck, "rh_yousell_chuck", "rh_idle_chuck", 24 );
+		thread SpeechTransition_Blend( $rhDalton, "rh_drink_beer_dalton", "rh_idle_dalton", 12 );
+		
+		thread Conversation2JenExit();
+		
+		PlayAnim_Blend( $rhChuck, ANIMCHANNEL_HEAD, "ch_roadhouse_heyyou", 6 );
+		$rhChuck.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhChuck.getHead(), -0.45 );
+		
+		//Girlfriend "This is a bar, boys.  We don't sell jewelry."
+		PlayAnim_Blend( $rhGirlfriend, ANIMCHANNEL_HEAD, "jn_roadhouse_thisis", 6 );
+		sys.waitForSilence( $rhGirlfriend.getHead(), 0 );
+				
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_idleb_grandfather", "rh_idle_grandfather", 36 ); //grandfather drinking
+				
+		//Chuck "Maybe she's got something else for sale..."
+		thread SpeechTransition_Blend( $rhChuck, "rh_maybeshe_chuck", "rh_idle_chuck", 24 );
+		thread SpeechTransition_Blend( $rhDalton, "rh_maybeshe_dalton", "rh_idle_dalton", 24 );
+		sys.wait( 0.35 );
+		PlayAnim_Blend( $rhDalton, ANIMCHANNEL_HEAD, "dl_roadhouse_maybeshe", 6 );
+		$rhDalton.lookAt( $rhGirlfriendLookAt, 5 );
+		sys.waitForSilence( $rhDalton.getHead(), -1.5 );
+	}
+	
+	void Conversation1GrandfatherEnter() {
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "rh_hallway_idle_to_grandfather", 0 );
+		sys.trigger( $rhGrandfatherForce1 );
+		sys.wait( $rhGrandfather.animLength( ANIMCHANNEL_LEGS, "rh_hallway_idle_to_grandfather" ) );
+		PlayCycle_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "rh_hallway_idle_grandfather", 12 );
+	}
+	
+	void Conversation1DoorSwingExitThread() {
+		$rhSwingDoor1CtrlP.time( 0.5 );
+		$rhSwingDoor2CtrlP.time( 0.5 );
+		
+		$rhSwingDoor1CtrlP.rotateOnce( '0 90 0' );
+		$rhSwingDoor2CtrlP.rotateOnce( '0 -90 0' );
+		sys.wait( 2 );
+		$rhSwingDoor1CtrlP.rotateOnce( '0 -90 0' );
+		$rhSwingDoor2CtrlP.rotateOnce( '0 90 0' );
+		sys.waitFor( $rhSwingDoor1CtrlP );
+		$rhSwingDoor1.unbind();
+		$rhSwingDoor2.unbind();
+	}
+	
+	void Conversation1DoorSwingExit() {
+		thread Conversation1DoorSwingExitThread();
+	}
+	
+	void Conversation1GrandfatherExit() {
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_idle_to_grandfather", "rh_idle_grandfather", 48 );
+		sys.wait( 3 );
+		$rhGrandfather.lookAt( $null_entity, 0 );
+		
+		$rhLightSwitch10Base.guiEvent( "TurnOn" ); //enable light switch near grandfather
+		
+		//overrideAnim on head for rh_idle_grandfather
+		sys.wait( $rhGrandfather.animLength( ANIMCHANNEL_LEGS, "rh_idle_to_grandfather" ) - 3 );		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+	}
+	
+	void RemoveGrandfatherClipThread() {
+		$rhGrandfatherClip1.speed( 21 );
+		$rhGrandfatherClip1.move( EAST, 48 );
+		$rhGrandfatherClip2.bindToJoint( $rhGrandfather, "hip", 0 );
+		sys.waitFor( $rhGrandfatherClip1 );
+		$rhGrandfatherClip1.remove();
+		sys.wait( 6 );
+		$rhGrandfatherClip2.remove();
+	}
+	
+	void RemoveGrandfatherClip() {
+		thread RemoveGrandfatherClipThread();
+	}
+	
+	void Conversation1() {
+		$rhGrandfather.lookAt( $player1, -1 );
+		
+		thread Conversation1GrandfatherEnter();
+						
+		//Grandfather "Tommy"
+		TommyQuiet( FALSE );
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_tommy", 0 );
+		sys.waitForSilence( $rhGrandfather.getHead(), 0.35 );
+		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+				
+		WaitDistanceGFHallway( 1, 4, 1 );
+		
+		//Tommy "Enisi? What are you doing here? You never come in here."
+		$player1.startSoundShader( "rh_conv1_tom02", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, 0.15 );
+				
+		WaitDistanceGFHallway( 0, 2, 1 );
+		
+		//Grandfather "I sense great change on the winds. I came to warn-"
+		PlayCycle_Blend( $rhGrandfather, ANIMCHANNEL_LEGS, "rh_hallway_idle_grandfather", 36 );
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_isense", 2 );
+		sys.wait( 3.8 );
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_hallway_cametowarn_grandfather", "rh_hallway_idle_B_grandfather", 8 );
+		
+		WaitDistanceGFHallway( 0, 2, 1 );
+		
+		//Tommy "Save it, Grandfather. You know I don't go for that shit."
+		$player1.startSoundShader( "rh_conv1_tom04", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, -0.6 );
+		
+		WaitDistanceGFHallway( 0, 2, 1 );
+		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		
+		//Grandfather "Listen Tommy. You cannot turn your back on your heritage any longer. It will give you strength."
+		thread SpeechTransition_Blend( $rhGrandfather, "rh_hallway_calmdown_grandfather", "rh_hallway_idle_C_grandfather", 12 );
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_listentommy", 4 );
+		sys.waitForSilence( $rhGrandfather.getHead(), 0.1 );
+		
+		$rhGrandfather.overrideAnim( ANIMCHANNEL_HEAD );
+		
+		if ( CheckDistanceGFHallway() ) {
+			//Tommy "For what?"
+			$player1.startSoundShader( "rh_conv1_tom06", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 0 );
+		}
+	
+		if ( CheckDistanceGFHallway() ) {
+			//Grandfather "To save yourself. To survive."
+			PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_tosave", 6 );
+			thread SpeechTransition_2Blends( $rhGrandfather, "rh_hall_tosave_gf", "rh_hallway_idle_grandfather", 12, 24 );
+			sys.waitForSilence( $rhGrandfather.getHead(), 0 );
+			
+			//Tommy "Uh, thanks for the concern. But I don't need saving. Go home. I gotta help Jen close up."
+			$player1.startSoundShader( "rh_conv1_tom08", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 1.0 );
+		}
+		
+		WaitDistanceGFHallway( 0, 2, 1 );
+		
+		$player1.startSoundShader( "rh_conv1_tom08a", SND_CHANNEL_VOICE );
+		sys.wait( 0.25 );
+		
+		//Grandfather "My place is here, by your side. You will have need of me this night."		
+		PlayAnim_Blend( $rhGrandfather, ANIMCHANNEL_HEAD, "gf_roadhouse_myplace", 2 );
+		
+		sys.waitForSilence( $player1, 0 ); //rh_conv1_tom08a
+				
+		thread Conversation1GrandfatherExit();
+		sys.waitForSilence( $rhGrandfather.getHead(), 0 ); //gf_roadhouse_myplace
+		
+		
+		if ( CheckDistanceGFHallway() ) {
+			//Tommy "Sure, whatever."
+			$player1.startSoundShader( "rh_conv1_tom10", SND_CHANNEL_VOICE );
+			sys.waitForSilence( $player1, 0 );
+		}
+		
+		TommyCanSpeak();
+	}
+	
+	void JukeboxStart() {
+		$rhJukeBox.setTrack( 1 );
+		$rhJukeBox.playSelected();
+	}
+	
+	void NPCSetup() {
+		$rhGrandfather.becomeNonSolid();
+		$rhGirlfriend.becomeNonSolid();
+		$rhChuck.becomeNonSolid();
+		$rhDalton.becomeNonSolid();
+		
+		$rhGirlfriend.disableClip();
+		
+		$rhGrandfather.setNeverDormant( 1 );
+		$rhGirlfriend.setNeverDormant( 1 );
+		$rhChuck.setNeverDormant( 1 );
+		$rhDalton.setNeverDormant( 1 );
+		
+		$rhGrandfather.DisableWalkIK();
+		$rhGirlfriend.DisableWalkIK();
+		$rhChuck.DisableWalkIK();
+		$rhDalton.DisableWalkIK();
+		
+		$rhGirlfriend.playCycle( ANIMCHANNEL_LEGS, "rh_wash_idle_jenny" );
+		$rhChuck.playCycle( ANIMCHANNEL_LEGS, "rh_idle_chuck" );
+		$rhDalton.playCycle( ANIMCHANNEL_LEGS, "rh_idle_dalton" );
+		
+		$rhGrandfather.allowMovement( 1 );
+		
+		sys.waitFrame();
+		
+		$rhChuckBeer1.moveToJoint( $rhChuck, "Lattach_gun" );
+		$rhChuckBeer1.setAngles( $rhChuck.getJointAngle( $rhChuck.getJointHandle( "Lattach_gun" ) ) + '-90 90 90' );
+		$rhChuckBeer1.bindToJoint( $rhChuck, "Lattach_gun", 1 );
+		$rhDaltonBeer1.moveToJoint( $rhDalton, "Rattach_gun" );
+		$rhDaltonBeer1.setAngles( $rhDalton.getJointAngle( $rhDalton.getJointHandle( "Rattach_gun" ) ) + '0 0 -90' );
+		$rhDaltonBeer1.bindToJoint( $rhDalton, "Rattach_gun", 1 );
+				
+		$rhGirlfriendLookAt.moveToJoint( $rhGirlfriend.getHead(), "head" );
+		$rhGirlfriendLookAt.bindToJoint( $rhGirlfriend.getHead(), "head", 1 );
+	}
+	
+	boolean NPCComment( entity npc, string anim, entity self ) {	
+		if ( !self.getFloatKey( "hasSpoken" ) ) {			
+			if ( TommyQuiet( TRUE ) ) {
+				self.setKey( "hasSpoken", 1 );
+				self.disable();
+				
+				PlayAnim_Blend( npc, ANIMCHANNEL_HEAD, anim, 6 );
+				npc.lookAt( $player1, npc.animLength( ANIMCHANNEL_HEAD, anim ) );
+				sys.waitForSilence( npc.getHead(), 0 );
+				TommyCanSpeak();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	//JEN		Tommy, knock it off! 
+	void JenKnockItOff( entity self ) {
+		NPCComment( $rhGirlfriend, "jn_roadhouse_tommyknock", self );
+	}
+	
+	//JEN		Tommy, grow up.
+	void JenGrowUp( entity self ) {
+		NPCComment( $rhGirlfriend, "jn_roadhouse_tommygrow", self );
+	}
+	
+	//CHUCK		Buzz off.
+	void ChuckBuzzOff( entity self ) {
+		if ( !gChuckDaltonBusy ) {
+			gChuckDaltonBusy = 1;
+			if ( NPCComment( $rhChuck, "ch_roadhouse_buzzoff", self ) ) {
+				thread SpeechTransition_Blend( $rhDalton, "rh_drink_beer_dalton", "rh_idle_dalton", 12 );
+				sys.wait( 8 );
+				$rh_dalton02.enable();
+			}
+			gChuckDaltonBusy = 0;
+		}
+	}
+	
+	//CHUCK		I said beat it.
+	void ChuckBeatIt( entity self ) {
+		if ( !gChuckDaltonBusy ) {
+			gChuckDaltonBusy = 1;
+			if ( NPCComment( $rhChuck, "ch_roadhouse_isaid", self ) ) {	
+				thread SpeechTransition_Blend( $rhDalton, "rh_drink_beer_dalton", "rh_idle_dalton", 12 );
+				thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+			}
+			gChuckDaltonBusy = 0;
+		}
+	}
+	
+	//CHUCK		Dalton, look at this guy.
+	//DALTON	Get lost asshole
+	void ChuckLookAt( entity self ) {
+		if ( !gChuckDaltonBusy ) {
+			gChuckDaltonBusy = 1;
+			if ( NPCComment( $rhChuck, "ch_roadhouse_daltonlook", self ) ) {
+				thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+				NPCComment( $rhDalton, "dl_roadhouse_getlost", $rh_dalton01 );
+				sys.wait( 8 );
+				$rh_chuck01.enable();
+			}
+			gChuckDaltonBusy = 0;
+		}
+	}
+	
+	//DALTON	Fuck off, man
+	void DaltonFuckOff( entity self ) {
+		if ( !gChuckDaltonBusy ) {
+			gChuckDaltonBusy = 1;
+			if ( NPCComment( $rhDalton, "dl_roadhouse_fuckoff", self ) ) {
+				thread SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+				sys.wait( 8 );
+				$rh_chuck02.enable();
+			}
+			gChuckDaltonBusy = 0;
+		}
+	}
+	
+	boolean TommyComment( string comment, entity self ) {
+		if ( !self.getFloatKey( "hasSpoken" ) ) {			
+			if ( TommyQuiet( TRUE ) ) {
+				self.setKey( "hasSpoken", 1 ); //comment won't be spoken again
+				self.disable();
+				
+				$player1.startSoundShader( comment, SND_CHANNEL_VOICE );
+				sys.waitForSilence( $player1, 1 );
+				TommyCanSpeak();
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	//disables all triggers for Tommy's window comment
+	void TommyWindow( entity self, entity sightEnt ) {
+		if ( sightEnt.playerCanSee() ) {
+			if ( TommyComment( "rh_tom_window", self ) ) {
+				//disable all window comment triggers
+				$rh_tom11.disable();
+				$rh_tom12.disable();
+				$rh_tom13.disable();
+			}
+		}
+	}
+	
+	void TommyWindow1( entity self ) {
+		TommyWindow( self, $window1Sight );
+	}
+	
+	void TommyWindow2( entity self ) {
+		TommyWindow( self, $window2Sight );
+	}
+	
+	void TommyWindow3( entity self ) {
+		TommyWindow( self, $window3Sight );
+	}
+	
+	//TOMMY	Doesn't anyone ever clean this place? 
+	void TommyDoesntAnyone( entity self ) {
+		TommyComment( "rh_tom01", self );
+	}
+	
+	//TOMMY	Oh, gross.
+	void TommyOhGross( entity self ) {
+		TommyComment( "rh_tom02", self );
+	}
+	
+	//TOMMY	Sugar and spice, my ass.
+	void TommySugarAndSpice( entity self ) {
+		TommyComment( "rh_tom03", self );
+	}
+	
+	//TOMMY	Looks like Jen's running low on Ryan Red.
+	void TommyLooksLikeJen( entity self ) {
+		TommyComment( "rh_tom04", self );
+	}
+		
+	//TOMMY	Worst. Indian casino. Ever.
+	void TommyWorstIndianCasino( entity self ) {
+		TommyComment( "rh_tom05", self );
+	}
+		
+	//TOMMY	Man, they need some new tunes in this thing.
+	void TommyManTheyNeed( entity self ) {		
+		if ( $rhJukeBox.playerCanSee() ) {
+			if ( TommyComment( "rh_tom06", self ) ) {
+				sys.wait( 10 );
+				$rh_tom07.enable(); //enable alternate dialog trigger
+			}
+		}
+	}
+		
+	//TOMMY	Who picks this stuff?
+	void TommyWhoPicks( entity self ) {
+		if ( $rhJukeBox.playerCanSee() ) {
+			TommyComment( "rh_tom07", self );
+		}
+	}
+		
+	//TOMMY	I just got here!
+	void TommyIJustGotHere( entity self ) {
+		if ( TommyComment( "rh_tom08", self ) ) {
+			sys.wait( 15 );
+			$rh_tom09.enable(); //enable alternate dialog trigger
+		}
+	}
+		
+	//TOMMY	I can�t leave yet
+	void TommyICantLeave( entity self ) {
+		TommyComment( "rh_tom09", self );
+	}
+	
+	//TOMMY	(laughs) Man, Jen�s let this place slide�
+	void TommyManJens( entity self ) {
+		TommyComment( "rh_tom10", self );
+	}
+	
+	//sets global shader parms used for dissolve effect
+	void SetGlobalShaderParms() {
+		sys.setShaderParm( 6, 0.3 );
+		sys.setShaderParm( 7, 0.075 );
+	}
+	
+	void SetEntityIDs() {
+		gDaltonID = sys.getEntitySpawnId( $rhDalton );
+		gChuckID = sys.getEntitySpawnId( $rhChuck );
+		gTruckID = sys.getEntitySpawnId( $rhTruck );
+	}
+	
+	void IntroMusicPlay() {
+		thread PlayMapMusic( "snd_roadhouse_flashback", false, MUS_TRANSITION_CUTOFF );
+	}
+	
+	void VoiceIntro() {
+		sys.fadeOut( '0 0 0', sys.getFrameTime() );
+		sys.wait( 1.5 );
+		$player1.startSoundShader( "rh_intro1", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, -1.5 );
+		$player1.startSoundShader( "rh_intro2", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, -1.5 );
+		$player1.startSoundShader( "rh_intro3", SND_CHANNEL_VOICE );
+		sys.waitForSilence( $player1, -4.5 );
+	}
+
+	
+	void CameraTrack( entity head ) {
+		$rhIntroCameraCtrlP.unbind();
+		
+		while ( gCameraTrack ) {
+			$rhIntroCameraCtrlP.setOrigin( head.getJointPos( head.getJointHandle( "camera" ) ) );
+			$rhIntroCameraCtrlP.setAngles( head.getJointAngle( head.getJointHandle( "camera" ) ) );
+			sys.waitFrame();
+		}
+	}
+	
+	void PlayerSetup() {
+		$player1.cinematic( 1, 1 );
+		
+		$rhIntroCamera.setAngles( '-3.39 -3.94 -1.43' ); //offset the camera a bit from the joint
+		$rhIntroCamera.bind( $rhIntroCameraCtrlP );
+		sys.wait( 2 );
+		
+		$player1.setPrivateCameraView( $rhIntroCamera, 1 );
+		$rhIntroCamera.setfov( 80, 0, 0, 0 );
+		
+		entity player1Head = $player1.getHead();
+		
+		$rhIntroCameraCtrlP.setAngles( player1Head.getJointAngle( player1Head.getJointHandle( "camera" ) ) );
+		$rhIntroCameraCtrlP.moveToJoint( player1Head, "camera" );
+		$rhIntroCameraCtrlP.bind( player1Head );
+		$rhIntroCameraCtrlP.bindToJoint( player1Head, "camera", 1 );
+		sys.waitFrame();
+		
+		thread CameraTrack( player1Head );
+			
+		$player1.setBlendFrames( ANIMCHANNEL_TORSO, 0 );
+		$player1.setBlendFrames( ANIMCHANNEL_LEGS, 0 );
+		$player1.playCycle( ANIMCHANNEL_TORSO, "rh_mirror_preidle_tommy" );
+		$player1.playCycle( ANIMCHANNEL_LEGS, "rh_mirror_preidle_tommy" );
+	}
+
+	void QuickStartMirrorControl() {
+		// End intro camera tracking and restore direct player control immediately.
+		gCameraTrack = 0;
+		$rhIntroCameraCtrlP.unbind();
+
+		$player1.setPrivateCameraView( $null_entity, 0 );
+		$player1.cinematic( 0, 0 );
+		$player1.enableEyeFocus();
+		$player1.setBlendFrames( ANIMCHANNEL_HEAD, 0 );
+		$player1.setBlendFrames( ANIMCHANNEL_TORSO, 0 );
+		$player1.setBlendFrames( ANIMCHANNEL_LEGS, 0 );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_HEAD, "roadhouse_idle", 0 );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_TORSO, "roadhouse_idle", 0 );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_LEGS, "roadhouse_idle", 0 );
+	}
+	
+	void IntroSinkTurnOn() {
+		sys.wait( 10.25 );
+		thread BathMSinkHotKnobToggle();
+	}
+	
+	void CasinoDaltonIdle() {
+		while ( true ) {
+			sys.wait( 8 + sys.random( 10 ) );
+			SpeechTransition_Blend( $rhDalton, "rh_drink_beer_dalton", "rh_idle_dalton", 12 );
+		}
+	}
+	
+	void CasinoChuckIdle() {
+		while ( true ) {
+			sys.wait( 8 + sys.random( 10 ) );
+			SpeechTransition_Blend( $rhChuck, "rh_drink_beer_chuck", "rh_idle_chuck", 12 );
+		}
+	}
+	
+	void CasinoGrandfatherIdle() {
+		float animNum;
+		string animName;
+		
+		while ( true ) {
+			sys.wait( 8 + sys.random( 10 ) );
+			
+			animNum = int( sys.random( 3 ) );
+			
+			if ( animNum == 0 ) {
+				animName = "rh_idleb_grandfather";
+			} else if ( animNum == 1 ) {
+				animName = "rh_idlec_grandfather";
+			} else if ( animNum == 2 ) {
+				animName = "rh_idled_grandfather";
+			}
+			
+			SpeechTransition_Blend( $rhGrandfather, animName, "rh_idle_grandfather", 36 );
+		}
+	}
+	
+	void CasinoPickUpTools() {
+		$casinoWrenchTrigger.disable(); //disable wrench pickup
+		$rhTools.hide();
+		$player1.unlockWeapon( 1 );
+	}
+	
+	void CasinoSetup() {
+		//set skins to disable impacts
+		$rhChuck.setSkin( "skins/characters/chuck_roadhouse_casino.skin" );
+		$rhDalton.setSkin( "skins/characters/dalton_roadhouse_casino.skin" );
+		
+		//remove grandfather hallway clip
+		$rhGrandfatherClip1.remove();
+		$rhGrandfatherClip2.remove();
+		
+		$rhGrandfatherHallwayTrigger.remove(); //trigger that starts grandfather conversation
+		$Conversation2.remove(); //trigger that starts bar conversation
+		
+		$casinoWrenchTrigger.enable(); //enable wrench pickup
+		
+		$player1.setBlendFrames( ANIMCHANNEL_TORSO, 0 );
+		$player1.setBlendFrames( ANIMCHANNEL_LEGS, 0 );
+		sys.waitFrame();
+		PlayCycle_Blend( $player1, ANIMCHANNEL_TORSO, "roadhouse_idle", 48 );
+		PlayCycle_Blend( $player1, ANIMCHANNEL_LEGS, "roadhouse_idle", 48 );
+		
+		gChuckDaltonBusy = 1; //disallow chuck/dalton comments
+		
+		//setup grandfather beer in hand and idle
+		$rhGrandfather.setBlendFrames( ANIMCHANNEL_LEGS, 0 );
+		$rhGrandfather.playCycle( ANIMCHANNEL_LEGS, "rh_idle_grandfather" );
+		$rhGrandfatherBeer.moveToJoint( $rhGrandfather, "Rattach_gun" );
+		$rhGrandfatherBeer.setAngles( $rhGrandfather.getJointAngle( $rhGrandfather.getJointHandle( "Rattach_gun" ) ) + '10 0 -83' );
+		$rhGrandfatherBeer.bindToJoint( $rhGrandfather, "Rattach_gun", 1 );
+		
+		$rhAbductEmitter.remove();
+		
+		thread CasinoGrandfatherIdle();
+		thread CasinoDaltonIdle();
+		thread CasinoChuckIdle();
+		
+		$rhLightSwitch10Base.guiEvent( "TurnOn" ); //enable light switch near grandfather
+	}
+	
+	void main() {
+		g_CasinoMode = sys.getcvarFloat( "g_casino" );
+		
+		SetEntityIDs();
+		SetGlobalShaderParms();
+		ShipSetup();
+		BathroomSetup();
+		RHLightSetup();
+		StoolSetup();
+		JukeboxStart();
+		WaterHeaterSetup();
+		thread NPCSetup();
+		thread WaterHeaterRun();
+		thread FanSpin( $fan1Blades, 0.0 );
+		thread FanSpin( $fan2Blades, 0.2 );
+		
+		if ( !g_CasinoMode ) {
+			sys.trigger( $rhLevelStartSoundFade );
+			PlayerSetup();
+			QuickStartMirrorControl();
+			IntroMusicPlay();
+			TommyCanSpeak();
+			thread ThunderSoftStart();
+			thread WolfHowlRun();
+			thread DogBarkRun();
+			thread CarPassBy();
+			thread ToiletBlow();
+		} else {		
+			CasinoSetup();
+			IntroMusicPlay();
+		}
+	}
+}

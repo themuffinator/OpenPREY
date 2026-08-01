@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Map = "mp/q4dm1",
+    [string]$Map = "game/dmroadhouse",
 
     [int]$Port = 28110,
 
@@ -15,21 +15,19 @@ param(
 
     [int]$ClientSettleSeconds = 5,
 
-    [string]$BasePath = "C:\Program Files (x86)\Steam\steamapps\common\Quake 4",
+    [string]$BasePath = "",
 
     [string]$SaveRoot = "",
 
     [switch]$ShowFPS,
 
     [ValidateRange(0, 2)]
-    [int]$ShowFramePacing = 0,
-
-    [switch]$Fullscreen
+    [int]$ShowFramePacing = 0
 )
 
 $ErrorActionPreference = "Stop"
 
-function New-openQ4CommonArgs {
+function New-openPREYCommonArgs {
     param(
         [Parameter(Mandatory = $true)]
         [string]$SavePath,
@@ -40,7 +38,6 @@ function New-openQ4CommonArgs {
         [Parameter(Mandatory = $true)]
         [string]$InstallDir,
 
-        [Parameter(Mandatory = $true)]
         [string]$BasePath,
 
         [Parameter(Mandatory = $true)]
@@ -48,9 +45,6 @@ function New-openQ4CommonArgs {
 
         [Parameter(Mandatory = $true)]
         [string]$SwapInterval,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Fullscreen,
 
         [Parameter(Mandatory = $true)]
         [bool]$ShowFPS,
@@ -66,13 +60,16 @@ function New-openQ4CommonArgs {
         "+set", "developer", "1",
         "+set", "com_maxfps", $MaxFPS,
         "+set", "r_swapInterval", $SwapInterval,
-        "+set", "r_fullscreen", $Fullscreen,
+        "+set", "r_fullscreen", "0",
         "+set", "g_autoScreenshot", "0",
-        "+set", "fs_basepath", $BasePath,
         "+set", "fs_savepath", $SavePath,
         "+set", "fs_devpath", $InstallDir,
-        "+set", "fs_game", "baseoq4"
+        "+set", "fs_game", "basepr"
     )
+
+    if (-not [string]::IsNullOrWhiteSpace($BasePath)) {
+        $args += @("+set", "fs_basepath", $BasePath)
+    }
 
     if ($ShowFPS) {
         $args += @("+set", "com_showFPS", "1")
@@ -88,7 +85,7 @@ function New-openQ4CommonArgs {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 $installDir = Join-Path $workspaceRoot ".install"
-$exePath = Join-Path $installDir "openQ4-client_x64.exe"
+$exePath = Join-Path $installDir "openPREY-client_x64.exe"
 
 if ([string]::IsNullOrWhiteSpace($SaveRoot)) {
     $SaveRoot = Join-Path $workspaceRoot ".tmp"
@@ -97,15 +94,15 @@ if ([string]::IsNullOrWhiteSpace($SaveRoot)) {
 }
 
 if (-not (Test-Path -LiteralPath $exePath)) {
-    throw "openQ4 client executable not found: $exePath"
+    throw "openPREY client executable not found: $exePath"
 }
 
 if (-not (Test-Path -LiteralPath $installDir)) {
-    throw "openQ4 install directory not found: $installDir"
+    throw "openPREY install directory not found: $installDir"
 }
 
-if (-not (Test-Path -LiteralPath $BasePath)) {
-    throw "Quake 4 base path not found: $BasePath"
+if (-not [string]::IsNullOrWhiteSpace($BasePath) -and -not (Test-Path -LiteralPath (Join-Path $BasePath "base"))) {
+    throw "Prey base path must contain base/: $BasePath"
 }
 
 if (-not (Test-Path -LiteralPath $SaveRoot)) {
@@ -117,18 +114,16 @@ $serverSavePath = Join-Path $SaveRoot ("listen_server_{0}" -f $stamp)
 $clientSavePath = Join-Path $SaveRoot ("listen_client_{0}" -f $stamp)
 New-Item -ItemType Directory -Force -Path $serverSavePath, $clientSavePath | Out-Null
 
-$fullscreenValue = if ($Fullscreen) { "1" } else { "0" }
 $maxFPSValue = $MaxFPS.ToString()
 $swapIntervalValue = $SwapInterval.ToString()
 
-$serverArgs = New-openQ4CommonArgs `
+$serverArgs = New-openPREYCommonArgs `
     -SavePath $serverSavePath `
     -LogFileName "logs/listen-server.log" `
     -InstallDir $installDir `
     -BasePath $BasePath `
     -MaxFPS $maxFPSValue `
     -SwapInterval $swapIntervalValue `
-    -Fullscreen $fullscreenValue `
     -ShowFPS $ShowFPS.IsPresent `
     -ShowFramePacing $ShowFramePacing
 
@@ -138,18 +133,17 @@ $serverArgs += @(
     "+seta", "si_pure", "0",
     "+set", "net_serverAllowServerMod", "1",
     "+set", "sv_cheats", "1",
-    "+set", "si_gameType", "DM",
+    "+set", "si_gameType", "deathmatch",
     "+spawnServer", $Map
 )
 
-$clientArgs = New-openQ4CommonArgs `
+$clientArgs = New-openPREYCommonArgs `
     -SavePath $clientSavePath `
     -LogFileName "logs/listen-client.log" `
     -InstallDir $installDir `
     -BasePath $BasePath `
     -MaxFPS $maxFPSValue `
     -SwapInterval $swapIntervalValue `
-    -Fullscreen $fullscreenValue `
     -ShowFPS $ShowFPS.IsPresent `
     -ShowFramePacing $ShowFramePacing
 
@@ -183,7 +177,7 @@ $result = [pscustomobject]@{
     Port            = $Port
     MaxFPS          = $MaxFPS
     SwapInterval    = $SwapInterval
-    Fullscreen      = $Fullscreen.IsPresent
+    Fullscreen      = $false
     ShowFPS         = $ShowFPS.IsPresent
     ShowFramePacing = $ShowFramePacing
     ServerPID       = $serverProcess.Id
@@ -192,8 +186,8 @@ $result = [pscustomobject]@{
     ClientRunning   = -not $clientProcess.HasExited
     ServerSavePath  = $serverSavePath
     ClientSavePath  = $clientSavePath
-    ServerLog       = (Join-Path $serverSavePath "q4base\logs\listen-server.log")
-    ClientLog       = (Join-Path $clientSavePath "q4base\logs\listen-client.log")
+    ServerLog       = (Join-Path $serverSavePath "basepr\logs\listen-server.log")
+    ClientLog       = (Join-Path $clientSavePath "basepr\logs\listen-client.log")
 }
 
 $result

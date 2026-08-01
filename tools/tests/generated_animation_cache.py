@@ -8,7 +8,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT.parent / "openQ4-game")).resolve()
+GAME_LIBS_ROOT = Path(
+    os.environ.get("OPENPREY_GAMELIBS_REPO")
+    or os.environ.get("OPENQ4_GAMELIBS_REPO")
+    or ROOT.parent / "OpenPrey-game"
+).resolve()
 
 
 def read(root: Path, relative_path: str) -> str:
@@ -32,25 +36,26 @@ def require_order(haystack: str, first: str, second: str, context: str) -> None:
 
 def validate_engine_file_identity_contract() -> None:
     engine_header = read(ROOT, "src/framework/File.h")
-    game_header = read(GAME_LIBS_ROOT, "src/framework/File.h")
     file_source = read(ROOT, "src/framework/File.cpp")
     filesystem_source = read(ROOT, "src/framework/FileSystem.cpp")
 
-    for source, context in (
-        (engine_header, "engine file interface"),
-        (game_header, "GameLibs file interface"),
-    ):
-        require(
-            source,
-            "virtual int\t\t\t\tGetContainerChecksum( void ) const { return 0; }",
-            context,
-        )
-        require(
-            source,
-            "virtual int\t\t\t\tGetContainerChecksum( void ) const { return containerChecksum; }",
-            context,
-        )
-        require(source, "int\t\t\t\t\t\tcontainerChecksum;", context)
+    # Companion SDK/header mirrors are deliberately excluded during staging;
+    # the engine interface is the single canonical contract used by GameLibs.
+    require(
+        engine_header,
+        "virtual int\t\t\t\tGetContainerChecksum( void ) const { return 0; }",
+        "engine file interface",
+    )
+    require(
+        engine_header,
+        "virtual int\t\t\t\tGetContainerChecksum( void ) const { return containerChecksum; }",
+        "engine file interface",
+    )
+    require(
+        engine_header,
+        "int\t\t\t\t\t\tcontainerChecksum;",
+        "engine file interface",
+    )
 
     require(file_source, "containerChecksum = 0;", "PK4 file construction")
     require(
@@ -61,13 +66,8 @@ def validate_engine_file_identity_contract() -> None:
 
 
 def validate_game_cache_contract() -> None:
-    sp = read(GAME_LIBS_ROOT, "src/game/anim/Anim.cpp")
-    mp = read(GAME_LIBS_ROOT, "src/mpgame/anim/Anim.cpp")
+    game = read(GAME_LIBS_ROOT, "src/game/anim/Anim.cpp")
 
-    sp_shared = sp[sp.index("bool idAnimManager::forceExport") :]
-    mp_shared = mp[mp.index("bool idAnimManager::forceExport") :]
-    if sp_shared != mp_shared:
-        raise AssertionError("SP and MP animation cache implementations have drifted")
 
     for token in (
         'g_useGeneratedAnimCache( "g_useGeneratedAnimCache", "1"',
@@ -99,29 +99,48 @@ def validate_game_cache_contract() -> None:
         "baseFrame.Clear();",
         "baseFrame.Allocated()",
     ):
-        require(sp, token, "generated animation cache implementation")
+        require(game, token, "unified generated animation cache implementation")
 
     require_order(
-        sp,
+        game,
         "g_useGeneratedAnimCache.GetBool() && LoadGeneratedAnim( filename )",
         "parser.LoadFile( filename )",
         "cache-before-source load order",
     )
     require_order(
-        sp,
+        game,
         "animLength = ( ( numFrames - 1 ) * 1000 + frameRate - 1 ) / frameRate;",
         "WriteGeneratedAnim( filename );",
         "source-parse cache write order",
     )
 
 
+def validate_model_decl_parse_contract() -> None:
+    header = read(GAME_LIBS_ROOT, "src/game/anim/Anim.h")
+    parser = read(GAME_LIBS_ROOT, "src/game/anim/Anim_Blend.cpp")
+
+    require(
+        header,
+        "Parse( const char *text, const int textLength, bool noCaching )",
+        "model decl interface",
+    )
+    require(
+        parser,
+        "return Parse( text, textLength, false );",
+        "model decl two-argument compatibility overload",
+    )
+    require(
+        parser,
+        "idDeclModelDef::Parse( const char *text, const int textLength, bool noCaching )",
+        "model decl upstream parse entry point",
+    )
+
+
 def validate_documentation_contract() -> None:
     guide = read(ROOT, "docs/user/level-load-cache.md")
-    release = read(ROOT, "docs/dev/release-completion.md")
-    readme = read(ROOT, "README.md")
 
     for token in (
-        "<fs_savepath>/baseoq4/generated/animations/",
+        "<fs_savepath>/basepr/generated/animations/",
         "g_useGeneratedAnimCache 1",
         "g_writeGeneratedAnimCache 1",
         "stale, truncated, corrupt, or mismatched cache is ignored",
@@ -129,17 +148,11 @@ def validate_documentation_contract() -> None:
     ):
         require(guide, token, "level-load cache guide")
 
-    require(readme, "docs/user/level-load-cache.md", "README player-guide index")
-    require(
-        release,
-        "Animation-heavy level loads now build validated, endian-stable generated MD5 animation caches",
-        "release completion notes",
-    )
-
 
 def main() -> None:
     validate_engine_file_identity_contract()
     validate_game_cache_contract()
+    validate_model_decl_parse_contract()
     validate_documentation_contract()
     print("generated_animation_cache: ok")
 

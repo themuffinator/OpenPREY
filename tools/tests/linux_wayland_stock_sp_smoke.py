@@ -2,8 +2,8 @@
 """Validate packaged stock SP gameplay, audio initialization, and save/load on Wayland.
 
 This is an opt-in native-Linux runtime test because it requires the retail
-Quake 4 PK4s. It launches the staged SP client through a real Wayland socket,
-enters ``game/airdefense1``, saves and restores an isolated slot through two
+Prey (2006) PK4s. It launches the staged client through a real Wayland socket,
+enters ``game/roadhouse``, saves and restores an isolated slot through two
 ``g_autoExecAfterMapLoad`` configs, captures post-restore gameplay, and writes
 an evidence bundle under ``.tmp`` (or an explicitly selected output root).
 
@@ -38,7 +38,7 @@ from linux_physical_host_evidence import (
 ROOT = Path(__file__).resolve().parents[2]
 REPORT_SCHEMA_VERSION = 1
 REPORT_TYPE = "linux-wayland-stock-sp"
-MAP_NAME = "game/airdefense1"
+MAP_NAME = "game/roadhouse"
 DEFAULT_SAVE_SLOT = "linux_wayland_roundtrip"
 LOG_NAME = "linux-wayland-stock-sp.log"
 SCREENSHOT_REL = "screenshots/linux-wayland-stock-sp/after-load.tga"
@@ -164,8 +164,8 @@ def read_text(path: Path | None) -> str:
 
 def find_log(savepath: Path) -> Path | None:
     for candidate in (
-        savepath / "baseoq4" / "logs" / LOG_NAME,
-        savepath / "q4base" / "logs" / LOG_NAME,
+        savepath / "basepr" / "logs" / LOG_NAME,
+        savepath / "base" / "logs" / LOG_NAME,
         savepath / "logs" / LOG_NAME,
     ):
         if candidate.is_file():
@@ -250,29 +250,29 @@ def validate_nontrivial_tga(path: Path | None) -> dict[str, Any]:
 def write_autoexec_configs(home: Path, save_slot: str, settle_frames: int) -> None:
     first_payload = "\n".join(
         (
-            "echo OPENQ4_WAYLAND_SP_SAVE_REQUEST",
+            "echo OPENPREY_WAYLAND_SP_SAVE_REQUEST",
             f"saveGame {save_slot}",
-            "echo OPENQ4_WAYLAND_SP_SAVE_RETURNED",
+            "echo OPENPREY_WAYLAND_SP_SAVE_RETURNED",
             f"set g_autoExecAfterMapLoad {RESTORED_CFG_REL}",
             "set g_autoExecAfterMapLoadDelayMs 1000",
-            "echo OPENQ4_WAYLAND_SP_LOAD_REQUEST",
+            "echo OPENPREY_WAYLAND_SP_LOAD_REQUEST",
             f"loadGame {save_slot}",
             "",
         )
     )
     restored_payload = "\n".join(
         (
-            "echo OPENQ4_WAYLAND_SP_RESTORE_ACTIVE",
+            "echo OPENPREY_WAYLAND_SP_RESTORE_ACTIVE",
             f"wait {max(1, settle_frames)}",
             "gfxInfo",
-            f'echo OPENQ4_WAYLAND_SP_POST_RESTORE_CAPTURE "{MAP_NAME}"',
+            f'echo OPENPREY_WAYLAND_SP_POST_RESTORE_CAPTURE "{MAP_NAME}"',
             f'screenshot "{SCREENSHOT_REL}"',
             "wait 5",
             "quit",
             "",
         )
     )
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr", "base"):
         first = home / game_dir / FIRST_CFG_REL
         restored = home / game_dir / RESTORED_CFG_REL
         first.parent.mkdir(parents=True, exist_ok=True)
@@ -283,7 +283,7 @@ def write_autoexec_configs(home: Path, save_slot: str, settle_frames: int) -> No
 
 
 def find_screenshot(home: Path) -> Path | None:
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr", "base"):
         candidate = home / game_dir / SCREENSHOT_REL
         if candidate.is_file():
             return candidate
@@ -295,7 +295,7 @@ def validate_save_files(home: Path, save_slot: str) -> dict[str, Any]:
     minimum_bytes = {".save": 4096, ".tga": 65536, ".txt": 1}
     save_dir: Path | None = None
     files: dict[str, Path] = {}
-    for game_dir in ("baseoq4", "q4base"):
+    for game_dir in ("basepr", "base"):
         candidate_dir = home / game_dir / "savegames"
         candidate_files = {suffix: candidate_dir / f"{save_slot}{suffix}" for suffix in minimum_bytes}
         if all(path.is_file() for path in candidate_files.values()):
@@ -332,7 +332,7 @@ def validate_save_files(home: Path, save_slot: str) -> dict[str, Any]:
 
 def expected_module_marker(game_module: Path, arch: str) -> str:
     return (
-        f"Selected game module: logical='game_sp' binary='game-sp_{arch}' "
+        f"Selected game module: logical='game' binary='game_{arch}' "
         f"path='{game_module}'"
     )
 
@@ -397,13 +397,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--client-executable",
         type=Path,
         default=None,
-        help="Override the packaged openQ4 SP client executable.",
+        help="Override the packaged openPREY client executable.",
     )
     parser.add_argument(
         "--basepath",
         type=Path,
         required=True,
-        help="Quake 4 install root containing unmodified q4base retail PK4s.",
+        help="Prey (2006) install root containing unmodified base retail PK4s.",
     )
     parser.add_argument(
         "--output-root",
@@ -463,34 +463,38 @@ def main(argv: list[str]) -> int:
     install_root = args.install_root.resolve()
     basepath = args.basepath.resolve()
     game_libs_repo = args.game_libs_repo.resolve() if args.game_libs_repo else None
-    client = (args.client_executable or install_root / f"openQ4-client_{arch}").resolve()
-    game_module = (install_root / "baseoq4" / f"game-sp_{arch}.so").resolve()
-    mod_manifest = install_root / "baseoq4" / "mod.json"
-    openq4_pak0 = install_root / "baseoq4" / "pak0.pk4"
-    openq4_pak1 = install_root / "baseoq4" / "pak1.pk4"
-    retail_pak = (basepath / "q4base" / "pak001.pk4").resolve()
+    client = (args.client_executable or install_root / f"openPREY-client_{arch}").resolve()
+    game_module = (install_root / "basepr" / f"game_{arch}.so").resolve()
+    mod_manifest = install_root / "basepr" / "mod.json"
+    openprey_pak0 = install_root / "basepr" / "pak0.pk4"
+    openprey_pak1 = install_root / "basepr" / "pak1.pk4"
+    retail_candidates = (
+        (basepath / "base" / "pak000.pk4").resolve(),
+        (basepath / "base" / "pak_data.pk4").resolve(),
+    )
+    retail_pak = next((path for path in retail_candidates if path.is_file()), retail_candidates[0])
     for description, path in (
         ("packaged client", client),
-        ("packaged SP game module", game_module),
-        ("packaged openQ4 mod manifest", mod_manifest),
-        ("packaged openQ4 pak0.pk4", openq4_pak0),
-        ("packaged openQ4 pak1.pk4", openq4_pak1),
-        ("retail Quake 4 pak001.pk4", retail_pak),
+        ("packaged unified game module", game_module),
+        ("packaged openPREY mod manifest", mod_manifest),
+        ("packaged openPREY pak0.pk4", openprey_pak0),
+        ("packaged openPREY pak1.pk4", openprey_pak1),
+        ("retail Prey base PK4", retail_pak),
     ):
         if not path.is_file():
             raise RuntimeError(f"{description} not found: {path}")
     if not os.access(client, os.X_OK):
         raise RuntimeError(f"packaged client is not executable: {client}")
 
-    packaged_q4base = install_root / "q4base"
-    if packaged_q4base.is_dir() and any(path.is_file() for path in packaged_q4base.rglob("*")):
+    packaged_retail_base = install_root / "base"
+    if packaged_retail_base.is_dir() and any(path.is_file() for path in packaged_retail_base.rglob("*")):
         raise RuntimeError(
-            f"refusing stock SP evidence because the staged package contains q4base overrides: {packaged_q4base}"
+            f"refusing stock SP evidence because the staged package contains retail base overrides: {packaged_retail_base}"
         )
 
     elf_metadata = {
         "client": validate_native_elf(client, arch),
-        "gameSp": validate_native_elf(game_module, arch),
+        "game": validate_native_elf(game_module, arch),
     }
 
     if not args.wayland_display or Path(args.wayland_display).name != args.wayland_display:
@@ -509,8 +513,8 @@ def main(argv: list[str]) -> int:
     args.output_root.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix=f"{arch}-", dir=args.output_root.resolve()))
     home = run_dir / "home"
-    (home / ".config" / "openq4").mkdir(parents=True)
-    (home / ".local" / "share" / "openq4").mkdir(parents=True)
+    (home / ".config" / "openprey").mkdir(parents=True)
+    (home / ".local" / "share" / "openprey").mkdir(parents=True)
     write_autoexec_configs(home, args.save_slot, args.settle_frames)
 
     stdout_path = run_dir / "stdout.txt"
@@ -526,7 +530,7 @@ def main(argv: list[str]) -> int:
         ("fs_homepath", home),
         ("fs_savepath", home),
         ("fs_devpath", install_root),
-        ("fs_game", "baseoq4"),
+        ("fs_game", "basepr"),
         ("si_gameType", "singleplayer"),
         ("r_ignoreGLErrors", "0"),
         ("r_fullscreen", "0"),
@@ -561,6 +565,7 @@ def main(argv: list[str]) -> int:
         }
     )
     environment.pop("DISPLAY", None)
+    environment.pop("OPENPREY_FORCE_X11", None)
     environment.pop("OPENQ4_FORCE_X11", None)
 
     started = time.monotonic()
@@ -632,7 +637,7 @@ def main(argv: list[str]) -> int:
     client_markers = {
         "nonempty engine log": bool(log_text),
         "native Wayland active": "SDL3: native Wayland active" in log_text,
-        "selected packaged game_sp": expected_module in log_text,
+        "selected packaged unified game": expected_module in log_text,
         "common initialization completed": "--- Common Initialization Complete ---" in log_text,
         "cinematic auto-skip configured": re.search(r"\bset g_autoSkipCinematics 1\b", log_text) is not None,
         "sound enabled": re.search(r"\bset s_noSound 0\b", log_text) is not None,
@@ -643,7 +648,7 @@ def main(argv: list[str]) -> int:
         "save load began": re.search(r"loading a v\d+ savegame", log_text) is not None,
         "save restore initialized": "---------- Game Map Init SaveGame -----------" in log_text,
         "second gameplay config executed": f"AutoExecAfterMapLoad: executed {RESTORED_CFG_REL}" in log_text,
-        "post-restore active marker": "OPENQ4_WAYLAND_SP_RESTORE_ACTIVE" in log_text,
+        "post-restore active marker": "OPENPREY_WAYLAND_SP_RESTORE_ACTIVE" in log_text,
         "post-restore screenshot write": f"Wrote {SCREENSHOT_REL}" in log_text,
         "clean game shutdown": "--------------- Game Shutdown ---------------" in log_text,
     }
@@ -664,20 +669,20 @@ def main(argv: list[str]) -> int:
         (
             ("software sound initialized", re.compile(re.escape("sound system initialized."))),
             ("native Wayland selected", re.compile(re.escape("SDL3: native Wayland active"))),
-            ("packaged SP module selected", re.compile(re.escape(expected_module))),
+            ("packaged unified module selected", re.compile(re.escape(expected_module))),
             ("initial map load", re.compile(re.escape(f"Map: {MAP_NAME}"))),
             ("initial player spawn", re.compile(r"SpawnPlayer:\s*\d+")),
             ("initial active draw", re.compile(re.escape("AutoExecAfterMapLoad: first active draw observed"))),
             ("save/load config executed", re.compile(re.escape(f"AutoExecAfterMapLoad: executed {FIRST_CFG_REL}"))),
-            ("save requested", re.compile(re.escape("OPENQ4_WAYLAND_SP_SAVE_REQUEST"))),
+            ("save requested", re.compile(re.escape("OPENPREY_WAYLAND_SP_SAVE_REQUEST"))),
             ("save completed", re.compile(re.escape(f"Saved '{args.save_slot}'"))),
-            ("load requested", re.compile(re.escape("OPENQ4_WAYLAND_SP_LOAD_REQUEST"))),
+            ("load requested", re.compile(re.escape("OPENPREY_WAYLAND_SP_LOAD_REQUEST"))),
             ("savegame stream opened", re.compile(r"loading a v\d+ savegame")),
             ("old map shut down", re.compile(re.escape("------------ Game Map Shutdown --------------"))),
             ("restored map load", re.compile(re.escape(f"Map: {MAP_NAME}"))),
             ("savegame map initialized", re.compile(re.escape("---------- Game Map Init SaveGame -----------"))),
             ("restored config executed", re.compile(re.escape(f"AutoExecAfterMapLoad: executed {RESTORED_CFG_REL}"))),
-            ("restored gameplay active", re.compile(re.escape("OPENQ4_WAYLAND_SP_RESTORE_ACTIVE"))),
+            ("restored gameplay active", re.compile(re.escape("OPENPREY_WAYLAND_SP_RESTORE_ACTIVE"))),
             ("post-restore capture", re.compile(re.escape(f"Wrote {SCREENSHOT_REL}"))),
             ("clean game shutdown", re.compile(re.escape("--------------- Game Shutdown ---------------"))),
         ),
@@ -755,12 +760,12 @@ def main(argv: list[str]) -> int:
         "glErrorMarkers": gl_error_markers,
         "audioErrorMarkers": audio_error_markers,
         "elapsedSeconds": round(elapsed, 3),
-        "openQ4Commit": git_commit(ROOT),
-        "openQ4GameCommit": git_commit(game_libs_repo),
+        "openPREYCommit": git_commit(ROOT),
+        "OpenPreyGameCommit": git_commit(game_libs_repo),
         "sha256": {
             "client": sha256_file(client),
-            "gameSp": sha256_file(game_module),
-            "retailPak001": sha256_file(retail_pak),
+            "game": sha256_file(game_module),
+            "retailPreyPak": sha256_file(retail_pak),
         },
         "elf": elf_metadata,
         "paths": {
@@ -777,6 +782,7 @@ def main(argv: list[str]) -> int:
             "SDL_VIDEO_DRIVER": "wayland",
             "SDL_VIDEODRIVER": "wayland",
             "DISPLAYRemoved": "DISPLAY" not in environment,
+            "OPENPREY_FORCE_X11Removed": "OPENPREY_FORCE_X11" not in environment,
             "OPENQ4_FORCE_X11Removed": "OPENQ4_FORCE_X11" not in environment,
         },
     }

@@ -251,6 +251,74 @@ static void R_AutospriteDeform( drawSurf_t *surf ) {
 
 /*
 =====================
+R_CoronaDeform
+
+Prey coronas are authored as quads and billboarded using a material-driven
+scale. The center is nudged toward the viewer to avoid shallow-angle z-fighting.
+=====================
+*/
+static void R_CoronaDeform( drawSurf_t *surf ) {
+	const srfTriangles_t *tri = surf->geo;
+	if ( ( tri->numVerts & 3 ) != 0 || tri->numIndexes != ( tri->numVerts >> 2 ) * 6 ) {
+		common->Warning( "R_CoronaDeform: material '%s' has invalid quad geometry", surf->material->GetName() );
+		return;
+	}
+
+	idVec3 leftDir;
+	idVec3 upDir;
+	idVec3 localViewer;
+	R_GlobalVectorToLocal( surf->space->modelMatrix, tr.viewDef->renderView.viewaxis[1], leftDir );
+	R_GlobalVectorToLocal( surf->space->modelMatrix, tr.viewDef->renderView.viewaxis[2], upDir );
+	R_GlobalPointToLocal( surf->space->modelMatrix, tr.viewDef->renderView.vieworg, localViewer );
+	if ( tr.viewDef->isMirror ) {
+		leftDir = -leftDir;
+	}
+
+	srfTriangles_t *newTri = static_cast<srfTriangles_t *>( R_ClearedFrameAlloc( sizeof( *newTri ) ) );
+	newTri->numVerts = tri->numVerts;
+	newTri->numIndexes = tri->numIndexes;
+	newTri->indexes = static_cast<glIndex_t *>( R_FrameAlloc( newTri->numIndexes * sizeof( newTri->indexes[0] ) ) );
+	idDrawVert *verts = static_cast<idDrawVert *>( _alloca16( newTri->numVerts * sizeof( idDrawVert ) ) );
+	const float scale = 2.0f * surf->shaderRegisters[ surf->material->GetDeformRegister( 0 ) ];
+
+	for ( int i = 0; i < tri->numVerts; i += 4 ) {
+		idVec3 positions[4];
+		for ( int j = 0; j < 4; ++j ) {
+			positions[j] = R_DeformQuadVertexPosition( tri, i + j );
+			verts[i + j] = tri->verts[i + j];
+		}
+		idVec3 center = ( positions[0] + positions[1] + positions[2] + positions[3] ) * 0.25f;
+		float radius = ( positions[0] - center ).Length() * scale;
+		if ( radius <= 0.0f ) {
+			radius = 1.0f;
+		}
+		idVec3 toEye = localViewer - center;
+		const float eyeDistance = toEye.Normalize();
+		if ( eyeDistance > 0.0f ) {
+			center += toEye * Min( radius, eyeDistance );
+		}
+		const idVec3 left = leftDir * radius;
+		const idVec3 up = upDir * radius;
+		verts[i + 0].xyz = center + left + up;
+		verts[i + 1].xyz = center - left + up;
+		verts[i + 2].xyz = center - left - up;
+		verts[i + 3].xyz = center + left - up;
+		verts[i + 0].st.Set( 0.0f, 0.0f );
+		verts[i + 1].st.Set( 1.0f, 0.0f );
+		verts[i + 2].st.Set( 1.0f, 1.0f );
+		verts[i + 3].st.Set( 0.0f, 1.0f );
+		newTri->indexes[6 * ( i >> 2 ) + 0] = i;
+		newTri->indexes[6 * ( i >> 2 ) + 1] = i + 1;
+		newTri->indexes[6 * ( i >> 2 ) + 2] = i + 2;
+		newTri->indexes[6 * ( i >> 2 ) + 3] = i;
+		newTri->indexes[6 * ( i >> 2 ) + 4] = i + 2;
+		newTri->indexes[6 * ( i >> 2 ) + 5] = i + 3;
+	}
+	R_FinishDeform( surf, newTri, verts );
+}
+
+/*
+=====================
 R_TubeDeform
 
 will pivot a rectangular quad along the center of its long axis
@@ -1214,6 +1282,9 @@ void R_DeformDrawSurf( drawSurf_t *drawSurf ) {
 		break;
 	case DFRM_FLARE:
 		R_FlareDeform( drawSurf );
+		break;
+	case DFRM_CORONA:
+		R_CoronaDeform( drawSurf );
 		break;
 	case DFRM_EXPAND:
 		R_ExpandDeform( drawSurf );

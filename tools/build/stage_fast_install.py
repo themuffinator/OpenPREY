@@ -11,17 +11,17 @@ from openq4_pak import copy_file_if_changed, is_relative_to
 
 
 ROOT_RUNTIME_PATTERNS = (
-    "openQ4-client_*.exe",
-    "openQ4-client_*.pdb",
-    "openQ4-ded_*.exe",
-    "openQ4-ded_*.pdb",
+    "openPREY-client_*.exe",
+    "openPREY-client_*.pdb",
+    "openPREY-ded_*.exe",
+    "openPREY-ded_*.pdb",
     "OpenAL32.dll",
 )
 GAME_RUNTIME_PATTERNS = (
-    "game-sp_*.dll",
-    "game-sp_*.pdb",
-    "game-mp_*.dll",
-    "game-mp_*.pdb",
+    "game_*.dll",
+    "game_*.pdb",
+    "game_*.so",
+    "game_*.dylib",
     "mod.json",
     "pak0.pk4",
     "pak1.pk4",
@@ -44,7 +44,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--source-root",
         default=str(Path(__file__).resolve().parents[2]),
-        help="openQ4 source root used to validate the fast staging target.",
+        help="openPREY source root used to validate the fast staging target.",
     )
     return parser.parse_args(argv[1:])
 
@@ -112,8 +112,8 @@ def main(argv: list[str]) -> int:
         source_root = source_root.resolve()
         build_dir = build_dir.resolve()
         install_dir = install_dir.resolve()
-        build_game_dir = build_dir / "baseoq4"
-        install_game_dir = install_dir / "baseoq4"
+        build_game_dir = build_dir / "basepr"
+        install_game_dir = install_dir / "basepr"
         install_dir.mkdir(parents=True, exist_ok=True)
         install_game_dir.mkdir(parents=True, exist_ok=True)
 

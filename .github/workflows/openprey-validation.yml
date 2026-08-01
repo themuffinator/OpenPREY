@@ -1,0 +1,145 @@
+name: openPREY Validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openprey-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OPENPREY_GAMELIBS_REPO: ${{ github.workspace }}/../OpenPrey-game
+
+jobs:
+  scaffold-contracts:
+    name: Scaffold and Content Contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout openPREY
+        uses: actions/checkout@v6
+
+      - name: Checkout OpenPrey-game
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/themuffinator/OpenPrey-GameLibs.git "${OPENPREY_GAMELIBS_REPO}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Validate scripts and staged source ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            tools/build/build_openq4_pack.py \
+            tools/build/generate_pak_header.py \
+            tools/build/generate_savegame_compat_header.py \
+            tools/build/openq4_pak.py \
+            tools/build/stage_gamelibs.py \
+            tools/build/write_pak_manifest.py \
+            tools/tests/linux_sanitizer_source_contract.py
+          bash -n tools/build/meson_setup.sh
+          python tools/build/sync_icons.py --check
+          python tools/tests/gamelibs_staging.py
+          python tools/tests/linux_sanitizer_source_contract.py
+
+      - name: Validate pak0 and pak1 inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/ci-paks
+          for pak in pak0 pak1; do
+            python tools/build/write_pak_manifest.py \
+              "${GITHUB_WORKSPACE}" \
+              "${pak}.pk4" \
+              "content/basepr/${pak}" \
+              ".tmp/ci-paks/${pak}.sources"
+            python tools/build/build_openq4_pack.py \
+              --pak-name "${pak}.pk4" \
+              --source-dir "content/basepr/${pak}" \
+              --manifest ".tmp/ci-paks/${pak}.sources" \
+              --out ".tmp/ci-paks/${pak}.pk4"
+          done
+
+  unified-gamelib:
+    name: Unified GameLib (${{ matrix.platform }})
+    needs: scaffold-contracts
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows x64
+            os: windows-2025
+            module: game_x64.dll
+          - platform: Linux x64
+            os: ubuntu-24.04
+            module: game_x64.so
+
+    steps:
+      - name: Checkout openPREY
+        uses: actions/checkout@v6
+
+      - name: Checkout OpenPrey-game
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/themuffinator/OpenPrey-GameLibs.git "${OPENPREY_GAMELIBS_REPO}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install Meson and Ninja
+        shell: bash
+        run: python -m pip install meson ninja
+
+      - name: Configure, build, and stage (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype debug --wrap-mode=forcefallback -Dbuild_engine=false -Dbuild_games=true -Dbuild_renderer_gl=false -Dbuild_renderer_vk=false
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
+
+      - name: Configure, build, and stage (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype debug --wrap-mode=forcefallback -Dbuild_engine=false -Dbuild_games=true -Dbuild_renderer_gl=false -Dbuild_renderer_vk=false
+          bash tools/build/meson_setup.sh compile -C builddir
+          bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
+
+      - name: Verify unified staged payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ".install/basepr/${{ matrix.module }}"
+          test -f ".install/basepr/pak0.pk4"
+          test -f ".install/basepr/pak1.pk4"
+          test -f ".install/basepr/mod.json"
+          test -f ".install/openPREY.ico"
+          test -f ".install/openPREY.icns"
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            test -f ".install/share/applications/openprey.desktop"
+            test -f ".install/share/applications/openprey-steamdeck.desktop"
+            test -f ".install/share/icons/hicolor/256x256/apps/openprey.png"
+          fi
+          if find .install/basepr -maxdepth 1 -type f \( \
+              -name 'game-sp_*' -o -name 'game-mp_*' -o \
+              -name 'game_sp_*' -o -name 'game_mp_*' \) | grep -q .; then
+            echo "Split GameLib artifacts must not be staged; openPREY ships one game_<arch> module."
+            exit 1
+          fi

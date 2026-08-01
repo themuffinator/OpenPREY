@@ -39,25 +39,25 @@ If you have questions concerning this license or the applicable additional terms
 
 const int USERCMD_HZ			= 60;			// 60 frames per second
 const int USERCMD_MSEC			= 1000 / USERCMD_HZ;
+const float USERCMD_ONE_OVER_HZ	= ( 1.0f / USERCMD_HZ );
 
 
 // usercmd_t->button bits
 const int BUTTON_ATTACK = BIT(0);
 const int BUTTON_RUN = BIT(1);
 const int BUTTON_ZOOM = BIT(2);
-const int BUTTON_SCORES = BIT(3);
-const int BUTTON_MLOOK = BIT(4);
-// RAVEN BEGIN
-// ddynerman: stats
-const int BUTTON_INGAMESTATS = BIT(5);
-// jscott: for voicechat
-const int BUTTON_VOICECHAT = BIT(6);
-// ddynerman: tourney display
-const int BUTTON_TOURNEY = BIT(7);
-// twhitaker: strafe
-const int BUTTON_STRAFE = BIT(8);
-const int BUTTON_WEAPONWHEEL = BIT(9);
-// RAVEN END
+const int BUTTON_ATTACK_ALT = BIT(3);
+const int BUTTON_SCORES = BIT(4);
+const int BUTTON_MLOOK = BIT(5);
+// Prey's historic BUTTON_6/BUTTON_7 aliases remain available to game code.
+const int BUTTON_6 = BIT(6);
+const int BUTTON_7 = BIT(7);
+// Upstream-only actions occupy free bits in the widened usercmd layout.
+const int BUTTON_INGAMESTATS = BUTTON_6;
+const int BUTTON_VOICECHAT = BUTTON_7;
+const int BUTTON_TOURNEY = BIT(8);
+const int BUTTON_STRAFE = BIT(9);
+const int BUTTON_WEAPONWHEEL = BIT(10);
 
 // usercmd_t->impulse commands
 const int IMPULSE_0				= 0;			// weap 0
@@ -183,6 +183,9 @@ public:
 
 	// Queue a one-shot impulse for the next generated usercmd.
 	virtual void		TriggerImpulse( int impulseNum ) = 0;
+
+	// Allows Prey game code to scale view input while zoomed or constrained.
+	virtual void		SetGameSensitivityFactor( float factor ) = 0;
 
 	// Presentation-frame view sampling groundwork (in_presentationView):
 	// drains pending mouse input under the async lock and reports the

@@ -2,6 +2,8 @@
 #ifndef __MATH_INTERPOLATE_H__
 #define __MATH_INTERPOLATE_H__
 
+class idTypeInfoTools;
+
 /*
 ==============================================================================================
 
@@ -34,10 +36,15 @@ public:
 	float				GetDuration( void ) const { return duration; }
 	const type &		GetStartValue( void ) const { return startValue; }
 	const type &		GetEndValue( void ) const { return endValue; }
+	const float *		GetStartTimePtr( void ) const { return &startTime; }
+	const float *		GetDurationPtr( void ) const { return &duration; }
+	const type *			GetStartValuePtr( void ) const { return &startValue; }
+	const type *			GetEndValuePtr( void ) const { return &endValue; }
 
 // RAVEN BEGIN
 // abahr: changed to protected
 protected:
+	friend class idTypeInfoTools;
 // RAVEN END
 	float				startTime;
 	float				duration;
@@ -195,10 +202,18 @@ public:
 	float				GetDuration( void ) const { return accelTime + linearTime + decelTime; }
 	float				GetAcceleration( void ) const { return accelTime; }
 	float				GetDeceleration( void ) const { return decelTime; }
+	float				GetLinearTime( void ) const { return linearTime; }
 	const type &		GetStartValue( void ) const { return startValue; }
 	const type &		GetEndValue( void ) const { return endValue; }
+	const float *		GetStartTimePtr( void ) const { return &startTime; }
+	const float *		GetAccelerationPtr( void ) const { return &accelTime; }
+	const float *		GetDecelerationPtr( void ) const { return &decelTime; }
+	const float *		GetLinearTimePtr( void ) const { return &linearTime; }
+	const type *			GetStartValuePtr( void ) const { return &startValue; }
+	const type *			GetEndValuePtr( void ) const { return &endValue; }
 
 private:
+	friend class idTypeInfoTools;
 	float				startTime;
 	float				accelTime;
 	float				linearTime;
@@ -344,10 +359,18 @@ public:
 	float				GetDuration( void ) const { return accelTime + linearTime + decelTime; }
 	float				GetAcceleration( void ) const { return accelTime; }
 	float				GetDeceleration( void ) const { return decelTime; }
+	float				GetLinearTime( void ) const { return linearTime; }
 	const type &		GetStartValue( void ) const { return startValue; }
 	const type &		GetEndValue( void ) const { return endValue; }
+	const float *		GetStartTimePtr( void ) const { return &startTime; }
+	const float *		GetAccelerationPtr( void ) const { return &accelTime; }
+	const float *		GetDecelerationPtr( void ) const { return &decelTime; }
+	const float *		GetLinearTimePtr( void ) const { return &linearTime; }
+	const type *		GetStartValuePtr( void ) const { return &startValue; }
+	const type *		GetEndValuePtr( void ) const { return &endValue; }
 
 private:
+	friend class idTypeInfoTools;
 	float				startTime;
 	float				accelTime;
 	float				linearTime;

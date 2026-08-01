@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write a content manifest for an openQ4 runtime PK4 source directory."""
+"""Write a content manifest for an openPREY runtime PK4 source directory."""
 
 from __future__ import annotations
 

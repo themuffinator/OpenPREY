@@ -772,7 +772,9 @@ void rvDebrisParticle::FinishSpawn(rvBSE* effect, rvSegment* segment, float birt
 			worldOrigin.z);
 	}
 
+#if !defined(HUMANHEAD)
 	game->SpawnClientMoveable(entityDefName, lifetimeMs, worldOrigin, worldAxis, worldVelocity, angularVelocity);
+#endif
 
 	// Debris is represented by spawned client entities, not by CPU-side BSE quads.
 	mEndTime = mStartTime;
@@ -874,6 +876,10 @@ void rvParticle::EvaluatePosition(const rvBSE* effect, rvParticleTemplate* pt, i
 }
 
 bool rvParticle::RunPhysics(rvBSE* effect, rvSegmentTemplate* st, float time) {
+#if defined(HUMANHEAD)
+	// OPENPREY-GATED(D3): collision/effect callbacks are absent from Prey's v7 ABI.
+	return false;
+#else
 	if (!effect || !st || !bse_physics.GetBool() || session->readDemo) {
 		return false;
 	}
@@ -944,6 +950,7 @@ bool rvParticle::RunPhysics(rvBSE* effect, rvSegmentTemplate* st, float time) {
 	}
 
 	return pt->GetDeleteOnImpact();
+#endif
 }
 
 void rvParticle::Bounce(rvBSE* effect, rvParticleTemplate* pt, idVec3 endPos, idVec3 normal, float time) {
@@ -994,6 +1001,9 @@ void rvParticle::Bounce(rvBSE* effect, rvParticleTemplate* pt, idVec3 endPos, id
 }
 
 void rvParticle::CheckTimeoutEffect(rvBSE* effect, rvSegmentTemplate* st, float time) {
+#if defined(HUMANHEAD)
+	return;
+#else
 	if (!effect || !st || !game) {
 		return;
 	}
@@ -1031,6 +1041,7 @@ void rvParticle::CheckTimeoutEffect(rvBSE* effect, rvSegmentTemplate* st, float 
 		false,
 		EC_IGNORE,
 		vec4_one);
+#endif
 }
 
 void rvParticle::CalcImpactPoint(idVec3& endPos, const idVec3& origin, const idVec3& motion, const idBounds& bounds, const idVec3& normal) {

@@ -42,6 +42,7 @@ usercmd_t::ByteSwap
 ================
 */
 void usercmd_t::ByteSwap( void ) {
+	buttons = LittleShort( buttons );
 	angles[0] = LittleShort( angles[0] );
 	angles[1] = LittleShort( angles[1] );
 	angles[2] = LittleShort( angles[2] );
@@ -95,11 +96,15 @@ typedef enum {
 	UB_BUTTON7,
 
 	UB_ATTACK,
+	UB_ATTACK_ALT,
 	UB_SPEED,
 	UB_ZOOM,
 	UB_SHOWSCORES,
 	UB_MLOOK,
 	UB_WEAPONWHEEL,
+	UB_INGAMESTATS,
+	UB_VOICECHAT,
+	UB_TOURNEY,
 
 	UB_IMPULSE0,
 	UB_IMPULSE1,
@@ -189,14 +194,15 @@ userCmdString_t	userCmdStrings[] = {
 	{ "_moveRight",		UB_MOVERIGHT },
 
 	{ "_attack",		UB_ATTACK },
+	{ "_attackalt",		UB_ATTACK_ALT },
 	{ "_speed",			UB_SPEED },
 	{ "_zoom",			UB_ZOOM },
 	{ "_showScores",	UB_SHOWSCORES },
 	{ "_mlook",			UB_MLOOK },
 	{ "_weaponWheel",	UB_WEAPONWHEEL },
-	{ "_ingameStats",	UB_BUTTON5 },
-	{ "_voiceChat",		UB_BUTTON6 },
-	{ "_tourney",		UB_BUTTON7 },
+	{ "_ingameStats",	UB_INGAMESTATS },
+	{ "_voiceChat",		UB_VOICECHAT },
+	{ "_tourney",		UB_TOURNEY },
 
 	{ "_button0",		UB_BUTTON0 },
 	{ "_button1",		UB_BUTTON1 },
@@ -382,6 +388,7 @@ public:
 
 	usercmd_t		GetDirectUsercmd( void );
 	void			TriggerImpulse( int impulseNum );
+	void			SetGameSensitivityFactor( float factor );
 	bool			GetPresentationViewDelta( float &yawDelta, float &pitchDelta );
 
 private:
@@ -417,6 +424,7 @@ private:
 	idVec3			viewangles;
 	int				flags;
 	int				impulse;
+	float			gameSensitivityFactor;
 
 	buttonState_t	toggled_crouch;
 	buttonState_t	toggled_run;
@@ -514,6 +522,7 @@ idUsercmdGenLocal::idUsercmdGenLocal( void ) {
 
 	flags = 0;
 	impulse = 0;
+	gameSensitivityFactor = 1.0f;
 
 	toggled_crouch.Clear();
 	toggled_run.Clear();
@@ -793,10 +802,10 @@ idUsercmdGenLocal::GetZoomLookSensitivityScale
 float idUsercmdGenLocal::GetZoomLookSensitivityScale( void ) const {
 	const int zoomedSlowPercent = cvarSystem->GetCVarInteger( "pm_isZoomed" );
 	if ( zoomedSlowPercent <= 0 ) {
-		return 1.0f;
+		return gameSensitivityFactor;
 	}
 
-	return idMath::ClampFloat( 0.01f, 1.0f, static_cast<float>( zoomedSlowPercent ) * 0.01f );
+	return gameSensitivityFactor * idMath::ClampFloat( 0.01f, 1.0f, static_cast<float>( zoomedSlowPercent ) * 0.01f );
 }
 
 /*
@@ -1139,6 +1148,11 @@ void idUsercmdGenLocal::CmdButtons( void ) {
 		cmd.buttons |= BUTTON_ATTACK;
 	}
 
+	// Prey uses a dedicated alternate-attack binding and wire bit.
+	if ( ButtonState( UB_ATTACK_ALT ) ) {
+		cmd.buttons |= BUTTON_ATTACK_ALT;
+	}
+
 	// check the run button
 	if ( IsRunButtonActive() ) {
 		cmd.buttons |= BUTTON_RUN;
@@ -1167,6 +1181,16 @@ void idUsercmdGenLocal::CmdButtons( void ) {
 
 	if ( ButtonState( UB_WEAPONWHEEL ) ) {
 		cmd.buttons |= BUTTON_WEAPONWHEEL;
+	}
+
+	if ( ButtonState( UB_INGAMESTATS ) ) {
+		cmd.buttons |= BUTTON_INGAMESTATS;
+	}
+	if ( ButtonState( UB_VOICECHAT ) ) {
+		cmd.buttons |= BUTTON_VOICECHAT;
+	}
+	if ( ButtonState( UB_TOURNEY ) ) {
+		cmd.buttons |= BUTTON_TOURNEY;
 	}
 }
 
@@ -1667,4 +1691,13 @@ void idUsercmdGenLocal::TriggerImpulse( int impulseNum ) {
 	flags ^= UCF_IMPULSE_SEQUENCE;
 	cmd.impulse = impulse;
 	cmd.flags = flags;
+}
+
+/*
+===================
+idUsercmdGenLocal::SetGameSensitivityFactor
+===================
+*/
+void idUsercmdGenLocal::SetGameSensitivityFactor( float factor ) {
+	gameSensitivityFactor = idMath::ClampFloat( 0.0f, 16.0f, factor );
 }

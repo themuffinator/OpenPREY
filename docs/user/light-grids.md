@@ -1,12 +1,16 @@
 # Light Grid and Irradiance Volume Guide
 
-This guide covers openQ4's user-facing light-grid system: what it does, how to enable or disable it, how to bake data for one map or many maps, where the baked files go, and how to troubleshoot common problems.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
 
-openQ4 keeps the existing feature naming in the engine and README, so you will see both of these terms:
+This guide covers openPREY's user-facing light-grid system: what it does, how to enable or disable it, how to bake data for one map or many maps, where the baked files go, and how to troubleshoot common problems.
+
+openPREY keeps the existing feature naming in the engine and README, so you will see both of these terms:
 - `light grid`
 - `irradiance volume`
 
-In practice they refer to the same openQ4 feature: precomputed indirect diffuse lighting sampled from a 3D probe layout.
+In practice they refer to the same openPREY feature: precomputed indirect diffuse lighting sampled from a 3D probe layout.
 
 ## Quick Start
 
@@ -28,7 +32,7 @@ bakeLightGrids
 Bake every discovered multiplayer map from the command line, then quit when finished:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids all-mp -quit
+openPREY-client_x64.exe +bakeLightGrids all-mp -quit
 ```
 
 Show probe positions while testing a baked map:
@@ -44,7 +48,7 @@ Notes:
 
 ## What the System Does
 
-openQ4's current light-grid path:
+openPREY's current light-grid path:
 - adds indirect diffuse lighting from precomputed probes
 - prefers one `.lightgridpack` file per map when present
 - falls back to one `.lightgrid` metadata file plus baked per-area atlas images
@@ -61,10 +65,10 @@ Current scope and limits:
 - non-PBR
 - LDR bake output
 - writes `.tga` atlas images, not BFG `.exr`
-- intended for openQ4's native bake/load path, not drop-in BFG asset parity
+- intended for openPREY's native bake/load path, not drop-in BFG asset parity
 - translucent effects, decals, and other non-lighting surfaces remain outside the runtime light-grid pass
 
-If no baked assets are found, openQ4 can still generate a runtime probe layout for debugging and baking, but there will be no indirect-light contribution until actual baked files exist.
+If no baked assets are found, openPREY can still generate a runtime probe layout for debugging and baking, but there will be no indirect-light contribution until actual baked files exist.
 
 ## Runtime Controls
 
@@ -117,9 +121,9 @@ bakeLightGrids
 ```
 
 After the bake completes:
-- openQ4 writes the `.lightgridpack` runtime pack.
-- openQ4 writes the `.lightgrid` metadata file.
-- openQ4 writes loose fallback/debug atlases per area.
+- openPREY writes the `.lightgridpack` runtime pack.
+- openPREY writes the `.lightgrid` metadata file.
+- openPREY writes loose fallback/debug atlases per area.
 - The newly written data is reloaded automatically.
 
 ## Batch Baking from the Command Line
@@ -129,32 +133,32 @@ This is the preferred workflow when you want progress information without manual
 Bake all maps:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids all -quit
+openPREY-client_x64.exe +bakeLightGrids all -quit
 ```
 
 Bake all multiplayer maps only:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids all-mp -quit
+openPREY-client_x64.exe +bakeLightGrids all-mp -quit
 ```
 
 Bake a selected list of maps:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids game/tram1 game/process1 mp/q4dm1 -quit
+openPREY-client_x64.exe +bakeLightGrids game/tram1 game/process1 mp/q4dm1 -quit
 ```
 
 Behavior:
-- openQ4 discovers or accepts target map names.
+- openPREY discovers or accepts target map names.
 - It loads each map automatically.
-- It switches between `game_sp` and `game_mp` automatically when needed.
+- It uses the same unified `game_<arch>` module for SP and MP map discovery.
 - Without `force`, it skips maps whose `.lightgridpack` output already exists and whose stored bake-settings/layout hash matches the current bake. If no valid pack exists, it can still skip when the older `.lightgrid` metadata and required loose atlas files are complete.
 - It prints live progress plus a final phase timing/counter summary to the console and log as it bakes probes and areas.
 - It exits at the end if `-quit` is supplied.
 
 Important:
-- Use `openQ4-client_x64.exe`, not `openQ4-ded_x64.exe`.
-- Multiplayer-map baking requires a render-capable client path, so openQ4 forces `net_serverDedicated 0` during that workflow when necessary.
+- Use `openPREY-client_x64.exe`, not `openPREY-ded_x64.exe`.
+- Multiplayer-map baking requires a render-capable client path, so openPREY forces `net_serverDedicated 0` during that workflow when necessary.
 
 ## Bake Command Syntax
 
@@ -165,10 +169,10 @@ bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<n
 ```
 
 If no map names are given:
-- openQ4 bakes the currently loaded map.
+- openPREY bakes the currently loaded map.
 
 If map names, `all`, or `all-mp` are given:
-- openQ4 runs in batch mode and loads maps automatically.
+- openPREY runs in batch mode and loads maps automatically.
 - Multiplayer targets are cheat-protected. Enable cheats first with `sv_cheats 1` or `net_allowCheats 1`.
 
 ### Bake Options
@@ -181,7 +185,7 @@ If map names, `all`, or `all-mp` are given:
 | `force` | `bakeLightGrids force` | Remove existing outputs for the target map(s) and rebuild them even if all required files already exist. |
 | `-quit` | `+bakeLightGrids all -quit` | Quit after the batch completes. |
 | `limit<num>` | `limit2048` | Maximum probe count per area before the grid spacing grows. |
-| `bounce<num>` | `bounce2` | Number of bake passes. Bounce 2+ reuses the previous openQ4 bake through the runtime light-grid path. |
+| `bounce<num>` | `bounce2` | Number of bake passes. Bounce 2+ reuses the previous openPREY bake through the runtime light-grid path. |
 | `size<num>` | `size256` | Cubemap capture resolution used during baking. |
 | `blends<num>` | `blends4` | Number of capture blends/jittered accumulations per face. |
 | `samples<num>` | `samples256` | Irradiance integration samples per output texel. |
@@ -193,21 +197,21 @@ If map names, `all`, or `all-mp` are given:
 Fast test bake:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids game/tram1 size64 samples32 limit1024 -quit
+openPREY-client_x64.exe +bakeLightGrids game/tram1 size64 samples32 limit1024 -quit
 ```
 
-For multiplayer maps or `all-mp`, enable cheats before starting the bake, for example `openQ4-client_x64.exe +set sv_cheats 1 +bakeLightGrids all-mp -quit`.
+For multiplayer maps or `all-mp`, enable cheats before starting the bake, for example `openPREY-client_x64.exe +set sv_cheats 1 +bakeLightGrids all-mp -quit`.
 
 Balanced quality:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids game/tram1 size128 samples128 blends1 bounce1 grid 64 64 128 -quit
+openPREY-client_x64.exe +bakeLightGrids game/tram1 size128 samples128 blends1 bounce1 grid 64 64 128 -quit
 ```
 
 Higher-quality bake:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids game/tram1 size256 samples256 blends2 bounce2 grid 48 48 96 -quit
+openPREY-client_x64.exe +bakeLightGrids game/tram1 size256 samples256 blends2 bounce2 grid 48 48 96 -quit
 ```
 
 Practical tuning advice:
@@ -242,7 +246,7 @@ env/maps/game/tram1/area1_lightgrid_pos.tga
 
 What each file is for:
 - `maps/.../*.lightgridpack`
-  Preferred runtime artifact. It stores the probe metadata plus an indexed set of per-area irradiance, visibility, and probe-position image chunks in the engine's binary image payload format, letting openQ4 load the current/neighbor areas from one map-local file.
+  Preferred runtime artifact. It stores the probe metadata plus an indexed set of per-area irradiance, visibility, and probe-position image chunks in the engine's binary image payload format, letting openPREY load the current/neighbor areas from one map-local file.
 - `maps/.../*.lightgrid`
   Loose fallback/debug metadata. It stores probe layout metadata, area assignment, bounds, spacing, probe origins, and deterministic bake stats used to detect stale outputs.
 - `env/maps/.../area*_lightgrid_amb.tga`
@@ -252,7 +256,7 @@ What each file is for:
 - `env/maps/.../area*_lightgrid_pos.tga`
   Loose fallback/debug compact per-probe relocation offsets so runtime visibility checks use the actual baked probe positions instead of ideal grid centers.
 
-openQ4 loads these files automatically when the corresponding map is loaded. A valid `.lightgridpack` wins; the loose `.lightgrid` and TGA files remain useful for inspection, compatibility, and fallback.
+openPREY loads these files automatically when the corresponding map is loaded. A valid `.lightgridpack` wins; the loose `.lightgrid` and TGA files remain useful for inspection, compatibility, and fallback.
 
 ## Typical Workflows
 
@@ -272,7 +276,7 @@ Then:
 ### 2. Batch Bake a Whole Asset Set Overnight
 
 ```text
-openQ4-client_x64.exe +set logFileName logs/openq4_lightgrids.log +bakeLightGrids all -quit
+openPREY-client_x64.exe +set logFileName logs/openprey_lightgrids.log +bakeLightGrids all -quit
 ```
 
 This gives you:
@@ -283,7 +287,7 @@ This gives you:
 ### 3. Re-Bake Only Multiplayer Maps
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids all-mp -quit
+openPREY-client_x64.exe +bakeLightGrids all-mp -quit
 ```
 
 ### 4. Force a Clean Re-Bake of the Current Map
@@ -321,13 +325,13 @@ Fix:
 - Or use explicit map targets:
 
 ```text
-openQ4-client_x64.exe +bakeLightGrids game/tram1 -quit
+openPREY-client_x64.exe +bakeLightGrids game/tram1 -quit
 ```
 
 ### `bakeLightGrids: no valid map targets were found.`
 
 Cause:
-- The supplied map names were wrong or not found by openQ4.
+- The supplied map names were wrong or not found by openPREY.
 
 Fix:
 - Use map paths without the `.map` extension.
@@ -405,7 +409,7 @@ r_showLightGrid 0
 
 ## Limitations and Expectations
 
-openQ4's current light-grid system is intentionally scoped. End users should expect:
+openPREY's current light-grid system is intentionally scoped. End users should expect:
 - indirect diffuse only
 - no specular/reflection-probe lighting from this system
 - no HDR/EXR bake output
@@ -414,11 +418,11 @@ openQ4's current light-grid system is intentionally scoped. End users should exp
 - loose per-area atlas files retained as fallback/debug outputs
 - console/log progress rather than a fully interactive bake UI
 
-That is by design for the current openQ4 implementation.
+That is by design for the current openPREY implementation.
 
 ## Log and Console Output
 
-During batch bakes, openQ4 reports:
+During batch bakes, openPREY reports:
 - map load progress
 - module switches between SP and MP
 - bounce count
@@ -432,10 +436,10 @@ During batch bakes, openQ4 reports:
 If you want a separate bake log:
 
 ```text
-openQ4-client_x64.exe +set logFileName logs/openq4_lightgrids.log +bakeLightGrids all -quit
+openPREY-client_x64.exe +set logFileName logs/openprey_lightgrids.log +bakeLightGrids all -quit
 ```
 
-On a standard local setup, logs are written under `fs_savepath/baseoq4/logs/`.
+On a standard local setup, logs are written under `fs_savepath/basepr/logs/`.
 
 ## Related Documentation
 

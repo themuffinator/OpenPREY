@@ -18,6 +18,8 @@ their layout, and corrupt/truncated streams fail at a bounded record.
 #include <errno.h>
 #include <time.h>
 
+#if OPENPREY_ENABLE_MVD
+
 namespace {
 
 static const byte MVD_MAGIC[8] = { 'O', 'Q', '4', 'M', 'V', 'D', 0x1a, '\n' };
@@ -3055,3 +3057,101 @@ void idMultiViewDemo::FreeRoam_f( const idCmdArgs &args ) {
 	}
 	idAsyncNetwork::multiViewDemo.FreeRoam();
 }
+
+#else
+
+// OPENPREY-GATED(D9): these inert entry points keep the upstream session and
+// async architecture intact without compiling v40-only game callbacks.
+
+namespace {
+
+void MultiViewDemo_Disabled_f( const idCmdArgs &args ) {
+	(void)args;
+	common->Printf( "Multi-view demos are disabled for the Prey game API\n" );
+}
+
+}
+
+mvdFileInfo_t::mvdFileInfo_t() {
+	valid = false;
+	compatible = false;
+	cleanEnd = false;
+	hasTimelineIndex = false;
+	formatMajor = 0;
+	formatMinor = 0;
+	protocolMajor = 0;
+	protocolMinor = 0;
+	durationMS = 0;
+	snapshotCount = 0;
+	reliableCount = 0;
+	recordCount = 0;
+	fileSize = 0;
+}
+
+idMultiViewDemo::idMultiViewDemo() {
+	state = MVD_IDLE;
+	file = NULL;
+}
+
+void idMultiViewDemo::Init() {
+	common->DPrintf( "Multi-view demos disabled (OPENPREY-GATED(D9))\n" );
+}
+
+void idMultiViewDemo::Shutdown() {}
+void idMultiViewDemo::SessionStop() {}
+
+bool idMultiViewDemo::IsRecording() const { return false; }
+bool idMultiViewDemo::IsPlaying() const { return false; }
+bool idMultiViewDemo::IsPaused() const { return false; }
+bool idMultiViewDemo::IsSeeking() const { return false; }
+float idMultiViewDemo::GetPlaybackScale() const { return 1.0f; }
+int idMultiViewDemo::GetPlaybackTimeMS() const { return 0; }
+int idMultiViewDemo::GetPlaybackDurationMS() const { return 0; }
+float idMultiViewDemo::GetPlaybackFraction() const { return 0.0f; }
+const char *idMultiViewDemo::GetPlaybackName() const { return ""; }
+int idMultiViewDemo::GetFollowClient() const { return -1; }
+
+void idMultiViewDemo::SetPaused( bool paused ) { (void)paused; }
+void idMultiViewDemo::TogglePaused() {}
+void idMultiViewDemo::SetPlaybackScale( float scale ) { (void)scale; }
+bool idMultiViewDemo::SeekToMS( int relativeTimeMS ) { (void)relativeTimeMS; return false; }
+bool idMultiViewDemo::SeekByMS( int deltaMS ) { (void)deltaMS; return false; }
+void idMultiViewDemo::StepFrames( int frames ) { (void)frames; }
+void idMultiViewDemo::FollowNext() {}
+void idMultiViewDemo::FreeRoam() {}
+
+bool idMultiViewDemo::QueryFileInfo( const char *name, mvdFileInfo_t &info ) {
+	(void)name;
+	info = mvdFileInfo_t();
+	info.error = "multi-view demos disabled for Prey game API v7";
+	return false;
+}
+
+void idMultiViewDemo::CaptureServerFrame( int gameFrame, int gameTime ) {
+	(void)gameFrame;
+	(void)gameTime;
+}
+
+void idMultiViewDemo::CaptureReliableMessage( const idBitMsg &msg, int routeType, int routeClient, int routeInstance ) {
+	(void)msg;
+	(void)routeType;
+	(void)routeClient;
+	(void)routeInstance;
+}
+
+void idMultiViewDemo::RunPlaybackFrame() {}
+void idMultiViewDemo::OnServerMapChange() {}
+
+void idMultiViewDemo::Record_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Stop_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Play_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Info_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Pause_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Seek_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Skip_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Speed_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::Step_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::FollowNext_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+void idMultiViewDemo::FreeRoam_f( const idCmdArgs &args ) { MultiViewDemo_Disabled_f( args ); }
+
+#endif

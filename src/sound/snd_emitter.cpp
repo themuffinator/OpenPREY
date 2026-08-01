@@ -45,6 +45,7 @@ extern idCVar s_speakerFraction;
 extern idCVar s_radioChatterFraction;
 extern idCVar s_quadraticFalloff;
 extern idCVar s_frequencyShift;
+extern idCVar com_profanity;
 
 static const int SOUND_SHADER_SHAKE_RATE_HZ = 30;
 static const float SOUND_SHADER_MATERIAL_SHAKE_SCALE = 2800.0f;
@@ -274,6 +275,11 @@ static bool SoundUsesMusicVolume( const soundShaderParms_t& parms )
 	return ( parms.soundShaderFlags & SSF_MUSIC ) != 0 || parms.soundClass == SOUND_CLASS_MUSICAL;
 }
 
+static bool IsProfanityCensorEnabled()
+{
+	return !com_profanity.GetBool();
+}
+
 static int SoundSampleChoiceFromDiversity( const int numEntries, const float diversity )
 {
 	if( numEntries <= 0 || FLOAT_IS_NAN( diversity ) )
@@ -319,6 +325,7 @@ void idSoundFade::Clear()
 	fadeEndTime = 0;
 	fadeStartVolume = 1.0f;
 	fadeEndVolume = 1.0f;
+	fadeHold = false;
 }
 
 /*
@@ -333,6 +340,7 @@ void idSoundFade::SetVolume( float to )
 	fadeEndVolume = to;
 	fadeStartTime = 0;
 	fadeEndTime = 0;
+	fadeHold = false;
 }
 
 /*
@@ -346,7 +354,7 @@ void idSoundFade::Fade( float to, int length, int soundTime )
 	length = SoundSanitizeFadeMsec( length );
 	int startTime = soundTime;
 	// if it is already fading to this volume at this rate, don't change it
-	if( fadeEndTime == startTime + length && fadeEndVolume == to )
+	if( !fadeHold && fadeEndTime == startTime + length && fadeEndVolume == to )
 	{
 		return;
 	}
@@ -354,6 +362,32 @@ void idSoundFade::Fade( float to, int length, int soundTime )
 	fadeEndVolume = to;
 	fadeStartTime = startTime;
 	fadeEndTime = startTime + length;
+	fadeHold = false;
+}
+
+/*
+========================
+idSoundFade::FadeFrom
+
+Apply a temporary hold in the linear volume pipeline.
+========================
+*/
+void idSoundFade::FadeFrom( float to, int delay, int length, int soundTime )
+{
+	to = SoundSanitizeFadeScale( to, 0.0f );
+	delay = SoundSanitizeFadeMsec( delay );
+	length = SoundSanitizeFadeMsec( length );
+	const int startTime = soundTime + delay;
+	const int endTime = startTime + length;
+	if( fadeHold && fadeStartTime == startTime && fadeEndTime == endTime && fadeEndVolume == to )
+	{
+		return;
+	}
+	fadeStartVolume = GetVolume( soundTime );
+	fadeEndVolume = to;
+	fadeStartTime = startTime;
+	fadeEndTime = endTime;
+	fadeHold = true;
 }
 
 /*
@@ -388,6 +422,10 @@ idSoundFade::GetVolume
 */
 float idSoundFade::GetVolume( const int soundTime ) const
 {
+	if( fadeHold )
+	{
+		return ( soundTime >= fadeStartTime && soundTime <= fadeEndTime ) ? fadeEndVolume : fadeStartVolume;
+	}
 	const float fadeDuration = ( fadeEndTime - fadeStartTime );
 	const int currentTime = soundTime;
 	const float playTime = ( currentTime - fadeStartTime );
@@ -839,6 +877,7 @@ void idSoundEmitterLocal::Init( int i, idSoundWorldLocal* sw )
 	occludingPortalCount = 0;
 
 	memset( &parms, 0, sizeof( parms ) );
+	parms.subIndex = -1;
 
 	if( soundWorld && soundWorld->writeDemo )
 	{
@@ -914,6 +953,38 @@ void idSoundEmitterLocal::OverrideParms( const soundShaderParms_t* base, const s
 	else
 	{
 		out->attenuatedVolume = base->attenuatedVolume;
+	}
+	if( over->subIndex >= 0 )
+	{
+		out->subIndex = over->subIndex;
+	}
+	else
+	{
+		out->subIndex = base->subIndex;
+	}
+	if( over->profanityIndex )
+	{
+		out->profanityIndex = over->profanityIndex;
+	}
+	else
+	{
+		out->profanityIndex = base->profanityIndex;
+	}
+	if( over->profanityDelay )
+	{
+		out->profanityDelay = over->profanityDelay;
+	}
+	else
+	{
+		out->profanityDelay = base->profanityDelay;
+	}
+	if( over->profanityDuration )
+	{
+		out->profanityDuration = over->profanityDuration;
+	}
+	else
+	{
+		out->profanityDuration = base->profanityDuration;
 	}
 	if( over->soundClass )
 	{
@@ -1009,7 +1080,7 @@ void idSoundEmitterLocal::Update( int currentTime )
 		// listener is outside the world
 		return;
 	}
-	if( soundSystemLocal.muted || soundWorld != soundSystemLocal.currentSoundWorld )
+	if( soundSystemLocal.IsMuted() || soundWorld != soundSystemLocal.currentSoundWorld )
 	{
 		return;
 	}
@@ -1381,6 +1452,17 @@ int idSoundEmitterLocal::StartSound( const idSoundShader* shader, const s_channe
 		const float frequencyShift = SoundChannelFrequencyShift( chan );
 		chan->endTime = chan->startTime + idMath::FtoiFast( length / frequencyShift ) + 100;
 	}
+
+	// Prey's authored bleep window mutes only the selected sample and restores
+	// the pre-window scale afterwards. The modern mixer is linear, so the hold
+	// target is exactly zero rather than a dB offset.
+	if( IsProfanityCensorEnabled() && chanParms.profanityDuration > 0.0f && chanParms.profanityIndex == choice )
+	{
+		chan->volumeFade.FadeFrom( 0.0f,
+			Max( 0, SEC2MS( chanParms.profanityDelay ) ),
+			Max( 1, SEC2MS( chanParms.profanityDuration ) ),
+			currentTime );
+	}
 	if( showStartSound )
 	{
 		if( loopingSample == NULL || leadinSample == loopingSample )
@@ -1489,6 +1571,53 @@ void idSoundEmitterLocal::ModifySound( const s_channelType channel, const soundS
 		}
 		OverrideParms( &chan->parms, parms, &chan->parms );
 	}
+}
+
+/*
+========================
+idSoundEmitterLocal::ModifySound
+========================
+*/
+void idSoundEmitterLocal::ModifySound( idSoundShader* shader, const s_channelType channel, const hhSoundShaderParmsModifier& modifier )
+{
+	for( int i = channels.Num() - 1; i >= 0; i-- )
+	{
+		idSoundChannel* chan = channels[i];
+		if( chan == NULL || ( channel != SCHANNEL_ANY && chan->logicalChannel != channel ) ||
+			( shader != NULL && chan->soundShader != shader ) )
+		{
+			continue;
+		}
+
+		soundShaderParms_t modified = chan->parms;
+		modifier.ModifyParms( modified );
+		ModifySound( chan->logicalChannel, &modified );
+		return;
+	}
+}
+
+/*
+========================
+idSoundEmitterLocal::GetSoundParms
+========================
+*/
+soundShaderParms_t* idSoundEmitterLocal::GetSoundParms( idSoundShader* shader, const s_channelType channel )
+{
+	static soundShaderParms_t convertedParms;
+	for( int i = channels.Num() - 1; i >= 0; i-- )
+	{
+		idSoundChannel* chan = channels[i];
+		if( chan == NULL || ( channel != SCHANNEL_ANY && chan->logicalChannel != channel ) ||
+			( shader != NULL && chan->soundShader != shader ) )
+		{
+			continue;
+		}
+
+		convertedParms = chan->parms;
+		convertedParms.volume = LinearToDB( chan->parms.volume );
+		return &convertedParms;
+	}
+	return NULL;
 }
 
 /*
@@ -1622,4 +1751,57 @@ float idSoundEmitterLocal::CurrentAmplitude()
 		return idMath::ATan( high * SOUND_SHADER_SHAKE_NORMALIZE, 1.0f ) / DEG2RAD( 45.0f );
 	}
 	return sampleAmplitude;
+}
+
+float idSoundEmitterLocal::CurrentAmplitude( const s_channelType channel )
+{
+	if( channel == SCHANNEL_ANY )
+	{
+		return CurrentAmplitude();
+	}
+
+	float amplitude = 0.0f;
+	const int currentTime = soundWorld->GetSoundTime();
+	for( int i = 0; i < channels.Num(); i++ )
+	{
+		idSoundChannel* chan = channels[i];
+		if( chan == NULL || chan->logicalChannel != channel || currentTime < chan->startTime || SoundChannelHasCompleted( chan, currentTime ) )
+		{
+			continue;
+		}
+		if( ( chan->parms.soundShaderFlags & SSF_NO_FLICKER ) != 0 )
+		{
+			return 1.0f;
+		}
+		if( chan->hardwareVoice != NULL )
+		{
+			amplitude = Max( amplitude, chan->hardwareVoice->GetAmplitude() );
+		}
+	}
+	return amplitude;
+}
+
+float idSoundEmitterLocal::CurrentVoiceAmplitude( const s_channelType channel )
+{
+	float amplitude = 0.0f;
+	const int currentTime = soundWorld->GetSoundTime();
+	for( int i = 0; i < channels.Num(); i++ )
+	{
+		idSoundChannel* chan = channels[i];
+		if( chan == NULL || ( channel != SCHANNEL_ANY && chan->logicalChannel != channel ) ||
+			( chan->parms.soundShaderFlags & SSF_VOICEAMPLITUDE ) == 0 ||
+			currentTime < chan->startTime || SoundChannelHasCompleted( chan, currentTime ) )
+		{
+			continue;
+		}
+		if( ( chan->parms.soundShaderFlags & SSF_NO_FLICKER ) != 0 )
+		{
+			return 1.0f;
+		}
+		if( chan->hardwareVoice != NULL )
+		{
+			amplitude = Max( amplitude, chan->hardwareVoice->GetAmplitude() );
+		}
+	}
+	return amplitude;
 }

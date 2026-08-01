@@ -39,6 +39,24 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "CollisionModel_local.h"
 
+#ifdef HUMANHEAD
+// Prey/Human Head contents bits. Keep this table self-contained so the
+// collision library does not depend on game-module copies of Material.h.
+enum {
+	PREY_CONTENTS_FORCEFIELD			= BIT(16),
+	PREY_CONTENTS_SPIRITBRIDGE			= BIT(17),
+	PREY_CONTENTS_AREAPORTAL			= BIT(18),
+	PREY_CONTENTS_NOCSG					= BIT(19),
+	PREY_CONTENTS_BLOCK_RADIUSDAMAGE	= BIT(20),
+	PREY_CONTENTS_SHOOTABLE				= BIT(21),
+	PREY_CONTENTS_DEATHVOLUME			= BIT(22),
+	PREY_CONTENTS_VEHICLECLIP			= BIT(23),
+	PREY_CONTENTS_OWNER_TO_OWNER		= BIT(24),
+	PREY_CONTENTS_GAME_PORTAL			= BIT(25),
+	PREY_CONTENTS_SHOOTABLEBYARROW		= BIT(26),
+	PREY_CONTENTS_HUNTERCLIP			= BIT(27)
+};
+#endif
 
 /*
 ===============================================================================
@@ -66,6 +84,20 @@ const char *cm_contentsNameByIndex[] = {
 	"aas_solid",					// 14
 	"aas_obstacle",					// 15
 	"flashlight_trigger",			// 16
+#ifdef HUMANHEAD
+	"forcefield",					// 17
+	"spiritbridge",					// 18
+	"areaportal",					// 19
+	"nocsg",						// 20
+	"block_radiusdamage",			// 21
+	"shootable",					// 22
+	"deathvolume",					// 23
+	"vehicleclip",					// 24
+	"owner_to_owner",				// 25
+	"game_portal",					// 26
+	"shootablebyarrow",				// 27
+	"hunterclip",					// 28
+#else
 	"sightclip",					// 17
 	"largeshotclip",				// 18
 	"notacticalfeatures",			// 19
@@ -78,6 +110,7 @@ const char *cm_contentsNameByIndex[] = {
 	"fog",							// 26
 	"lava",							// 27
 	"slime",						// 28
+#endif
 	NULL
 };
 
@@ -99,6 +132,20 @@ int cm_contentsFlagByIndex[] = {
 	CONTENTS_AAS_SOLID,				// 14
 	CONTENTS_AAS_OBSTACLE,			// 15
 	CONTENTS_FLASHLIGHT_TRIGGER,	// 16
+#ifdef HUMANHEAD
+	PREY_CONTENTS_FORCEFIELD,		// 17
+	PREY_CONTENTS_SPIRITBRIDGE,		// 18
+	PREY_CONTENTS_AREAPORTAL,		// 19
+	PREY_CONTENTS_NOCSG,			// 20
+	PREY_CONTENTS_BLOCK_RADIUSDAMAGE, // 21
+	PREY_CONTENTS_SHOOTABLE,		// 22
+	PREY_CONTENTS_DEATHVOLUME,		// 23
+	PREY_CONTENTS_VEHICLECLIP,		// 24
+	PREY_CONTENTS_OWNER_TO_OWNER,	// 25
+	PREY_CONTENTS_GAME_PORTAL,		// 26
+	PREY_CONTENTS_SHOOTABLEBYARROW,	// 27
+	PREY_CONTENTS_HUNTERCLIP,		// 28
+#else
 	CONTENTS_SIGHTCLIP,				// 17
 	CONTENTS_LARGESHOTCLIP,			// 18
 	CONTENTS_NOTACTICALFEATURES,	// 19
@@ -111,6 +158,7 @@ int cm_contentsFlagByIndex[] = {
 	CONTENTS_FOG,					// 26
 	CONTENTS_LAVA,					// 27
 	CONTENTS_SLIME,					// 28
+#endif
 	0
 };
 
@@ -138,6 +186,21 @@ int idCollisionModelManagerLocal::ContentsFromString( const char *string ) const
 		if ( token == "," ) {
 			continue;
 		}
+#ifdef HUMANHEAD
+		// Accept historical no-underscore aliases as well as retail spellings.
+		if ( token.Icmp( "blockradiusdamage" ) == 0 ) {
+			contents |= PREY_CONTENTS_BLOCK_RADIUSDAMAGE;
+			continue;
+		}
+		if ( token.Icmp( "ownertoowner" ) == 0 ) {
+			contents |= PREY_CONTENTS_OWNER_TO_OWNER;
+			continue;
+		}
+		if ( token.Icmp( "gameportal" ) == 0 ) {
+			contents |= PREY_CONTENTS_GAME_PORTAL;
+			continue;
+		}
+#endif
 		for ( i = 1; cm_contentsNameByIndex[i] != NULL; i++ ) {
 			if ( token.Icmp( cm_contentsNameByIndex[i] ) == 0 ) {
 				contents |= cm_contentsFlagByIndex[i];
@@ -656,7 +719,10 @@ void idCollisionModelManagerLocal::SpeedTest( const idVec3 &origin ) {
 	testend = NULL;
 }
 
-void idCollisionModelManagerLocal::DebugOutput( const idVec3 &viewOrigin, const idMat3 &viewAxis ) {
+void idCollisionModelManagerLocal::DebugOutput( const idVec3 &viewOrigin ) {
+	idMat3 viewAxis;
+	viewAxis.Identity();
+
 	SpeedTest( viewOrigin );
 	DebugTranslationFailure( viewOrigin, viewAxis );
 	DebugRotationFailure( viewOrigin, viewAxis );

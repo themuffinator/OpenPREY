@@ -1,0 +1,98 @@
+// Static
+
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 1
+
+
+	// -------------------------------------------------------------------------------
+	// Animation control definitions
+	// -------------------------------------------------------------------------------
+	windowDef ActivationSequence {
+		rect		0, 0, 0, 0
+		visible		1
+		notime		0
+
+		onTime 100 {
+			transition "static::rect" "0 0 640 480" "0 50 640 400" "100" ;
+		}
+		onTime 150 {
+			set "static::visible" "1"
+			transition "static::rect" "0 0 640 400" "0 0 640 480" "100" ;
+		}
+		onTime 200 {
+			set "static::visible" "0"
+		}
+		onTime 300 {
+			set "static::visible" "1"
+			transition "static::rect" "0 0 640 480" "0 0 500 480" "100" ;
+		}
+		onTime 390 {
+			transition "static::matcolor" "1 1 1 0.5" "1 1 1 0.6" "100" ;
+		}
+		onTime 400 {
+			set "static::visible" "0"
+		}
+		onTime 500 {
+			set "static::visible" "1"
+			transition "static::matcolor" "1 1 1 0.8" "1 1 1 0.3" "100" ;
+		}
+		onTime 800 {
+			resetTime "ActivationSequence" "0" ;
+		}
+	}
+	
+	
+	
+	
+	
+	
+	windowDef static1 {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 1
+		matcolor	0.5, 0.5, 0.5, 0.7
+		background	"textures/sfx/static"
+		}
+	windowDef static {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 0.5
+		background	"guis/assets/static/static007"
+		visible		1
+	}
+	windowDef scan {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/wallwalk/scanline"
+	}
+	windowDef scan2 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan"
+	}
+	windowDef scan3 {
+		rect		10, 10, 620, 460
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/scanline/g_scan2"
+	}
+	windowDef flicker {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, powersurge2[time*0.0012]
+	}
+	windowDef frame {
+		rect		0, 0, 640, 480
+		backcolor	0, 0, 0, 0
+		forecolor	1, 1, 1, 1
+		matcolor	1, 1, 1, 1
+		background	"guis/assets/static/frame"
+		visible		1
+	}
+	
+}

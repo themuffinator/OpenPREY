@@ -903,6 +903,13 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 			backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
 	}
 
+	// Lit Prey decals need the same offset in the depth and interaction passes;
+	// otherwise the GL_EQUAL lighting pass can miss the displaced depth.
+	if ( surfaceShader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * surfaceShader->GetPolygonOffset() );
+	}
+
 	// hack depth range if needed
 	if ( surf->space->weaponDepthHack ) {
 		RB_EnterWeaponDepthHack();
@@ -914,6 +921,7 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 
 	inter.surf = surf;
 	inter.lightFalloffImage = vLight->falloffImage;
+	inter.alphaTestThreshold = -1.0f;
 
 	R_GlobalPointToLocal( surf->space->modelMatrix, vLight->globalLightOrigin, inter.localLightOrigin.ToVec3() );
 	R_GlobalPointToLocal( surf->space->modelMatrix, backEnd.viewDef->renderView.vieworg, inter.localViewOrigin.ToVec3() );
@@ -949,6 +957,7 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 		inter.bumpImage = NULL;
 		inter.specularImage = NULL;
 		inter.diffuseImage = NULL;
+		inter.alphaTestThreshold = -1.0f;
 		inter.diffuseColor[0] = inter.diffuseColor[1] = inter.diffuseColor[2] = inter.diffuseColor[3] = 0;
 		inter.specularColor[0] = inter.specularColor[1] = inter.specularColor[2] = inter.specularColor[3] = 0;
 		inter.flatDiffuseParams.Zero();
@@ -983,6 +992,7 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 					RB_SubmittInteraction( &inter, DrawInteraction );
 					inter.diffuseImage = NULL;
 					inter.specularImage = NULL;
+					inter.alphaTestThreshold = -1.0f;
 					R_SetDrawInteraction( surfaceStage, surfaceRegs, &inter.bumpImage, inter.bumpMatrix, NULL );
 					break;
 				}
@@ -993,6 +1003,7 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 					}
 					if ( inter.diffuseImage ) {
 						RB_SubmittInteraction( &inter, DrawInteraction );
+						inter.alphaTestThreshold = -1.0f;
 					}
 					R_SetDrawInteraction( surfaceStage, surfaceRegs, &inter.diffuseImage,
 											inter.diffuseMatrix, inter.diffuseColor.ToFloatPtr() );
@@ -1002,6 +1013,11 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 					inter.diffuseColor[1] *= lightColor[1];
 					inter.diffuseColor[2] *= lightColor[2];
 					inter.diffuseColor[3] *= lightColor[3];
+					if ( surfaceStage->hasAlphaTest ) {
+						// The retail program uses KIL; bias by one texture step to
+						// preserve GL_GREATER semantics at 8-bit alpha precision.
+						inter.alphaTestThreshold = surfaceRegs[ surfaceStage->alphaTestRegister ] + ( 1.0f / 255.0f );
+					}
 					inter.vertexColor = surfaceStage->vertexColor;
 					break;
 				}
@@ -1022,11 +1038,32 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 					inter.vertexColor = surfaceStage->vertexColor;
 					break;
 				}
+				case SL_INTERACTION: {
+					if ( !surfaceRegs[ surfaceStage->conditionRegister ] ) {
+						break;
+					}
+					RB_SubmittInteraction( &inter, DrawInteraction );
+					inter.bumpImage = NULL;
+					inter.diffuseImage = NULL;
+					inter.specularImage = NULL;
+					inter.alphaTestThreshold = -1.0f;
+					inter.diffuseColor.Zero();
+					inter.specularColor.Zero();
+					inter.flatDiffuseParams.Zero();
+					if ( tr.backEndRenderer == BE_ARB2 && surfaceStage->newStage != NULL ) {
+						RB_ARB2_DrawShaderInteraction( &inter, surfaceStage, surfaceRegs, lightColor );
+					}
+					break;
+				}
 			}
 		}
 
 		// draw the final interaction
 		RB_SubmittInteraction( &inter, DrawInteraction );
+	}
+
+	if ( surfaceShader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glDisable( GL_POLYGON_OFFSET_FILL );
 	}
 
 	// unhack depth range if needed

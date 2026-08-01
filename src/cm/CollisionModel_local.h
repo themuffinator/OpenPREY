@@ -361,9 +361,13 @@ public:
 	void			LoadMap( const idMapFile *mapFile, bool forceCreateMap);
 	// frees all the collision models
 	void			FreeMap(const char* mapName);
+	void			FreeMap( void ) { FreeMap( mapName.c_str() ); }
 
 	// get clip handle for model
 	virtual idCollisionModel *LoadModel(const char* mapName, const char *modelName, const bool precache = false );
+	virtual idCollisionModel *LoadModel( const char *modelName, const bool precache = false ) {
+		return LoadModel( mapName.c_str(), modelName, precache );
+	}
 	virtual idCollisionModel *ExtractCollisionModel( idRenderModel *renderModel, const char *modelName );
 	virtual void	PreCacheModel( const char *mapName, const char *modelName );
 
@@ -376,6 +380,9 @@ public:
 
 	// create trace model from a collision model, returns true if succesfull
 	bool			TrmFromModel( const char *mapName, const char *modelName, idTraceModel &trm );
+	bool			TrmFromModel( const char *modelName, idTraceModel &trm ) {
+		return TrmFromModel( mapName.c_str(), modelName, trm );
+	}
 	int				CompoundTrmFromModel( const char *mapName, const char *modelName, idTraceModel *trms, int maxTrms );
 
 	// translates a trm and reports the first collision if any
@@ -395,7 +402,8 @@ public:
 								const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
 								idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
 	// test collision detection
-	void			DebugOutput( const idVec3 &viewOrigin, const idMat3 &viewAxis );
+	void			DebugOutput( const idVec3 &viewOrigin );
+	const char *	ContentsName( const int contents ) const { return StringFromContents( contents ); }
 
 	// list all loaded models
 	void			ListModels( void );
@@ -562,6 +570,7 @@ private:			// CollisionMap_load.cpp
 	const char *	GetFullModelName( const char *mapName, const char *modelName, idStr &fullName ) const;
 	const char *	GetModelLoadFileName( const char *mapName, const char *modelName, idStr &fileName ) const;
 	idCollisionModel* FindModel( const char *name );
+	idCollisionModelLocal *GetWorldModel( void ) const;
 	idCollisionModelLocal *	CollisionModelForMapEntity( const idMapFile *mapFile, const idMapEntity *mapEnt );	// brush/patch model from .map
 	idCollisionModelLocal *	LoadRenderModel( const char *fileName );					// ASE/LWO models
 	bool			TrmFromModel_r( idTraceModel &trm, cm_node_t *node, int primitiveNum );

@@ -93,6 +93,10 @@ void BSESpawnTrace(const char* fmt, ...) {
 }
 
 void rvSegment::PlayEffect(rvBSE* effect, rvSegmentTemplate* st, float depthOffset) {
+#if defined(HUMANHEAD)
+	// OPENPREY-GATED(D3): nested BSE effects require Quake 4 idGame callbacks.
+	return;
+#else
 	if (!effect || !st || st->mNumEffects <= 0 || !game) {
 		return;
 	}
@@ -113,6 +117,7 @@ void rvSegment::PlayEffect(rvBSE* effect, rvSegmentTemplate* st, float depthOffs
 		false,
 		EC_IGNORE,
 		vec4_one);
+#endif
 }
 
 rvParticle* rvSegment::InitParticleArray(rvBSE* effect) {

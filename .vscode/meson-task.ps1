@@ -15,10 +15,10 @@ $fastStageScript = Join-Path $workspaceRoot 'tools\build\stage_fast_install.py'
 $checkStagedContentScript = Join-Path $workspaceRoot 'tools\build\check_staged_content_edits.py'
 
 if (-not (Test-Path $mesonWrapper)) {
-    throw "openQ4 Meson wrapper not found at '$mesonWrapper'."
+    throw "openPREY Meson wrapper not found at '$mesonWrapper'."
 }
 
-function Invoke-openQ4Meson([string[]]$MesonArgs) {
+function Invoke-openPREYMeson([string[]]$MesonArgs) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $mesonWrapper @MesonArgs
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -41,7 +41,7 @@ function Test-MesonBuildDirectory([string]$Path) {
 switch ($Action) {
     'setup' {
         if (Test-MesonBuildDirectory $buildDir) {
-            Invoke-openQ4Meson @(
+            Invoke-openPREYMeson @(
                 'setup',
                 $buildDir,
                 $workspaceRoot,
@@ -53,7 +53,7 @@ switch ($Action) {
                 '--wrap-mode=forcefallback'
             )
         } else {
-            Invoke-openQ4Meson @(
+            Invoke-openPREYMeson @(
                 'setup',
                 '--wipe',
                 $buildDir,
@@ -67,7 +67,7 @@ switch ($Action) {
         }
     }
     'compile' {
-        Invoke-openQ4Meson @(
+        Invoke-openPREYMeson @(
             'compile',
             '-C',
             $buildDir
@@ -75,13 +75,13 @@ switch ($Action) {
     }
     'fastbuild' {
         if (-not (Test-Path $fastStageScript)) {
-            throw "openQ4 fast staging script not found at '$fastStageScript'."
+            throw "openPREY fast staging script not found at '$fastStageScript'."
         }
         if (-not (Test-Path $checkStagedContentScript)) {
-            throw "openQ4 staged content edit check script not found at '$checkStagedContentScript'."
+            throw "openPREY staged content edit check script not found at '$checkStagedContentScript'."
         }
 
-        Invoke-openQ4Meson @(
+        Invoke-openPREYMeson @(
             'compile',
             '-C',
             $buildDir
@@ -102,7 +102,7 @@ switch ($Action) {
         )
     }
     'install' {
-        Invoke-openQ4Meson @(
+        Invoke-openPREYMeson @(
             'install',
             '-C',
             $buildDir,

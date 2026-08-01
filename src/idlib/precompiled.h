@@ -352,6 +352,9 @@ public:
 #include "../framework/declEntityDef.h"
 #include "../framework/declAF.h"
 #include "../framework/DeclPDA.h"
+#include "../framework/DeclFX.h"
+#include "../framework/DeclParticle.h"
+#include "../framework/declPreyBeam.h"
 // RAVEN BEGIN
 // jscott: new decl types
 #include "../framework/DeclPlayerModel.h"
@@ -359,6 +362,9 @@ public:
 #include "../framework/declLipSync.h"
 #include "../framework/declPlayback.h"
 // RAVEN END
+
+static_assert( DECL_FX == 11 && DECL_PARTICLE == 12 && DECL_BEAM == 13 && DECL_PLAYER_MODEL == 21,
+	"Prey declType_t ABI changed; update engine and staged game headers together" );
 
 // We have expression parsing and evaluation code in multiple places:
 // materials, sound shaders, and guis. We should unify them.
@@ -398,6 +404,10 @@ const float MAX_BOUND_SIZE = 65536.0f;
 // AAS files and manager
 #include "../aas/AASFile.h"
 #include "../aas/AASFileManager.h"
+
+// Exposed to both engine and game. This resolves from the staged companion
+// source tree; the canonical header remains in openPREY-game.
+#include "../preyengine/profiler.h"
 
 // game
 #include "../game/Game.h"

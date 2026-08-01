@@ -1,6 +1,10 @@
 # Cel Shading Guide
 
-openQ4 can render Quake 4 with a cel-shaded look: lighting quantized into flat bands, and black ink around the shapes. It ships off, so stock Quake 4 still looks like Quake 4 until you ask for something else.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
+
+openPREY can render Prey (2006) with a cel-shaded look: lighting quantized into flat bands, and black ink around the shapes. It ships off, so stock Prey (2006) still looks like Prey (2006) until you ask for something else.
 
 ## Quick Start
 
@@ -43,7 +47,7 @@ seta r_celShadingWorldNormalThreshold 0.5
 
 ### Cel-Shaded Characters Only
 
-Leaves the level looking like retail Quake 4 and costs almost nothing extra.
+Leaves the level looking like retail Prey (2006) and costs almost nothing extra.
 
 ```cfg
 seta r_celShading 1

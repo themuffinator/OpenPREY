@@ -87,6 +87,10 @@ typedef enum {
 // RAVEN END
 
 extern idCVar		com_productionMode;
+extern idCVar		g_subtitles;
+extern idCVar		com_profanity;
+extern idCVar		s_musicvolume_dB;
+extern idCVar		g_levelloadmusic;
 
 // converted to a class so the idStr gets constructed
 class MemInfo {
@@ -171,6 +175,7 @@ struct MemInfo_t {
 	// asset totals
 	int				imageAssetsTotal;
 	int				modelAssetsTotal;
+	int				animAssetsTotal;
 	int				soundAssetsTotal;
 };
 
@@ -339,6 +344,33 @@ public:
 
 	// Returns the binding bound to the key
 	virtual const char* BindingFromKey(const char* key) = 0;
+
+	// Returns Prey's key-tip material metadata for the first key bound to a command.
+	virtual void				MaterialKeyForBinding( const char *binding, char *keyMaterial, char *key, bool &isWide ) {
+		if ( keyMaterial != NULL ) {
+			keyMaterial[0] = '\0';
+		}
+		if ( key != NULL ) {
+			key[0] = '\0';
+		}
+		isWide = false;
+	}
+
+	// Allows game logic to scale view sensitivity without sharing engine cvars.
+	virtual void				SetGameSensitivityFactor( float factor ) {
+		(void)factor;
+	}
+	virtual void				SetGamePadRumble( int effect ) {
+		(void)effect;
+	}
+
+	// Copies key-name text across the module boundary without sharing idStr storage.
+	virtual void				FixupKeyTranslations( const char *src, char *dst, int dstSize ) {
+		if ( dst == NULL || dstSize <= 0 ) {
+			return;
+		}
+		idStr::Copynz( dst, src != NULL ? src : "", dstSize );
+	}
 
 	// Directly sample a button.
 	virtual int					ButtonState(int key) = 0;

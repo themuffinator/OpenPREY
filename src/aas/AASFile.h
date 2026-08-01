@@ -11,7 +11,11 @@
 */
 
 #define AAS_FILEID					"DewmAAS"
+#ifdef HUMANHEAD
+#define AAS_FILEVERSION				"1.07"
+#else
 #define AAS_FILEVERSION				"1.08"
+#endif
 
 // travel flags
 #define TFL_INVALID					BIT(0)		// not valid
@@ -365,6 +369,7 @@ typedef enum aasDummySection_e {
 
 
 class idAASFile {
+	friend class idAASLocal;
 public:
 	virtual 					~idAASFile(void) {}
 

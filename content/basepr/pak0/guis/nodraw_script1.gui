@@ -1,0 +1,44 @@
+windowDef desktop {
+	rect		0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	nocursor	1
+
+	onAction {
+		runScript "gui::gui_parm1";
+		if ("gui::gui_parm25" != 0) {
+			set "desktop::noninteractive" "1" ;
+		}
+	}
+
+	// Console was used by AI.  Update as if the player pressed the button
+	onNamedEvent AIUse {
+		runScript "gui::gui_parm1";
+		if ("gui::gui_parm25" != 0) {
+			set "desktop::noninteractive" "1" ;
+		}
+	}
+	
+	onNamedEvent TurnOff {
+		resettime "PowerOff" "0";
+	}
+	onNamedEvent TurnOn {
+		resettime "PowerOn" "0";
+	}
+	
+	windowDef PowerOff {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "desktop::noninteractive" "1" ;
+		}
+	}
+	
+	windowDef PowerOn {
+		rect		0, 0, 0, 0
+		noTime		1
+		onTime 0 {
+			set "desktop::noninteractive" "0" ;
+		}
+	}
+
+}

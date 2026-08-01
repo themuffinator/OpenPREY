@@ -1825,6 +1825,17 @@ void idInteraction::AddActiveInteraction( void ) {
 
 	vLight = lightDef->viewLight;
 	vEntity = entityDef->viewEntity;
+
+	// Apply spirit visibility before either receiver or conservative shadow-map
+	// caster submission so hidden entities cannot leak shadows into the view.
+	if ( tr.viewDef->renderView.viewSpiritEntities ) {
+		if ( entityDef->parms.onlyInvisibleInSpirit ) {
+			return;
+		}
+	} else if ( entityDef->parms.onlyVisibleInSpirit ) {
+		return;
+	}
+
 	const bool		shadowMapConservativeCandidate =
 		interactionHasShadows &&
 		R_ShadowMapConservativeCastersEnabled() &&
@@ -2051,7 +2062,7 @@ void idInteraction::AddActiveInteraction( void ) {
 		bool shadowSuppressed = false;
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( entityDef->parms.suppressShadowInViewID &&
-				entityDef->parms.suppressShadowInViewID == tr.viewDef->renderView.viewID ) {
+				entityDef->parms.suppressShadowInViewID == R_EffectiveViewIDForSubview() ) {
 				shadowSuppressed = true;
 			}
 			if ( entityDef->parms.suppressShadowInLightID &&
@@ -2091,9 +2102,9 @@ void idInteraction::AddActiveInteraction( void ) {
 		if ( shadowMapCasterPolicyActive ) {
 			const bool isViewOnlyEntity =
 				( entityDef->parms.allowSurfaceInViewID != 0 &&
-					entityDef->parms.allowSurfaceInViewID == tr.viewDef->renderView.viewID ) ||
+					entityDef->parms.allowSurfaceInViewID == R_EffectiveViewIDForSubview() ) ||
 				( entityDef->parms.weaponDepthHackInViewID != 0 &&
-					entityDef->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID );
+					entityDef->parms.weaponDepthHackInViewID == R_EffectiveViewIDForSubview() );
 			const bool shadowMapNoSelfShadow = materialNoSelfShadow;
 			const bool shadowMapsEnabled = r_shadows.GetBool() && r_useShadowMap.GetBool();
 			const bool translucentShadowMapSupported =

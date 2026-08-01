@@ -1,18 +1,22 @@
 # Level-Load Cache
 
-openQ4 automatically builds compact binary caches for MD5 animations as they are first encountered. Later launches can load the final animation data directly instead of decompressing and parsing the much larger text source again.
+> [!NOTE]
+> This page documents inherited engine/tooling capability. Retail Prey behavior remains
+> runtime-validation pending unless the rebase status ledger records specific evidence.
 
-The first visit to animation-heavy maps can therefore take slightly longer while cache files are written. Subsequent visits should be faster. A representative Air Defense 1 run generated 820 cache entries using about 27 MiB and reduced the animation-heavy model-definition phase from roughly 2.7–2.8 seconds to about 1.0 second on the tested Windows x64 system.
+openPREY automatically builds compact binary caches for MD5 animations as they are first encountered. Later launches can load the final animation data directly instead of decompressing and parsing the much larger text source again.
+
+The first visit to animation-heavy maps can therefore take slightly longer while cache files are written. Subsequent visits should be faster. Upstream reference testing generated 820 cache entries using about 27 MiB and reduced an animation-heavy model-definition phase from roughly 2.7–2.8 seconds to about 1.0 second on the tested Windows x64 system; Prey-specific performance remains validation-pending.
 
 ## Location
 
 Caches are written below the active save path:
 
 ```text
-<fs_savepath>/baseoq4/generated/animations/
+<fs_savepath>/basepr/generated/animations/
 ```
 
-They are generated runtime data, not replacement game assets, and should not be copied into retail Quake 4 PK4s.
+They are generated runtime data, not replacement game assets, and should not be copied into retail Prey (2006) PK4s.
 
 ## Validation and portability
 
@@ -20,7 +24,7 @@ Each cache records the source path, source size, timestamp, and containing PK4 c
 
 The cache stores fixed-width values and floating-point arrays in a portable byte order. x64 and ARM64 builds use the same format, although moving the game installation or changing the source package can intentionally trigger a rebuild.
 
-Loaded cache data becomes the normal runtime animation data; openQ4 does not retain a second permanent copy in memory. Animation memory reporting also includes base-frame storage.
+Loaded cache data becomes the normal runtime animation data; openPREY does not retain a second permanent copy in memory. Animation memory reporting also includes base-frame storage.
 
 ## Controls
 
@@ -35,4 +39,4 @@ g_writeGeneratedAnimCache 1
 - Set `g_writeGeneratedAnimCache 0` to prevent new cache files from being written.
 - Disable both for a source-parse benchmark.
 
-To force a clean rebuild, close openQ4 and delete the `generated/animations/` directory under the active `fs_savepath`. Do not delete the original `models/**/*.md5anim` files from the Quake 4 installation.
+To force a clean rebuild, close openPREY and delete the `generated/animations/` directory under the active `fs_savepath`. Do not delete the original `models/**/*.md5anim` files from the Prey (2006) installation.

@@ -614,6 +614,9 @@ bool R_CornerCullLocalBox( const idBounds &bounds, const float modelMatrix[16], 
 	if ( r_useCulling.GetInteger() < 2 ) {
 		return false;
 	}
+	if ( numPlanes <= 0 || numPlanes > 6 || planes == NULL || modelMatrix == NULL ) {
+		return false;
+	}
 
 	// transform into world space
 	for ( i = 0 ; i < 8 ; i++ ) {

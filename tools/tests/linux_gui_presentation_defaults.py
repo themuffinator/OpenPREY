@@ -71,7 +71,11 @@ def validate_linux_sdl3_x11_helpers_are_optional() -> None:
     require(linux_sdl3, "Sys_PreferDrmSysfsBeforeX11VideoRam", "SDL3 Linux Wayland-first VRAM probe")
     require(linux_sdl3, "SDL_GetCurrentVideoDriver()", "SDL3 Linux active-driver VRAM probe")
     require(linux_sdl3, 'SDL3_EnvHasValue("WAYLAND_DISPLAY")', "SDL3 Linux pre-video Wayland-session VRAM probe")
-    require(linux_sdl3, 'SDL3_EnvFlagEnabled("OPENQ4_FORCE_X11")', "SDL3 Linux explicit XWayland VRAM probe")
+    require(
+        linux_sdl3,
+        'SDL3_EnvFlagEnabledWithLegacyAlias("OPENPREY_FORCE_X11", "OPENQ4_FORCE_X11")',
+        "SDL3 Linux explicit XWayland VRAM probe",
+    )
     require(linux_sdl3, 'Sys_IsWaylandVideoDriverName(getenv("SDL_VIDEO_DRIVER"))', "SDL3 Linux explicit Wayland VRAM probe")
     require(linux_sdl3, 'Sys_IsWaylandVideoDriverName(getenv("SDL_VIDEODRIVER"))', "SDL3 Linux explicit legacy Wayland VRAM probe")
     require(linux_sdl3, "if (!preferDrmBeforeX11)", "SDL3 Linux skips X11 VRAM probe on native Wayland")
@@ -90,10 +94,19 @@ def validate_linux_sdl3_x11_helpers_are_optional() -> None:
     reject(linux_sdl3, '#include "local.h"', "SDL3 Linux local X11 header dependency")
     reject(sdl3_backend, '../linux/local.h', "SDL3 backend local X11 header dependency")
     reject(linux_main, '#include "local.h"', "shared Linux main X11 header dependency")
-    require(linux_main, "OPENQ4_FORCE_X11=1", "Linux Wayland runtime XWayland fallback guidance")
-    require(linux_main, "OPENQ4_WAYLAND_DISABLE_LIBDECOR=1", "Linux Wayland runtime libdecor opt-out guidance")
-    require(linux_main, "OPENQ4_WAYLAND_PREFER_LIBDECOR=1", "Linux Wayland runtime libdecor guidance")
-    require(linux_main, "OPENQ4_WAYLAND_SYNC_WINDOW_OPS=1", "Linux Wayland runtime sync-window guidance")
+    require(linux_main, "OPENPREY_FORCE_X11=1", "Linux Wayland runtime XWayland fallback guidance")
+    require(linux_main, "OPENPREY_WAYLAND_DISABLE_LIBDECOR=1", "Linux Wayland runtime libdecor opt-out guidance")
+    require(linux_main, "OPENPREY_WAYLAND_PREFER_LIBDECOR=1", "Linux Wayland runtime libdecor guidance")
+    require(linux_main, "OPENPREY_WAYLAND_SYNC_WINDOW_OPS=1", "Linux Wayland runtime sync-window guidance")
+    for primary_name, legacy_name in (
+        ("OPENPREY_FORCE_X11", "OPENQ4_FORCE_X11"),
+        ("OPENPREY_WAYLAND_DISABLE_LIBDECOR", "OPENQ4_WAYLAND_DISABLE_LIBDECOR"),
+        ("OPENPREY_WAYLAND_PREFER_LIBDECOR", "OPENQ4_WAYLAND_PREFER_LIBDECOR"),
+        ("OPENPREY_WAYLAND_SYNC_WINDOW_OPS", "OPENQ4_WAYLAND_SYNC_WINDOW_OPS"),
+    ):
+        require(sdl3_backend, primary_name, f"SDL3 Linux {primary_name} primary environment control")
+        require(sdl3_backend, legacy_name, f"SDL3 Linux {legacy_name} migration alias")
+    require(sdl3_backend, 'PROJECT_VERSION, "openprey"', "SDL3 openPREY Wayland application id")
 
     require(meson_sources, "LINUX_X11_HELPER_SOURCES", "optional Linux X11 helper sources")
     require(meson_sources, "--linux-x11-helpers", "optional Linux X11 helper source switch")
@@ -129,7 +142,8 @@ def validate_linux_legacy_config_migration() -> None:
 
 def validate_release_note() -> None:
     release_notes = read("docs/dev/release-completion.md")
-    require(release_notes, "GUI/font presentation atlases are protected from downsizing", "release completion notes")
+    require(release_notes, "Repository rebranded", "release completion notes")
+    require(release_notes, "Wayland/X11 runtime boundaries", "release completion notes")
 
 
 def main() -> None:

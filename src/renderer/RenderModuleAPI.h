@@ -48,7 +48,11 @@
 //      surface creation (the module never links SDL)
 // Version 7 keeps stale renderer modules from consuming the extended
 // renderEntity_t presentation contract (flat diffuse colour and sweep flags).
-#define RENDER_API_VERSION			7
+// Version 8 carries the Prey render-entity ABI and a late-bound game time-group
+// query so renderer modules do not import the engine's mutable `game` global.
+// Version 9 extends glyphInfo_t with the per-glyph material required by retail
+// Doom 3/Prey bitmap fonts, whose glyphs span multiple texture atlases.
+#define RENDER_API_VERSION			9
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -89,6 +93,9 @@ typedef struct renderModuleServices_s {
 	// --- version 5: the loader owns request/active/disposition status; the
 	// module's gfxInfo routes here so the report stays truthful ---
 	void			( *PrintRendererApiStatus )( void );
+	// --- version 8: game libraries load after the renderer module, so this
+	// callback resolves the active game interface at call time ---
+	int				( *GetTimeGroupTime )( int timeGroup, int fallbackTime );
 	// worker-thread creation intentionally not carried yet: the light-grid
 	// bake pool's Sys_CreateThread signature (thread registry, priority,
 	// threadInfo_t) is resolved by the module-side forwarder design in

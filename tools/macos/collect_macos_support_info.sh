@@ -1,5 +1,5 @@
 #!/bin/sh
-# Collect redacted macOS support data for experimental openQ4 crash reports.
+# Collect redacted macOS support data for experimental openPREY crash reports.
 
 set -eu
 umask 077
@@ -9,12 +9,12 @@ case "$0" in
     *) script_dir=. ;;
 esac
 SCRIPT_DIR=$(CDPATH= cd "${script_dir}" && pwd -P)
-PACKAGE_ROOT=${OPENQ4_PACKAGE_ROOT:-$SCRIPT_DIR}
+PACKAGE_ROOT=${OPENPREY_PACKAGE_ROOT:-${OPENQ4_PACKAGE_ROOT:-$SCRIPT_DIR}}
 OUTPUT_DIR=${1:-$(pwd)}
 HOME_DIR=${HOME:-}
 STAMP=$(date -u +"%Y%m%d-%H%M%SZ")
-WORK_PARENT=$(mktemp -d "${TMPDIR:-/tmp}/openq4-support.XXXXXX")
-BUNDLE_NAME="openq4-macos-support-${STAMP}"
+WORK_PARENT=$(mktemp -d "${TMPDIR:-/tmp}/openprey-support.XXXXXX")
+BUNDLE_NAME="openprey-macos-support-${STAMP}"
 BUNDLE_DIR="${WORK_PARENT}/${BUNDLE_NAME}"
 ARCHIVE_PATH="${OUTPUT_DIR%/}/${BUNDLE_NAME}.tar.gz"
 ARCHIVE_TMP=
@@ -45,7 +45,7 @@ runtime_arch_token() {
 }
 
 RUNTIME_ARCH=$(runtime_arch_token)
-APP_ROOT="${PACKAGE_ROOT}/openQ4.app"
+APP_ROOT="${PACKAGE_ROOT}/openPREY.app"
 APP_RESOURCE_ROOT="${APP_ROOT}/Contents/Resources"
 APP_FRAMEWORK_ROOT="${APP_ROOT}/Contents/Frameworks"
 SKIPPED_CRASH_REPORT_INDEX=0
@@ -155,18 +155,18 @@ write_openq4_log_candidate_paths() {
     target=$1
     : > "${target}"
     if [ -n "${HOME_DIR}" ]; then
-        printf '%s\n' "${HOME_DIR}/Library/Application Support/openQ4/baseoq4/logs/openq4.log" >> "${target}"
-        printf '%s\n' "${HOME_DIR}/baseoq4/logs/openq4.log" >> "${target}"
+        printf '%s\n' "${HOME_DIR}/Library/Application Support/openPREY/basepr/logs/openprey.log" >> "${target}"
+        printf '%s\n' "${HOME_DIR}/basepr/logs/openprey.log" >> "${target}"
     fi
-    printf '%s\n' "${PACKAGE_ROOT}/baseoq4/logs/openq4.log" >> "${target}"
+    printf '%s\n' "${PACKAGE_ROOT}/basepr/logs/openprey.log" >> "${target}"
 }
 
 write_openq4_renderer_config_candidate_paths() {
     target=$1
     : > "${target}"
     if [ -n "${HOME_DIR}" ]; then
-        printf '%s\n' "${HOME_DIR}/Library/Application Support/openQ4/baseoq4/openQ4Config.cfg" >> "${target}"
-        printf '%s\n' "${HOME_DIR}/baseoq4/openQ4Config.cfg" >> "${target}"
+        printf '%s\n' "${HOME_DIR}/Library/Application Support/openPREY/basepr/openPREYConfig.cfg" >> "${target}"
+        printf '%s\n' "${HOME_DIR}/basepr/openPREYConfig.cfg" >> "${target}"
     fi
 }
 
@@ -223,7 +223,7 @@ write_command "system/displays.txt" system_profiler SPDisplaysDataType
 
 {
     printf 'Collector timestamp UTC: %s\n' "${STAMP}"
-    printf 'Rosetta is not a supported openQ4 release target; this report only identifies translated support sessions.\n'
+    printf 'Rosetta is not a supported openPREY release target; this report only identifies translated support sessions.\n'
 
     if command -v arch >/dev/null 2>&1; then
         printf '\n$ arch\n'
@@ -262,9 +262,9 @@ fi
     printf 'Current directory: %s\n' "$(pwd)"
     printf '\nExpected self-contained app and diagnostic package entries:\n'
     for entry in \
-        "openQ4.app" \
-        "openQ4-client_${RUNTIME_ARCH}" \
-        "openQ4-ded_${RUNTIME_ARCH}" \
+        "openPREY.app" \
+        "openPREY-client_${RUNTIME_ARCH}" \
+        "openPREY-ded_${RUNTIME_ARCH}" \
         "collect_macos_support_info.sh" \
         "VERSION.txt" \
         "SYMBOLS.txt"
@@ -277,8 +277,8 @@ fi
     done
     printf '\nPackage root listing:\n'
     ls -la "${PACKAGE_ROOT}" 2>&1 || true
-    printf '\nEmbedded baseoq4 data listing:\n'
-    ls -la "${APP_RESOURCE_ROOT}/baseoq4" 2>&1 || true
+    printf '\nEmbedded basepr data listing:\n'
+    ls -la "${APP_RESOURCE_ROOT}/basepr" 2>&1 || true
     printf '\nEmbedded game-module listing:\n'
     ls -la "${APP_FRAMEWORK_ROOT}" 2>&1 || true
 } | write_bounded_report "package/layout.txt"
@@ -288,15 +288,15 @@ fi
     printf 'Package root: %s\n' "${PACKAGE_ROOT}"
     printf 'Detected runtime architecture token: %s\n' "${RUNTIME_ARCH}"
     printf 'App path: %s\n' "${APP_ROOT}"
-    printf 'App executable path: %s\n' "${APP_ROOT}/Contents/MacOS/openQ4"
-    printf 'Expected loose client path: %s\n' "${PACKAGE_ROOT}/openQ4-client_${RUNTIME_ARCH}"
-    printf 'Expected loose dedicated-server path: %s\n' "${PACKAGE_ROOT}/openQ4-ded_${RUNTIME_ARCH}"
-    printf 'Expected embedded game-data path: %s\n' "${APP_RESOURCE_ROOT}/baseoq4"
-    printf 'Expected embedded game-module path: %s\n' "${APP_FRAMEWORK_ROOT}"
+    printf 'App executable path: %s\n' "${APP_ROOT}/Contents/MacOS/openPREY"
+    printf 'Expected loose client path: %s\n' "${PACKAGE_ROOT}/openPREY-client_${RUNTIME_ARCH}"
+    printf 'Expected loose dedicated-server path: %s\n' "${PACKAGE_ROOT}/openPREY-ded_${RUNTIME_ARCH}"
+    printf 'Expected embedded game-data path: %s\n' "${APP_RESOURCE_ROOT}/basepr"
+    printf 'Expected embedded game-module path: %s\n' "${APP_FRAMEWORK_ROOT}/game_${RUNTIME_ARCH}.dylib"
     printf 'Expected log keys: fs_basepath, fs_cdpath, fs_savepath\n'
     printf '\nCaptured filesystem path lines from available logs:\n'
     if [ -z "${HOME_DIR}" ]; then
-        printf 'HOME was not set; home-scoped openq4.log paths were skipped.\n'
+        printf 'HOME was not set; home-scoped openprey.log paths were skipped.\n'
     fi
 
     found_log=0
@@ -320,7 +320,7 @@ fi
     done < "${log_candidates}"
 
     if [ "${found_log}" -eq 0 ]; then
-        printf 'No openq4.log files were found. fs_basepath, fs_cdpath, and fs_savepath values could not be copied without launching openQ4.\n'
+        printf 'No openprey.log files were found. fs_basepath, fs_cdpath, and fs_savepath values could not be copied without launching openPREY.\n'
     fi
 } | write_bounded_report "package/path-resolution.txt"
 
@@ -331,7 +331,7 @@ fi
 
     for manifest_path in \
         "${PACKAGE_ROOT}/VERSION.txt" \
-        "${PACKAGE_ROOT}/openQ4.app/Contents/Resources/VERSION.txt"
+        "${PACKAGE_ROOT}/openPREY.app/Contents/Resources/VERSION.txt"
     do
         printf '\n-- %s --\n' "${manifest_path}"
         if [ -L "${manifest_path}" ]; then
@@ -348,14 +348,10 @@ fi
     printf '\nGame module files in the app Frameworks directory (plus legacy adjacent locations):\n'
     found_module=0
     for module_path in \
-        "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-        "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dll \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dll \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.so \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.so
+        "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
+        "${PACKAGE_ROOT}/basepr"/game_*.dylib \
+        "${PACKAGE_ROOT}/basepr"/game_*.dll \
+        "${PACKAGE_ROOT}/basepr"/game_*.so
     do
         if [ -L "${module_path}" ]; then
             found_module=1
@@ -373,20 +369,18 @@ fi
 {
     printf 'Collector timestamp UTC: %s\n' "${STAMP}"
     printf 'Package root: %s\n' "${PACKAGE_ROOT}"
-    printf 'Architecture checks do not launch openQ4.\n'
+    printf 'Architecture checks do not launch openPREY.\n'
 
     for binary_path in \
-        "${APP_ROOT}/Contents/MacOS/openQ4" \
-        "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-        "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
-        "${PACKAGE_ROOT}/openQ4-client_arm64" \
-        "${PACKAGE_ROOT}/openQ4-client_x64" \
-        "${PACKAGE_ROOT}/openQ4-client_x86" \
-        "${PACKAGE_ROOT}/openQ4-ded_arm64" \
-        "${PACKAGE_ROOT}/openQ4-ded_x64" \
-        "${PACKAGE_ROOT}/openQ4-ded_x86" \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib
+        "${APP_ROOT}/Contents/MacOS/openPREY" \
+        "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
+        "${PACKAGE_ROOT}/openPREY-client_arm64" \
+        "${PACKAGE_ROOT}/openPREY-client_x64" \
+        "${PACKAGE_ROOT}/openPREY-client_x86" \
+        "${PACKAGE_ROOT}/openPREY-ded_arm64" \
+        "${PACKAGE_ROOT}/openPREY-ded_x64" \
+        "${PACKAGE_ROOT}/openPREY-ded_x86" \
+        "${PACKAGE_ROOT}/basepr"/game_*.dylib
     do
         if path_exists_for_inspection "${binary_path}"; then
             printf '\n-- %s --\n' "${binary_path}"
@@ -408,21 +402,19 @@ fi
 {
     printf 'Collector timestamp UTC: %s\n' "${STAMP}"
     printf 'Package root: %s\n' "${PACKAGE_ROOT}"
-    printf 'Dependency and install-name checks do not launch openQ4.\n'
+    printf 'Dependency and install-name checks do not launch openPREY.\n'
 
     if command -v otool >/dev/null 2>&1; then
         for binary_path in \
-            "${APP_ROOT}/Contents/MacOS/openQ4" \
-            "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-            "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
-            "${PACKAGE_ROOT}/openQ4-client_arm64" \
-            "${PACKAGE_ROOT}/openQ4-client_x64" \
-            "${PACKAGE_ROOT}/openQ4-client_x86" \
-            "${PACKAGE_ROOT}/openQ4-ded_arm64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x86" \
-            "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-            "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib
+            "${APP_ROOT}/Contents/MacOS/openPREY" \
+            "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
+            "${PACKAGE_ROOT}/openPREY-client_arm64" \
+            "${PACKAGE_ROOT}/openPREY-client_x64" \
+            "${PACKAGE_ROOT}/openPREY-client_x86" \
+            "${PACKAGE_ROOT}/openPREY-ded_arm64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x86" \
+            "${PACKAGE_ROOT}/basepr"/game_*.dylib
         do
             if path_exists_for_inspection "${binary_path}"; then
                 printf '\n-- otool -L: %s --\n' "${binary_path}"
@@ -445,7 +437,7 @@ fi
     printf 'Expected log keys: OpenAL vendor, OpenAL renderer, OpenAL version, OpenAL requested device, OpenAL default device, OpenAL active device, OpenAL EFX\n'
     printf '\nCaptured OpenAL and EFX lines from available logs:\n'
     if [ -z "${HOME_DIR}" ]; then
-        printf 'HOME was not set; home-scoped openq4.log paths were skipped.\n'
+        printf 'HOME was not set; home-scoped openprey.log paths were skipped.\n'
     fi
 
     found_log=0
@@ -471,7 +463,7 @@ fi
     done < "${log_candidates}"
 
     if [ "${found_log}" -eq 0 ]; then
-        printf 'No openq4.log files were found. OpenAL vendor, renderer, device name, and EFX warning lines could not be copied without launching openQ4.\n'
+        printf 'No openprey.log files were found. OpenAL vendor, renderer, device name, and EFX warning lines could not be copied without launching openPREY.\n'
     elif [ "${found_audio_line}" -eq 0 ]; then
         printf '\nNo OpenAL vendor, renderer, device name, or EFX warning lines were found in the copied logs.\n'
     fi
@@ -482,7 +474,7 @@ fi
     printf 'Expected renderer keys: R_InitOpenGL, renderer startup phase, Renderer driver quirks, interaction fallback, render-target/MSAA diagnostics, selected filesystem/module paths, fatal signal\n'
     printf '\nCaptured renderer startup and crash lines from available logs:\n'
     if [ -z "${HOME_DIR}" ]; then
-        printf 'HOME was not set; home-scoped openq4.log paths were skipped.\n'
+        printf 'HOME was not set; home-scoped openprey.log paths were skipped.\n'
     fi
 
     found_log=0
@@ -508,7 +500,7 @@ fi
     done < "${log_candidates}"
 
     if [ "${found_log}" -eq 0 ]; then
-        printf 'No openq4.log files were found. Renderer startup and crash lines could not be copied without launching openQ4.\n'
+        printf 'No openprey.log files were found. Renderer startup and crash lines could not be copied without launching openPREY.\n'
     elif [ "${found_renderer_line}" -eq 0 ]; then
         printf '\nNo renderer startup, interaction-fallback, render-target, filesystem/module, or fatal-signal lines were found in the copied logs.\n'
     fi
@@ -519,7 +511,7 @@ fi
     printf 'Only renderer and performance settings are copied: r_* plus com_machineSpec and com_performancePreset. Bindings, player/account, network, audio-device, and arbitrary config settings are excluded.\n'
     printf '\nCaptured renderer/performance settings from safe saved configs:\n'
     if [ -z "${HOME_DIR}" ]; then
-        printf 'HOME was not set; saved openQ4Config.cfg paths were skipped.\n'
+        printf 'HOME was not set; saved openPREYConfig.cfg paths were skipped.\n'
     fi
 
     found_config=0
@@ -545,7 +537,7 @@ fi
     done < "${renderer_config_candidates}"
 
     if [ "${found_config}" -eq 0 ]; then
-        printf 'No saved openQ4Config.cfg files were found. Renderer settings could not be copied without launching openQ4.\n'
+        printf 'No saved openPREYConfig.cfg files were found. Renderer settings could not be copied without launching openPREY.\n'
     elif [ "${found_renderer_config_line}" -eq 0 ]; then
         printf '\nNo renderer or performance settings were found in the inspected saved configs.\n'
     fi
@@ -554,22 +546,20 @@ fi
 {
     printf 'Collector timestamp UTC: %s\n' "${STAMP}"
     printf 'Package root: %s\n' "${PACKAGE_ROOT}"
-    printf 'Signing and Gatekeeper checks do not launch openQ4.\n'
+    printf 'Signing and Gatekeeper checks do not launch openPREY.\n'
 
     if command -v codesign >/dev/null 2>&1; then
         for signed_path in \
             "${APP_ROOT}" \
-            "${APP_ROOT}/Contents/MacOS/openQ4" \
-            "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-            "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
-            "${PACKAGE_ROOT}/openQ4-client_arm64" \
-            "${PACKAGE_ROOT}/openQ4-client_x64" \
-            "${PACKAGE_ROOT}/openQ4-client_x86" \
-            "${PACKAGE_ROOT}/openQ4-ded_arm64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x86" \
-            "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-            "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib
+            "${APP_ROOT}/Contents/MacOS/openPREY" \
+            "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
+            "${PACKAGE_ROOT}/openPREY-client_arm64" \
+            "${PACKAGE_ROOT}/openPREY-client_x64" \
+            "${PACKAGE_ROOT}/openPREY-client_x86" \
+            "${PACKAGE_ROOT}/openPREY-ded_arm64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x86" \
+            "${PACKAGE_ROOT}/basepr"/game_*.dylib
         do
             if path_exists_for_inspection "${signed_path}"; then
                 printf '\n-- codesign verify: %s --\n' "${signed_path}"
@@ -585,12 +575,12 @@ fi
     if command -v spctl >/dev/null 2>&1; then
         for assessed_path in \
             "${APP_ROOT}" \
-            "${PACKAGE_ROOT}/openQ4-client_arm64" \
-            "${PACKAGE_ROOT}/openQ4-client_x64" \
-            "${PACKAGE_ROOT}/openQ4-client_x86" \
-            "${PACKAGE_ROOT}/openQ4-ded_arm64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x86"
+            "${PACKAGE_ROOT}/openPREY-client_arm64" \
+            "${PACKAGE_ROOT}/openPREY-client_x64" \
+            "${PACKAGE_ROOT}/openPREY-client_x86" \
+            "${PACKAGE_ROOT}/openPREY-ded_arm64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x86"
         do
             if path_exists_for_inspection "${assessed_path}"; then
                 printf '\n-- spctl assess: %s --\n' "${assessed_path}"
@@ -626,19 +616,17 @@ fi
         for xattr_path in \
             "${PACKAGE_ROOT}" \
             "${APP_ROOT}" \
-            "${APP_ROOT}/Contents/MacOS/openQ4" \
-            "${APP_RESOURCE_ROOT}/baseoq4" \
-            "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-            "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
-            "${PACKAGE_ROOT}/openQ4-client_arm64" \
-            "${PACKAGE_ROOT}/openQ4-client_x64" \
-            "${PACKAGE_ROOT}/openQ4-client_x86" \
-            "${PACKAGE_ROOT}/openQ4-ded_arm64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x64" \
-            "${PACKAGE_ROOT}/openQ4-ded_x86" \
-            "${PACKAGE_ROOT}/baseoq4" \
-            "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-            "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib \
+            "${APP_ROOT}/Contents/MacOS/openPREY" \
+            "${APP_RESOURCE_ROOT}/basepr" \
+            "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
+            "${PACKAGE_ROOT}/openPREY-client_arm64" \
+            "${PACKAGE_ROOT}/openPREY-client_x64" \
+            "${PACKAGE_ROOT}/openPREY-client_x86" \
+            "${PACKAGE_ROOT}/openPREY-ded_arm64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x64" \
+            "${PACKAGE_ROOT}/openPREY-ded_x86" \
+            "${PACKAGE_ROOT}/basepr" \
+            "${PACKAGE_ROOT}/basepr"/game_*.dylib \
             "${PACKAGE_ROOT}/collect_macos_support_info.sh"
         do
             if path_exists_for_inspection "${xattr_path}"; then
@@ -667,23 +655,23 @@ fi
 } | write_bounded_report "package/quarantine.txt"
 
 copy_text_if_present "${PACKAGE_ROOT}/VERSION.txt" "package/VERSION.txt"
-copy_text_if_present "${PACKAGE_ROOT}/openQ4.app/Contents/Resources/VERSION.txt" "package/app-VERSION.txt"
+copy_text_if_present "${PACKAGE_ROOT}/openPREY.app/Contents/Resources/VERSION.txt" "package/app-VERSION.txt"
 copy_text_if_present "${PACKAGE_ROOT}/SYMBOLS.txt" "package/SYMBOLS.txt"
-copy_text_if_present "${PACKAGE_ROOT}/openQ4.app/Contents/Info.plist" "package/Info.plist"
+copy_text_if_present "${PACKAGE_ROOT}/openPREY.app/Contents/Info.plist" "package/Info.plist"
 if [ -n "${HOME_DIR}" ]; then
-    copy_text_if_present "${HOME_DIR}/Library/Application Support/openQ4/baseoq4/logs/openq4.log" "logs/home-openq4.log"
-    copy_text_if_present "${HOME_DIR}/baseoq4/logs/openq4.log" "logs/home-baseoq4-openq4.log"
-    copy_text_if_present "${HOME_DIR}/Library/Application Support/openQ4/baseoq4/logs/fatal.txt" "logs/home-fatal.txt"
-    copy_text_if_present "${HOME_DIR}/baseoq4/logs/fatal.txt" "logs/home-baseoq4-fatal.txt"
+    copy_text_if_present "${HOME_DIR}/Library/Application Support/openPREY/basepr/logs/openprey.log" "logs/home-openprey.log"
+    copy_text_if_present "${HOME_DIR}/basepr/logs/openprey.log" "logs/home-basepr-openprey.log"
+    copy_text_if_present "${HOME_DIR}/Library/Application Support/openPREY/basepr/logs/fatal.txt" "logs/home-fatal.txt"
+    copy_text_if_present "${HOME_DIR}/basepr/logs/fatal.txt" "logs/home-basepr-fatal.txt"
 else
     write_text "logs/home-paths-unavailable.txt" \
-        "HOME was not set; home-scoped openq4.log files were skipped." \
+        "HOME was not set; home-scoped openprey.log files were skipped." \
         "Package-local logs were still inspected when present."
 fi
-copy_text_if_present "${PACKAGE_ROOT}/baseoq4/logs/openq4.log" "logs/package-baseoq4-openq4.log"
-copy_text_if_present "${PACKAGE_ROOT}/baseoq4/logs/fatal.txt" "logs/package-baseoq4-fatal.txt"
-copy_text_if_present "${APP_RESOURCE_ROOT}/baseoq4/logs/openq4.log" "logs/app-resource-baseoq4-openq4.log"
-copy_text_if_present "${APP_RESOURCE_ROOT}/baseoq4/logs/fatal.txt" "logs/app-resource-baseoq4-fatal.txt"
+copy_text_if_present "${PACKAGE_ROOT}/basepr/logs/openprey.log" "logs/package-basepr-openprey.log"
+copy_text_if_present "${PACKAGE_ROOT}/basepr/logs/fatal.txt" "logs/package-basepr-fatal.txt"
+copy_text_if_present "${APP_RESOURCE_ROOT}/basepr/logs/openprey.log" "logs/app-resource-basepr-openprey.log"
+copy_text_if_present "${APP_RESOURCE_ROOT}/basepr/logs/fatal.txt" "logs/app-resource-basepr-fatal.txt"
 
 CRASH_LIST="${WORK_PARENT}/crash-list.txt"
 if [ -z "${HOME_DIR}" ]; then
@@ -698,19 +686,19 @@ else
             "The support collector does not follow symlinks when copying crash-report text."
     elif [ -d "${CRASH_DIR}" ]; then
         find "${CRASH_DIR}" -type f \( \
-            -name 'openQ4*.ips' -o \
-            -name 'openQ4*.crash' -o \
-            -name 'openQ4-client*.ips' -o \
-            -name 'openQ4-client*.crash' -o \
-            -name 'openQ4-ded*.ips' -o \
-            -name 'openQ4-ded*.crash' \
+            -name 'openPREY*.ips' -o \
+            -name 'openPREY*.crash' -o \
+            -name 'openPREY-client*.ips' -o \
+            -name 'openPREY-client*.crash' -o \
+            -name 'openPREY-ded*.ips' -o \
+            -name 'openPREY-ded*.crash' \
         \) -mtime -30 -print | sort | tail -n 10 > "${CRASH_LIST}"
         if [ -s "${CRASH_LIST}" ]; then
             while IFS= read -r crash_path; do
                 copy_crash_report_if_safe "${crash_path}"
             done < "${CRASH_LIST}"
         else
-            write_text "crash-reports/README.txt" "No matching openQ4 crash reports were found in ~/Library/Logs/DiagnosticReports from the last 30 days."
+            write_text "crash-reports/README.txt" "No matching openPREY crash reports were found in ~/Library/Logs/DiagnosticReports from the last 30 days."
         fi
     else
         write_text "crash-reports/README.txt" "The macOS DiagnosticReports directory was not found."
@@ -719,21 +707,21 @@ fi
 
 write_text "README.txt" \
     "Review this archive before attaching it to a public issue." \
-    "The collector redacts /Users/<name> paths and email-like strings, does not dump the environment, does not launch openQ4, and does not copy retail q4base PK4 assets." \
+    "The collector redacts /Users/<name> paths and email-like strings, does not dump the environment, does not launch openPREY, and does not copy retail Prey assets." \
     "Copied text is sanitized for embedded control characters, and command/report output is stream-limited before redaction so noisy tools cannot inflate the support archive." \
     "The collector does not follow symlinked package, log, or crash-report inputs; skipped symlinks are recorded in the relevant report files." \
     "If HOME is not set, home-scoped logs and DiagnosticReports are skipped with an archive note instead of aborting collection." \
     "system/rosetta.txt records the collector process architecture and sysctl.proc_translated value so unsupported Rosetta/translated reports are easy to spot." \
-    "package/build-metadata.txt records package VERSION.txt metadata, app VERSION.txt metadata, openQ4/openQ4-game commit fields when present, and the game module filenames in the app Frameworks directory or a legacy adjacent baseoq4 directory." \
-    "package/binary-architecture.txt records file/lipo architecture output for package executables and game modules without launching openQ4." \
-    "package/dylib-dependencies.txt records otool dependency and game-module install-name output without launching openQ4." \
+    "package/build-metadata.txt records package VERSION.txt metadata, app VERSION.txt metadata, inherited commit-field keys when present, and the unified game module filename in the app Frameworks directory or a legacy adjacent basepr directory." \
+    "package/binary-architecture.txt records file/lipo architecture output for package executables and game modules without launching openPREY." \
+    "package/dylib-dependencies.txt records otool dependency and game-module install-name output without launching openPREY." \
     "package/path-resolution.txt records the package root, app path, expected loose runtime paths, and any fs_basepath, fs_cdpath, or fs_savepath lines found in copied logs." \
-    "package/signing.txt records codesign, spctl execute assessment, and stapler validation output for package executables and app bundles without launching openQ4." \
+    "package/signing.txt records codesign, spctl execute assessment, and stapler validation output for package executables and app bundles without launching openPREY." \
     "package/quarantine.txt lists extended-attribute names and com.apple.quarantine presence without copying extended-attribute values." \
     "logs/openal-summary.txt records OpenAL vendor, renderer, version, device, and EFX warning/status lines found in copied logs." \
     "logs/renderer-summary.txt records renderer startup, driver-quirk, ARB2 interaction, and fatal-signal breadcrumbs found in copied logs." \
     "logs/renderer-config.txt records only renderer/performance settings (r_* plus named com settings) from safe saved configs; bindings, player/account, network, audio-device, and arbitrary config settings are excluded." \
-    "crash-reports/ includes up to 10 recent matching openQ4, openQ4-client, and openQ4-ded DiagnosticReports files when macOS wrote them." \
+    "crash-reports/ includes up to 10 recent matching openPREY, openPREY-client, and openPREY-ded DiagnosticReports files when macOS wrote them." \
     "If package/SYMBOLS.txt is present, include it with any .ips report so maintainers can pick the matching macOS dSYM symbol archive." \
     "For issue #73 style crashes, include full terminal output as text in the issue body too; this archive cannot recover terminal output that was not logged."
 

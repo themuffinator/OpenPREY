@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage openQ4-game game sources into a temporary local tree."""
+"""Stage OpenPrey-game sources with openPREY's current public engine headers."""
 
 from __future__ import annotations
 
@@ -12,16 +12,26 @@ import sys
 from pathlib import Path
 
 
-OPENQ4_SUPPORT_DIRS = (
+OPENPREY_SUPPORT_DIRS = (
     "idlib",
+    "framework",
     "renderer",
     "ui",
     "sys",
     "bse",
     "MayaImport",
+    "cm",
+    "sound",
+    "tools/compilers",
 )
 
-MANIFEST_NAME = "openq4_gamelibs_stage_manifest.json"
+OPENPREY_GAME_SOURCE_DIRS = (
+    "game",
+    "Prey",
+    "preyengine",
+)
+
+MANIFEST_NAME = "openprey_gamelibs_stage_manifest.json"
 
 
 def repo_git_value(root: Path, *args: str) -> str:
@@ -94,12 +104,24 @@ def validate_stage_root(project_root: Path, gamelibs_root: Path, stage_root: Pat
     if stage_root.is_symlink():
         raise RuntimeError(f"refusing to stage into symlink: {stage_root}")
 
-    project_tmp = project_root / ".tmp"
-    if not is_relative_to(stage_root, project_tmp) or stage_root == project_tmp:
-        raise RuntimeError(f"stage root must be under openQ4 .tmp: {stage_root}")
+    if stage_root.name != "openprey_gamelibs_stage" or stage_root.parent.name != ".tmp":
+        raise RuntimeError(f"stage root must end with .tmp/openprey_gamelibs_stage: {stage_root}")
 
     if is_relative_to(project_root, stage_root) or is_relative_to(gamelibs_root, stage_root):
         raise RuntimeError(f"refusing to stage over source repository: {stage_root}")
+
+    if is_relative_to(stage_root, gamelibs_root):
+        raise RuntimeError(f"refusing to stage inside GameLibs source repository: {stage_root}")
+
+    protected_project_roots = (
+        project_root / ".git",
+        project_root / "src",
+        project_root / "content",
+        project_root / "tools",
+    )
+    for protected_root in protected_project_roots:
+        if is_relative_to(stage_root, protected_root):
+            raise RuntimeError(f"refusing to stage inside openPREY source tree: {stage_root}")
 
 
 def copy_game_sources(source_game_dir: Path, dest_game_dir: Path) -> list[Path]:
@@ -119,7 +141,7 @@ def mirror_project_support_dirs(project_root: Path, stage_root: Path) -> list[Pa
     stage_src_root = stage_root / "src"
     copied: list[Path] = []
 
-    for dir_name in OPENQ4_SUPPORT_DIRS:
+    for dir_name in OPENPREY_SUPPORT_DIRS:
         copied += mirror_support_dir(source_root / dir_name, stage_src_root / dir_name)
     return copied
 
@@ -205,7 +227,7 @@ def main(argv: list[str]) -> int:
     raw_project_root = Path(argv[1])
     raw_gamelibs_root = Path(argv[2])
     if raw_project_root.is_symlink():
-        print(f"error: openQ4 root must not be a symlink: {raw_project_root}", file=sys.stderr)
+        print(f"error: openPREY root must not be a symlink: {raw_project_root}", file=sys.stderr)
         return 1
     if raw_gamelibs_root.is_symlink():
         print(f"error: GameLibs root must not be a symlink: {raw_gamelibs_root}", file=sys.stderr)
@@ -220,8 +242,8 @@ def main(argv: list[str]) -> int:
     stage_root = raw_stage_root.resolve()
 
     source_game_dirs = {
-        "game": gamelibs_root / "src" / "game",
-        "mpgame": gamelibs_root / "src" / "mpgame",
+        dir_name: gamelibs_root / "src" / dir_name
+        for dir_name in OPENPREY_GAME_SOURCE_DIRS
     }
     for module_name, source_game_dir in source_game_dirs.items():
         if not source_game_dir.is_dir():
@@ -229,7 +251,7 @@ def main(argv: list[str]) -> int:
             return 1
 
     if not project_root.is_dir():
-        print(f"error: openQ4 root not found: {project_root}", file=sys.stderr)
+        print(f"error: openPREY root not found: {project_root}", file=sys.stderr)
         return 1
 
     try:

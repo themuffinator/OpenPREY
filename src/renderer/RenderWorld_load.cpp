@@ -1276,7 +1276,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	const bool hasMD5RProcCompanion = R_RenderWorld_HasMD5RProcCompanion( name, md5rProcFilename, &md5rProcTimeStamp );
 	if ( hasMD5RProcCompanion ) {
 		common->DPrintf(
-			"Found MD5RProc companion '%s' for map '%s'; openQ4 will prefer it before the classic proc world '%s'.\n",
+			"Found MD5RProc companion '%s' for map '%s'; openPREY will prefer it before the classic proc world '%s'.\n",
 			md5rProcFilename.c_str(),
 			name,
 			filename.c_str() );
@@ -1356,24 +1356,33 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 		WriteLoadMap();
 	}
 
-	if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILE_ID ) ) {
-		common->Printf( "idRenderWorldLocal::InitFromMap: bad id '%s' instead of '%s'\n", token.c_str(), PROC_FILE_ID );
+	if ( !src->ReadToken( &token ) ) {
+		common->Printf( "idRenderWorldLocal::InitFromMap: missing proc id in '%s'\n", filename.c_str() );
 		delete src;
 		return false;
 	}
 
-// jmarshall: quake 4 proc format
-	if (!src->ReadToken(&token) || token.Icmp(PROC_FILEVERSION)) {
-		common->Printf("idRenderWorldLocal::InitFromMap: bad version '%s' instead of '%s'\n", token.c_str(), PROC_FILEVERSION);
+	const bool isQ4Proc = token.Icmp( PROC_FILE_ID ) == 0;
+	const bool isD3Proc = token.Icmp( "mapProcFile003" ) == 0;
+	if ( !isQ4Proc && !isD3Proc ) {
+		common->Printf( "idRenderWorldLocal::InitFromMap: bad id '%s' (expected '%s' or 'mapProcFile003')\n", token.c_str(), PROC_FILE_ID );
 		delete src;
 		return false;
 	}
 
 	mapFileCRC = 0u;
-	if ( src->ReadToken( &token ) ) {
-		mapFileCRC = token.GetUnsignedLongValue();
+	if ( isQ4Proc ) {
+		if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILEVERSION ) ) {
+			common->Printf( "idRenderWorldLocal::InitFromMap: bad version '%s' instead of '%s'\n", token.c_str(), PROC_FILEVERSION );
+			delete src;
+			return false;
+		}
+		if ( src->ReadToken( &token ) ) {
+			mapFileCRC = token.GetUnsignedLongValue();
+		}
+	} else {
+		common->DPrintf( "idRenderWorldLocal::InitFromMap: loading Doom 3 proc '%s' without a CRC stamp\n", filename.c_str() );
 	}
-// jmarshall end
 
 	// parse the file
 	while ( 1 ) {

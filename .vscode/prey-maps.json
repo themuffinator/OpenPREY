@@ -1,0 +1,179 @@
+{
+  "maps": [
+    {
+      "name": "(SP) roadhouse 'Last Call'",
+      "kind": "sp",
+      "map": "game/roadhouse"
+    },
+    {
+      "name": "(SP) feedingtowera 'Escape Velocity'",
+      "kind": "sp",
+      "map": "game/feedingtowera"
+    },
+    {
+      "name": "(SP) feedingtowerb 'Downward Spiral'",
+      "kind": "sp",
+      "map": "game/feedingtowerb"
+    },
+    {
+      "name": "(SP) lotaa 'Rites of Passage'",
+      "kind": "sp",
+      "map": "game/lotaa"
+    },
+    {
+      "name": "(SP) feedingtowerc 'Second Chances'",
+      "kind": "sp",
+      "map": "game/feedingtowerc"
+    },
+    {
+      "name": "(SP) feedingtowerd 'All Fall Down'",
+      "kind": "sp",
+      "map": "game/feedingtowerd"
+    },
+    {
+      "name": "(SP) salvage 'Crash Landing'",
+      "kind": "sp",
+      "map": "game/salvage"
+    },
+    {
+      "name": "(SP) salvageboss 'Sacrifices'",
+      "kind": "sp",
+      "map": "game/salvageboss"
+    },
+    {
+      "name": "(SP) lotab 'There Are Others'",
+      "kind": "sp",
+      "map": "game/lotab"
+    },
+    {
+      "name": "(SP) shuttlea 'Guiding Fires'",
+      "kind": "sp",
+      "map": "game/shuttlea"
+    },
+    {
+      "name": "(SP) shuttleb 'The Old Tribes'",
+      "kind": "sp",
+      "map": "game/shuttleb"
+    },
+    {
+      "name": "(SP) biolabsa 'Hidden Agenda'",
+      "kind": "sp",
+      "map": "game/biolabsa"
+    },
+    {
+      "name": "(SP) biolabsb 'Jen'",
+      "kind": "sp",
+      "map": "game/biolabsb"
+    },
+    {
+      "name": "(SP) superportal 'The Dark Harvest'",
+      "kind": "sp",
+      "map": "game/superportal"
+    },
+    {
+      "name": "(SP) harvestera 'Following Her'",
+      "kind": "sp",
+      "map": "game/harvestera"
+    },
+    {
+      "name": "(SP) harvesterb 'The Complex'",
+      "kind": "sp",
+      "map": "game/harvesterb"
+    },
+    {
+      "name": "(SP) spindlea 'Ascent'",
+      "kind": "sp",
+      "map": "game/spindlea"
+    },
+    {
+      "name": "(SP) spindleb 'Center of Gravity'",
+      "kind": "sp",
+      "map": "game/spindleb"
+    },
+    {
+      "name": "(SP) girlfriendx 'Resolutions'",
+      "kind": "sp",
+      "map": "game/girlfriendx"
+    },
+    {
+      "name": "(SP) lotad 'Oath of Vengeance'",
+      "kind": "sp",
+      "map": "game/lotad"
+    },
+    {
+      "name": "(SP) keeperfortress 'Facing the Enemy'",
+      "kind": "sp",
+      "map": "game/keeperfortress"
+    },
+    {
+      "name": "(SP) spherebrain 'Mother's Embrace'",
+      "kind": "sp",
+      "map": "game/spherebrain"
+    },
+    {
+      "name": "(SP) flashinghead 'Flashing Head'",
+      "kind": "sp",
+      "map": "game/flashinghead"
+    },
+    {
+      "name": "(MP) dmescher 'Keeper Gravity'",
+      "kind": "mp",
+      "map": "game/dmescher"
+    },
+    {
+      "name": "(MP) dmescher2 'Cubiks Rube'",
+      "kind": "mp",
+      "map": "game/dmescher2"
+    },
+    {
+      "name": "(MP) dmgravitylab_6 'Gravity Lab'",
+      "kind": "mp",
+      "map": "game/dmgravitylab_6"
+    },
+    {
+      "name": "(MP) dmplanes_4 'Space Oddity'",
+      "kind": "mp",
+      "map": "game/dmplanes_4"
+    },
+    {
+      "name": "(MP) dmroadhouse 'Roadhouse'",
+      "kind": "mp",
+      "map": "game/dmroadhouse"
+    },
+    {
+      "name": "(MP) dmsalvagewalk 'Salvage Walk'",
+      "kind": "mp",
+      "map": "game/dmsalvagewalk"
+    },
+    {
+      "name": "(MP) dmshuttle1 'Shuttle 1'",
+      "kind": "mp",
+      "map": "game/dmshuttle1"
+    },
+    {
+      "name": "(MP) dmshuttle2 'Shuttle 2'",
+      "kind": "mp",
+      "map": "game/dmshuttle2"
+    },
+    {
+      "name": "(MP) dmsphere 'Spindle Spheres'",
+      "kind": "mp",
+      "map": "game/dmsphere"
+    },
+    {
+      "name": "(MP) dmtopillogical_4 'Topillogical'",
+      "kind": "mp",
+      "map": "game/dmtopillogical_4"
+    },
+    {
+      "name": "(MP) dmtunnelrat_8 'Tunnel Rat'",
+      "kind": "mp",
+      "map": "game/dmtunnelrat_8"
+    },
+    {
+      "name": "(MP) dmwallwalk2 'Wall Walk'",
+      "kind": "mp",
+      "map": "game/dmwallwalk2"
+    }
+  ]
+}

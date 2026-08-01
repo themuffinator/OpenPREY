@@ -149,6 +149,10 @@ static void RM_Services_PrintRendererApiStatus( void ) {
 	RendererModule_PrintGfxInfo();
 }
 
+static int RM_Services_GetTimeGroupTime( int timeGroup, int fallbackTime ) {
+	return game != NULL ? game->GetTimeGroupTime( timeGroup ) : fallbackTime;
+}
+
 static const renderModuleServices_t rm_services = {
 	RM_Services_Printf,
 	RM_Services_Warning,
@@ -163,6 +167,7 @@ static const renderModuleServices_t rm_services = {
 	RM_Services_LeaveCriticalSection,
 	RM_Services_IsRenderDocInjected,
 	RM_Services_PrintRendererApiStatus,
+	RM_Services_GetTimeGroupTime,
 };
 
 /*
