@@ -5022,7 +5022,7 @@ void hhPlayer::Think( void ) {
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 
-	if ( gameLocal.inCinematic && gameLocal.skipCinematic ) {
+	if ( gameLocal.skipCinematic && ( gameLocal.inCinematic || InCinematic() ) ) {
 		return;
 	}
 

@@ -131,6 +131,7 @@ public:
 	bool			noTouch;						// whether to disregard touch as triggering mechanism
 	bool			initiallyEnabled;				// whether the trigger is initially triggerable
 	bool			bUntrigger;						// whether to resend the trigger message when untriggered
+	bool			acceptSweptTouch;				// allow immediate trigger actions after a confirmed sweep hit
 	idEntityPtr<idEntity>	unTriggerActivator;			// Used solely for sending to Activate() when bUntrigger is set
 
 	idList<idStr>	TriggerClasses;

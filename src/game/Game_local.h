@@ -242,9 +242,9 @@ private:
 
 //============================================================================
 
-int						OpenPrey_GetSpawnId( int index );
-idEntity *				OpenPrey_GetEntity( int index );
-int						OpenPrey_GetSpawnIdForEntity( const idEntity *ent );
+int						openPREY_GetSpawnId( int index );
+idEntity *				openPREY_GetEntity( int index );
+int						openPREY_GetSpawnIdForEntity( const idEntity *ent );
 
 template< class type >
 class idEntityPtr {
@@ -352,7 +352,7 @@ ID_INLINE idEntityPtr<type> &idEntityPtr<type>::Assign( const idEntity *ent ) {
 		spawnId = 0;
 	} else {
 		//HUMANHEAD rww - take cent bits into account
-		spawnId = OpenPrey_GetSpawnIdForEntity( ent );
+		spawnId = openPREY_GetSpawnIdForEntity( ent );
 	}
 	return *this;
 }
@@ -372,7 +372,7 @@ ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( type *ent ) {
 	if ( ent == NULL ) {
 		spawnId = 0;
 	} else {
-		spawnId = ( OpenPrey_GetSpawnId( ent->entityNumber ) << GENTITYNUM_BITS ) | ent->entityNumber;
+		spawnId = ( openPREY_GetSpawnId( ent->entityNumber ) << GENTITYNUM_BITS ) | ent->entityNumber;
 	}
 	return *this;
 }
@@ -385,7 +385,7 @@ ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
 		return false;
 	}
 	//HUMANHEAD rww - take cent bits into account
-	if ( ( id >> GENTITYNUM_BITS_PLUSCENT ) == OpenPrey_GetSpawnId( id & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) ) ) {
+	if ( ( id >> GENTITYNUM_BITS_PLUSCENT ) == openPREY_GetSpawnId( id & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) ) ) {
 		spawnId = id;
 		return true;
 	}
@@ -395,15 +395,15 @@ ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
 template< class type >
 ID_INLINE bool idEntityPtr<type>::IsValid( void ) const {
 	//HUMANHEAD rww - take cent bits into account
-	return ( OpenPrey_GetSpawnId( spawnId & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) ) == ( spawnId >> GENTITYNUM_BITS_PLUSCENT ) );
+	return ( openPREY_GetSpawnId( spawnId & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 ) ) == ( spawnId >> GENTITYNUM_BITS_PLUSCENT ) );
 }
 
 template< class type >
 ID_INLINE type *idEntityPtr<type>::GetEntity( void ) const {
 	//HUMANHEAD rww - take cent bits into account
 	int entityNum = spawnId & ( ( 1 << GENTITYNUM_BITS_PLUSCENT ) - 1 );
-	if ( ( OpenPrey_GetSpawnId( entityNum ) == ( spawnId >> GENTITYNUM_BITS_PLUSCENT ) ) ) {
-		return static_cast<type *>( OpenPrey_GetEntity( entityNum ) );
+	if ( ( openPREY_GetSpawnId( entityNum ) == ( spawnId >> GENTITYNUM_BITS_PLUSCENT ) ) ) {
+		return static_cast<type *>( openPREY_GetEntity( entityNum ) );
 	}
 	return NULL;
 }
@@ -902,11 +902,11 @@ protected:	// HUMANHEAD
 //extern idGameLocal			gameLocal;
 //#endif	// HUMANHEAD
 
-ID_INLINE int OpenPrey_GetSpawnId( int index ) {
+ID_INLINE int openPREY_GetSpawnId( int index ) {
 	return gameLocal.spawnIds[ index ];
 }
 
-ID_INLINE idEntity *OpenPrey_GetEntity( int index ) {
+ID_INLINE idEntity *openPREY_GetEntity( int index ) {
 	return gameLocal.entities[ index ];
 }
 

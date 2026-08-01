@@ -426,6 +426,7 @@ void hhTrigger::Spawn(void) {
 	
 	unTriggerActivator=NULL;
 	bActive=false;
+	acceptSweptTouch = false;
 
 	spawnArgs.GetFloat( "wait", "0.5", wait );
 	spawnArgs.GetFloat( "random", "0", random );
@@ -825,8 +826,12 @@ void hhTrigger::Event_Touch( idEntity *other, trace_t *trace ) {
 		return;
 	}
 
+	const bool sweptTouch = trace && trace->fraction > 0.0f && trace->fraction < 1.0f && other && !IsEncroaching( other );
+
 	if( !IsActive() ) {
+		acceptSweptTouch = sweptTouch && !delay;
 		Activate( other );
+		acceptSweptTouch = false;
 
 		// If this trigger uses any of the unTrigger mechanisms, start polling
 		if (bUntrigger || refire || unfuncInfo.GetFunction()  || unfuncRefInfo.GetFunction() || unfuncRefActivatorInfo.GetFunction()) {
@@ -835,7 +840,9 @@ void hhTrigger::Event_Touch( idEntity *other, trace_t *trace ) {
 	}
 	// If we have already triggered the first time, but should always trigger
 	else if ( alwaysTrigger ) {
+		acceptSweptTouch = sweptTouch && !delay;
 		Activate( other );
+		acceptSweptTouch = false;
 	}
 }
 
@@ -883,7 +890,7 @@ void hhTrigger::Event_TriggerAction( idEntity *activator ) {
 	//HUMANHEAD END
 	// Added noTouch && !IsEncroached to fix the issue with retriggered hurt constantly damaging the player, even when they weren't in it.
 	// nla - Added check to allow 'delayed' triggers to function when you weren't in them.
-	if (!noTouch && !IsEncroaching(activator) && !delay ) {
+	if (!noTouch && !acceptSweptTouch && !IsEncroaching(activator) && !delay ) {
 		CancelEvents( &EV_Retrigger );
 		PostEventMS( &EV_Deactivate, 0 );
 		return;

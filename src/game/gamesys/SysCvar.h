@@ -66,6 +66,7 @@ extern idCVar	g_forceSingleSmokeView;
 extern idCVar	developer;
 
 extern idCVar	g_cinematic;
+extern idCVar	g_skipCinematics;
 extern idCVar	g_cinematicMaxSkipTime;
 
 extern idCVar	g_monsters;

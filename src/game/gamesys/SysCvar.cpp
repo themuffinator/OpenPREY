@@ -147,6 +147,7 @@ idCVar ui_modelNum(					"ui_modelNum",				"0",			CVAR_GAME | CVAR_USERINFO | CVA
 idCVar developer(					"developer",				"0",			CVAR_GAME | CVAR_BOOL, "" );
 
 idCVar g_cinematic(					"g_cinematic",				"1",			CVAR_GAME | CVAR_BOOL, "skips updating entities that aren't marked 'cinematic' '1' during cinematics" );
+idCVar g_skipCinematics(			"g_skipCinematics",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "automatically skips scripted sections where the player has no control" );
 idCVar g_cinematicMaxSkipTime(		"g_cinematicMaxSkipTime",	"600",			CVAR_GAME | CVAR_FLOAT, "# of seconds to allow game to run when skipping cinematic.  prevents lock-up when cinematic doesn't end.", 0, 3600 );
 
 idCVar g_muzzleFlash(				"g_muzzleFlash",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show muzzle flashes" );

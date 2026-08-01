@@ -55,11 +55,11 @@ hhGameLocal					gameLocal;
 //#endif
 idGame *					game = &gameLocal;	// statically pointed at an idGameLocal
 
-int OpenPrey_GetSpawnIdForEntity( const idEntity *ent ) {
+int openPREY_GetSpawnIdForEntity( const idEntity *ent ) {
 	if ( ent == NULL ) {
 		return 0;
 	}
-	return ( OpenPrey_GetSpawnId( ent->entityNumber ) << GENTITYNUM_BITS_PLUSCENT ) | ent->entityNumber;
+	return ( openPREY_GetSpawnId( ent->entityNumber ) << GENTITYNUM_BITS_PLUSCENT ) | ent->entityNumber;
 }
 
 #ifdef HUMANHEAD

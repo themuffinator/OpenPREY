@@ -22,15 +22,15 @@
 #include "../Prey/game_zone.h"
 //HUMANHEAD END
 
-static ID_INLINE bool OpenPrey_IsFiniteFloat( const float value ) {
+static ID_INLINE bool openPREY_IsFiniteFloat( const float value ) {
 	return ( value == value ) && ( idMath::Fabs( value ) < idMath::INFINITY );
 }
 
-static bool OpenPrey_IsReasonablePVSBounds( const idBounds &bounds ) {
+static bool openPREY_IsReasonablePVSBounds( const idBounds &bounds ) {
 	for ( int axis = 0; axis < 3; axis++ ) {
 		const float mins = bounds[0][axis];
 		const float maxs = bounds[1][axis];
-		if ( !OpenPrey_IsFiniteFloat( mins ) || !OpenPrey_IsFiniteFloat( maxs ) ) {
+		if ( !openPREY_IsFiniteFloat( mins ) || !openPREY_IsFiniteFloat( maxs ) ) {
 			return false;
 		}
 		if ( mins > maxs ) {
@@ -1538,9 +1538,9 @@ void idEntity::UpdatePVSAreas( void ) {
 	int i;
 
 	modelAbsBounds.FromTransformedBounds( renderEntity.bounds, renderEntity.origin, renderEntity.axis );
-	if ( !OpenPrey_IsReasonablePVSBounds( modelAbsBounds ) ) {
+	if ( !openPREY_IsReasonablePVSBounds( modelAbsBounds ) ) {
 		modelAbsBounds = idBounds( renderEntity.origin ).Expand( 256.0f );
-		if ( !OpenPrey_IsReasonablePVSBounds( modelAbsBounds ) ) {
+		if ( !openPREY_IsReasonablePVSBounds( modelAbsBounds ) ) {
 			numPVSAreas = 0;
 			for ( i = 0; i < MAX_PVS_AREAS; i++ ) {
 				PVSAreas[i] = 0;
@@ -4117,20 +4117,20 @@ bool idEntity::TouchTriggers( void ) const {
 	idClipModel *	cm;
 	idClipModel *	clipModels[ MAX_GENTITIES ];
 	idEntity *		ent;
-	trace_t			trace;
 	const idBounds	currentBounds = GetPhysics()->GetAbsBounds();
 	idBounds			queryBounds = currentBounds;
 	idBounds			oldBounds;
 	const idVec3 *	sweptStart = NULL;
+	trace_t			baseTrace;
 
-	memset( &trace, 0, sizeof( trace ) );
-	trace.endpos = GetPhysics()->GetOrigin();
-	trace.endAxis = GetPhysics()->GetAxis();
+	memset( &baseTrace, 0, sizeof( baseTrace ) );
+	baseTrace.endpos = GetPhysics()->GetOrigin();
+	baseTrace.endAxis = GetPhysics()->GetAxis();
 
 	if ( IsType( idPlayer::Type ) && GetPhysics()->IsType( hhPhysics_Player::Type ) ) {
 		const hhPhysics_Player *playerPhysics = static_cast<const hhPhysics_Player *>( GetPhysics() );
-		if ( playerPhysics->GetOldOrigin() != trace.endpos ) {
-			oldBounds = currentBounds.Translate( playerPhysics->GetOldOrigin() - trace.endpos );
+		if ( playerPhysics->GetOldOrigin() != baseTrace.endpos ) {
+			oldBounds = currentBounds.Translate( playerPhysics->GetOldOrigin() - baseTrace.endpos );
 			queryBounds.AddBounds( oldBounds );
 			sweptStart = &playerPhysics->GetOldOrigin();
 		}
@@ -4159,18 +4159,28 @@ bool idEntity::TouchTriggers( void ) const {
 		}
 		//HUMANHEAD END
 
+		trace_t touchTrace = baseTrace;
 		bool triggerHit = ( GetPhysics()->ClipContents( cm ) != 0 );
-		if ( !triggerHit && IsType( idPlayer::Type ) ) {
-			// Thin trigger volumes can be skipped when the player moves quickly
-			// or on a rotated gravity axis, so fall back to a swept AABB test.
-			const idBounds &triggerBounds = cm->GetAbsBounds();
-			triggerHit = currentBounds.IntersectsBounds( triggerBounds );
-			if ( !triggerHit && sweptStart ) {
-				triggerHit = oldBounds.IntersectsBounds( triggerBounds );
-				if ( !triggerHit ) {
-					idBounds expandedTrigger = triggerBounds;
-					expandedTrigger.ExpandSelf( currentBounds.Size() * 0.5f );
-					triggerHit = expandedTrigger.LineIntersection( *sweptStart, trace.endpos );
+		if ( !triggerHit && IsType( idPlayer::Type ) && sweptStart ) {
+			const idClipModel *entityClipModel = GetPhysics()->GetClipModel();
+			if ( entityClipModel ) {
+				trace_t sweepTrace;
+				// Confirm trigger crossings with the actual player hull instead of
+				// broad bounds overlap so thin hallway triggers remain reliable.
+				gameLocal.clip.TranslationModel(
+					sweepTrace,
+					*sweptStart,
+					baseTrace.endpos,
+					entityClipModel,
+					baseTrace.endAxis,
+					cm->GetContents(),
+					cm->Handle(),
+					cm->GetOrigin(),
+					cm->GetAxis()
+				);
+				if ( sweepTrace.fraction < 1.0f ) {
+					touchTrace = sweepTrace;
+					triggerHit = true;
 				}
 			}
 		}
@@ -4180,12 +4190,12 @@ bool idEntity::TouchTriggers( void ) const {
 
 		numEntities++;
 
-		trace.c.contents = cm->GetContents();
-		trace.c.entityNum = cm->GetEntity()->entityNumber;
-		trace.c.id = cm->GetId();
+		touchTrace.c.contents = cm->GetContents();
+		touchTrace.c.entityNum = cm->GetEntity()->entityNumber;
+		touchTrace.c.id = cm->GetId();
 
 		ent->Signal( SIG_TOUCH );
-		ent->ProcessEvent( &EV_Touch, this, &trace );
+		ent->ProcessEvent( &EV_Touch, this, &touchTrace );
 
 		if ( !gameLocal.entities[ entityNumber ] ) {
 			gameLocal.Printf( "entity was removed while touching triggers\n" );

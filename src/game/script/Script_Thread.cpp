@@ -1307,9 +1307,9 @@ idThread::Event_Trigger
 void idThread::Event_Trigger( idEntity *ent ) {
 	if ( ent ) {
 		ent->Signal( SIG_TRIGGER );
-		// Scripts use entity.activate() when they need a specific activator.
-		// sys.trigger() should behave like a generic fire-and-forget trigger.
-		ent->ProcessEvent( &EV_Activate, static_cast<idEntity *>( NULL ) );
+		// Prey scripts expect sys.trigger() to preserve the implicit player
+		// activator. Use entity.activate() when a different activator is needed.
+		ent->ProcessEvent( &EV_Activate, gameLocal.GetLocalPlayer() );
 		ent->TriggerGuis();
 	}
 }

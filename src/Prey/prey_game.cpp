@@ -10,6 +10,10 @@ extern idCVar com_forceGenericSIMD;
 const int DECL_MAX_TYPES_NUM_BITS		= hhMath::BitsForInteger( DECL_MAX_TYPES );
 //HUMANHEAD END
 
+static bool HH_ControlLockedCinematicActive( const idPlayer *player ) {
+	return player && player->IsType( hhPlayer::Type ) && static_cast<const hhPlayer *>( player )->InCinematic();
+}
+
 //=============================================================================
 // Overridden functions
 //=============================================================================
@@ -672,6 +676,7 @@ gameReturn_t hhGameLocal::RunFrame( const usercmd_t *clientCmds ) {
 	idTimer		timer_think, timer_events, timer_singlethink;
 	gameReturn_t ret;
 	idPlayer	*player;
+	bool		controlLockedCinematic;
 	const renderView_t *view;
 	// HUMANHEAD pdm
 	idTimer		timer_singledormant;
@@ -688,6 +693,7 @@ gameReturn_t hhGameLocal::RunFrame( const usercmd_t *clientCmds ) {
 #endif
 
 	player = GetLocalPlayer();
+	controlLockedCinematic = HH_ControlLockedCinematicActive( player );
 
 	if ( !isMultiplayer && g_stopTime.GetBool() ) {
 		// clear any debug lines from a previous frame
@@ -861,6 +867,11 @@ gameReturn_t hhGameLocal::RunFrame( const usercmd_t *clientCmds ) {
 
 		timer_events.Stop();
 
+		controlLockedCinematic = HH_ControlLockedCinematicActive( player );
+		if ( !isMultiplayer && g_skipCinematics.GetBool() && !skipCinematic && ( inCinematic || controlLockedCinematic ) ) {
+			SkipCinematic();
+		}
+
 		// free the player pvs
 		FreePlayerPVS();
 
@@ -907,7 +918,7 @@ gameReturn_t hhGameLocal::RunFrame( const usercmd_t *clientCmds ) {
 			skipCinematic = false;
 			break;
 		}
-	} while( ( inCinematic || ( time < cinematicStopTime ) ) && skipCinematic );
+	} while( ( inCinematic || controlLockedCinematic || ( time < cinematicStopTime ) ) && skipCinematic );
 
 	ret.syncNextGameFrame = skipCinematic;
 	if ( skipCinematic ) {
