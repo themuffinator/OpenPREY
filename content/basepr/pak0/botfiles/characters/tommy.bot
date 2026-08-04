@@ -1,0 +1,31 @@
+// Tommy (Domasi Tawodi) is a former soldier who spends the campaign pursuing
+// Jen through the Sphere. He is adaptable and relentless, but anger can keep
+// him in a fight after a calmer opponent would rotate away.
+character "Tommy" {
+	inherit		"hunter"
+	description	"relentless former soldier who commits to the rescue"
+	skillBand	3 5
+	modelNum	0
+
+	set	combatRange		600
+	add	aggression		0.12
+	add	patience		-0.08
+	set	targetStickiness	0.88
+	set	opportunism		0.90
+	set	vengefulness		1.00
+	scale	pursuit			1.20
+	scale	itemFocus		0.80
+	set	initiative		0.66
+	set	suppressionMsec	250
+	set	aimHeight		0.03
+	set	chatiness		0.42
+
+	weapon	"weaponobj_rifle"		1.35
+	weapon	"weaponobj_rocketlauncher"	1.25
+	weapon	"weaponobj_wrench"		1.15
+
+	skill 5 {
+		add	aimLead			0.03
+		scale	weaponSwitchMsec	0.90
+	}
+}

@@ -232,7 +232,8 @@ The SDK is subject to the original Human Head Studios EULA, which permits non-co
 | [SDL3](https://www.libsdl.org/) | 3.4.0 | Cross-platform window, input, and display management |
 | [GLEW](http://glew.sourceforge.net/) | 2.3.4 | OpenGL extension loading |
 | [OpenAL Soft](https://openal-soft.org/) | bundled Windows package | 3D audio rendering |
-| [stb_vorbis](https://github.com/nothings/stb) | 1.22 | Ogg Vorbis audio decoding |
+| [libogg](https://xiph.org/ogg/) | 1.3.6 | Ogg bitstream support |
+| [libvorbis](https://xiph.org/vorbis/) | 1.3.7 | Ogg Vorbis audio decoding and file access |
 
 All dependencies are resolved through Meson subprojects and wraps. No manual dependency installation is required on Windows; Linux requires system development packages (see [BUILDING.md](BUILDING.md)).
 

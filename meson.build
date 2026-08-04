@@ -669,7 +669,8 @@ endif
 
 glew_dep = disabler()
 glew_dedicated_dep = disabler()
-stb_vorbis_dep = disabler()
+ogg_dep = disabler()
+vorbisfile_dep = disabler()
 openal_dep = disabler()
 sdl3_dep = disabler()
 macos_graphics_bridge_dep = disabler()
@@ -694,10 +695,19 @@ if build_engine
     endif
   endif
 
-  stb_vorbis_dep = dependency(
-    'stb_vorbis',
+  # Configure libogg first so libvorbis and every consumer share the same
+  # static fallback and the public ogg headers propagate to engine sources.
+  ogg_dep = dependency(
+    'ogg',
     required: true,
-    fallback: ['stb_vorbis', 'stb_vorbis_dep'],
+    fallback: ['ogg', 'libogg_dep'],
+    default_options: fallback_opt,
+  )
+
+  vorbisfile_dep = dependency(
+    'vorbisfile',
+    required: true,
+    fallback: ['vorbis', 'vorbisfile_dep'],
     default_options: fallback_opt,
   )
 
@@ -754,7 +764,7 @@ if build_engine
     endif
   endif
 
-  deps = [glew_dep, openal_dep, stb_vorbis_dep]
+  deps = [glew_dep, openal_dep, ogg_dep, vorbisfile_dep]
 
   if host_system == 'windows'
     deps += [
@@ -825,7 +835,7 @@ if renderer_module_only_client
     compile_args: true,
     includes: true,
   )
-  client_deps = [glew_headers_dep, openal_dep, stb_vorbis_dep]
+  client_deps = [glew_headers_dep, openal_dep, ogg_dep, vorbisfile_dep]
   if host_system == 'windows'
     client_deps += [
       cc.find_library('Dbghelp', required: true),
@@ -854,7 +864,8 @@ if windows_gl_free_ded
   dedicated_deps = [
     glew_dedicated_dep,
     openal_dep,
-    stb_vorbis_dep,
+    ogg_dep,
+    vorbisfile_dep,
     cc.find_library('Dbghelp', required: true),
     cc.find_library('Iphlpapi', required: true),
     cc.find_library('Winmm', required: true),
@@ -873,7 +884,8 @@ if build_engine and host_system == 'linux'
   dedicated_deps = [
     glew_dedicated_dep,
     openal_headers_dep,
-    stb_vorbis_dep,
+    ogg_dep,
+    vorbisfile_dep,
     dependency('threads', required: true),
     cc.find_library('dl', required: true),
   ]
@@ -1114,7 +1126,7 @@ if build_engine
   endif
 
   bse_library = static_library(
-    'openq4_bse',
+    'openprey_bse',
     bse_sources,
     include_directories: bse_client_include_dirs,
     cpp_args: bse_cpp_args,
@@ -1669,6 +1681,14 @@ if version_iteration_summary == ''
   version_iteration_summary = 'none'
 endif
 
+meson.add_install_script(
+  py,
+  files('tools/build/clean_runtime_install.py'),
+  '--install-root', install_root_dir,
+  '--game-dir', install_game_dir,
+  '--host-system', host_system,
+)
+
 openq4_git_sha_summary = openq4_git_sha
 if openq4_git_sha_summary == ''
   openq4_git_sha_summary = 'unavailable'
@@ -1716,7 +1736,7 @@ summary(
     'Linux executable PIE': linux_executable_pie,
     'GLEW': glew_dep.found(),
     'OpenAL': openal_dep.found(),
-    'stb_vorbis': stb_vorbis_dep.found(),
+    'libvorbisfile': vorbisfile_dep.found(),
     'Precompiled headers': get_option('use_pch'),
     'Dedicated server target': build_engine,
     'Linux dedicated headless link split': build_engine and host_system == 'linux',

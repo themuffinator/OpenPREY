@@ -214,6 +214,43 @@ static void ASE_SkipRestOfLine( void )
 	ASE_GetToken( true );
 }
 
+static bool ASE_HasGameDirAssetPath( const idStr &path )
+{
+	if ( path.IsEmpty() ) {
+		return false;
+	}
+
+	// Keep this admission check aligned with OSPathToRelativePath: ASE files
+	// authored for the active mod or its base mod are just as convertible as
+	// retail base/basepr paths. Invalid workstation/bare-name metadata still
+	// bypasses the converter so it does not generate warning noise.
+	const char *gameDirs[] = {
+		BASE_GAMEDIR,
+		OPENQ4_GAMEDIR,
+		cvarSystem != NULL ? cvarSystem->GetCVarString( "fs_game" ) : "",
+		cvarSystem != NULL ? cvarSystem->GetCVarString( "fs_game_base" ) : ""
+	};
+	for ( int i = 0; i < static_cast<int>( sizeof( gameDirs ) / sizeof( gameDirs[0] ) ); i++ ) {
+		const char *gameDir = gameDirs[i];
+		if ( gameDir == NULL || gameDir[0] == '\0' ) {
+			continue;
+		}
+		const int gameDirLength = strlen( gameDir );
+		const char *segment = path.c_str();
+
+		while ( ( segment = strstr( segment, gameDir ) ) != NULL ) {
+			const bool completeStart = segment == path.c_str() || segment[-1] == '/';
+			const char *assetPath = segment + gameDirLength;
+			if ( completeStart && assetPath[0] == '/' && assetPath[1] != '\0' && assetPath[1] != '/' ) {
+				return true;
+			}
+			segment++;
+		}
+	}
+
+	return false;
+}
+
 static void ASE_KeyMAP_DIFFUSE( const char *token )
 {
 	aseMaterial_t	*material;
@@ -234,7 +271,12 @@ static void ASE_KeyMAP_DIFFUSE( const char *token )
 
 		// convert the 3DSMax material pathname to a qpath
 		matname.BackSlashesToSlashes();
-		qpath = fileSystem->OSPathToRelativePath( matname );
+		// Some shipped models contain empty, bare filename, or unrelated
+		// workstation paths.  They historically produce an empty material; avoid
+		// sending those non-convertible authoring strings through the filesystem.
+		if ( ASE_HasGameDirAssetPath( matname ) ) {
+			qpath = fileSystem->OSPathToRelativePath( matname );
+		}
 		idStr::Copynz( ase.currentMaterial->name, qpath, sizeof( ase.currentMaterial->name ) );
 	}
 	else if ( !strcmp( token, "*UVW_U_OFFSET" ) )

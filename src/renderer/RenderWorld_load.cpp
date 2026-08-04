@@ -1503,8 +1503,8 @@ void idRenderWorldLocal::AddWorldModelEntities() {
 			const modelSurface_t *surf = hModel->Surface( j );
 
 			if ( surf->shader != NULL && ( surf->shader->IsPortalSky()
-				|| surf->shader->Texgen() == TG_SKYBOX_CUBE
-				|| surf->shader->Texgen() == TG_WOBBLESKY_CUBE ) ) {
+				|| surf->shader->HasTexgen( TG_SKYBOX_CUBE )
+				|| surf->shader->HasTexgen( TG_WOBBLESKY_CUBE ) ) ) {
 				def->needsPortalSky = true;
 			}
 		}

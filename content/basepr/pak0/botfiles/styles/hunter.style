@@ -1,0 +1,48 @@
+// hunter.style
+//
+// Picks one opponent and keeps following after line of sight breaks. This is
+// distinct from the named Hunter character, which inherits this archetype.
+
+style "hunter" {
+	description	"fixates on one target and follows it through the Sphere"
+
+	set	combatRange		480
+	set	aggression		0.72
+	set	patience		0.30
+	add	initiative		0.18
+	set	targetStickiness	0.92
+	set	opportunism		0.75
+	set	vengefulness		0.60
+	add	suppressionMsec	350
+	set	strafeRhythmMsec	550
+	set	strafeRhythmVarianceMsec	500
+	set	weaponSwitchMsec	450
+
+	scale	pursuit			1.60
+	scale	reacquireMsec		1.40
+	scale	reacquireFraction	0.90
+	scale	sightRange		1.10
+	scale	targetSelection		0.85
+	scale	itemFocus		0.65
+
+	weapon	"weaponobj_rocketlauncher"	1.30
+	weapon	"weaponobj_rifle"		1.20
+	weapon	"weaponobj_autocannon"		1.15
+	weapon	"weaponobj_hiderweapon"		1.10
+	weapon	"weaponobj_soulstripper"	1.00
+	weapon	"weaponobj_crawlergrenade"	0.80
+	weapon	"weaponobj_bow"			0.75
+	weapon	"weaponobj_wrench"		0.65
+
+	skill 1 {
+		scale	pursuit			0.80
+		scale	sightRange		0.95
+	}
+	skill 2 {
+		scale	pursuit			0.90
+	}
+	skill 5 {
+		scale	reacquireMsec		1.15
+		scale	reacquireFraction	0.92
+	}
+}

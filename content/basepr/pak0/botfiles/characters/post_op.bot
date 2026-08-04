@@ -1,0 +1,31 @@
+// Post-op is a processed captive whose exact identity is deliberately absent
+// from retail lore. Controlled motion and clinical fragments suggest the
+// conversion without claiming a biography the game never supplies.
+character "Post-op" {
+	inherit		"skirmisher"
+	description	"processed survivor with controlled motion and an altered voice"
+	skillBand	3 5
+	modelNum	13
+
+	set	combatRange		650
+	set	aggression		0.55
+	set	patience		0.50
+	scale	turnDamping		1.15
+	scale	aimTremorDeg		0.85
+	scale	aimTrackTimeConst	0.90
+	set	targetStickiness	0.75
+	set	opportunism		1.00
+	set	vengefulness		0.20
+	set	suppressionMsec	400
+	set	chatiness		0.18
+	scale	chatDelayScale		1.25
+
+	weapon	"weaponobj_soulstripper"	1.50
+	weapon	"weaponobj_hiderweapon"		1.30
+	weapon	"weaponobj_autocannon"		1.20
+
+	skill 5 {
+		scale	aimTrackError		0.92
+		scale	weaponSwitchMsec	0.88
+	}
+}

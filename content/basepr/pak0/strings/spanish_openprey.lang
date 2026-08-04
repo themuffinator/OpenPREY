@@ -6,6 +6,7 @@
 	"#str_04137"	"Soporte EAX activado."
 	"#str_100625"	"Se recomienda el modo de servidor dedicado para servidores de Internet con mas de %d jugadores. ?Continuar en modo listen?"
 	"#str_100626"	"Servidor dedicado recomendado"
+	"#str_107240"	"Inicio de mapa"
 	"#str_107660"	"Limite de frags"
 	"#str_107661"	"Limite de capturas"
 	"#str_107676"	"Torneo"

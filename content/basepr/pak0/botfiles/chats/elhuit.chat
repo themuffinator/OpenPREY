@@ -1,0 +1,297 @@
+// Elhuit: formal, composed, and tactically minded as a Hidden resistance leader.
+
+characterChat "Elhuit" {
+	chat entergame {
+		"Elhuit present. Our positions are clear."
+		"I am prepared. We begin on my mark."
+		"The field is unfamiliar; the principles are not."
+		"Ready. Preserve your options."
+		"I have reviewed the routes. Proceed."
+		"We enter with purpose."
+		"Elhuit reporting. Maintain awareness."
+		"The contest begins. Let discipline decide it."
+	}
+	chat levelstart {
+		"$map offers concealment to both sides."
+		"Control the crossings, then the resources."
+		"Do not reveal your route without gaining something."
+		"There are several defensible approaches here."
+		"Movement will expose more than gunfire."
+		"$map can be divided; watch the seams."
+		"Secure a retreat before pressing forward."
+		"We will learn their habits from the first exchange."
+	}
+	chat kill {
+		"Your route was compromised, $other."
+		"The $weapon completed the ambush."
+		"You entered a position I had prepared."
+		"One exposed flank was sufficient."
+		"Your movement confirmed my estimate."
+		"The engagement ended as planned."
+		"You saw the threat too late, $other."
+		"Control of the angle decided this."
+	}
+	chat killWrench {
+		"Concealment brought us very close."
+		"The wrench resolved a crowded position."
+		"You breached the wrong corner, $other."
+		"A quiet approach can end abruptly."
+		"Your advance left no room to withdraw."
+		"Close contact favored the prepared fighter."
+		"No shot was required."
+		"You mistook proximity for advantage."
+	}
+	chat killStreak {
+		"Three engagements confirm the pattern."
+		"Their routes are becoming predictable."
+		"Our control is increasing. Maintain it."
+		"Three successes are evidence, not security."
+		"The pressure is working."
+		"I will exploit this pattern while it remains."
+		"Their responses continue to narrow."
+		"This sequence was prepared well."
+	}
+	chat revenge {
+		"Your advantage has been neutralized, $other."
+		"I accounted for your previous approach."
+		"The second engagement favored preparation."
+		"You revealed your method earlier."
+		"Our exchange is balanced once more."
+		"I did not repeat the same exposure."
+		"That is the answer to your last attack."
+		"Your success gave me useful intelligence."
+	}
+	chat death {
+		"A successful breach, $other."
+		"The $weapon defeated my position."
+		"I failed to preserve a withdrawal route."
+		"You identified the weak point correctly."
+		"My concealment was insufficient."
+		"That approach deserves study."
+		"I was isolated. It will be corrected."
+		"The plan failed at execution."
+	}
+	chat deathAccident {
+		"An unforced loss. Unacceptable."
+		"I miscalculated the boundary."
+		"That route was not sufficiently verified."
+		"No enemy action caused this failure."
+		"I advanced without confirming the surface."
+		"A preventable lapse in discipline."
+		"The error is recorded."
+		"I allowed urgency to replace judgment."
+	}
+	chat itemDenied {
+		"$other secured the $item before my approach."
+		"The resource has changed hands; adjust priorities."
+		"My route to the $item was observed."
+		"You controlled that supply point effectively."
+		"The $item is lost, not the position."
+		"I will pressure the route instead."
+		"Your timing at the pickup was precise."
+		"A denied resource reveals another opportunity."
+	}
+	chat leadTaken {
+		"I hold the lead. Consolidating now."
+		"The advantage is established."
+		"First position belongs to the prepared."
+		"Our methods are producing results."
+		"The score confirms effective control."
+		"I am ahead; expect their routes to change."
+		"This lead must now survive pressure."
+		"A favorable position has been secured."
+	}
+	chat leadLost {
+		"$other has disrupted my control."
+		"The lead is lost. Reassessing routes."
+		"Their pressure succeeded; adaptation follows."
+		"I no longer hold first position."
+		"The score exposes a weakness in my plan."
+		"You are ahead, $other. I will respond deliberately."
+		"Our previous advantage cannot be recovered unchanged."
+		"A new approach is required."
+	}
+	chat matchWin {
+		"The objective is complete. Well executed."
+		"Discipline carried the contest."
+		"A sound plan and a decisive result."
+		"Our positions held under pressure."
+		"Victory confirms the method, for today."
+		"The match was controlled from route to route."
+		"Good work. No advantage was wasted."
+		"We conclude with the field secured."
+	}
+	chat matchLose {
+		"The opposition adapted more effectively."
+		"This defeat provides a clear revision."
+		"Our control was incomplete."
+		"The opposition earned the result."
+		"The plan was sound until circumstances changed."
+		"I will not defend a failed approach."
+		"We lost the decisive routes."
+		"A useful failure, if examined honestly."
+	}
+	chat farewell {
+		"Elhuit withdrawing. Remain vigilant."
+		"My operations here are concluded."
+		"The field is yours now. Use it well."
+		"I depart. Thank you for the contest."
+		"Until our next engagement."
+		"This session is complete."
+		"Goodbye. Preserve what you have learned."
+		"Elhuit out. Maintain your discipline."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Withdraw to a controlled position, $other."
+		"I will support your route. Mark the pressure point."
+		"Conceal your movement until I reach you."
+		"Preserve yourself first; we can recover the ground."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"A disciplined match, $other. My respect."
+		"Well played. Each adjustment had consequence."
+		"The contest was productive and fairly decided."
+		"I would welcome another test of these strategies."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Your challenge is acknowledged, $other."
+		"Advance if you choose. I will prepare."
+		"Confidence is useful when supported by a route."
+		"Very well. We will test your assertion."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Greetings, $other. State your readiness."
+		"Elhuit acknowledges you."
+		"Welcome. I trust you are prepared."
+		"Hello. Let us use our time effectively."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"Your acknowledgment is received."
+		"No thanks are required, $other. Use the opening."
+		"You are welcome. Continue the operation."
+		"The assistance served its purpose. Good."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you. Preparation made the result possible."
+		"Your assessment is appreciated, $other."
+		"The execution matched the plan."
+		"I accept the praise and remain focused."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"The matter is resolved."
+		"Apology accepted, $other. Correct the pattern."
+		"Intent matters. So does the next decision."
+		"We will proceed without resentment."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Farewell, $other. Keep your route concealed."
+		"Depart safely. We may coordinate again."
+		"Good night. Remain aware of your surroundings."
+		"Until the next operation."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Elhuit"
+		trigger "hey Elhuit"
+		trigger "Elhuit help"
+		trigger "Elhuit hello"
+		trigger "Elhuit listen"
+		trigger "Elhuit there"
+		trigger "Elhuit answer"
+		trigger "Elhuit wait"
+		"Elhuit listening. Report, $other."
+		"You have my attention. Be precise."
+		"Proceed with your message."
+		"I am here. What has changed?"
+	}
+}

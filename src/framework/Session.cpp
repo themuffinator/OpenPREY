@@ -4823,6 +4823,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		guiLoading->SetStateString( "loading_levelname", loadingLevelName );
 		guiLoading->SetStateString( "friendlyname", loadingLevelName );
 		guiLoading->SetStateString( "loading_objectives", loadingObjectives );
+		guiLoading->SetStateInt( "loading_objectives_visible", loadingObjectives[ 0 ] ? 1 : 0 );
 		guiLoading->SetStateString( "loading_author", loadingAuthor );
 		guiLoading->SetStateInt( "loading_author_visible", loadingAuthor[ 0 ] ? 1 : 0 );
 		guiLoading->SetStateString( "loading_message", "" );
@@ -4970,9 +4971,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 		!idAsyncNetwork::serverDedicated.GetBool() &&
 		menuSoundWorld != NULL &&
 		g_levelloadmusic.GetBool();
-	const idStr loadMusic = playLevelLoadMusic
-		? Session_GetMapLoadMusic( mapSpawnData.serverInfo.GetString( "si_map" ) )
-		: idStr();
+	idStr loadMusic;
 
 	loadingAssetQueueActive = false;
 	loadingAssetQueueTotal = 0;
@@ -4996,6 +4995,9 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	if ( playLevelLoadMusic ) {
 		SetPlayingSoundWorld( menuSoundWorld );
 		soundSystem->SetMute( false );
+		const bool oldDeclInsideLoad = declManager->GetInsideLoad();
+		declManager->SetInsideLoad( true );
+		loadMusic = Session_GetMapLoadMusic( mapSpawnData.serverInfo.GetString( "si_map" ) );
 		if ( loadMusic.Length() > 0 ) {
 			if ( menuSoundWorld->IsPaused() ) {
 				menuSoundWorld->UnPause();
@@ -5003,6 +5005,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 			menuSoundWorld->PlayShaderDirectly( loadMusic.c_str() );
 			Session_ServiceLoadingSound();
 		}
+		declManager->SetInsideLoad( oldDeclInsideLoad );
 	}
 
 	// unpause the game sound world
@@ -7340,15 +7343,16 @@ void idSessionLocal::ShowSubtitle( const idStrList& lines )
 	{
 		return;
 	}
-	const int count = lines.Num();
-	for( int i = 0; i < 3; i++ )
+	for( int i = 0; i < 4; i++ )
 	{
-		const int sourceIndex = count - 1 - i;
-		const int displayIndex = 3 - i;
-		const char* text = sourceIndex >= 0 ? common->GetLanguageDict()->GetString( lines[sourceIndex] ) : "";
+		const int displayIndex = i + 1;
+		const bool hasText = i < lines.Num() && lines[i].Length() > 0;
+		const char* text = hasText ? common->GetLanguageDict()->GetString( lines[i] ) : "";
 		guiSubtitles->SetStateString( va( "subtitleText%d", displayIndex ), text );
-		guiSubtitles->SetStateFloat( va( "subtitleAlpha%d", displayIndex ), sourceIndex >= 0 ? 1.0f : 0.0f );
+		guiSubtitles->SetStateFloat( va( "subtitleAlpha%d", displayIndex ), hasText ? 1.0f : 0.0f );
 	}
+	guiSubtitles->SetStateString( "subtitleText5", "" );
+	guiSubtitles->SetStateFloat( "subtitleAlpha5", 0.0f );
 	guiSubtitles->StateChanged( common->GetPresentationTime() );
 }
 
@@ -7360,8 +7364,10 @@ void idSessionLocal::HideSubtitle() const
 	}
 	for( int i = 1; i <= 5; i++ )
 	{
+		guiSubtitles->SetStateString( va( "subtitleText%d", i ), "" );
 		guiSubtitles->SetStateFloat( va( "subtitleAlpha%d", i ), 0.0f );
 	}
+	guiSubtitles->StateChanged( common->GetPresentationTime() );
 }
 
 /*

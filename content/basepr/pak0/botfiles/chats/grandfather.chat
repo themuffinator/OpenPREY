@@ -1,0 +1,297 @@
+// Grandfather: patient, observant, and spiritually grounded without imitation folklore.
+
+characterChat "Grandfather" {
+	chat entergame {
+		"Grandfather is here. We may begin."
+		"I am ready. Let patience guide the first step."
+		"Another contest, and another chance to learn."
+		"My bow is ready. So am I."
+		"Let us begin with clear minds."
+		"I have arrived. Take your time, but not too much."
+		"The match waits for no one. I am prepared."
+		"Good. We are all here."
+	}
+	chat levelstart {
+		"$map rewards those who observe before moving."
+		"Listen to the room. Movement always leaves a sign."
+		"Do not confuse haste with purpose."
+		"Every path here leads somewhere useful."
+		"Keep the long view, even in a narrow corridor."
+		"A quiet position can still shape the match."
+		"We know little of $map yet. Let us pay attention."
+		"Choose your ground with care."
+	}
+	chat kill {
+		"You crossed my sightline, $other."
+		"The $weapon answered cleanly."
+		"Patience made that opening."
+		"Your path became predictable."
+		"One careful shot was enough."
+		"You moved before you looked, $other."
+		"The distance favored me."
+		"I waited for the right moment."
+	}
+	chat killWrench {
+		"Even patience sometimes meets at arm's length."
+		"You came nearer than wisdom advised."
+		"The wrench provided a direct lesson."
+		"Distance failed us both, $other."
+		"A simple tool ended a complicated approach."
+		"I prefer the bow, but I do not depend on it."
+		"Close quarters leave little time for reflection."
+		"You expected me to retreat."
+	}
+	chat killStreak {
+		"Three shots have found their purpose."
+		"A steady hand carries farther than excitement."
+		"The pattern is clear now."
+		"Three opponents, each choosing too quickly."
+		"I will remain patient while this advantage lasts."
+		"The score grows; my pace need not."
+		"Consistency is serving me well."
+		"I see the routes more clearly now."
+	}
+	chat revenge {
+		"I understood your lesson, $other."
+		"This time I waited for you."
+		"Our balance is restored."
+		"The same opening did not remain open."
+		"I remembered where your advantage began."
+		"We have each made our point now."
+		"Your earlier shot sharpened my attention."
+		"An answer, offered without anger."
+	}
+	chat death {
+		"A thoughtful shot, $other."
+		"The $weapon reached me before I adjusted."
+		"I mistook stillness for safety."
+		"Well done. I will remember the angle."
+		"My patience lasted one moment too long."
+		"You saw what I failed to see."
+		"That was a fair defeat."
+		"I will return with better judgment."
+	}
+	chat deathAccident {
+		"The ground corrected my carelessness."
+		"I gave too little thought to that step."
+		"Even an old man can hurry unwisely."
+		"That mistake needed no opponent."
+		"I looked ahead and forgot to look down."
+		"A poor choice, plainly made."
+		"I will not blame the map for my footing."
+		"There is always more attention to practice."
+	}
+	chat itemDenied {
+		"Your path to the $item was better, $other."
+		"Keep the $item. Need will create another choice."
+		"I arrived after the useful moment."
+		"The resource is gone; the lesson remains."
+		"You anticipated that pickup well."
+		"I will adjust my timing rather than complain."
+		"The $item favored your route this time."
+		"There are other tools and other paths."
+	}
+	chat leadTaken {
+		"I hold the lead. I will hold my focus as well."
+		"First place is a responsibility, not a rest."
+		"My patience has produced an advantage."
+		"The score favors me for this moment."
+		"I am ahead. Let us see what pressure teaches."
+		"A lead invites every eye. I am ready."
+		"The long view has brought me to the front."
+		"I will protect this position without clinging to it."
+	}
+	chat leadLost {
+		"$other has taken the lead with purpose."
+		"I am behind now, but the match remains."
+		"The score asks me to reconsider my route."
+		"A lead can pass between careful hands."
+		"You moved ahead, $other. I will observe why."
+		"My advantage ended; my patience did not."
+		"There is time to answer thoughtfully."
+		"First place has changed. The work continues."
+	}
+	chat matchWin {
+		"A good contest. Thank you all."
+		"Patience carried me to a welcome result."
+		"I am grateful for a match worth studying."
+		"Victory is pleasant. Understanding it matters more."
+		"We finished with discipline. Well done."
+		"The final score reflects many small choices."
+		"A satisfying match, won without haste."
+		"Today my judgment held."
+	}
+	chat matchLose {
+		"You have earned this victory."
+		"Defeat has shown me where to look next."
+		"A worthy match does not require me to win it."
+		"My choices were patient, but not always correct."
+		"Well played. I will carry the lesson forward."
+		"The better path belonged to you today."
+		"I accept the result and will improve upon it."
+		"There is no shame in learning from a fair loss."
+	}
+	chat farewell {
+		"Grandfather is leaving. Be well."
+		"Thank you for the matches."
+		"I have learned enough for one evening."
+		"Until we meet again, watch your path."
+		"I will go now. Keep a clear mind."
+		"Goodbye, and thank you for your company."
+		"The contest is over for me today."
+		"Take care of yourselves and one another."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Step away from danger first, $other."
+		"I am coming. Choose ground you can defend."
+		"Do not panic; show me where the pressure begins."
+		"Retreat is useful when it gives you another choice."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"A good game indeed, $other."
+		"Thank you. The contest gave us much to consider."
+		"Well played; your choices kept me attentive."
+		"I would be pleased to share another match."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"A challenge needs no anger, $other. I accept."
+		"Come when you are ready, not merely loud."
+		"We will let our choices answer for us."
+		"Very well. I will meet you with patience."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Welcome, $other. I hope you are well."
+		"Grandfather hears you. Hello."
+		"It is good to have your company."
+		"Greetings. Let us begin thoughtfully."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You are welcome, $other."
+		"I am glad the help reached you in time."
+		"Your thanks are received with respect."
+		"Of course. We all need another hand sometimes."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you. I waited for the proper moment."
+		"Your kind judgment is appreciated."
+		"The shot was careful; your notice was generous."
+		"I am pleased the effort appeared worthwhile."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Your apology is accepted freely."
+		"We need not carry this mistake, $other."
+		"Thank you for speaking honestly. We may continue."
+		"There is nothing between us that patience cannot settle."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Farewell, $other. Travel carefully."
+		"Good night. May your mind be at ease."
+		"Until another match, be well."
+		"Go safely. Your company was welcome."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Grandfather"
+		trigger "hey Grandfather"
+		trigger "Grandfather help"
+		trigger "Grandfather hello"
+		trigger "Grandfather listen"
+		trigger "Grandfather there"
+		trigger "Grandfather answer"
+		trigger "Grandfather wait"
+		"Yes, $other? I am listening."
+		"Grandfather is here. Speak plainly."
+		"You have my attention."
+		"Tell me what you have noticed."
+	}
+}

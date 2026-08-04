@@ -387,8 +387,7 @@ static void R_ViewStatistics( viewDef_t *parms ) {
 		if ( surf->material->IsPortalSky() ) {
 			portalSkySurfs++;
 		}
-		const texgen_t texgen = surf->material->Texgen();
-		if ( texgen == TG_SKYBOX_CUBE || texgen == TG_WOBBLESKY_CUBE ) {
+		if ( surf->material->HasTexgen( TG_SKYBOX_CUBE ) || surf->material->HasTexgen( TG_WOBBLESKY_CUBE ) ) {
 			skyboxSurfs++;
 		}
 		if ( surf->material->GetSort() >= SS_POST_PROCESS ) {

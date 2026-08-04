@@ -111,9 +111,19 @@
       "map": "game/spherebrain"
     },
     {
-      "name": "(SP) flashinghead 'Flashing Head'",
+      "name": "(SP) deathwalk1 'Death Walk 1'",
       "kind": "sp",
-      "map": "game/flashinghead"
+      "map": "game/deathwalk1"
+    },
+    {
+      "name": "(SP) deathwalk2 'Death Walk 2'",
+      "kind": "sp",
+      "map": "game/deathwalk2"
+    },
+    {
+      "name": "(SP) deathwalk3 'Death Walk 3'",
+      "kind": "sp",
+      "map": "game/deathwalk3"
     },
     {
       "name": "(MP) dmescher 'Keeper Gravity'",

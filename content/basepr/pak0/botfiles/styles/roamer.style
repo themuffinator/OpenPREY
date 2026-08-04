@@ -1,0 +1,42 @@
+// roamer.style
+//
+// Plays the map rather than one opponent, rotating through Prey's weapon and
+// ammunition pickups and taking the fights found on the way.
+
+style "roamer" {
+	description	"runs the weapon rotation and fights what gets in the way"
+
+	set	combatRange		620
+	set	aggression		0.50
+	set	patience		0.45
+	add	initiative		0.05
+	set	targetStickiness	0.35
+	set	opportunism		0.95
+	set	vengefulness		0.10
+	add	suppressionMsec	100
+	set	strafeRhythmMsec	450
+	set	strafeRhythmVarianceMsec	700
+	set	weaponSwitchMsec	400
+
+	scale	itemFocus		1.40
+	scale	pursuit			0.85
+	scale	reacquireMsec		0.90
+	add	rangeDiscipline		0.05
+
+	weapon	"weaponobj_rocketlauncher"	1.25
+	weapon	"weaponobj_autocannon"		1.15
+	weapon	"weaponobj_rifle"		1.10
+	weapon	"weaponobj_soulstripper"	1.05
+	weapon	"weaponobj_hiderweapon"		1.00
+	weapon	"weaponobj_crawlergrenade"	0.90
+	weapon	"weaponobj_bow"			0.80
+	weapon	"weaponobj_wrench"		0.55
+
+	skill 1 {
+		scale	itemFocus		0.85
+	}
+	skill 5 {
+		add	itemFocus		0.15
+		add	patience		0.05
+	}
+}

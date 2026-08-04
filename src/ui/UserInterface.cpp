@@ -727,10 +727,16 @@ void idUserInterfaceLocal::WriteToDemoFile( class idDemoFile *f ) {
 	f->WriteFloat( cursorY );
 }
 
+static const int OPENPREY_GUI_SAVE_MAGIC = 'P' | ( 'G' << 8 ) | ( 'U' << 16 ) | ( 'I' << 24 );
+static const int OPENPREY_GUI_SAVE_VERSION = 1;
+
 bool idUserInterfaceLocal::WriteToSaveGame( idFile *savefile ) const {
 	int len;
 	const idKeyValue *kv;
 	const char *string;
+
+	savefile->Write( &OPENPREY_GUI_SAVE_MAGIC, sizeof( OPENPREY_GUI_SAVE_MAGIC ) );
+	savefile->Write( &OPENPREY_GUI_SAVE_VERSION, sizeof( OPENPREY_GUI_SAVE_VERSION ) );
 
 	int num = state.GetNumKeyVals();
 	savefile->Write( &num, sizeof( num ) );
@@ -807,10 +813,22 @@ static bool UI_ReadSaveGameString( idFile *savefile, idStr &string, const char *
 }
 
 bool idUserInterfaceLocal::ReadFromSaveGame( idFile *savefile ) {
+	int magic;
+	int version;
 	int num;
 	int i;
 	idStr key;
 	idStr value;
+
+	if ( !UI_ReadSaveGameBytes( savefile, &magic, sizeof( magic ), "GUI save magic" ) ||
+		!UI_ReadSaveGameBytes( savefile, &version, sizeof( version ), "GUI save version" ) ) {
+		return false;
+	}
+	if ( magic != OPENPREY_GUI_SAVE_MAGIC || version != OPENPREY_GUI_SAVE_VERSION ) {
+		common->Warning( "idUserInterfaceLocal::ReadFromSaveGame: unsupported GUI stream marker 0x%08x version %d",
+			magic, version );
+		return false;
+	}
 
 	if ( !UI_ReadSaveGameBytes( savefile, &num, sizeof( num ), "state count" ) ) {
 		return false;

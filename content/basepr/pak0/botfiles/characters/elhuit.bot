@@ -1,0 +1,29 @@
+// Elhuit kept the Hidden alive inside the Sphere and built an escape around
+// stolen portal technology. She fights like a planner: control a route, deny
+// it, and preserve the larger operation.
+character "Elhuit" {
+	inherit		"ambusher"
+	description	"Hidden resistance leader who turns routes into prepared ground"
+	skillBand	3 5
+	modelNum	16
+
+	set	combatRange		820
+	set	aggression		0.40
+	set	patience		0.92
+	set	targetStickiness	0.65
+	set	opportunism		1.00
+	set	vengefulness		0.30
+	set	suppressionMsec	500
+	scale	itemFocus		1.25
+	set	weaponSwitchMsec	350
+	set	chatiness		0.50
+
+	weapon	"weaponobj_hiderweapon"		1.35
+	weapon	"weaponobj_crawlergrenade"	1.30
+	weapon	"weaponobj_rifle"		1.20
+
+	skill 5 {
+		scale	reactionMsec		0.93
+		add	targetSelection		0.04
+	}
+}

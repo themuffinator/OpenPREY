@@ -668,12 +668,15 @@ public:
 	{
 		int						subIndex;
 		int						subNum;
+		const idSoundChannel*	channel;
+		int						channelStartTime;
 		const soundSub_t*		subtitle;
 		int						endTime;
 	};
 
 	bool					SubtitleQueueContains( const soundSub_t* subtitle ) const;
-	bool					AppendSubtitleForChannel( const idSoundChannel* channel );
+	int						FindSubtitleQueueIndexForChannel( const idSoundChannel* channel ) const;
+	bool					AppendSubtitleForChannel( const idSoundChannel* channel, bool markQueueChanged = true );
 	void					CollectActiveSubtitles();
 	void					PruneExpiredSubtitles();
 	bool					SyncSubtitleQueues();
@@ -685,6 +688,8 @@ public:
 	idList<const soundSub_t*>	sf_subtitleQueue;
 
 public:
+	void					RemoveSubtitlesForChannel( const idSoundChannel* channel );
+
 	idList<soundSubtitleList_t> soundSubtitleList;
 
 	//-------------------------

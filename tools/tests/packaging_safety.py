@@ -49,6 +49,7 @@ STAGE_GAMELIBS = load_module("stage_gamelibs_safety_test", BUILD_DIR / "stage_ga
 VERSION = load_module("openq4_version_safety_test", BUILD_DIR / "openq4_version.py")
 WINDOWS_RUNTIME = load_module("windows_runtime_safety_test", BUILD_DIR / "windows_runtime.py")
 MESON_SOURCES = load_module("meson_sources_safety_test", BUILD_DIR / "meson_sources.py")
+CLEAN_RUNTIME_INSTALL = BUILD_DIR / "clean_runtime_install.py"
 
 
 def write_file(path: Path, data: bytes = b"data\n") -> None:
@@ -203,6 +204,14 @@ def validate_pk4_archive_member_guards() -> None:
         lambda: OPENQ4_PAK.inspect_game_pk4(symlink_path, required_files=set()),
         "non-regular archive entry",
         "PK4 symlink member",
+    )
+
+    fixture_path = WORK / "bad-archives" / "roadhouse-quick-fixture.pk4"
+    write_zip(fixture_path, [(zip_info("script/map_roadhouse_quick.script"), b"dev fixture\n")])
+    expect_runtime_error(
+        lambda: OPENQ4_PAK.inspect_game_pk4(fixture_path, required_files=set()),
+        "pure runtime pack",
+        "roadhouse_quick fixture must stay out of runtime PK4s",
     )
 
 
@@ -412,6 +421,83 @@ def validate_fast_stage_guards_and_copy() -> None:
         raise AssertionError("fast stage did not copy root runtime binary")
     if not (install_dir / "basepr" / "game_x64.dll").is_file():
         raise AssertionError("fast stage did not copy game runtime binary")
+
+
+def validate_dev_only_fixtures_not_in_pak_sources() -> None:
+    pak0 = ROOT / "content" / "basepr" / "pak0"
+    dev = ROOT / "content" / "basepr" / "dev"
+    required_dev_fixture_paths = (
+        dev / "maps" / "game" / "roadhouse_quick.map",
+        dev / "maps" / "game" / "roadhouse_quick.cm",
+        dev / "maps" / "game" / "roadhouse_quick.proc",
+        dev / "maps" / "game" / "roadhouse_quick.aas48",
+        dev / "script" / "map_roadhouse_quick.script",
+    )
+    for fixture_path in required_dev_fixture_paths:
+        if not fixture_path.is_file():
+            raise AssertionError(f"development-only fixture is missing: {fixture_path}")
+
+    shipped_fixture_sources = sorted(path for path in pak0.rglob("*roadhouse_quick*") if path.is_file())
+    if shipped_fixture_sources:
+        formatted = "\n".join(str(path) for path in shipped_fixture_sources)
+        raise AssertionError(f"roadhouse_quick fixture leaked into pak0 sources:\n{formatted}")
+
+
+def validate_plain_install_cleanup() -> None:
+    install_root = WORK / "plain-install-cleanup" / ".install"
+    game_dir = install_root / "basepr"
+    for artifact in (
+        install_root / "renderer-gl_x64.lib",
+        install_root / "renderer-vk_x64.exp",
+        game_dir / "game_x64.lib",
+        game_dir / "game_x64.map",
+        game_dir / "stale_renderer.so",
+    ):
+        write_file(artifact)
+    for runtime in (
+        install_root / "openPREY-client_x64.exe",
+        install_root / "renderer-gl_x64.dll",
+        game_dir / "game_x64.dll",
+    ):
+        write_file(runtime)
+
+    result = run_script(
+        CLEAN_RUNTIME_INSTALL,
+        "--install-root",
+        install_root,
+        "--game-dir",
+        game_dir,
+        "--host-system",
+        "windows",
+    )
+    if result.returncode != 0:
+        raise AssertionError(f"clean_runtime_install.py failed: {result.stderr}")
+    for artifact in (
+        install_root / "renderer-gl_x64.lib",
+        install_root / "renderer-vk_x64.exp",
+        game_dir / "game_x64.lib",
+        game_dir / "game_x64.map",
+        game_dir / "stale_renderer.so",
+    ):
+        if artifact.exists():
+            raise AssertionError(f"clean_runtime_install.py left non-runtime artifact staged: {artifact}")
+    for runtime in (
+        install_root / "openPREY-client_x64.exe",
+        install_root / "renderer-gl_x64.dll",
+        game_dir / "game_x64.dll",
+    ):
+        if not runtime.is_file():
+            raise AssertionError(f"clean_runtime_install.py removed runtime artifact: {runtime}")
+
+    meson_build = (ROOT / "meson.build").read_text(encoding="utf-8")
+    for token in (
+        "clean_runtime_install.py",
+        "--install-root",
+        "--game-dir",
+        "--host-system",
+    ):
+        if token not in meson_build:
+            raise AssertionError(f"meson.build is missing install cleanup token {token!r}")
 
 
 def validate_stale_content_prune_symlink_handling() -> None:
@@ -1104,6 +1190,8 @@ def main() -> None:
         validate_legacy_build_pak0_cli_guards()
         validate_list_sources_guards()
         validate_fast_stage_guards_and_copy()
+        validate_dev_only_fixtures_not_in_pak_sources()
+        validate_plain_install_cleanup()
         validate_stale_content_prune_symlink_handling()
         validate_package_name_and_copy_guards()
         validate_renderer_module_staging()

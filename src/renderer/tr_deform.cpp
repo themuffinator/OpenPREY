@@ -1250,7 +1250,173 @@ Emit particles from the surface instead of drawing it
 =====================
 */
 static void R_ParticleDeform( drawSurf_t *surf, bool useArea ) {
-	
+	if ( r_skipParticles.GetBool() || surf == NULL || surf->material == NULL ||
+		surf->space == NULL || surf->space->entityDef == NULL ||
+		tr.viewDef == NULL || surf->geo == NULL ) {
+		return;
+	}
+
+	const renderEntity_t *renderEntity = &surf->space->entityDef->parms;
+	const viewDef_t *viewDef = tr.viewDef;
+	const idDeclParticle *particleSystem = static_cast<const idDeclParticle *>( surf->material->GetDeformDecl() );
+
+	if ( particleSystem == NULL ) {
+		return;
+	}
+
+	const srfTriangles_t *srcTri = surf->geo;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	srfTriangles_t tempTri;
+	if ( srcTri->primBatchMesh != NULL ) {
+		idDrawVert *tempVerts = static_cast<idDrawVert *>( _alloca16( srcTri->numVerts * sizeof( idDrawVert ) ) );
+		glIndex_t *tempIndexes = static_cast<glIndex_t *>( _alloca16( srcTri->numIndexes * sizeof( tempIndexes[0] ) ) );
+		R_MaterializePrimBatchTriangles( srcTri, &tempTri, tempVerts, tempIndexes );
+		srcTri = &tempTri;
+	}
+#endif
+	const int numSourceTris = srcTri->numIndexes / 3;
+	if ( numSourceTris <= 0 || srcTri->verts == NULL || srcTri->indexes == NULL ) {
+		return;
+	}
+
+	float totalArea = 0.0f;
+	float *sourceTriAreas = NULL;
+	if ( useArea ) {
+		sourceTriAreas = static_cast<float *>( _alloca16( sizeof( sourceTriAreas[0] ) * numSourceTris ) );
+		for ( int triNum = 0; triNum < numSourceTris; ++triNum ) {
+			const int firstIndex = triNum * 3;
+			sourceTriAreas[triNum] = totalArea;
+			totalArea += idWinding::TriangleArea(
+				srcTri->verts[srcTri->indexes[firstIndex + 0]].xyz,
+				srcTri->verts[srcTri->indexes[firstIndex + 1]].xyz,
+				srcTri->verts[srcTri->indexes[firstIndex + 2]].xyz );
+		}
+		if ( totalArea <= 0.0f ) {
+			return;
+		}
+	}
+
+	particleGen_t g;
+	g.renderEnt = renderEntity;
+	g.renderView = &viewDef->renderView;
+	g.origin.Zero();
+	g.axis.Identity();
+
+	const int sourceTriIterations = useArea ? 1 : numSourceTris;
+	for ( int currentTri = 0; currentTri < sourceTriIterations; ++currentTri ) {
+		for ( int stageNum = 0; stageNum < particleSystem->stages.Num(); ++stageNum ) {
+			idParticleStage *stage = particleSystem->stages[stageNum];
+			if ( stage == NULL || stage->material == NULL || stage->cycleMsec == 0 ||
+				stage->particleLife <= 0.0f || stage->hidden ) {
+				continue;
+			}
+
+			// Surface particle counts are authored per 4096 square units. particle2
+			// uses the declared count once per source triangle instead.
+			int totalParticles = stage->totalParticles;
+			if ( useArea ) {
+				const double scaledParticles = static_cast<double>( stage->totalParticles ) *
+					static_cast<double>( totalArea ) / 4096.0;
+				if ( !( scaledParticles > 0.0 ) || scaledParticles > static_cast<double>( idMath::INT_MAX ) ) {
+					continue;
+				}
+				totalParticles = static_cast<int>( scaledParticles );
+			}
+
+			particleGeometryCounts_t geometryCounts;
+			if ( !R_GetParticleGeometryCounts( totalParticles, stage->NumQuadsPerParticle(),
+				idMath::INT_MAX - 16, geometryCounts ) ) {
+				continue;
+			}
+
+			srfTriangles_t *tri = static_cast<srfTriangles_t *>( R_ClearedFrameAlloc( sizeof( *tri ) ) );
+			tri->numVerts = geometryCounts.numVerts;
+			tri->numIndexes = geometryCounts.numIndexes;
+			tri->verts = static_cast<idDrawVert *>( R_FrameAlloc( geometryCounts.vertexBytes ) );
+			tri->indexes = static_cast<glIndex_t *>( R_FrameAlloc( geometryCounts.indexBytes ) );
+			tri->bounds = stage->bounds;
+			tri->numVerts = 0;
+
+			idRandom steppingRandom;
+			idRandom previousCycleRandom;
+			const int stageAge = g.renderView->time + renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000 - stage->timeOffset * 1000;
+			const int stageCycle = stageAge / stage->cycleMsec;
+			const int diversitySeed = static_cast<int>( renderEntity->shaderParms[SHADERPARM_DIVERSITY] * idRandom::MAX_RAND );
+			steppingRandom.SetSeed( R_ParticleCycleSeed( stageCycle, false, diversitySeed ) );
+			previousCycleRandom.SetSeed( R_ParticleCycleSeed( stageCycle, true, diversitySeed ) );
+
+			for ( int index = 0; index < totalParticles; ++index ) {
+				g.index = index;
+				steppingRandom.RandomInt();
+				previousCycleRandom.RandomInt();
+
+				const int bunchOffset = stage->particleLife * 1000 * stage->spawnBunching * index / totalParticles;
+				const int particleAge = stageAge - bunchOffset;
+				const int particleCycle = particleAge / stage->cycleMsec;
+				if ( particleCycle < 0 || ( stage->cycles != 0 && particleCycle >= stage->cycles ) ) {
+					continue;
+				}
+				g.random = particleCycle == stageCycle ? steppingRandom : previousCycleRandom;
+				const int inCycleTime = particleAge - particleCycle * stage->cycleMsec;
+				if ( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f &&
+					g.renderView->time - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000 ) {
+					continue;
+				}
+
+				g.frac = static_cast<float>( inCycleTime ) / ( stage->particleLife * 1000 );
+				if ( g.frac < 0.0f || g.frac > 1.0f ) {
+					continue;
+				}
+
+				int pointTri = currentTri;
+				if ( useArea ) {
+					pointTri = idBinSearch_LessEqual<float>( sourceTriAreas, numSourceTris, g.random.RandomFloat() * totalArea );
+				}
+
+				const idDrawVert *v1 = &srcTri->verts[srcTri->indexes[pointTri * 3 + 0]];
+				const idDrawVert *v2 = &srcTri->verts[srcTri->indexes[pointTri * 3 + 1]];
+				const idDrawVert *v3 = &srcTri->verts[srcTri->indexes[pointTri * 3 + 2]];
+				float f1 = g.random.RandomFloat();
+				float f2 = g.random.RandomFloat();
+				float f3 = g.random.RandomFloat();
+				const float invTotal = 1.0f / ( f1 + f2 + f3 + 0.0001f );
+				f1 *= invTotal;
+				f2 *= invTotal;
+				f3 *= invTotal;
+
+				g.origin = v1->xyz * f1 + v2->xyz * f2 + v3->xyz * f3;
+				g.axis[0] = v1->tangents[0] * f1 + v2->tangents[0] * f2 + v3->tangents[0] * f3;
+				g.axis[1] = v1->tangents[1] * f1 + v2->tangents[1] * f2 + v3->tangents[1] * f3;
+				g.axis[2] = v1->normal * f1 + v2->normal * f2 + v3->normal * f3;
+				g.originalRandom = g.random;
+				g.age = g.frac * stage->particleLife;
+				tri->numVerts += stage->CreateParticle( &g, tri->verts + tri->numVerts );
+			}
+
+			if ( tri->numVerts <= 0 ) {
+				continue;
+			}
+
+			int numIndexes = 0;
+			for ( int i = 0; i < tri->numVerts; i += 4 ) {
+				tri->indexes[numIndexes + 0] = i;
+				tri->indexes[numIndexes + 1] = i + 2;
+				tri->indexes[numIndexes + 2] = i + 3;
+				tri->indexes[numIndexes + 3] = i;
+				tri->indexes[numIndexes + 4] = i + 3;
+				tri->indexes[numIndexes + 5] = i + 1;
+				numIndexes += 6;
+			}
+			tri->numIndexes = numIndexes;
+			tri->ambientCache = vertexCache.AllocFrameTemp( tri->verts, tri->numVerts * sizeof( tri->verts[0] ) );
+			if ( r_useIndexBuffers.GetBool() ) {
+				tri->indexCache = vertexCache.AllocFrameTemp( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), true );
+			}
+			if ( tri->ambientCache != NULL ) {
+				R_AddDrawSurf( tri, surf->space, renderEntity, stage->material, surf->scissorRect );
+			}
+		}
+	}
 }
 
 //========================================================================================

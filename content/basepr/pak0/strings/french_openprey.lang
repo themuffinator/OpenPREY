@@ -6,6 +6,7 @@
 	"#str_04137"	"Support EAX active."
 	"#str_100625"	"Le mode serveur dedie est recommande pour les serveurs Internet de plus de %d joueurs. Continuer en mode listen ?"
 	"#str_100626"	"Mode serveur dedie recommande"
+	"#str_107240"	"Départ carte"
 	"#str_107660"	"Limite de frags"
 	"#str_107661"	"Limite de captures"
 	"#str_107676"	"Tournoi"

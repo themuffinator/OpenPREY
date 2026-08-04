@@ -1,0 +1,298 @@
+// post_op.chat
+// Controlled focus on targets and routes; the retail label is never a joke.
+
+characterChat "Post-op" {
+	chat entergame {
+		"Post-op present. Focus set."
+		"Ready. Targets before noise."
+		"Entering with a clear plan."
+		"Route selected. Moving."
+		"I am prepared for contact."
+		"Attention forward. Begin."
+		"Combat state steady."
+		"Arrived. Keep communication exact."
+	}
+	chat levelstart {
+		"$map. Establish route and fallback."
+		"Observe first movement carefully."
+		"Control the useful intersections."
+		"Choose targets. Do not drift."
+		"A clear route prevents rushed choices."
+		"Set range before committing."
+		"Mark transitions between cover."
+		"Plan complete. Execute calmly."
+	}
+	chat kill {
+		"$other removed from the route."
+		"$weapon performed as selected."
+		"Target resolved on schedule."
+		"One objective complete."
+		"Firing decision was correct."
+		"$other gave a clear window."
+		"Contact closed. Reassess."
+		"Position secured by precision."
+	}
+	chat killWrench {
+		"Wrench selected for proximity."
+		"Close target resolved directly."
+		"$other entered the final step."
+		"No range remained to manage."
+		"Melee decision complete."
+		"Direct force cleared the route."
+		"Close contact required no delay."
+		"That approach ended at reach."
+	}
+	chat killStreak {
+		"Three targets, one controlled sequence."
+		"The current plan is producing results."
+		"Focus maintained through three contacts."
+		"Multiple objectives resolved cleanly."
+		"Do not change a stable approach."
+		"Three removals. Recheck the route."
+		"Pressure remains measured."
+		"Sequence complete without overreach."
+	}
+	chat revenge {
+		"$other was included in the revised plan."
+		"Prior result corrected."
+		"Reassessment led to this outcome."
+		"The return engagement was controlled."
+		"I adjusted to your angle."
+		"Outstanding target resolved."
+		"Previous error is now closed."
+		"$other met the prepared route."
+	}
+	chat death {
+		"I lost focus at contact."
+		"$other selected the better angle."
+		"$weapon defeated my position."
+		"Current route invalid. Resetting."
+		"That target window favored them."
+		"Exchange lost. Analysis remains clear."
+		"My position failed under pressure."
+		"Returning with a revised plan."
+	}
+	chat deathAccident {
+		"Route error without opposition."
+		"I misjudged the transition."
+		"Environmental risk was understated."
+		"Avoidable. I will correct it."
+		"Movement plan needs one correction."
+		"I committed before checking the ground."
+		"Fallback point was poorly chosen."
+		"Resetting after an unforced mistake."
+	}
+	chat itemDenied {
+		"$other won the $item timing."
+		"$item unavailable. Plan continues."
+		"Resource target removed from this route."
+		"Pickup window closed before arrival."
+		"Reallocate attention elsewhere."
+		"$other anticipated that supply path."
+		"Denied resource noted for the next cycle."
+		"No reason to contest an empty point."
+	}
+	chat leadTaken {
+		"Lead obtained through controlled choices."
+		"First position. Maintain the plan."
+		"Score confirms route efficiency."
+		"Advantage established without haste."
+		"I hold the lead. Focus remains unchanged."
+		"Current method is sufficient."
+		"Front position secured. Recheck threats."
+		"The match now follows my pace."
+	}
+	chat leadLost {
+		"$other took the lead. Recalculate."
+		"First position lost at the last exchange."
+		"Deficit requires cleaner target choice."
+		"Advantage gone. Focus is not."
+		"A revised route can recover this."
+		"The leader is now the primary measure."
+		"Score slipped through avoidable decisions."
+		"Control can be rebuilt one contact at a time."
+	}
+	chat matchWin {
+		"The plan held through completion."
+		"Victory achieved with controlled pressure."
+		"Final result confirms the route."
+		"Targets chosen well. Match complete."
+		"A measured engagement, successfully closed."
+		"Focus produced the winning margin."
+		"No wasted changes were needed."
+		"Good contest. The objective is met."
+	}
+	chat matchLose {
+		"The plan failed under real pressure."
+		"Defeat accepted for analysis."
+		"Opponent choices were cleaner."
+		"I held the wrong route too long."
+		"Final result requires adjustment."
+		"Focus alone did not solve this match."
+		"Good contest. My decisions need revision."
+		"Loss recorded without excuse."
+	}
+	chat farewell {
+		"Post-op leaving the match."
+		"Focus released. Session complete."
+		"My route ends here for now."
+		"Good matches. Reassess and recover."
+		"Departing with the results noted."
+		"No further targets. Signing off."
+		"Plan closed. Post-op out."
+		"I am done for this session."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "can anyone help"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		trigger "assist me"
+		"Choose cover and state your route, $other."
+		"I can support a clear position."
+		"Reduce the immediate risk; help is moving."
+		"Hold focus. Assistance is part of the plan."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good match, $other. The pressure stayed useful."
+		"Well played. Both plans were tested."
+		"A worthwhile contest from start to finish."
+		"Agreed. That match rewarded clear decisions."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Your challenge is now a target choice."
+		"I will meet you on the useful ground, $other."
+		"Noise does not alter my route."
+		"Accepted. Prepare a better plan than that message."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "whats up"
+		"Hello, $other. State anything important early."
+		"Post-op acknowledges you."
+		"Good. Communication is available."
+		"Greeting heard. Focus remains forward."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "appreciate it"
+		trigger "cheers"
+		trigger "thanks a lot"
+		"You're welcome. Use the advantage deliberately."
+		"Acknowledged, $other. Return to the plan."
+		"Assistance completed its purpose."
+		"No debt remains between us."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you. The target window was clear."
+		"Your assessment matches the result."
+		"I value precise feedback, $other."
+		"Good observation. Keep tracking the route."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "that was my fault"
+		trigger "i messed up"
+		"Apology accepted. Change the decision."
+		"The error is useful if measured."
+		"Understood, $other. Focus on correction."
+		"No blame needed. A better route is enough."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "take care"
+		"Goodbye, $other. Close your session cleanly."
+		"Departure noted. Keep your focus elsewhere."
+		"Until the next planned engagement."
+		"Take care. Leave by a controlled route."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Post-op"
+		trigger "Post-op respond"
+		trigger "Post-op report"
+		trigger "Post-op status"
+		trigger "Post-op listen"
+		trigger "Post-op answer"
+		trigger "Post-op come in"
+		trigger "Post-op are you there"
+		"Post-op is listening, $other."
+		"State the target or route."
+		"You have my attention. Be exact."
+		"Present. What requires focus?"
+	}
+}

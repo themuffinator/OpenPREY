@@ -753,8 +753,11 @@ public:
 	// particle system to emit from surface and table for turbulent
 	const idDecl* GetDeformDecl(void) const { return deformDecl; }
 
-	// currently a surface can only have one unique texgen for all the stages
+	// Legacy first non-explicit stage query.  Stage renderers should inspect the
+	// stage itself; surface setup uses GetSurfaceTexgen for generated vertices.
 	texgen_t			Texgen() const;
+	bool				HasTexgen( texgen_t texgen ) const;
+	texgen_t			GetSurfaceTexgen() const;
 
 	// wobble sky parms
 	const int* GetTexGenRegisters(void) const { return texGenRegisters; }

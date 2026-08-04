@@ -12050,6 +12050,7 @@ typedef struct {
 	char			name[64];
 	bool			interactionProgram;
 	bool			sourceScanned;
+	bool			loadAttempted;
 	bool			valid;
 	bool			warnedOnUse;
 	bool			requiredForLighting;
@@ -12146,6 +12147,7 @@ static void RB_SetARBProgramPath( progDef_t &prog ) {
 static void RB_ResetARBProgramStatus( progDef_t &prog ) {
 	prog.interactionProgram = false;
 	prog.sourceScanned = false;
+	prog.loadAttempted = false;
 	prog.valid = false;
 	prog.warnedOnUse = false;
 	prog.requiredForLighting = RB_IsRequiredLightingARBProgram( prog );
@@ -12241,6 +12243,31 @@ static bool RB_IsSimpleInteractionProgram( const progDef_t &prog ) {
 		idStr::Icmp( prog.name, "SimpleInteraction.vfp" ) == 0;
 }
 
+static bool RB_IsDormantMD5RProgram( const progDef_t &prog ) {
+	return prog.target == GL_VERTEX_PROGRAM_ARB &&
+		prog.ident >= ARB2_MD5R_INTERACTION_VPROG_BASE &&
+		prog.ident <= ARB2_MD5R_BASIC_FOG_VPROG_BASE + 2;
+}
+
+static bool RB_ShouldEagerLoadARBProgram( const progDef_t &prog ) {
+	// SimpleInteraction is a platform-specific fallback. Loading it on every
+	// renderer startup turns an unused compatibility path into a false missing-
+	// asset diagnostic for the retail Prey data set.
+	if ( RB_IsSimpleInteractionProgram( prog ) ) {
+		return RB_UseSimpleInteractionShader();
+	}
+
+	// Glass-warp and packed MD5R programs retain their fixed ids for
+	// compatibility, but Prey does not ship the Quake 4 sources. Load them on
+	// first actual use so an exercised missing path remains actionable.
+	if ( prog.ident == VPROG_GLASSWARP || prog.ident == FPROG_GLASSWARP ||
+		RB_IsDormantMD5RProgram( prog ) ) {
+		return false;
+	}
+
+	return true;
+}
+
 static GLuint RB_CurrentInteractionProgramIdent( GLenum target ) {
 	if ( r_testARBProgram.GetBool() ) {
 		return ( target == GL_VERTEX_PROGRAM_ARB ) ? VPROG_TEST : FPROG_TEST;
@@ -12306,8 +12333,11 @@ static void RB_WarnInvalidARBProgramUse( progDef_t *prog, GLenum target, GLuint 
 static bool RB_CurrentInteractionProgramsValid( void ) {
 	const GLuint vertexProgram = RB_CurrentInteractionProgramIdent( GL_VERTEX_PROGRAM_ARB );
 	const GLuint fragmentProgram = RB_CurrentInteractionProgramIdent( GL_FRAGMENT_PROGRAM_ARB );
-	return R_IsARBProgramValid( GL_VERTEX_PROGRAM_ARB, vertexProgram ) &&
-		R_IsARBProgramValid( GL_FRAGMENT_PROGRAM_ARB, fragmentProgram );
+	// Evaluate both records even if the vertex program fails so diagnostics and
+	// report accounting describe the complete selected pair.
+	const bool vertexValid = R_IsARBProgramValid( GL_VERTEX_PROGRAM_ARB, vertexProgram );
+	const bool fragmentValid = R_IsARBProgramValid( GL_FRAGMENT_PROGRAM_ARB, fragmentProgram );
+	return vertexValid && fragmentValid;
 }
 
 static void RB_ErrorIfDriverRequiredSimpleInteractionFailed( void ) {
@@ -12351,13 +12381,21 @@ static void RB_WarnInteractionShaderRescueMode( void ) {
 R_LoadARBProgram
 =================
 */
+void R_LoadARBProgram( int progIndex );
+
 bool R_IsARBProgramValid( GLenum target, GLuint ident ) {
-	const progDef_t *prog = RB_FindARBProgramRecord( target, ident );
+	progDef_t *prog = RB_FindARBProgramRecord( target, ident );
+	if ( prog != NULL && !prog->loadAttempted ) {
+		R_LoadARBProgram( static_cast<int>( prog - progs ) );
+	}
 	return prog != NULL && prog->valid;
 }
 
 bool R_BindARBProgram( GLenum target, GLuint ident, const char *usage, bool required ) {
 	progDef_t *prog = RB_FindARBProgramRecord( target, ident );
+	if ( prog != NULL && !prog->loadAttempted ) {
+		R_LoadARBProgram( static_cast<int>( prog - progs ) );
+	}
 	if ( prog == NULL || !prog->valid ) {
 		RB_WarnInvalidARBProgramUse( prog, target, ident, usage, required );
 		return false;
@@ -12380,6 +12418,7 @@ void R_LoadARBProgram( int progIndex ) {
 	char	*start = NULL, *end;
 
 	RB_ResetARBProgramStatus( prog );
+	prog.loadAttempted = true;
 
 	if ( RB_IsFullInteractionProgram( prog ) ) {
 		R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_ARB2_INTERACTION_FULL_UPLOAD );
@@ -12515,7 +12554,7 @@ bool R_ARBProgramUsesInteractionInputs( unsigned int target, const char *program
 	if ( progIndex < 0 ) {
 		return false;
 	}
-	if ( !progs[progIndex].sourceScanned ) {
+	if ( !progs[progIndex].sourceScanned && !progs[progIndex].loadAttempted ) {
 		R_LoadARBProgram( progIndex );
 	}
 	return progs[progIndex].interactionProgram;
@@ -12564,20 +12603,54 @@ int R_FindARBProgram( GLenum target, const char *program ) {
 	return progs[i].ident;
 }
 
+static void RB_LoadARBProgramSet( bool startupEagerOnly ) {
+	int i;
+	for ( i = 0; progs[i].name[0]; i++ ) {
+		RB_ResetARBProgramStatus( progs[i] );
+	}
+	for ( i = 0; progs[i].name[0]; i++ ) {
+		if ( !startupEagerOnly || RB_ShouldEagerLoadARBProgram( progs[i] ) ) {
+			R_LoadARBProgram( i );
+		}
+	}
+}
+
+/*
+==================
+R_LoadARBProgramsForStartup
+
+Preload only programs needed by the selected renderer path. Dormant fixed-id
+compatibility records remain available for lazy first use without diagnosing
+unshipped Quake 4 sources during ordinary Prey startup.
+==================
+*/
+void R_LoadARBProgramsForStartup( void ) {
+	g_interactionShaderRescueWarned = false;
+	R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_RELOAD_ARB_PROGRAMS );
+	common->Printf( "----- R_LoadARBProgramsForStartup -----\n" );
+	RB_LoadARBProgramSet( true );
+	RB_RecordCurrentInteractionSelectionBreadcrumb();
+	RB_ErrorIfDriverRequiredSimpleInteractionFailed();
+	common->Printf( "---------------------------------------\n" );
+	if ( r_shaderReport.GetInteger() >= 1 ) {
+		R_ReportShaderPrograms_f( idCmdArgs() );
+	}
+}
+
 /*
 ==================
 R_ReloadARBPrograms_f
+
+An explicit reload is also a validation command: attempt every registered
+record, including programs deliberately left dormant during startup.
 ==================
 */
 void R_ReloadARBPrograms_f( const idCmdArgs &args ) {
-	int		i;
-
+	(void)args;
 	g_interactionShaderRescueWarned = false;
 	R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_RELOAD_ARB_PROGRAMS );
 	common->Printf( "----- R_ReloadARBPrograms -----\n" );
-	for ( i = 0 ; progs[i].name[0] ; i++ ) {
-		R_LoadARBProgram( i );
-	}
+	RB_LoadARBProgramSet( false );
 	RB_RecordCurrentInteractionSelectionBreadcrumb();
 	RB_ErrorIfDriverRequiredSimpleInteractionFailed();
 	common->Printf( "-------------------------------\n" );
@@ -12597,23 +12670,31 @@ static const char *RB_ShadowProgramStatusName( GLhandleARB programObject, bool p
 void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
 	int validCount = 0;
 	int invalidCount = 0;
+	int unloadedCount = 0;
 
 	common->Printf( "----- R_ReportShaderPrograms -----\n" );
+	// Validation may lazy-load a newly selected interaction family. Perform it
+	// before tallying records so the detail rows and summary describe one stable
+	// post-validation state.
+	const bool currentInteractionProgramsValid = RB_CurrentInteractionProgramsValid();
 	for ( int i = 0; i < MAX_GLPROGS && progs[i].name[0]; i++ ) {
 		const progDef_t &prog = progs[i];
-		if ( prog.valid ) {
+		if ( !prog.loadAttempted ) {
+			unloadedCount++;
+		} else if ( prog.valid ) {
 			validCount++;
 		} else {
 			invalidCount++;
 		}
+		const char *status = !prog.loadAttempted ? "unloaded" : ( prog.valid ? "valid" : "invalid" );
 
 		common->Printf( "ARB %-8s id=%3u required=%s status=%s path=%s",
 			RB_ARBProgramTargetName( prog.target ),
 			prog.ident,
 			prog.requiredForLighting ? "yes" : "no",
-			prog.valid ? "valid" : "invalid",
+			status,
 			prog.normalizedPath[0] ? prog.normalizedPath : prog.name );
-		if ( !prog.valid ) {
+		if ( prog.loadAttempted && !prog.valid ) {
 			common->Printf( " reason=%s", prog.failureReason[0] ? prog.failureReason : "unknown failure" );
 			if ( prog.errorPosition >= 0 ) {
 				common->Printf( " errorPosition=%d", prog.errorPosition );
@@ -12622,10 +12703,11 @@ void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
 		common->Printf( "\n" );
 	}
 
-	common->Printf( "ARB summary: valid=%d invalid=%d rescueMode=%s\n",
+	common->Printf( "ARB summary: valid=%d invalid=%d unloaded=%d rescueMode=%s\n",
 		validCount,
 		invalidCount,
-		RB_CurrentInteractionProgramsValid() ? "off" : "on" );
+		unloadedCount,
+		currentInteractionProgramsValid ? "off" : "on" );
 	common->Printf( "ARB interaction family: %s\n", RB_CurrentInteractionProgramFamilyName() );
 	common->Printf( "GLSL shadow projected: %s\n",
 		RB_ShadowProgramStatusName( g_shadowMapProgram.programObject, g_shadowMapProgram.programValid, g_shadowMapProgram.programGeneration ) );

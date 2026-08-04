@@ -23,12 +23,16 @@ from .charset import (
 	unicode_ranges,
 )
 from .donor import get_face, solve_instance
-from .fontdat import SourceFont, load_source_font
+from .fontdat import SourceFont, load_prey_source_font, load_source_font
 from .grid import load_grid_font
 from .path import Contour, Path2D
 from .trace import TraceOptions, trace_coverage
 
 UNITS_PER_EM = 2048
+# FontBuilder otherwise stamps the current time into the ``head`` table.  These
+# runtime assets are generated from fixed retail inputs, so a stable timestamp
+# keeps a rebuild byte-for-byte reproducible.
+DETERMINISTIC_TTF_TIMESTAMP = 3818534400  # 2025-01-01T00:00:00Z in the Mac epoch
 # Effective pixel size a glyph is traced at. Sources at or above this are traced
 # as they are; smaller ones are resampled up to roughly this before tracing.
 DENSIFY_TARGET_SIZE = 64.0
@@ -55,6 +59,11 @@ class FaceSpec:
 	description: str = ""
 	# Set for the fixed-cell console sheet, which has no .fontdat beside it.
 	grid_atlas: str | None = None
+	# Prey uses a Doom 3-style .dat record and can distribute one face across
+	# several atlas images; Quake 4's .fontdat record always has one image.
+	prey_format: bool = False
+	project_name: str = "openQ4"
+	bitmap_attribution: str = "the Quake 4 bitmap fonts by Raven Software / id Software"
 
 
 @dataclass
@@ -148,6 +157,8 @@ class FaceBuilder:
 		self.spec = spec
 		if spec.grid_atlas is not None:
 			self.source: SourceFont = load_grid_font(source_dir / spec.grid_atlas, spec.source)
+		elif spec.prey_format:
+			self.source = load_prey_source_font(source_dir / spec.source, 48, spec.source)
 		else:
 			self.source = load_source_font(source_dir, spec.source, 48)
 		# Small sources are densified before tracing.  The tracer places an edge
@@ -213,9 +224,16 @@ class FaceBuilder:
 			coverage = self.source.coverage(slot)
 			traced = self._trace(coverage)
 			if not traced.contours:
-				# Several slots in the retail atlases are reserved but blank
-				# (the cent sign, for one).  Leaving them out entirely lets the
-				# donor supply a real glyph instead of an empty box.
+				# Some Prey slots (notably non-breaking space) serialize a useful
+				# advance and UV rectangle even though their source page has no ink.
+				# Preserve the blank advancing glyph: omitting it makes legacy
+				# Windows-1252 text fall through to .notdef and changes layout.
+				if advance > 0:
+					self._add(name, codepoint, None, advance)
+					self.report["blank_advancing_slots"] = self.report.get("blank_advancing_slots", 0) + 1
+					continue
+				# Other empty reserved slots have no layout meaning. Leaving those
+				# absent lets a donor supply a real glyph where one is available.
 				self.report["blank_slots"] = self.report.get("blank_slots", 0) + 1
 				continue
 			# Pixel space (y down, glyph-local) -> font units (y up, on the pen).
@@ -648,7 +666,7 @@ class FaceBuilder:
 		builder.setupNameTable({
 			"familyName": self.spec.family,
 			"styleName": self.spec.style,
-			"uniqueFontIdentifier": f"DarkMatter Productions: {full}: openQ4 {version}",
+			"uniqueFontIdentifier": f"DarkMatter Productions: {full}: {self.spec.project_name} {version}",
 			"fullName": full,
 			"version": f"Version {version}",
 			"psName": f"{self.spec.family.replace(' ', '')}-{self.spec.style}",
@@ -656,8 +674,8 @@ class FaceBuilder:
 			"description": self.spec.description,
 			"manufacturer": "DarkMatter Productions",
 			"licenseDescription": (
-				"Latin outlines are traced from the Quake 4 bitmap fonts by Raven Software / id Software "
-				"and are covered by the openQ4 project terms. Glyphs for scripts outside that source are "
+				f"Latin outlines are traced from {self.spec.bitmap_attribution}. "
+				"Glyphs for scripts outside that source are "
 				"derived from the Noto fonts, (c) Google, licensed under the SIL Open Font License 1.1."
 			),
 		})
@@ -673,6 +691,9 @@ class FaceBuilder:
 			fsType=0,
 		)
 		builder.setupPost()
+		builder.font["head"].created = DETERMINISTIC_TTF_TIMESTAMP
+		builder.font["head"].modified = DETERMINISTIC_TTF_TIMESTAMP
+		builder.font.recalcTimestamp = False
 		destination.parent.mkdir(parents=True, exist_ok=True)
 		builder.save(str(destination))
 

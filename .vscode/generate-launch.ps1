@@ -21,6 +21,7 @@ function New-BaseArguments {
         '+set', 'logFileName', $LogName,
         '+set', 'developer', '1',
         '+set', 'r_fullscreen', '0',
+        '+set', 's_deviceName', 'default',
         '+set', 'fs_savepath', $savePath,
         '+set', 'fs_devpath', $devPath,
         '+set', 'fs_game', 'basepr'
@@ -51,7 +52,24 @@ if (-not (Test-Path -LiteralPath $MapManifest -PathType Leaf)) {
 
 $manifest = Get-Content -LiteralPath $MapManifest -Raw | ConvertFrom-Json
 $configurations = [System.Collections.Generic.List[object]]::new()
-$configurations.Add((New-LaunchConfiguration -Name 'Launch openPREY' -Program $clientProgram -Arguments (New-BaseArguments 'logs/openprey.log')))
+
+$glArguments = [System.Collections.Generic.List[object]]::new()
+foreach ($argument in (New-BaseArguments 'logs/openprey-gl.log')) {
+    $glArguments.Add($argument)
+}
+foreach ($argument in @('+set', 'r_renderApi', 'gl')) {
+    $glArguments.Add($argument)
+}
+$configurations.Add((New-LaunchConfiguration -Name 'Launch openPREY (OpenGL)' -Program $clientProgram -Arguments $glArguments.ToArray()))
+
+$vulkanArguments = [System.Collections.Generic.List[object]]::new()
+foreach ($argument in (New-BaseArguments 'logs/openprey-vulkan.log')) {
+    $vulkanArguments.Add($argument)
+}
+foreach ($argument in @('+set', 'r_renderApi', 'vulkan')) {
+    $vulkanArguments.Add($argument)
+}
+$configurations.Add((New-LaunchConfiguration -Name 'Launch openPREY (Vulkan)' -Program $clientProgram -Arguments $vulkanArguments.ToArray()))
 
 foreach ($entry in $manifest.maps) {
     if ($entry.kind -notin @('sp', 'mp')) {

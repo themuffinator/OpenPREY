@@ -70,6 +70,7 @@ jobs:
             tools/tests/filesystem_case_segments.py \
             tools/tests/filesystem_mod_manifest.py \
             tools/tests/openprey_filesystem_policy.py \
+            tools/tests/openprey_rebase_contract.py \
             tools/tests/openprey_runtime_branding.py \
             tools/tests/openprey_tool_branding.py \
             tools/tests/game_class_allocator_alignment.py \
@@ -182,6 +183,7 @@ jobs:
           python tools/tests/filesystem_case_segments.py
           python tools/tests/filesystem_mod_manifest.py
           python tools/tests/openprey_filesystem_policy.py
+          python tools/tests/openprey_rebase_contract.py
           python tools/tests/openprey_runtime_branding.py
           python tools/tests/openprey_tool_branding.py
           python tools/tests/game_type_module_selection.py

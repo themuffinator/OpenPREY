@@ -1,0 +1,29 @@
+// Becky comes from the official multiplayer add-on roster but has no campaign
+// dialogue. Her concise, self-possessed voice and mobile marksmanship are an
+// intentionally limited multiplayer characterization, not claimed canon.
+character "Becky" {
+	inherit		"skirmisher"
+	description	"self-possessed marksman who relocates after every clean exchange"
+	skillBand	3 5
+	modelNum	14
+
+	set	combatRange		900
+	set	aggression		0.42
+	set	patience		0.42
+	scale	strafeChance		1.15
+	set	targetStickiness	0.40
+	set	opportunism		1.00
+	set	initiative		0.55
+	set	weaponSwitchMsec	240
+	set	aimHeight		0.08
+	set	chatiness		0.48
+
+	weapon	"weaponobj_rifle"		1.45
+	weapon	"weaponobj_hiderweapon"		1.30
+	weapon	"weaponobj_autocannon"		1.20
+
+	skill 5 {
+		scale	aimTrackTimeConst	0.94
+		add	rangeDiscipline		0.04
+	}
+}

@@ -1,0 +1,27 @@
+// The alternate Hider model has no separate campaign biography. Its identity
+// stays within established Hidden lore and makes it the bolder field scout,
+// not a newly invented named hero.
+character "Mohawk Hider" {
+	inherit		"skirmisher"
+	description	"bold Hidden scout that changes angles before the countershot"
+	skillBand	3 5
+	modelNum	11
+
+	set	combatRange		700
+	set	aggression		0.60
+	set	patience		0.35
+	scale	strafeChance		1.15
+	scale	jumpChance		1.15
+	set	targetStickiness	0.60
+	scale	pursuit			1.10
+	set	chatiness		0.35
+
+	weapon	"weaponobj_hiderweapon"		1.70
+	weapon	"weaponobj_autocannon"		1.20
+	weapon	"weaponobj_wrench"		1.10
+
+	skill 5 {
+		scale	dodgeReactMsec		0.88
+		add	initiative		0.04
+	}
+}

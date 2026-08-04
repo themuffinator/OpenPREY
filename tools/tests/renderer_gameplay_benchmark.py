@@ -63,7 +63,14 @@ def load_prey_map_manifest() -> dict[str, dict[str, str]]:
 CANONICAL_PREY_MAPS = load_prey_map_manifest()
 
 
-def prey_scene(map_name: str, kind: str, purpose: str) -> dict[str, str]:
+def prey_scene(
+    map_name: str,
+    kind: str,
+    purpose: str,
+    *,
+    path: str = "spawn-static",
+    exec_commands: tuple[str, ...] = (),
+) -> dict[str, Any]:
     entry = CANONICAL_PREY_MAPS.get(map_name)
     if entry is None:
         raise RuntimeError(f"renderer scene uses a map absent from {PREY_MAP_MANIFEST}: {map_name}")
@@ -72,13 +79,16 @@ def prey_scene(map_name: str, kind: str, purpose: str) -> dict[str, str]:
             f"renderer scene classifies {map_name} as {kind}, "
             f"but {PREY_MAP_MANIFEST} classifies it as {entry['kind']}"
         )
-    return {
+    scene: dict[str, Any] = {
         "mode": kind.upper(),
         "map": map_name,
         "title": entry["name"],
         "purpose": purpose,
-        "path": "spawn-static",
+        "path": path,
     }
+    if exec_commands:
+        scene["execCommands"] = exec_commands
+    return scene
 
 REQUIRED_SCENES: dict[str, dict[str, Any]] = {
     "sp-roadhouse": prey_scene(
@@ -373,6 +383,7 @@ class RunSpec:
     display_mode: str
     shadow_preset: str
     renderer: str
+    exec_commands: tuple[str, ...] = ()
 
     @property
     def id(self) -> str:
@@ -491,6 +502,14 @@ def append_command(args: list[str], name: str, *values: Any) -> None:
     args.extend(str(value) for value in values)
 
 
+def append_post_map_autoexec(args: list[str], autoexec_cfg: str | None, autoexec_delay_ms: int) -> None:
+    if not autoexec_cfg:
+        return
+    if autoexec_delay_ms > 0:
+        append_command(args, "waitMsec", max(0, autoexec_delay_ms))
+    append_command(args, "exec_savepath", autoexec_cfg)
+
+
 def common_args(
     root: Path,
     savepath: Path,
@@ -501,8 +520,6 @@ def common_args(
     modern_executor: bool,
     show_fps_overlay: bool,
     launch_cvars: tuple[tuple[str, str], ...] = (),
-    autoexec_cfg: str | None = None,
-    autoexec_delay_ms: int = 1000,
 ) -> list[str]:
     args: list[str] = []
     multiple_instance_cvar = "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances"
@@ -517,11 +534,8 @@ def common_args(
     append_set(args, "com_showFPS", "1" if show_fps_overlay else "0")
     append_set(args, "com_skipLoadingContinue", "1")
     append_set(args, "com_loadingContinueAutoAdvance", "1")
-    append_set(args, "g_autoSkipCinematics", "1")
+    append_set(args, "g_skipCinematics", "1")
     append_set(args, "g_autoScreenshot", "0")
-    if autoexec_cfg:
-        append_set(args, "g_autoExecAfterMapLoad", autoexec_cfg)
-        append_set(args, "g_autoExecAfterMapLoadDelayMs", max(0, autoexec_delay_ms))
     append_set(args, "r_glTier", spec.tier)
     append_set(args, "r_renderer", spec.renderer)
     append_set(args, "r_rendererMetrics", "0")
@@ -575,10 +589,12 @@ def build_scripted_capture_lines(
         f"wait {max(1, settle_frames)}",
         "god",
         "notarget",
-        "getviewpos",
     ]
     lines.extend(exec_commands)
-    lines.append("framePacingReset")
+    lines += [
+        "getviewpos",
+        "framePacingReset",
+    ]
     sample_wait = f"waitMsec {max(1, sample_msec)}" if sample_msec > 0 else f"wait {max(1, sample_frames)}"
     if renderer_metrics:
         lines += [
@@ -941,7 +957,7 @@ def evaluate_role_result(
         rms_threshold,
         max_threshold,
         require_reference,
-        spec.id,
+        spec.case_id,
     )
     missing: list[str] = []
     if timed_out:
@@ -1044,7 +1060,8 @@ def run_sp_spec(
 ) -> dict[str, Any]:
     savepath = output_dir / "savepaths" / spec.id
     savepath.mkdir(parents=True, exist_ok=True)
-    log_name = f"openprey_gameplay_{spec.id}.log"
+    exec_commands = spec.exec_commands + args.exec_commands
+    log_name = "openprey_gameplay_sp.log"
     log_path = find_log(savepath, log_name)
     if log_path is not None:
         log_path.unlink()
@@ -1059,7 +1076,7 @@ def run_sp_spec(
         args.sample_frames,
         args.sample_msec,
         args.extra_cvars,
-        args.exec_commands,
+        exec_commands,
         args.gpu_timers,
         not args.pacing_only,
     )
@@ -1073,20 +1090,22 @@ def run_sp_spec(
         args.modern_executor,
         args.show_fps_overlay,
         args.launch_cvars,
-        autoexec_cfg,
-        args.autoexec_delay_ms,
     )
     append_set(game_args, "si_gameType", "singleplayer")
     append_command(game_args, "map", spec.map_name)
+    append_post_map_autoexec(game_args, autoexec_cfg, args.autoexec_delay_ms)
 
     if args.dry_run:
         return {
             "id": spec.id,
+            "caseId": spec.case_id,
             "mode": spec.mode,
             "map": spec.map_name,
+            "path": spec.path_name,
             "status": "planned",
             "args": game_args,
             "autoexecCfg": autoexec_cfg,
+            "execCommands": list(exec_commands),
             "screenshotRequest": screenshot_rel,
             "roles": [],
         }
@@ -1121,15 +1140,18 @@ def run_sp_spec(
     )
     return {
         "id": spec.id,
+        "caseId": spec.case_id,
         "mode": spec.mode,
         "map": spec.map_name,
         "purpose": spec.purpose,
+        "path": spec.path_name,
         "tier": spec.tier,
         "maxfps": spec.maxfps,
         "swapInterval": spec.swap_interval,
         "display": spec.display_mode,
         "shadowPreset": spec.shadow_preset,
         "renderer": spec.renderer,
+        "execCommands": list(exec_commands),
         "status": role_result["status"],
         "roles": [role_result],
     }
@@ -1146,13 +1168,14 @@ def run_mp_spec(
     args: argparse.Namespace,
 ) -> dict[str, Any]:
     port = args.mp_port + index
+    exec_commands = spec.exec_commands + args.exec_commands
     server_savepath = output_dir / "savepaths" / f"{spec.id}_server"
     client_savepath = output_dir / "savepaths" / f"{spec.id}_client"
     server_savepath.mkdir(parents=True, exist_ok=True)
     client_savepath.mkdir(parents=True, exist_ok=True)
 
-    server_log = f"openprey_gameplay_{spec.id}_server.log"
-    client_log = f"openprey_gameplay_{spec.id}_client.log"
+    server_log = "openprey_gameplay_server.log"
+    client_log = "openprey_gameplay_client.log"
     for savepath, log_name in ((server_savepath, server_log), (client_savepath, client_log)):
         log_path = find_log(savepath, log_name)
         if log_path is not None:
@@ -1172,7 +1195,7 @@ def run_mp_spec(
         args.sample_frames,
         args.sample_msec,
         args.extra_cvars,
-        args.exec_commands,
+        exec_commands,
         args.gpu_timers,
         not args.pacing_only,
     )
@@ -1186,8 +1209,6 @@ def run_mp_spec(
         args.modern_executor,
         args.show_fps_overlay,
         args.launch_cvars,
-        server_autoexec_cfg,
-        args.autoexec_delay_ms,
     )
     append_set(server_args, "net_serverDedicated", "0")
     append_set(server_args, "net_port", str(port))
@@ -1196,6 +1217,7 @@ def run_mp_spec(
     append_set(server_args, "sv_cheats", "1")
     append_set(server_args, "si_gameType", "DM")
     append_command(server_args, "spawnServer", spec.map_name)
+    append_post_map_autoexec(server_args, server_autoexec_cfg, args.autoexec_delay_ms)
 
     client_autoexec_cfg, client_screenshot = write_autoexec_cfg(
         client_savepath,
@@ -1206,7 +1228,7 @@ def run_mp_spec(
         args.sample_frames,
         args.sample_msec,
         args.extra_cvars,
-        args.exec_commands,
+        exec_commands,
         args.gpu_timers,
         not args.pacing_only,
     )
@@ -1220,22 +1242,24 @@ def run_mp_spec(
         args.modern_executor,
         args.show_fps_overlay,
         args.launch_cvars,
-        client_autoexec_cfg,
-        args.autoexec_delay_ms,
     )
     append_set(client_args, "ui_name", "RendererBenchClient")
     append_command(client_args, "connect", f"127.0.0.1:{port}")
+    append_post_map_autoexec(client_args, client_autoexec_cfg, args.autoexec_delay_ms)
 
     if args.dry_run:
         return {
             "id": spec.id,
+            "caseId": spec.case_id,
             "mode": spec.mode,
             "map": spec.map_name,
+            "path": spec.path_name,
             "status": "planned",
             "serverArgs": server_args,
             "clientArgs": client_args,
             "serverAutoexecCfg": server_autoexec_cfg,
             "clientAutoexecCfg": client_autoexec_cfg,
+            "execCommands": list(exec_commands),
             "serverScreenshotRequest": server_screenshot,
             "clientScreenshotRequest": client_screenshot,
             "roles": [],
@@ -1319,15 +1343,18 @@ def run_mp_spec(
     ok = server_result["status"] == "pass" and client_result["status"] == "pass"
     return {
         "id": spec.id,
+        "caseId": spec.case_id,
         "mode": spec.mode,
         "map": spec.map_name,
         "purpose": spec.purpose,
+        "path": spec.path_name,
         "tier": spec.tier,
         "maxfps": spec.maxfps,
         "swapInterval": spec.swap_interval,
         "display": spec.display_mode,
         "shadowPreset": spec.shadow_preset,
         "renderer": spec.renderer,
+        "execCommands": list(exec_commands),
         "status": "pass" if ok else "fail",
         "port": port,
         "roles": [server_result, client_result],
@@ -1358,15 +1385,18 @@ def harness_failure_result(spec: RunSpec, exc: Exception) -> dict[str, Any]:
     }
     return {
         "id": spec.id,
+        "caseId": spec.case_id,
         "mode": spec.mode,
         "map": spec.map_name,
         "purpose": spec.purpose,
+        "path": spec.path_name,
         "tier": spec.tier,
         "maxfps": spec.maxfps,
         "swapInterval": spec.swap_interval,
         "display": spec.display_mode,
         "shadowPreset": spec.shadow_preset,
         "renderer": spec.renderer,
+        "execCommands": list(spec.exec_commands),
         "status": "fail",
         "roles": [role_result],
         "harnessError": message,
@@ -1411,6 +1441,7 @@ def build_specs(args: argparse.Namespace) -> list[RunSpec]:
                                     display_mode=display,
                                     shadow_preset=shadow,
                                     renderer=args.renderer,
+                                    exec_commands=tuple(scene.get("execCommands", ())),
                                 )
                             )
     if args.limit > 0:
@@ -1448,13 +1479,13 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         "",
         "## Results",
         "",
-        "| Status | Case | Mode | Map | Tier | FPS | VSync | Display | Shadow | Pacing | Benchmark | Image | Screenshot | Log |",
-        "|---|---|---|---|---|---:|---:|---|---|---|---|---|---|---|",
+        "| Status | Case | Mode | Map | Path | Tier | FPS | VSync | Display | Shadow | Pacing | Benchmark | Image | Screenshot | Log |",
+        "|---|---|---|---|---|---|---:|---:|---|---|---|---|---|---|---|",
     ]
     for result in results:
         if result["status"] == "planned":
             lines.append(
-                f"| planned | `{result['id']}` | {result['mode']} | `{result['map']}` |  |  |  |  |  |  | dry run |  |  |  |"
+                f"| planned | `{result['id']}` | {result['mode']} | `{result['map']}` | `{result.get('path', '')}` |  |  |  |  |  |  | dry run |  |  |  |"
             )
             continue
         role = next((item for item in result.get("roles", []) if item["role"] in ("client", "sp")), result.get("roles", [{}])[0])
@@ -1476,12 +1507,12 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         screenshot = role.get("screenshot", "")
         log = role.get("log", "")
         lines.append(
-            f"| {result['status']} | `{result['id']}` | {result['mode']} | `{result['map']}` | `{result['tier']}` | {result['maxfps']} | {result['swapInterval']} | {result['display']} | `{result['shadowPreset']}` | {pacing or 'missing'} | {benchmark or 'missing'} | {image_status} | `{screenshot}` | `{log}` |"
+            f"| {result['status']} | `{result['id']}` | {result['mode']} | `{result['map']}` | `{result.get('path', '')}` | `{result['tier']}` | {result['maxfps']} | {result['swapInterval']} | {result['display']} | `{result['shadowPreset']}` | {pacing or 'missing'} | {benchmark or 'missing'} | {image_status} | `{screenshot}` | `{log}` |"
         )
         for role_result in result.get("roles", []):
             if role_result.get("missing"):
                 lines.append(
-                    f"|  | `{role_result['role']}` missing |  |  |  |  |  |  |  | {'; '.join(role_result['missing'])} |  |  |  |  |"
+                    f"|  | `{role_result['role']}` missing |  |  |  |  |  |  |  |  | {'; '.join(role_result['missing'])} |  |  |  |  |"
                 )
 
     diagnostic_roles = [
@@ -1609,10 +1640,13 @@ def print_list() -> None:
             * len(defaults["shadows"])
         )
         profile_cvars = defaults.get("cvars", ())
+        profile_launch_cvars = defaults.get("launchCvars", ())
         profile_exec_commands = defaults.get("execCommands", ())
         annotations: list[str] = []
         if profile_cvars:
             annotations.append("cvars " + ", ".join(f"{key}={value}" for key, value in profile_cvars))
+        if profile_launch_cvars:
+            annotations.append("launch cvars " + ", ".join(f"{key}={value}" for key, value in profile_launch_cvars))
         if profile_exec_commands:
             annotations.append(f"{len(profile_exec_commands)} scripted command(s)")
         annotation_text = " - " + "; ".join(annotations) if annotations else ""
@@ -1679,6 +1713,7 @@ def main(argv: list[str]) -> int:
         "maxP95Ms": args.max_p95_ms,
         "maxP99Ms": args.max_p99_ms,
         "profileCvars": dict(PROFILE_DEFAULTS[args.profile].get("cvars", ())),
+        "profileLaunchCvars": dict(PROFILE_DEFAULTS[args.profile].get("launchCvars", ())),
         "profileExecCommands": list(PROFILE_DEFAULTS[args.profile].get("execCommands", ())),
         "launchCvars": dict(args.launch_cvars),
         "execCommands": list(args.exec_commands),

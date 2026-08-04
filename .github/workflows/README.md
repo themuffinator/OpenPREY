@@ -1,8 +1,10 @@
 # openPREY workflows
 
-`openprey-validation.yml` is the active build and validation workflow. It checks the
-canonical `OpenPrey-game` source staging contract, the unified `game_<arch>` module,
-the `basepr/` runtime layout, and openPREY desktop/icon payloads.
+`openprey-validation.yml` is the active build and validation workflow. Its Windows and
+Linux jobs build the engine, dedicated server, GL and Vulkan renderer modules, and the
+canonical unified `game_<arch>` module. It also checks the `OpenPrey-game` staging
+contract, the `basepr/` runtime layout, the high-risk rebase source contracts, and
+openPREY desktop/icon payloads.
 
 The inherited OpenQ4 commit, push, ARM64, macOS, Universal2, and manual-release
 workflows are retained only as static-test/reference fixtures. They are manual-only,

@@ -1,0 +1,27 @@
+// Roy is a multiplayer-only Ted variant. A dry, patient lane-holder makes him
+// distinct without pretending the campaign gave him a hidden history.
+character "Roy" {
+	inherit		"ambusher"
+	description	"dry lane-holder who waits for someone else to blink"
+	skillBand	2 4
+	modelNum	10
+
+	set	combatRange		700
+	set	aggression		0.35
+	set	patience		0.90
+	set	targetStickiness	0.70
+	set	opportunism		0.90
+	set	suppressionMsec	300
+	scale	strafeChance		0.80
+	set	chatiness		0.40
+	scale	chatDelayScale		1.10
+
+	weapon	"weaponobj_crawlergrenade"	1.40
+	weapon	"weaponobj_rifle"		1.20
+	weapon	"weaponobj_rocketlauncher"	1.20
+
+	skill 4 {
+		scale	peripheralPenaltyMsec	0.92
+		add	rangeDiscipline		0.04
+	}
+}

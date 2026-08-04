@@ -30,12 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "../snd_local.h"
-#include <cstdlib>
 #include <stdint.h>
-
-#define STB_VORBIS_HEADER_ONLY
-#include "stb_vorbis.c"
-#undef STB_VORBIS_HEADER_ONLY
+#include <vorbis/vorbisfile.h>
 
 extern idCVar s_useCompression;
 extern idCVar s_noSound;
@@ -49,8 +45,91 @@ static const int ROQ_SOUND_STEREO = 0x1021;
 static const int ROQ_AUDIO_SAMPLE_RATE = 22050;
 static const int ROQ_AUDIO_MIN_SAMPLE = -32768;
 static const int ROQ_AUDIO_MAX_SAMPLE = 32767;
+static const int OGG_MAX_HOLE_RETRIES = 16;
 
 extern idCVar sys_lang;
+
+struct oggMemoryStream_t
+{
+	const byte*	data;
+	size_t		length;
+	size_t		offset;
+};
+
+static size_t OggMemoryRead( void* output, size_t itemSize, size_t itemCount, void* dataSource )
+{
+	oggMemoryStream_t* stream = static_cast<oggMemoryStream_t*>( dataSource );
+	if( stream == NULL || output == NULL || itemSize == 0 || itemCount == 0 || stream->offset > stream->length )
+	{
+		return 0;
+	}
+
+	const size_t availableItems = ( stream->length - stream->offset ) / itemSize;
+	const size_t readItems = Min( itemCount, availableItems );
+	const size_t readBytes = readItems * itemSize;
+	memcpy( output, stream->data + stream->offset, readBytes );
+	stream->offset += readBytes;
+	return readItems;
+}
+
+static int OggMemorySeek( void* dataSource, ogg_int64_t offset, int origin )
+{
+	oggMemoryStream_t* stream = static_cast<oggMemoryStream_t*>( dataSource );
+	if( stream == NULL || stream->offset > stream->length )
+	{
+		return -1;
+	}
+
+	size_t base;
+	switch( origin )
+	{
+		case SEEK_SET:
+			base = 0;
+			break;
+		case SEEK_CUR:
+			base = stream->offset;
+			break;
+		case SEEK_END:
+			base = stream->length;
+			break;
+		default:
+			return -1;
+	}
+
+	if( offset < 0 )
+	{
+		// Avoid negating INT64_MIN while validating the backwards seek.
+		const uint64_t magnitude = static_cast<uint64_t>( -( offset + 1 ) ) + 1;
+		if( magnitude > base )
+		{
+			return -1;
+		}
+		stream->offset = base - static_cast<size_t>( magnitude );
+	}
+	else
+	{
+		const uint64_t forward = static_cast<uint64_t>( offset );
+		if( forward > stream->length - base )
+		{
+			return -1;
+		}
+		stream->offset = base + static_cast<size_t>( forward );
+	}
+
+	return 0;
+}
+
+static long OggMemoryTell( void* dataSource )
+{
+	const oggMemoryStream_t* stream = static_cast<const oggMemoryStream_t*>( dataSource );
+	return stream != NULL ? static_cast<long>( stream->offset ) : -1L;
+}
+
+static int OggMemoryClose( void* dataSource )
+{
+	( void )dataSource;
+	return 0;
+}
 
 /*
 ========================
@@ -933,47 +1012,140 @@ bool idSoundSample_OpenAL::LoadOgg( const idStr& filename )
 	ampName.SetFileExtension( "amp" );
 	LoadAmplitude( ampName );
 
-	int channels = 0;
-	int sampleRate = 0;
-	short* decoded = NULL;
-	const int samplesPerChannel = stb_vorbis_decode_memory( fileData, fileLen, &channels, &sampleRate, &decoded );
-
-	Mem_Free( fileData );
-
-	if( samplesPerChannel <= 0 || decoded == NULL )
+	oggMemoryStream_t memoryStream = { fileData, static_cast<size_t>( fileLen ), 0 };
+	const ov_callbacks callbacks = { OggMemoryRead, OggMemorySeek, OggMemoryClose, OggMemoryTell };
+	OggVorbis_File vorbisFile;
+	memset( &vorbisFile, 0, sizeof( vorbisFile ) );
+	const int openResult = ov_open_callbacks( &memoryStream, &vorbisFile, NULL, 0, callbacks );
+	if( openResult != 0 )
 	{
-		if( decoded != NULL )
-		{
-			free( decoded );
-		}
-		idLib::Warning( "LoadOgg( %s ) : failed to decode Ogg Vorbis", filename.c_str() );
+		Mem_Free( fileData );
+		idLib::Warning( "LoadOgg( %s ) : failed to open Ogg Vorbis stream (%d)", filename.c_str(), openResult );
 		MakeDefault();
 		return false;
 	}
 
+	vorbis_info* streamInfo = ov_info( &vorbisFile, 0 );
+	const int channels = streamInfo != NULL ? streamInfo->channels : 0;
+	const int sampleRate = streamInfo != NULL ? streamInfo->rate : 0;
+	const ogg_int64_t samplesPerChannel64 = ov_pcm_total( &vorbisFile, -1 );
+
 	if( channels < 1 || channels > 2 )
 	{
-		free( decoded );
+		ov_clear( &vorbisFile );
+		Mem_Free( fileData );
 		idLib::Warning( "LoadOgg( %s ) : unsupported channel count %d", filename.c_str(), channels );
 		MakeDefault();
 		return false;
 	}
 	if( sampleRate <= 0 )
 	{
-		free( decoded );
+		ov_clear( &vorbisFile );
+		Mem_Free( fileData );
 		idLib::Warning( "LoadOgg( %s ) : invalid sample rate %d", filename.c_str(), sampleRate );
 		MakeDefault();
 		return false;
 	}
 
-	const uint64 decodedBytes = ( uint64 )samplesPerChannel * channels * sizeof( int16 );
-	if( decodedBytes == 0 || decodedBytes > ( uint64 )idMath::INT_MAX )
+	const uint64_t bytesPerFrame = static_cast<uint64_t>( channels ) * sizeof( int16 );
+	if( samplesPerChannel64 <= 0 ||
+		static_cast<uint64_t>( samplesPerChannel64 ) > static_cast<uint64_t>( idMath::INT_MAX ) / bytesPerFrame )
 	{
-		free( decoded );
+		ov_clear( &vorbisFile );
+		Mem_Free( fileData );
 		idLib::Warning( "LoadOgg( %s ) : decoded data is too large", filename.c_str() );
 		MakeDefault();
 		return false;
 	}
+	const uint64_t decodedBytes = static_cast<uint64_t>( samplesPerChannel64 ) * bytesPerFrame;
+
+	byte* decoded = static_cast<byte*>( Mem_Alloc( static_cast<int>( decodedBytes ) ) );
+	if( decoded == NULL )
+	{
+		ov_clear( &vorbisFile );
+		Mem_Free( fileData );
+		idLib::Warning( "LoadOgg( %s ) : could not allocate decoder output", filename.c_str() );
+		MakeDefault();
+		return false;
+	}
+
+	uint64_t decodedOffset = 0;
+	int holeRetries = 0;
+	int decodeError = 0;
+	bool reachedEof = false;
+	while( decodedOffset < decodedBytes )
+	{
+		int logicalBitstream = -1;
+		const long chunk = ov_read(
+			&vorbisFile,
+			reinterpret_cast<char*>( decoded + decodedOffset ),
+			static_cast<int>( decodedBytes - decodedOffset ),
+			Swap_IsBigEndian() ? 1 : 0,
+			2,
+			1,
+			&logicalBitstream );
+		if( chunk == OV_HOLE )
+		{
+			// libvorbisfile consumed the damaged packet and can normally resume on
+			// the next call.  Bound retries so a malformed stream cannot spin here.
+			if( ++holeRetries > OGG_MAX_HOLE_RETRIES )
+			{
+				decodeError = OV_HOLE;
+				break;
+			}
+			continue;
+		}
+		if( chunk == 0 )
+		{
+			reachedEof = true;
+			break;
+		}
+		if( chunk < 0 )
+		{
+			decodeError = static_cast<int>( chunk );
+			break;
+		}
+
+		vorbis_info* chunkInfo = ov_info( &vorbisFile, logicalBitstream );
+		if( chunkInfo == NULL || chunkInfo->channels != channels || chunkInfo->rate != sampleRate )
+		{
+			decodeError = OV_EBADLINK;
+			break;
+		}
+		const uint64_t chunkBytes = static_cast<uint64_t>( chunk );
+		if( chunkBytes > decodedBytes - decodedOffset || chunkBytes % bytesPerFrame != 0 )
+		{
+			decodeError = OV_EBADLINK;
+			break;
+		}
+		decodedOffset += chunkBytes;
+	}
+
+	ov_clear( &vorbisFile );
+	Mem_Free( fileData );
+	if( decodeError != 0 )
+	{
+		Mem_Free( decoded );
+		if( decodeError == OV_HOLE )
+		{
+			idLib::Warning( "LoadOgg( %s ) : exceeded Ogg Vorbis hole recovery limit", filename.c_str() );
+		}
+		else
+		{
+			idLib::Warning( "LoadOgg( %s ) : fatal Ogg Vorbis decoder error %d", filename.c_str(), decodeError );
+		}
+		MakeDefault();
+		return false;
+	}
+	if( reachedEof && decodedOffset < decodedBytes )
+	{
+		// ov_pcm_total is the authoritative sample timeline.  Preserve it and
+		// deterministically silence any clean-EOF shortfall rather than exposing
+		// uninitialized PCM or disagreeing with the sample metadata.
+		memset( decoded + decodedOffset, 0, static_cast<size_t>( decodedBytes - decodedOffset ) );
+	}
+
+	const int samplesPerChannel = static_cast<int>( samplesPerChannel64 );
 
 	memset( &format, 0, sizeof( format ) );
 	format.basic.formatTag = idWaveFile::FORMAT_PCM;
@@ -994,7 +1166,7 @@ bool idSoundSample_OpenAL::LoadOgg( const idStr& filename )
 	buffers[0].buffer = AllocBuffer( totalBufferSize, GetName() );
 	if( buffers[0].buffer == NULL )
 	{
-		free( decoded );
+		Mem_Free( decoded );
 		idLib::Warning( "LoadOgg( %s ) : could not allocate decoded audio", filename.c_str() );
 		MakeDefault();
 		return false;
@@ -1003,7 +1175,7 @@ bool idSoundSample_OpenAL::LoadOgg( const idStr& filename )
 	memcpy( buffers[0].buffer, decoded, totalBufferSize );
 	buffers[0].buffer = GPU_CONVERT_CPU_TO_CPU_CACHED_READONLY_ADDRESS( buffers[0].buffer );
 
-	free( decoded );
+	Mem_Free( decoded );
 
 	return true;
 }

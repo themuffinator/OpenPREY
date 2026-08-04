@@ -243,7 +243,10 @@ def marching_squares(field: np.ndarray, level: float = 0.5) -> list[list[Point]]
 	contours: list[list[Point]] = []
 	unvisited = set(links)
 	while unvisited:
-		start = next(iter(unvisited))
+		# The start point becomes the first on-curve point in the emitted glyph.
+		# Set iteration is hash-randomised between Python processes, so choosing
+		# it directly made equivalent traces produce different glyf byte streams.
+		start = min(unvisited)
 		chain: list[Point] = []
 		node = start
 		while node in unvisited:

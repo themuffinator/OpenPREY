@@ -7,10 +7,10 @@ class idDecl;
 
 typedef idDecl* (*BSE_AllocDeclEffect_t)(void);
 
-rvBSEManager*				openQ4_GetIntegratedBSEManager( void );
-rvDeclEffectEdit*			openQ4_GetIntegratedBSEDeclEffectEdit( void );
-idDecl*						openQ4_AllocIntegratedBSEDeclEffect( void );
-bool						openQ4_IsIntegratedBSEDeclEffect( const idDecl *decl );
+rvBSEManager*				openPREY_GetIntegratedBSEManager( void );
+rvDeclEffectEdit*			openPREY_GetIntegratedBSEDeclEffectEdit( void );
+idDecl*						openPREY_AllocIntegratedBSEDeclEffect( void );
+bool						openPREY_IsIntegratedBSEDeclEffect( const idDecl *decl );
 
 extern BSE_AllocDeclEffect_t	bseAllocDeclEffect;
 

@@ -85,7 +85,8 @@ typedef struct
 {
 	idStr					subText;
 	float					subTime;
-	int					subChannel;
+	int						subNum;
+	int						subChannel;
 } soundSub_t;
 
 typedef struct

@@ -109,45 +109,70 @@ static bool ParseSoundClassToken( idToken& token, int& soundClass )
 	return false;
 }
 
+static const int MAX_SUBTITLE_CHANNELS = 4;
+
 static bool ParseSubtitleDirective( idLexer& src, const idToken& directive, const char* shaderName, int& tableIndex )
 {
 	const bool combat = directive.IcmpPrefix( "subtitlecombat" ) == 0;
 	const char* prefix = combat ? "subtitlecombat" : "subtitle";
 	const char* suffix = directive.c_str() + idStr::Length( prefix );
-	if( suffix[0] == '\0' )
+	int subtitleNumber = 1;
+	if( suffix[0] != '\0' )
 	{
-		suffix = "1";
-	}
-	for( const char* p = suffix; *p != '\0'; ++p )
-	{
-		if( *p < '0' || *p > '9' )
+		for( const char* p = suffix; *p != '\0'; ++p )
 		{
-			src.Warning( "Subtitle token '%s' has an invalid channel suffix", directive.c_str() );
-			return false;
+			if( *p < '0' || *p > '9' )
+			{
+				src.Warning( "Subtitle token '%s' has an invalid channel suffix", directive.c_str() );
+				return false;
+			}
 		}
+		subtitleNumber = atoi( suffix );
 	}
 
-	int subtitleNumber = atoi( suffix );
-	if( subtitleNumber < 1 || ( combat && subtitleNumber > 4 ) )
+	if( subtitleNumber < 1 )
 	{
 		src.Warning( "Subtitle index out of range in '%s'", directive.c_str() );
 		return false;
 	}
-	if( combat )
-	{
-		subtitleNumber += 3;
-	}
 
-	idToken delay;
-	idToken text;
-	if( !src.ExpectAnyToken( &delay ) || !src.ExpectAnyToken( &text ) )
+	idToken time;
+	if( !src.ExpectAnyToken( &time ) )
 	{
-		src.Warning( "Incomplete subtitle directive '%s'", directive.c_str() );
+		src.Warning( "Expected time after subtext" );
 		return false;
 	}
 
+	int subChannel = 0;
+	if( time.Length() > 0 && ( time[0] == 'c' || time[0] == 'C' ) )
+	{
+		const int authoredChannel = atoi( time.c_str() + 1 );
+		if( authoredChannel < 1 || authoredChannel > MAX_SUBTITLE_CHANNELS )
+		{
+			src.Warning( "Value '%i' is out of range for MAX_SUBTITLE_CHANNELS.", authoredChannel );
+			return false;
+		}
+		subChannel = authoredChannel - 1;
+		if( !src.ExpectAnyToken( &time ) )
+		{
+			src.Warning( "Expected time after subtitle channel" );
+			return false;
+		}
+	}
+
+	idToken text;
+	if( !src.ExpectAnyToken( &text ) )
+	{
+		src.Warning( "Expected text after subtext and time" );
+		return false;
+	}
+	if( combat )
+	{
+		subChannel += 3;
+	}
+
 	tableIndex = soundSystemLocal.GetSubtitleIndex( shaderName );
-	soundSystemLocal.SetSubtitleData( tableIndex, subtitleNumber, text.c_str(), delay.GetFloatValue(), subtitleNumber );
+	soundSystemLocal.SetSubtitleData( tableIndex, subtitleNumber, text.c_str(), time.GetFloatValue(), subChannel );
 	return true;
 }
 
@@ -358,7 +383,14 @@ bool idSoundShader::RebuildTextSource() {
 			for( int i = 0; i < subtitleList->subList.Num(); i++ )
 			{
 				const soundSub_t& sub = subtitleList->subList[i];
-				file.WriteFloatString( "\tsubtitle%d\t%.4g \"%s\"\r\n", sub.subChannel, sub.subTime, sub.subText.c_str() );
+				if( sub.subChannel >= 0 && sub.subChannel < MAX_SUBTITLE_CHANNELS )
+				{
+					file.WriteFloatString( "\tsubtitle%d\tc%d %.4g \"%s\"\r\n", sub.subNum, sub.subChannel + 1, sub.subTime, sub.subText.c_str() );
+				}
+				else
+				{
+					file.WriteFloatString( "\tsubtitle%d\t%.4g \"%s\"\r\n", sub.subNum, sub.subTime, sub.subText.c_str() );
+				}
 			}
 		}
 	}

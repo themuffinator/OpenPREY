@@ -1,0 +1,297 @@
+// Teacher: methodical and observant, using only the model label as characterization.
+
+characterChat "Teacher" {
+	chat entergame {
+		"Teacher here. Attendance looks adequate."
+		"Ready. Let us begin with the basics."
+		"I am prepared to observe and participate."
+		"Everything is in order. Start the match."
+		"A fresh round offers useful evidence."
+		"Present and ready."
+		"Teacher reporting. We shall see who studied the routes."
+		"Let us begin. Attention will matter."
+	}
+	chat levelstart {
+		"$map presents several testable routes."
+		"First observation: the center is overly exposed."
+		"Please note the useful cover before ignoring it."
+		"A map is easier to learn while moving through it."
+		"We should identify the resource cycle early."
+		"Corners are questions. Check before answering."
+		"The lesson here appears to be positioning."
+		"Observe the traffic before choosing a lane."
+	}
+	chat kill {
+		"Your approach needed revision, $other."
+		"The $weapon supplied a clear conclusion."
+		"That angle was visible from the start."
+		"You repeated the same movement."
+		"A useful demonstration of timing."
+		"I anticipated your next step, $other."
+		"The evidence favored my position."
+		"That exchange was instructive."
+	}
+	chat killWrench {
+		"A practical lesson at close range."
+		"The wrench made the point plainly."
+		"Personal space remains a useful concept."
+		"You skipped the distance calculation, $other."
+		"No advanced equipment was necessary."
+		"That example was more physical than intended."
+		"A basic tool can still produce a final answer."
+		"Please reconsider rushing that corner."
+	}
+	chat killStreak {
+		"Three results now support the hypothesis."
+		"The current method is performing well."
+		"Consistency has become the lesson."
+		"A third success makes the pattern difficult to ignore."
+		"The observations are becoming decisive."
+		"I will continue while the evidence agrees."
+		"Three points earned through repeated attention."
+		"The exercise is proceeding efficiently."
+	}
+	chat revenge {
+		"I incorporated your earlier correction, $other."
+		"The revised approach produced a better result."
+		"We may call the comparison complete."
+		"Your previous method was informative."
+		"This trial reversed the outcome."
+		"The same question received a different answer."
+		"I reviewed the mistake and responded."
+		"That balances our practical exercise."
+	}
+	chat death {
+		"A strong counterexample, $other."
+		"The $weapon invalidated my position."
+		"I overlooked an important angle."
+		"That was a well-supported conclusion."
+		"My timing requires improvement."
+		"You identified the flaw in my approach."
+		"I will review that exchange carefully."
+		"The lesson appears to be mobility."
+	}
+	chat deathAccident {
+		"An avoidable error in execution."
+		"I failed my own footing test."
+		"That shortcut does not merit a passing grade."
+		"No opponent was required for that correction."
+		"I should have inspected the edge."
+		"A careless result from incomplete observation."
+		"I will revise that route immediately."
+		"Let us file that under obvious mistakes."
+	}
+	chat itemDenied {
+		"$other reached the $item with better planning."
+		"The pickup schedule requires revision."
+		"I have noted the timing of that $item."
+		"Your route demonstrated greater efficiency."
+		"Resource denied; alternative selected."
+		"The $item is unavailable, but the data is useful."
+		"I was late to that particular lesson."
+		"Well anticipated, $other."
+	}
+	chat leadTaken {
+		"The score places me first."
+		"My current approach is earning high marks."
+		"I hold the lead; the examination continues."
+		"The results presently support my method."
+		"First position achieved through careful review."
+		"I am ahead, though the sample remains incomplete."
+		"A favorable assessment so far."
+		"The scoreboard has recorded my progress."
+	}
+	chat leadLost {
+		"$other now leads the practical."
+		"My position has fallen below first."
+		"The updated score requires a new approach."
+		"A useful reminder not to assume the outcome."
+		"You have moved ahead, $other. Well demonstrated."
+		"The assessment changed while I repeated myself."
+		"I must improve the next set of decisions."
+		"First place is now an assignment to recover."
+	}
+	chat matchWin {
+		"The final result is satisfactory."
+		"A strong performance across the full exercise."
+		"Good match. The method held."
+		"The evidence supports a deserved victory."
+		"A productive contest with a welcome conclusion."
+		"I applied the lesson successfully."
+		"The score reflects consistent attention."
+		"Class dismissed on a favorable result."
+	}
+	chat matchLose {
+		"The outcome identifies several areas for improvement."
+		"You performed better in this examination."
+		"A fair loss and a useful review."
+		"My method did not survive the full test."
+		"The final score is difficult but informative."
+		"I will prepare a stronger answer next round."
+		"Well played. Your work was consistent."
+		"The lesson belongs to me this time."
+	}
+	chat farewell {
+		"Teacher signing off. Review your routes."
+		"The session has concluded. Goodbye."
+		"That is sufficient study for today."
+		"Thank you for participating."
+		"I will see you at the next practical."
+		"Good games. Class is over."
+		"Until next time, remain observant."
+		"I am leaving. Keep learning the map."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Move behind cover and describe the problem, $other."
+		"I am approaching. Preserve a safe route."
+		"First step: disengage. Second step: recover."
+		"Use what we observed and retreat from that lane."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. The challenge was instructive."
+		"Well played. Your preparation was evident."
+		"A valuable match, regardless of the score."
+		"I would gladly repeat that exercise."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Challenge accepted, $other. Prepare your argument."
+		"Very well. We will compare methods."
+		"A confident claim deserves a practical test."
+		"Proceed when ready; I will be observing."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hello, $other. You are marked present."
+		"Teacher here. Welcome."
+		"Greetings. I hope you came prepared."
+		"Good to see you. Let us pay attention."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You are welcome. Apply it well."
+		"Of course, $other. Assistance is part of the exercise."
+		"Acknowledged. I am pleased it helped."
+		"No difficulty. Continue your work."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you. The preparation was worthwhile."
+		"Your positive assessment is noted."
+		"I appreciate the feedback, $other."
+		"Good observation. The timing was deliberate."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Apology accepted. Learn from the error."
+		"We may move forward, $other."
+		"Thank you for correcting the social mistake."
+		"No penalty remains. Continue."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Goodbye, $other. Remember what worked."
+		"Good night. The lesson can wait."
+		"Until next session, keep observing."
+		"Farewell. Your participation was appreciated."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Teacher"
+		trigger "hey Teacher"
+		trigger "Teacher help"
+		trigger "Teacher hello"
+		trigger "Teacher listen"
+		trigger "Teacher there"
+		trigger "Teacher answer"
+		trigger "Teacher wait"
+		"Teacher listening. What is your question?"
+		"Yes, $other? Present your observation."
+		"Your question has my attention."
+		"Go ahead. I will consider it."
+	}
+}

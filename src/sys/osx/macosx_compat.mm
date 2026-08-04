@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #import <OpenGL/OpenGL.h>
 #import <mach-o/dyld.h>
 #import <mach/mach_time.h>
+#import <math.h>
 #import <pthread.h>
 #import <errno.h>
 #import <limits.h>
@@ -54,6 +55,24 @@ static idStr	cdpath;
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
+
+extern "C" bool Sys_MacOSGetWindowChrome( void *nativeWindow, int *top, int *left, int *bottom, int *right ) {
+	if ( nativeWindow == NULL || top == NULL || left == NULL || bottom == NULL || right == NULL ) {
+		return false;
+	}
+
+	@autoreleasepool {
+		NSWindow *window = (NSWindow *)nativeWindow;
+		const NSRect frame = [window frame];
+		const NSRect content = [window contentRectForFrameRect:frame];
+
+		*top = static_cast<int>( lround( NSMaxY( frame ) - NSMaxY( content ) ) );
+		*left = static_cast<int>( lround( NSMinX( content ) - NSMinX( frame ) ) );
+		*bottom = static_cast<int>( lround( NSMinY( content ) - NSMinY( frame ) ) );
+		*right = static_cast<int>( lround( NSMaxX( frame ) - NSMaxX( content ) ) );
+		return true;
+	}
+}
 
 static bool Sys_CopyPathIfFits( char *outPath, size_t outPathSize, const char *sourcePath ) {
 	if ( outPath == NULL || outPathSize <= 0 || sourcePath == NULL || sourcePath[0] == '\0' ) {

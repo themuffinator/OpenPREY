@@ -1,0 +1,28 @@
+// Jen is grounded, sharp and proud of the home Tommy initially rejects. Her
+// style is mobile and practical: survive the exchange, answer plainly, move.
+character "Jen" {
+	inherit		"skirmisher"
+	description	"grounded defender who stays mobile and chooses the practical fight"
+	skillBand	2 4
+	modelNum	18
+
+	set	combatRange		760
+	set	aggression		0.48
+	set	patience		0.48
+	set	targetStickiness	0.55
+	set	opportunism		0.92
+	set	vengefulness		0.72
+	add	retreatHealth		0.05
+	scale	itemFocus		1.15
+	set	aimHeight		0.06
+	set	chatiness		0.60
+
+	weapon	"weaponobj_rifle"		1.25
+	weapon	"weaponobj_soulstripper"	1.20
+	weapon	"weaponobj_hiderweapon"		1.10
+
+	skill 4 {
+		scale	dodgeReactMsec		0.92
+		add	rangeDiscipline		0.04
+	}
+}

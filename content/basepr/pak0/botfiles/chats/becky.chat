@@ -1,0 +1,297 @@
+// Becky: a concise, self-possessed multiplayer voice with no invented biography.
+
+characterChat "Becky" {
+	chat entergame {
+		"Becky here. Ready."
+		"I'm in. Let's begin."
+		"All set on my side."
+		"Ready to make this interesting."
+		"Weapons good. Focus better."
+		"I made it. Start whenever."
+		"Becky reporting. Keep it quick."
+		"Let's play."
+	}
+	chat levelstart {
+		"$map. Plenty of room for mistakes."
+		"I'll take the useful route."
+		"Watch the middle. I'll watch the edges."
+		"Good cover, if nobody gets attached to it."
+		"This layout rewards quick decisions."
+		"Resources first. Score follows."
+		"$map looks readable. Let's test that."
+		"Stay light on your feet."
+	}
+	chat kill {
+		"Caught you, $other."
+		"That $weapon felt right."
+		"You left one gap."
+		"Quick decision, clean result."
+		"I saw the turn coming."
+		"That lane was mine."
+		"You made it close, $other."
+		"Point secured."
+	}
+	chat killWrench {
+		"Wrong range, $other."
+		"Wrench beats hesitation."
+		"That was direct."
+		"You crowded the corner."
+		"No shot, no problem."
+		"Useful tool."
+		"Close enough to regret it."
+		"That ended quickly."
+	}
+	chat killStreak {
+		"Three. Still focused."
+		"This pace works."
+		"Good streak. Better timing."
+		"The openings keep appearing."
+		"I'm making this count."
+		"Three points, no wasted motion."
+		"Momentum accepted."
+		"Everything is lining up."
+	}
+	chat revenge {
+		"Returned, $other."
+		"I corrected the last exchange."
+		"We're even."
+		"Saw that approach coming this time."
+		"You only get one surprise."
+		"That closes the account."
+		"My answer was ready."
+		"Previous result reversed."
+	}
+	chat death {
+		"Nice one, $other."
+		"That $weapon was decisive."
+		"I gave up the angle."
+		"Fair shot."
+		"Too slow on the turn."
+		"You read me. I'll adjust."
+		"That position stopped working."
+		"Down for now."
+	}
+	chat deathAccident {
+		"Entirely my fault."
+		"Bad landing."
+		"That route needed a warning label."
+		"I rushed the last step."
+		"Unforced and unnecessary."
+		"Well, that was efficient in the wrong direction."
+		"I misjudged the edge."
+		"Reset. Forget that."
+	}
+	chat itemDenied {
+		"You got the $item, $other."
+		"Pickup missed. Plan unchanged."
+		"I'll use a different resource."
+		"Your timing beat mine."
+		"The $item was worth checking."
+		"Fine. I wanted the route more."
+		"One supply point denied."
+		"Keep it. I have options."
+	}
+	chat leadTaken {
+		"First. Good place to be."
+		"Lead acquired."
+		"I'm ahead. Staying busy."
+		"The score likes my choices."
+		"Top position, no fuss."
+		"I've got the lead."
+		"Ahead by enough to matter."
+		"Now to keep it."
+	}
+	chat leadLost {
+		"Lead lost. Noted."
+		"$other moved ahead."
+		"Time to change the tempo."
+		"I'm second, temporarily."
+		"The score needs attention."
+		"You passed me, $other. Nice timing."
+		"That advantage expired."
+		"Still close enough."
+	}
+	chat matchWin {
+		"Good game. Nice result."
+		"Won cleanly enough."
+		"That plan held."
+		"I'll keep this score."
+		"Solid finish."
+		"Worked for it, got it."
+		"Good pressure all match."
+		"Victory suits the effort."
+	}
+	chat matchLose {
+		"Fair win."
+		"I missed the better choices."
+		"Good match. Next one changes."
+		"That score tells the story."
+		"I'll own the loss."
+		"You were sharper today."
+		"Not ideal. Still useful."
+		"Defeat recorded. Moving on."
+	}
+	chat farewell {
+		"Becky out. Good games."
+		"I'm done for now."
+		"See you next round."
+		"That's enough. Later."
+		"Good match. I'm leaving."
+		"Time for me to go."
+		"Catch you another day."
+		"Signing off."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Get to cover, $other. I'm moving."
+		"Call the shortest route to you."
+		"Back out of the lane. I'll take pressure."
+		"Stay mobile until I arrive."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. Clean competition."
+		"Well played. I enjoyed the pressure."
+		"That match had a good pace."
+		"Fair result. Let's keep it."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Sure, $other. Show me."
+		"Challenge heard."
+		"Less typing, more finding me."
+		"All right. Make it convincing."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hey, $other."
+		"Becky here. Hello."
+		"Hi. Ready to play?"
+		"Good to hear you."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You're welcome, $other."
+		"No trouble."
+		"Happy it worked."
+		"Sure. Keep the advantage."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thanks, $other."
+		"Appreciated. The angle helped."
+		"Good to know it looked clean."
+		"I'll take that."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Accepted. We're done with it."
+		"No issue, $other."
+		"Thanks for the apology."
+		"Fine by me. Continue."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Later, $other. Good rounds."
+		"Goodbye. See you soon."
+		"Have a good night."
+		"Catch you in another match."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Becky"
+		trigger "hey Becky"
+		trigger "Becky help"
+		trigger "Becky hello"
+		trigger "Becky listen"
+		trigger "Becky there"
+		trigger "Becky answer"
+		trigger "Becky wait"
+		"Yes, $other?"
+		"Becky listening."
+		"Go ahead."
+		"What's needed?"
+	}
+}

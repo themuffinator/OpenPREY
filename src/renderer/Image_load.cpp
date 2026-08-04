@@ -30,28 +30,322 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 
+struct preyRetailImageAlias_t {
+	const char *missingName;
+	const char *replacementName;
+};
+
+// These are exact asset-token substitutions verified against the retail
+// declarations and shipped image set.  Keeping the logical image name intact
+// preserves material identity while the resolved name supplies the pixels and
+// source timestamp.  Full tokens (rather than numbered-family heuristics) are
+// intentional: nearby numbered textures are usually different artwork.
+static const preyRetailImageAlias_t PREY_RETAIL_IMAGE_ALIASES[] = {
+	{ "textures/roadhouse/barside_cap_d", "textures/roadhouse/barside1_d" },
+	{ "textures/roadhouse/barside_cap_s", "textures/roadhouse/barside1_s" },
+	{ "textures/roadhouse/barside_cap_local", "textures/roadhouse/barside1_local" },
+	{ "textures/organic_wall/g_bonewall_001_d", "textures/organic_wall/g_bonewall_001b_d" },
+	{ "textures/organic_wall/g_bonewall_001_s", "textures/organic_wall/g_bonewall_001b_s" },
+	{ "textures/organic_wall/g_bonewall_001_local", "textures/organic_wall/g_bonewall_001b_local" },
+	{ "textures/organic_wall/g_bonewall_001_h", "textures/organic_wall/g_bonewall_001b_h" },
+	{ "textures/organic_wall/hybridwall2_d", "textures/organic_wall/bio_organic_005_d" },
+	{ "textures/organic_wall/hybridwall2_s", "textures/organic_wall/bio_organic_005_s" },
+	{ "textures/organic_wall/hybridwall2_local", "textures/organic_wall/bio_organic_005_local" },
+	{ "textures/organic_wall/hybridwall2_h", "textures/organic_wall/bio_organic_005_h" },
+	{ "textures/organic_wall/bio_organic_004_d", "textures/organic_wall/bio_organic_005_d" },
+	{ "textures/organic_wall/bio_organic_004_s", "textures/organic_wall/bio_organic_005_s" },
+	{ "textures/organic_wall/bio_organic_004_local", "textures/organic_wall/bio_organic_005_local" },
+	{ "textures/organic_wall/bio_organic_001_d", "textures/organic_wall/bio_organic_001_plain_d" },
+	{ "textures/organic_wall/bio_organic_001_s", "textures/organic_wall/bio_organic_001_plain_s" },
+	{ "textures/organic_wall/bio_organic_062_d", "textures/organic_wall/bio_organic_062b_d" },
+	{ "textures/organic_wall/bio_organic_062_s", "textures/organic_wall/bio_organic_062b_s" },
+	{ "textures/organic_wall/bio_organic_062_local", "textures/organic_wall/bio_organic_062b_local" },
+	{ "textures/organic_wall/kf_bio_organic_344_d", "textures/organic_wall/bio_organic_344_d" },
+	{ "textures/organic_wall/kf_bio_organic_344_s", "textures/organic_wall/bio_organic_344_s" },
+	{ "textures/organic_wall/kf_bio_organic_344_local", "textures/organic_wall/bio_organic_344_local" },
+	{ "textures/organic_wall/kf_bio_organic_344_h", "textures/organic_wall/bio_organic_344_h" },
+	{ "env/spheresky1", "env/spheresky" }
+};
+
+// Exact source tokens referenced by shipped materials/maps but absent from the
+// audited retail image set.  These retain a usage-neutral renderer fallback;
+// guessing a neighboring numbered texture would silently substitute different
+// art.  Unknown missing images remain warnings.
+static const char * const PREY_RETAIL_KNOWN_MISSING_IMAGES[] = {
+	"textures/organic_floor/bio_organicfloor_350sw_d",
+	"textures/organic_floor/bio_organicfloor_350sw_s",
+	"textures/organic_floor/circwall1_floora_d",
+	"textures/organic_floor/circwall1_floora_h",
+	"textures/organic_trim/g_bonetrim_009_d",
+	"textures/organic_trim/g_bonetrim_009_h",
+	"textures/organic_trim/g_bonetrim_009_local",
+	"textures/organic_trim/g_bonetrim_009_s",
+	"textures/organic_wall/bio_organic_050_d",
+	"textures/organic_wall/bio_organic_050_local",
+	"textures/organic_wall/bio_organic_050_s",
+	"textures/organic_wall/bio_organic_107b_d",
+	"textures/organic_wall/bio_organic_107b_h",
+	"textures/organic_wall/bio_organic_107b_local",
+	"textures/organic_wall/bio_organic_107b_s",
+	"textures/organic_wall/bio_organic_308_d",
+	"textures/organic_wall/bio_organic_308_h",
+	"textures/organic_wall/bio_organic_308_local",
+	"textures/organic_wall/bio_organic_308_s",
+	"textures/organic_wall/bio_organic_325a_add",
+	"textures/organic_wall/bio_organic_338_d",
+	"textures/organic_wall/bio_organic_338_h",
+	"textures/organic_wall/bio_organic_338_local",
+	"textures/organic_wall/bio_organic_338_s",
+	"textures/organic_wall/bio_organic_339_d",
+	"textures/organic_wall/bio_organic_339_h",
+	"textures/organic_wall/bio_organic_339_local",
+	"textures/organic_wall/bio_organic_339_s",
+	"textures/organic_wall/bio_organic_341_d",
+	"textures/organic_wall/bio_organic_341_h",
+	"textures/organic_wall/bio_organic_341_local",
+	"textures/organic_wall/bio_organic_341_s",
+	"textures/organic_wall/bio_organic_376ib_d",
+	"textures/organic_wall/bio_organic_376ib_h",
+	"textures/organic_wall/bio_organic_376ib_local",
+	"textures/organic_wall/bio_organic_376ib_s",
+	"textures/organic_wall/chitinwall1_s4",
+	"textures/roadhouse/rh_bricks1_d",
+	"textures/roadhouse/rh_bricks1_h",
+	"textures/roadhouse/rh_bricks1_local",
+	"textures/roadhouse/rh_bricks1_s",
+	"textures/shipgrave/gravefloor2",
+	"textures/tech_trim/biotechtrim_104_d",
+	"textures/tech_trim/biotechtrim_104_h",
+	"textures/tech_trim/biotechtrim_104_local",
+	"textures/tech_trim/biotechtrim_104_s",
+	"textures/tech_wall/biotech_201_d",
+	"textures/tech_wall/biotech_201_h",
+	"textures/tech_wall/biotech_201_local",
+	"textures/tech_wall/biotech_201_s",
+	"textures/tech_wall/biotech3_d",
+	"textures/tech_wall/biotech3_h",
+	"textures/tech_wall/biotech3_local",
+	"textures/tech_wall/biotech3_s",
+	"textures/tech_wall/bl_techwalltube02_d",
+	"textures/tech_wall/bl_techwalltube02_h",
+	"textures/tech_wall/bl_techwalltube02_local",
+	"textures/tech_wall/bl_techwalltube02_s",
+	"textures/tech_wall/techwall10_d",
+	"textures/tech_wall/techwall10_h",
+	"textures/tech_wall/techwall10_local",
+	"textures/tech_wall/techwall10_s"
+};
+
+static bool R_IsImageProgramTokenDelimiter( char c, bool trailing ) {
+	return c == '\0' || c <= ' ' || c == '(' || c == ')' || c == ',' || c == '"' || ( trailing && c == '.' );
+}
+
+static bool R_ReplaceExactImageProgramToken( idStr &program, const char *missingName, const char *replacementName ) {
+	const int missingLength = idStr::Length( missingName );
+	int searchStart = 0;
+	bool replaced = false;
+
+	while ( true ) {
+		const int tokenIndex = idStr::FindText( program.c_str(), missingName, false, searchStart );
+		if ( tokenIndex < 0 ) {
+			break;
+		}
+		const char before = tokenIndex > 0 ? program[tokenIndex - 1] : '\0';
+		const char after = program[tokenIndex + missingLength];
+		if ( !R_IsImageProgramTokenDelimiter( before, false ) || !R_IsImageProgramTokenDelimiter( after, true ) ) {
+			searchStart = tokenIndex + missingLength;
+			continue;
+		}
+
+		idStr updated;
+		updated.Append( program.c_str(), tokenIndex );
+		updated.Append( replacementName );
+		updated.Append( program.c_str() + tokenIndex + missingLength );
+		program = updated;
+		searchStart = tokenIndex + idStr::Length( replacementName );
+		replaced = true;
+	}
+
+	return replaced;
+}
+
+static bool R_ResolvePreyRetailImageSourceInternal( const char *logicalName, idStr &resolvedName ) {
+	resolvedName = logicalName != NULL ? logicalName : "";
+	bool replaced = false;
+	for ( int i = 0; i < static_cast<int>( sizeof( PREY_RETAIL_IMAGE_ALIASES ) / sizeof( PREY_RETAIL_IMAGE_ALIASES[0] ) ); ++i ) {
+		replaced |= R_ReplaceExactImageProgramToken(
+			resolvedName,
+			PREY_RETAIL_IMAGE_ALIASES[i].missingName,
+			PREY_RETAIL_IMAGE_ALIASES[i].replacementName );
+	}
+	return replaced;
+}
+
+static bool R_IsImageProgramOperatorToken( const idToken &token ) {
+	return !token.Icmp( "heightmap" ) ||
+		!token.Icmp( "addnormals" ) ||
+		!token.Icmp( "smoothnormals" ) ||
+		!token.Icmp( "add" ) ||
+		!token.Icmp( "scale" ) ||
+		!token.Icmp( "invertAlpha" ) ||
+		!token.Icmp( "invertColor" ) ||
+		!token.Icmp( "makeIntensity" ) ||
+		!token.Icmp( "downsize" ) ||
+		!token.Icmp( "makeAlpha" );
+}
+
+static bool R_ImageLeafMatchesKnownLogicalName( const char *leafName, const char *knownName ) {
+	if ( idStr::Icmp( leafName, knownName ) == 0 ) {
+		return true;
+	}
+
+	idStr leafWithoutExtension = leafName;
+	idStr extension;
+	leafWithoutExtension.ExtractFileExtension( extension );
+	if ( idStr::Icmp( extension.c_str(), "tga" ) != 0 &&
+		idStr::Icmp( extension.c_str(), "jpg" ) != 0 &&
+		idStr::Icmp( extension.c_str(), "dds" ) != 0 ) {
+		return false;
+	}
+	leafWithoutExtension.StripFileExtension();
+	return leafWithoutExtension.Icmp( knownName ) == 0;
+}
+
+static bool R_IsKnownMissingRetailImageLeaf( const char *leafName ) {
+	if ( leafName == NULL || leafName[0] == '\0' ) {
+		return false;
+	}
+	if ( idStr::Icmp( leafName, "_emptyname" ) == 0 || idStr::Icmp( leafName, "unnamed" ) == 0 ) {
+		return true;
+	}
+	if ( R_ImageLeafMatchesKnownLogicalName( leafName, "textures/common_misc/flickerflare" ) ) {
+		return true;
+	}
+	if ( idStr::FindText( leafName, "_lightgrid_" ) >= 0 ) {
+		return true;
+	}
+	for ( int i = 0; i < static_cast<int>( sizeof( PREY_RETAIL_KNOWN_MISSING_IMAGES ) / sizeof( PREY_RETAIL_KNOWN_MISSING_IMAGES[0] ) ); ++i ) {
+		if ( R_ImageLeafMatchesKnownLogicalName( leafName, PREY_RETAIL_KNOWN_MISSING_IMAGES[i] ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /*
 ========================
 R_ShouldSuppressMissingImageWarning
 
-Suppress warning noise for known optional/missing stock references that
-already fall back to a safe transparent placeholder.
+Suppress a failed image program only when every leaf that actually failed to
+resolve is an exact known retail omission. A compound program containing an
+unknown missing source must remain actionable even if another leaf is known.
 ========================
 */
-static bool R_ShouldSuppressMissingImageWarning( const char * imageName ) {
-	if ( imageName == NULL || imageName[0] == '\0' ) {
+static bool R_ShouldSuppressMissingImageWarning( const char *imageProgram, textureUsage_t usage ) {
+	if ( imageProgram == NULL || imageProgram[0] == '\0' ) {
 		return true;
 	}
-	if ( idStr::Icmp( imageName, "_emptyname" ) == 0 ) {
-		return true;
+
+	idLexer src;
+	src.LoadMemory( imageProgram, idStr::Length( imageProgram ), imageProgram );
+	src.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
+
+	bool foundLeaf = false;
+	bool foundMissingLeaf = false;
+	idToken token;
+	while ( src.ReadToken( &token ) ) {
+		if ( token.type == TT_NUMBER || token.type == TT_PUNCTUATION || R_IsImageProgramOperatorToken( token ) ) {
+			continue;
+		}
+
+		foundLeaf = true;
+		ID_TIME_T leafTimestamp = FILE_NOT_FOUND_TIMESTAMP;
+		R_LoadImageForUsage( token.c_str(), NULL, NULL, NULL, &leafTimestamp, true, usage );
+		if ( leafTimestamp != FILE_NOT_FOUND_TIMESTAMP ) {
+			continue;
+		}
+
+		foundMissingLeaf = true;
+		if ( !R_IsKnownMissingRetailImageLeaf( token.c_str() ) ) {
+			src.FreeSource();
+			return false;
+		}
 	}
-	if ( idStr::Icmp( imageName, "textures/common_misc/flickerflare" ) == 0 ) {
-		return true;
+	src.FreeSource();
+
+	return foundLeaf && foundMissingLeaf;
+}
+
+static void R_FillUsageNeutralMissingImage( byte *rgba, int pixelCount, textureUsage_t usage ) {
+	if ( rgba == NULL || pixelCount <= 0 ) {
+		return;
 	}
-	if ( idStr::FindText( imageName, "_lightgrid_" ) >= 0 ) {
-		return true;
+
+	byte neutral[4] = { 0, 0, 0, 0 };
+	if ( usage == TD_BUMP ) {
+		neutral[0] = 128;
+		neutral[1] = 128;
+		neutral[2] = 255;
+		neutral[3] = 255;
+	} else if ( usage == TD_DIFFUSE ) {
+		neutral[0] = 255;
+		neutral[1] = 255;
+		neutral[2] = 255;
+		neutral[3] = 255;
 	}
-	return false;
+
+	for ( int i = 0; i < pixelCount; ++i ) {
+		memcpy( rgba + i * 4, neutral, sizeof( neutral ) );
+	}
+}
+
+#if defined( _DEBUG ) || defined( OPENQ4_ENABLE_IDLIB_ASSERTS )
+static void R_PreyRetailImageCompatibilitySelfTestOnce() {
+	static bool tested = false;
+	if ( tested ) {
+		return;
+	}
+	tested = true;
+
+	idStr resolved;
+	assert( R_ResolvePreyRetailImageSourceInternal(
+		"addnormals( textures/organic_wall/g_bonewall_001_local, heightmap( textures/organic_wall/g_bonewall_001_h, 6))",
+		resolved ) );
+	assert( resolved.Icmp(
+		"addnormals( textures/organic_wall/g_bonewall_001b_local, heightmap( textures/organic_wall/g_bonewall_001b_h, 6))" ) == 0 );
+	assert( R_ResolvePreyRetailImageSourceInternal(
+		"addnormals( textures/organic_wall/bio_organic_062_local, heightmap( textures/organic_wall/bio_organic_062_h, 6))",
+		resolved ) );
+	assert( resolved.Icmp(
+		"addnormals( textures/organic_wall/bio_organic_062b_local, heightmap( textures/organic_wall/bio_organic_062_h, 6))" ) == 0 );
+	assert( R_ResolvePreyRetailImageSourceInternal( "env/spheresky1", resolved ) && resolved.Icmp( "env/spheresky" ) == 0 );
+	assert( !R_ResolvePreyRetailImageSourceInternal( "textures/organic_wall/bio_organic_062_damaged", resolved ) );
+	assert( R_IsKnownMissingRetailImageLeaf( "textures/organic_wall/bio_organic_308_local.tga" ) );
+	assert( !R_IsKnownMissingRetailImageLeaf( "textures/organic_wall/bio_organic_308_local_extra" ) );
+	assert( R_ShouldSuppressMissingImageWarning( "unnamed", TD_DEFAULT ) );
+	assert( R_ShouldSuppressMissingImageWarning(
+		"addnormals( textures/organic_wall/bio_organic_308_local, heightmap( textures/organic_wall/bio_organic_308_h, 6))",
+		TD_BUMP ) );
+	assert( !R_ShouldSuppressMissingImageWarning(
+		"addnormals( textures/mod/unknown_missing, textures/organic_wall/bio_organic_308_local )",
+		TD_BUMP ) );
+	assert( !R_ShouldSuppressMissingImageWarning( "textures/mod/unknown_missing", TD_DEFAULT ) );
+
+	byte bumpFallback[4];
+	R_FillUsageNeutralMissingImage( bumpFallback, 1, TD_BUMP );
+	assert( bumpFallback[0] == 128 && bumpFallback[1] == 128 && bumpFallback[2] == 255 && bumpFallback[3] == 255 );
+	byte diffuseFallback[4];
+	R_FillUsageNeutralMissingImage( diffuseFallback, 1, TD_DIFFUSE );
+	assert( diffuseFallback[0] == 255 && diffuseFallback[1] == 255 && diffuseFallback[2] == 255 && diffuseFallback[3] == 255 );
+}
+#else
+static ID_INLINE void R_PreyRetailImageCompatibilitySelfTestOnce() {
+}
+#endif
+
+static bool R_ResolvePreyRetailImageSource( const char *logicalName, idStr &resolvedName ) {
+	R_PreyRetailImageCompatibilitySelfTestOnce();
+	return R_ResolvePreyRetailImageSourceInternal( logicalName, resolvedName );
 }
 
 static unsigned int R_GetImageDownsizeSignature( const char *name, textureUsage_t usage, bool allowDownSize );
@@ -441,19 +735,24 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 			generatedName.SetFileExtension( mipExt );
 		}
 	}
+	// Resolve verified retail source-name variants before every source probe.
+	// The logical image name remains unchanged so materials and generated-file
+	// keys stay stable, while timestamps and decoded pixels come from the same
+	// resolved source (including tokens nested inside image programs).
+	idStr retailSourceName;
+	R_ResolvePreyRetailImageSource( GetName(), retailSourceName );
 	idStr sourceExtension;
-	idStr sourceName = GetName();
-	sourceName.ExtractFileExtension( sourceExtension );
+	retailSourceName.ExtractFileExtension( sourceExtension );
 	const bool explicitDDSImage = idStr::Icmp( sourceExtension.c_str(), "dds" ) == 0;
 	idStr preferredDDSName;
 	ID_TIME_T preferredDDSFileTime = FILE_NOT_FOUND_TIMESTAMP;
 	bool preferredDDSPrecompressed = false;
 	bool preferredDDSImage = !explicitDDSImage &&
 		cubeFiles == CF_2D &&
-		R_ResolvePreferredDDSImageSource( GetName(), preferredDDSName, &preferredDDSFileTime, true, &preferredDDSPrecompressed );
+		R_ResolvePreferredDDSImageSource( retailSourceName.c_str(), preferredDDSName, &preferredDDSFileTime, true, &preferredDDSPrecompressed );
 	if ( preferredDDSImage && !fileSystem->InProductionMode() ) {
 		ID_TIME_T originalSourceTime = FILE_NOT_FOUND_TIMESTAMP;
-		R_LoadImageProgram( GetName(), NULL, NULL, NULL, &originalSourceTime, &usage );
+		R_LoadImageProgram( retailSourceName.c_str(), NULL, NULL, NULL, &originalSourceTime, &usage );
 		if ( R_IsPreferredDDSStale( preferredDDSName, preferredDDSFileTime, originalSourceTime ) ) {
 			if ( cvarSystem->GetCVarBool( "image_showPrecompressedTextures" ) ) {
 				common->Printf( "Ignoring stale DDS replacement %s for %s\n", preferredDDSName.c_str(), GetName() );
@@ -470,10 +769,10 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	if ( preferredDDSImage && cvarSystem->GetCVarBool( "image_showPrecompressedTextures" ) ) {
 		common->Printf( "Using DDS replacement %s for %s\n", preferredDDSName.c_str(), GetName() );
 	}
-	const char *loadSourceName = preferredDDSImage ? preferredDDSName.c_str() : GetName();
+	const char *loadSourceName = preferredDDSImage ? preferredDDSName.c_str() : retailSourceName.c_str();
 	const bool selectedDDSImage = explicitDDSImage || preferredDDSImage;
 	const bool bypassGeneratedFile = explicitDDSImage || preferredDDSPrecompressed;
-	idStr selectedSourceName = GetName();
+	idStr selectedSourceName = retailSourceName;
 	if ( preferredDDSImage ) {
 		selectedSourceName = preferredDDSName;
 	}
@@ -537,11 +836,11 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	if ( binaryFileTime != FILE_NOT_FOUND_TIMESTAMP && !fileSystem->InProductionMode() ) {
 		if ( !sourceFileTimeKnown ) {
 			if ( cubeFiles != CF_2D ) {
-				R_LoadCubeImages( GetName(), cubeFiles, NULL, NULL, &sourceFileTime );
+				R_LoadCubeImages( retailSourceName.c_str(), cubeFiles, NULL, NULL, &sourceFileTime );
 			} else if ( preferredDDSImage ) {
 				sourceFileTime = preferredDDSFileTime;
 			} else {
-				R_LoadImageProgram( GetName(), NULL, NULL, NULL, &sourceFileTime, &usage );
+				R_LoadImageProgram( retailSourceName.c_str(), NULL, NULL, NULL, &sourceFileTime, &usage );
 			}
 			sourceFileTimeKnown = true;
 		}
@@ -573,8 +872,10 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 			int size;
 			byte * pics[6];
 
-			if ( !R_LoadCubeImages( GetName(), cubeFiles, pics, &size, &sourceFileTime ) || size == 0 ) {
-				idLib::Warning( "Couldn't load cube image: %s", GetName() );
+			if ( !R_LoadCubeImages( retailSourceName.c_str(), cubeFiles, pics, &size, &sourceFileTime ) || size == 0 ) {
+				if ( !R_ShouldSuppressMissingImageWarning( retailSourceName.c_str(), usage ) ) {
+					idLib::Warning( "Couldn't load cube image: %s", GetName() );
+				}
 				// create a default so it doesn't get continuously reloaded
 				opts.width = 8;
 				opts.height = 8;
@@ -582,9 +883,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 				DeriveOpts();
 				AllocImage();
 
-				// clear the data so it's not left uninitialized
+				// Fill every face with a neutral value for the declared usage.
 				idTempArray<byte> clear( opts.width * opts.height * 4 );
-				memset( clear.Ptr(), 0, clear.Size() );
+				R_FillUsageNeutralMissingImage( clear.Ptr(), opts.width * opts.height, usage );
 				for ( int level = 0; level < opts.numLevels; level++ ) {
 					for ( int side = 0; side < 6; side++ ) {
 						SubImageUpload( level, 0, 0, side, opts.width >> level, opts.height >> level, clear.Ptr() );
@@ -592,6 +893,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 				}
 
 				defaulted = true;
+				loadedSourceName = retailSourceName;
 				return;
 			}
 
@@ -646,58 +948,24 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 			} else {
 				const char *fallbackLoadSourceName = loadSourceName;
 				if ( preferredDDSPrecompressed ) {
-					common->Warning( "Couldn't load preferred precompressed DDS replacement %s for %s; falling back to original source", loadSourceName, GetName() );
-					fallbackLoadSourceName = GetName();
-					selectedSourceName = GetName();
+					common->Warning( "Couldn't load preferred precompressed DDS replacement %s for %s; falling back to resolved source", loadSourceName, GetName() );
+					fallbackLoadSourceName = retailSourceName.c_str();
+					selectedSourceName = retailSourceName;
 					sourceFileTime = FILE_NOT_FOUND_TIMESTAMP;
 				}
 
 				// load the full specification, and perform any image program calculations
 				R_LoadImageProgram( fallbackLoadSourceName, &pic, &width, &height, &sourceFileTime, &usage );
 				if ( pic == NULL && preferredDDSImage && !preferredDDSPrecompressed ) {
-					common->Warning( "Couldn't decode preferred DDS replacement %s for %s; falling back to original source", loadSourceName, GetName() );
-					selectedSourceName = GetName();
+					common->Warning( "Couldn't decode preferred DDS replacement %s for %s; falling back to resolved source", loadSourceName, GetName() );
+					selectedSourceName = retailSourceName;
 					sourceFileTime = FILE_NOT_FOUND_TIMESTAMP;
-					R_LoadImageProgram( GetName(), &pic, &width, &height, &sourceFileTime, &usage );
+					R_LoadImageProgram( retailSourceName.c_str(), &pic, &width, &height, &sourceFileTime, &usage );
 				}
-					sourceFileTimeKnown = true;
+				sourceFileTimeKnown = true;
 
-					if ( pic == NULL ) {
-						// Known retail-asset naming variants. Retry a nearby shipped texture
-						// before creating the renderer's default image.
-						idStr fallbackProgram = GetName();
-						if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_d", false ) >= 0 ) {
-							fallbackProgram.Replace( "barside_cap_d", "barside1_d" );
-						} else if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_s", false ) >= 0 ) {
-							fallbackProgram.Replace( "barside_cap_s", "barside1_s" );
-						} else if ( fallbackProgram.Find( "textures/roadhouse/barside_cap_local", false ) >= 0 ) {
-							fallbackProgram.Replace( "barside_cap_local", "barside1_local" );
-						} else if ( fallbackProgram.Find( "textures/organic_wall/g_bonewall_001", false ) >= 0 ) {
-							fallbackProgram.Replace( "g_bonewall_001_d", "g_bonewall_001b_d" );
-							fallbackProgram.Replace( "g_bonewall_001_s", "g_bonewall_001b_s" );
-							fallbackProgram.Replace( "g_bonewall_001_local", "g_bonewall_001b_local" );
-							fallbackProgram.Replace( "g_bonewall_001_h", "g_bonewall_001b_h" );
-						} else if ( fallbackProgram.Find( "textures/organic_wall/hybridwall2", false ) >= 0 ) {
-							fallbackProgram.Replace( "hybridwall2_d", "bio_organic_005_d" );
-							fallbackProgram.Replace( "hybridwall2_s", "bio_organic_005_s" );
-							fallbackProgram.Replace( "hybridwall2_local", "bio_organic_005_local" );
-							fallbackProgram.Replace( "hybridwall2_h", "bio_organic_005_h" );
-						} else if ( fallbackProgram.Find( "textures/organic_wall/bio_organic_004", false ) >= 0 ) {
-							fallbackProgram.Replace( "bio_organic_004_d", "bio_organic_005_d" );
-							fallbackProgram.Replace( "bio_organic_004_s", "bio_organic_005_s" );
-							fallbackProgram.Replace( "bio_organic_004_local", "bio_organic_005_local" );
-						} else if ( fallbackProgram.Find( "textures/organic_wall/bio_organic_001_d", false ) >= 0 ||
-								fallbackProgram.Find( "textures/organic_wall/bio_organic_001_s", false ) >= 0 ) {
-							fallbackProgram.Replace( "bio_organic_001_d", "bio_organic_001_plain_d" );
-							fallbackProgram.Replace( "bio_organic_001_s", "bio_organic_001_plain_s" );
-						}
-						if ( fallbackProgram != GetName() ) {
-							R_LoadImageProgram( fallbackProgram.c_str(), &pic, &width, &height, &sourceFileTime, &usage );
-						}
-					}
-
-					if ( pic == NULL ) {
-						if ( !R_ShouldSuppressMissingImageWarning( GetName() ) ) {
+				if ( pic == NULL ) {
+					if ( !R_ShouldSuppressMissingImageWarning( retailSourceName.c_str(), usage ) ) {
 						idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
 					}
 					// create a default so it doesn't get continuously reloaded
@@ -707,14 +975,16 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 					DeriveOpts();
 					AllocImage();
 
-					// clear the data so it's not left uninitialized
+					// Fill with a neutral value for the declared usage. In particular,
+					// missing bump programs must not become an all-zero normal map.
 					idTempArray<byte> clear( opts.width * opts.height * 4 );
-					memset( clear.Ptr(), 0, clear.Size() );
+					R_FillUsageNeutralMissingImage( clear.Ptr(), opts.width * opts.height, usage );
 					for ( int level = 0; level < opts.numLevels; level++ ) {
 						SubImageUpload( level, 0, 0, 0, opts.width >> level, opts.height >> level, clear.Ptr() );
 					}
 
 					defaulted = true;
+					loadedSourceName = selectedSourceName;
 					return;
 				}
 
@@ -1558,20 +1828,20 @@ void idImage::Reload( bool force ) {
 	// check file times
 	if ( !force ) {
 		ID_TIME_T current = FILE_NOT_FOUND_TIMESTAMP;
-		idStr currentSourceName = imgName;
+		idStr currentSourceName;
+		R_ResolvePreyRetailImageSource( imgName.c_str(), currentSourceName );
 		if ( cubeFiles != CF_2D ) {
-			R_LoadCubeImages( imgName, cubeFiles, NULL, NULL, &current );
+			R_LoadCubeImages( currentSourceName.c_str(), cubeFiles, NULL, NULL, &current );
 		} else {
 			idStr sourceExtension;
-			idStr sourceName = imgName;
-			sourceName.ExtractFileExtension( sourceExtension );
+			currentSourceName.ExtractFileExtension( sourceExtension );
 			idStr preferredDDSName;
 			ID_TIME_T preferredDDSFileTime = FILE_NOT_FOUND_TIMESTAMP;
 			if ( idStr::Icmp( sourceExtension.c_str(), "dds" ) != 0 &&
-				 R_ResolvePreferredDDSImageSource( imgName, preferredDDSName, &preferredDDSFileTime, true, NULL ) ) {
+				 R_ResolvePreferredDDSImageSource( currentSourceName.c_str(), preferredDDSName, &preferredDDSFileTime, true, NULL ) ) {
 				ID_TIME_T originalSourceTime = FILE_NOT_FOUND_TIMESTAMP;
 				if ( !fileSystem->InProductionMode() ) {
-					R_LoadImageProgram( imgName, NULL, NULL, NULL, &originalSourceTime );
+					R_LoadImageProgram( currentSourceName.c_str(), NULL, NULL, NULL, &originalSourceTime );
 				}
 				if ( R_IsPreferredDDSStale( preferredDDSName, preferredDDSFileTime, originalSourceTime ) ) {
 					current = originalSourceTime;
@@ -1581,7 +1851,7 @@ void idImage::Reload( bool force ) {
 				}
 			} else {
 				// get the current values
-				R_LoadImageProgram( imgName, NULL, NULL, NULL, &current );
+				R_LoadImageProgram( currentSourceName.c_str(), NULL, NULL, NULL, &current );
 			}
 		}
 		const bool sourceSelectionChanged = loadedSourceName.Length() == 0 || loadedSourceName.Icmp( currentSourceName ) != 0;

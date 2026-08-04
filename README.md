@@ -133,7 +133,7 @@ Keep compatibility with official Prey assets in mind, follow the existing code s
 
 ### Third-Party Libraries
 
-- **Sean Barrett** — [stb_vorbis](https://github.com/nothings/stb) audio codec
+- **Xiph.Org Foundation** — [libogg and libvorbis](https://xiph.org/vorbis/) audio codecs
 - **GLEW Team** — OpenGL extension wrangler
 - **OpenAL Soft Contributors** — 3D audio implementation
 - **SDL Team** — Cross-platform framework

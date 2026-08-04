@@ -1,8 +1,14 @@
 # openPREY → openQ4 Rebase: Implementation Guide
 
-Status: executed rebase record (2026-08-01). Implementation is complete; validated
-outcomes, including package/runtime and root-validator closure, are summarized in Phase 8
-and tracked per item in [`status-ledger.md`](status-ledger.md). This is the
+Status: executed rebase record (2026-08-01). Implementation is complete after a
+post-closure catalog/source audit corrected FW-19, FW-38, the WP5.7 GUI stream/flag
+guards, residual external-BSE workflow naming, plain-install non-runtime artifact cleanup,
+the `roadhouse_quick` dev-fixture script leaking into `pak0.pk4`, missing autosave
+string `#str_107240`, false-positive loading-music decl-load warnings, and stale
+renderer-benchmark autoexec cvars. Validated outcomes,
+including package/runtime, root-validator closure, follow-up audio/script validation,
+and focused Vulkan gameplay smoke, are summarized in Phase 8 and tracked per item in
+[`status-ledger.md`](status-ledger.md). This is the
 execution-level companion to
 [`plan.md`](plan.md) (strategy, standing decisions D1–D10, risk register).
 Per-change evidence lives in the catalogs in this directory, and current status is in
@@ -978,6 +984,11 @@ choice under assets-04.
 | Pak validation | Digital retail layout passed; a synthetic numbered-pak layout reached the settled menu, but genuine CD-era checksums remain deferred |
 | Package archive/runtime | **Passed**; the Windows x64 archive manifest and payload were inspected, then an isolated windowed launch reached Roadhouse and wrote an engine screenshot |
 | Root validator | **Passed**; the push profile completed every active check, including staged-payload validation |
+| Post-audit Windows full build | **951/951 build targets completed** after the corrective source changes |
+| Post-closure rebase audit | All 137 catalog IDs reconcile exactly with the ledger. FW-19, FW-38, WP5.7 GUI guards, and old external-BSE workflow naming were corrected and added to `openprey_rebase_contract.py`; active CI was expanded to request engine + dedicated + GL/Vulkan renderers + unified game module builds on Windows/Linux. Hosted execution remains CI-pending. |
+| Post-audit GUI save stream | **Passed**; a fresh windowed Roadhouse save contained 54 `PGUI` v1 markers, restored through `Game Map Init SaveGame` without GUI stream errors, wrote an engine screenshot, and shut down cleanly. |
+| Final staging/content audit | **Passed**; plain Meson install now runs `clean_runtime_install.py`, staged-payload validation rejects non-runtime artifacts, and PK4 source/build/staged checks keep all `roadhouse_quick` fixture content under `content/basepr/dev/` rather than `pak0.pk4`. |
+| Final Roadhouse clean-log audit | **Passed**; a fresh staged Windows launch into `game/roadhouse` wrote an engine screenshot and shut down with zero warnings/errors after fixing the missing autosave string, loading-music decl-load scope, and benchmark harness post-map command path. The repaired smoke profile passed through `renderer_gameplay_benchmark.py`. |
 
 ### WP8.2 — runtime matrix (retail assets)
 
@@ -988,9 +999,12 @@ Recorded representative runtime evidence:
 2. Retail gameplay ran on Roadhouse, Feeding Tower, deathwalk/spirit, Shuttle, and
    `girlfriendx`/portal scenes. These are representative captures, not an exhaustive
    per-map or renderer-backend parity matrix.
-3. Save/load round-trip and legacy config-casing migration passed.
-4. The unified module loaded through canonical and legacy aliases; a requested Vulkan
-   renderer fell back to GL as designed when Prey Vulkan parity was unavailable.
+3. Save/load round-trip and legacy config-casing migration passed. A second, post-audit
+   round trip specifically exercised the new versioned GUI stream marker.
+4. The unified module loaded through canonical and legacy aliases. A focused Vulkan
+   Roadhouse/Biolabsa smoke now reaches the Vulkan module (`requested=vulkan
+   active=vulkan`) with zero Vulkan warning counters; exhaustive Vulkan feature parity
+   remains deferred.
 5. A listen server and two clients ran together; network `_attackalt` reached the game
    through the merged `usercmd_t` layout.
 6. Two isolated `roadhouse_quick` dmap runs emitted byte-identical `.cm`/`.proc` files,
@@ -999,9 +1013,9 @@ Recorded representative runtime evidence:
 7. Runtime logs use lowercase `logs/openprey_*.log` names.
 
 Still unrun or incomplete: the exhaustive SP/MP/manual visual matrix, localization,
-subtitle/censor/audio checks, full ModernGL/Vulkan parity, genuine CD-era checksum capture,
-and macOS/ARM64 release-lane signoff. These are explicit parity/release deferrals rather
-than unclosed rebase evidence gates.
+full subtitle/censor/audio matrix, full ModernGL/Vulkan parity, genuine CD-era checksum
+capture, and macOS/ARM64 release-lane signoff. These are explicit parity/release
+deferrals rather than unclosed rebase evidence gates.
 The mirror clip-plane workaround remains active and tracked in
 `references/retail_mirror_clip_parity_plan.md`.
 
@@ -1175,3 +1189,27 @@ The mirror clip-plane workaround remains active and tracked in
 Package production/inspection/runtime-smoke evidence and the root-validator run are closed.
 The table above contains only explicit feature, parity, release-lane, and upstream follow-up
 work; none is an undisclosed rebase implementation gate.
+
+## 13. Appendix — intentional OpenQ4/Quake 4 identifiers
+
+The WP1.2 sweep is complete. Remaining non-document `openq4`/`Quake 4` strings fall into
+the following compatibility or provenance classes; they are not active product identity:
+
+- **Migration-compatible entry points and inputs:** established helper filenames such as
+  `openq4_validate.py`, generated-header names, and the documented `OPENQ4_*` environment
+  aliases accepted while callers migrate to `OPENPREY_*`.
+- **Serialized/runtime compatibility:** legacy save/config names, old game-module loader
+  aliases, inherited renderer or save markers, and explicit diagnostics for unsupported
+  retail Quake 4 data. Removing these would silently break migration or format detection.
+- **Inherited source/API provenance:** internal `openQ4_*` helper symbols, comments,
+  shader identifiers, and tool/resource names retained where renaming would add churn or
+  alter an upstream interface without changing user-visible behavior.
+- **False-gated reference fixtures:** inherited OpenQ4 release, macOS, ARM64, sanitizer,
+  Wayland, VM, and test fixtures kept for later reconstruction under
+  TODO-RELEASE-LANES or explicitly excluded as non-applicable to Prey's v7 API.
+- **Third-party/upstream assets:** bundled dependency metadata and historical source text
+  whose upstream name is factual provenance.
+
+The former closed-source `openQ4-BSE` companion workflow is not in that allowlist. The
+active target and integrated API use openPREY names, and the build wrappers no longer
+detect or clean its removed option/artifacts. BSE is built only from `src/bse` in-tree.

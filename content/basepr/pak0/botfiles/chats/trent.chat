@@ -1,0 +1,297 @@
+// Trent: concise and route-aware, characterized only through multiplayer behavior.
+
+characterChat "Trent" {
+	chat entergame {
+		"Trent in. Route check starts now."
+		"Ready. I'll watch the crossings."
+		"Joined. Marking the fast lanes."
+		"I'm set. Keep the exits in mind."
+		"Trent ready. Let's move early."
+		"Starting now. Center first."
+		"I'm here. Pickups before chatter."
+		"Match found. Route selected."
+	}
+	chat levelstart {
+		"$map loaded. Checking the short loop."
+		"Main crossing is exposed. Use the sides."
+		"Listen for traffic near the pickup lane."
+		"I have the near route."
+		"Two exits ahead. Keep both visible."
+		"Timing the center cycle now."
+		"Move wide until the paths are clear."
+		"First pass through $map. Stay mobile."
+	}
+	chat kill {
+		"Caught you crossing, $other."
+		"The $weapon covered that lane."
+		"One route closed."
+		"You doubled back too soon."
+		"I tracked the exit."
+		"That corner was already watched."
+		"Point taken. Rotating out."
+		"Your path was too direct."
+	}
+	chat killWrench {
+		"Wrong turn. Wrench range."
+		"Too close at the crossing."
+		"The short route ended here."
+		"No room left, $other."
+		"Wrench connected. Moving on."
+		"You crowded the exit."
+		"That lane became close quarters."
+		"Distance gone. Point mine."
+	}
+	chat killStreak {
+		"Three down along one rotation."
+		"Route control is holding."
+		"Streak active. Keep the pace."
+		"Third point. Same clean loop."
+		"Traffic keeps meeting my aim."
+		"Three stops, no delay."
+		"The lane is paying off."
+		"Momentum up. Route unchanged."
+	}
+	chat revenge {
+		"Found your return path, $other."
+		"Second pass corrected."
+		"You reused the route."
+		"Earlier loss accounted for."
+		"Tracked you back to the crossing."
+		"Adjustment complete. We're even."
+		"Your escape loop was readable."
+		"Revenge point. Rotating away."
+	}
+	chat death {
+		"You covered the exit, $other."
+		"The $weapon caught my rotation."
+		"Route compromised. Resetting."
+		"I crossed at the wrong time."
+		"Good intercept."
+		"That lane was not clear."
+		"I missed the side angle."
+		"Trent down. New path next spawn."
+	}
+	chat deathAccident {
+		"Bad route choice."
+		"That edge was the wrong exit."
+		"Hazard missed during the scan."
+		"Shortcut rejected."
+		"I moved before checking the floor."
+		"No target involved. Just poor footing."
+		"Marking that path unsafe."
+		"Route error logged. Reset."
+	}
+	chat itemDenied {
+		"$other beat my route to the $item."
+		"Pickup gone. Moving to the outer loop."
+		"The $item cycle was earlier than expected."
+		"Missed the resource by one crossing."
+		"You had the shorter line, $other."
+		"No pickup here. Next location."
+		"Timing updated for the next $item."
+		"Denied. Changing the rotation."
+	}
+	chat leadTaken {
+		"Lead gained. Keep rotating."
+		"First place through clean routes."
+		"I'm ahead. No slowdown."
+		"Top score. Watching the return lanes."
+		"The loop put me in front."
+		"Lead secured at the crossing."
+		"Trent leads. Route discipline stays."
+		"First for now. Next pickup matters."
+	}
+	chat leadLost {
+		"Someone passed me. Closing the gap."
+		"Lead lost during the last rotation."
+		"I'm behind. Shorter route next."
+		"First place moved. Tracking it."
+		"Score changed. Pace increases."
+		"Lost the top spot at the crossing."
+		"New leader. Same objective."
+		"Gap noted. Route adjusted."
+	}
+	chat matchWin {
+		"Match won through steady movement."
+		"Good game. The routes held."
+		"Top score. Clean finish."
+		"That rotation carried the round."
+		"Win secured. Timing stayed sharp."
+		"Trent takes it. Well played."
+		"Final lane clear. Match complete."
+		"Good contest. Movement made the difference."
+	}
+	chat matchLose {
+		"Good game. My routes were too slow."
+		"You won the key crossings."
+		"Loss recorded. Timing needs work."
+		"Fair result. I missed the late cycle."
+		"Well played. The winning route was better."
+		"The last rotation cost me."
+		"No complaint. I chose the longer path."
+		"Next match, tighter movement."
+	}
+	chat farewell {
+		"Trent out. Routes logged."
+		"Leaving now. Good games."
+		"Last crossing for me."
+		"I'm done. Keep moving."
+		"See you on the next map."
+		"Signing off. Watch the exits."
+		"That's my final rotation."
+		"Later. The lanes are yours."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Hold the corner, $other. Taking the short route."
+		"Fall back one lane. I'll cover the crossing."
+		"Moving to you through the outer loop."
+		"Backup en route. Keep your nearest exit open."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. Strong movement."
+		"Well played. The routes stayed competitive."
+		"Good match on $map. Timing was close."
+		"Agreed. Clean round from every lane."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Come through the center, $other."
+		"Challenge noted. Pick a lane."
+		"Try the short route. I'll be there."
+		"Less talk. Meet at the next crossing."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hey, $other. Trent here."
+		"Hello. Routes are open."
+		"Good to see you. Watch the center."
+		"Hi. Starting a pass through $map."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"Acknowledged, $other. Keep moving."
+		"No problem. The route was clear."
+		"Any time. Hold the next crossing."
+		"You're welcome. Use the opening."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thanks, $other. The angle stayed open."
+		"Noted. Route knowledge helped."
+		"Good call. The timing was exact."
+		"Appreciated. I tracked the exit."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Accepted, $other. Reset your route."
+		"No issue. Keep the next lane clear."
+		"Understood. Move on."
+		"We're fine. Check before crossing again."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Later, $other. Take the safe exit."
+		"Good night. Routes reopen next match."
+		"See you. I'll keep the loop in mind."
+		"Goodbye. Watch your last crossing."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Trent"
+		trigger "hey Trent"
+		trigger "Trent help"
+		trigger "Trent hello"
+		trigger "Trent listen"
+		trigger "Trent there"
+		trigger "Trent answer"
+		trigger "Trent wait"
+		"Trent here. Which route, $other?"
+		"Listening. Keep it brief."
+		"I hear you. Go ahead."
+		"Say it while the lane is clear."
+	}
+}

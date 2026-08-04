@@ -1,17 +1,17 @@
 /*
 ===========================================================================
 
-openQ4 Source Code
+openPREY Source Code
 Copyright (C) 2026 DarkMatter Productions
 
-This file is part of the openQ4 Source Code.
+This file is part of the openPREY Source Code.
 
-openQ4 Source Code is free software: you can redistribute it and/or modify
+openPREY Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-openQ4 Source Code is distributed in the hope that it will be useful,
+openPREY Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
@@ -73,7 +73,8 @@ const double Q4_TTF_PACKING_HEADROOM = 1.25;
 const int Q4_CONSOLE_GRID = 16;
 const int Q4_CONSOLE_CELL_SIZE = 16;
 const char * const Q4_CONSOLE_ATLAS_IMAGE = "_ttfconsolefont";
-const char * const Q4_CONSOLE_FONT_MATERIAL = "fonts/english/bigchars";
+// Prey keeps the fixed-cell sheet outside the GUI font directories.
+const char * const Q4_CONSOLE_FONT_MATERIAL = "textures/bigchars";
 
 // The virtual GUI canvas is 640x480; rasterising at the display's upscale
 // factor is what makes the text resolution-independent.
@@ -532,7 +533,7 @@ static bool R_TTFBuildSlot( idTrueTypeFont &face, const char *fontName, const q4
 	idStr safeName = fontName;
 	safeName.Replace( "/", "_" );
 	const idStr imageName = va( "_ttfatlas_%s_%i", safeName.c_str(), slot.pointSize );
-	const idStr materialName = va( "openq4/ttffont/%s_%i", safeName.c_str(), slot.pointSize );
+	const idStr materialName = va( "openprey/ttffont/%s_%i", safeName.c_str(), slot.pointSize );
 
 	idImageOpts opts;
 	opts.textureType = TT_2D;

@@ -1,4 +1,4 @@
-"""Reader for the fixed-cell console atlas (``bigchars``).
+"""Reader for a fixed-cell console atlas (``bigchars``).
 
 Unlike the ``.fontdat`` fonts there is no metrics file: ``bigchars`` is a plain
 16x16 grid of 16x16 pixel cells indexed by Windows-1252 byte, and the engine

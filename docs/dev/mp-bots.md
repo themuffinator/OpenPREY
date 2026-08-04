@@ -1,710 +1,535 @@
-# Multiplayer bots
+# Multiplayer bot characters
 
-openQ4 multiplayer ships with bots that navigate any map without a per-map
-authoring or compile step, and that arrive with a name, a way of playing and
-something to say about it. This describes how they work and how to drive them.
+openPREY multiplayer ships a data-driven cast built on Prey's own artificial
+player. Each bot is a normal multiplayer player entity with a retail model,
+skill-scaled execution, a recognizable way of fighting, and a separate voice.
+This guide describes the runtime contract, content format, operator controls,
+and the limits that still matter.
 
-## Why not AAS
+The design follows the successful content process used upstream in openQ4:
+skill, style, character mechanics, and chat remain separate and independently
+validated. The runtime is deliberately Prey-specific. It uses
+`hhArtificialPlayer`, `ui_modelNum`, Prey's `weaponobj_*` classes, and the
+player's current gravity axis; it does not import Quake 4 client-slot, model,
+weapon, or navigation assumptions.
 
-Quake 4's SDK routes AI over AAS, an offline navigation compile stored as a
-`.aas48` / `.aas96` file next to the `.proc`. id shipped those files for the
-single-player campaign only: **not one of the 49 stock multiplayer maps has an
-AAS file**, and neither do community maps built with the retail tools, because
-the multiplayer game never had anything to navigate. AAS-based bots therefore
-have nothing to route over in multiplayer, which is exactly what the SDK's own
-`idGameLocal::AddBot` reports when it refuses to add a bot.
+## Architecture and API compatibility
 
-So navigation is generated at runtime instead, from the collision world the
-players themselves move through.
-
-## The navmesh
-
-`src/mpgame/bots/NavMesh.{h,cpp}` (in the openQ4-GameLibs repository) builds a
-multi-level grid navmesh at map load.
-
-**Generation** follows the same shape as a modern voxel navmesh generator -
-rasterise the walkable surface, connect what a walking agent can traverse - but
-the "rasteriser" is the engine's own collision system, so a link exists only if
-the player's bounding box can actually make that move:
-
-1. **Seeds.** Spawn points, items, jump pads and their landing targets, and any
-   player already in the map. These are places the map guarantees are standable,
-   and flooding out from them avoids probing the solid majority of the world
-   bounds.
-2. **Flood fill.** From each node, the eight neighbouring grid cells are probed
-   with `TryStep`, which sweeps the player's bounding box - `pm_bboxwidth` by
-   `pm_normalheight`, taken live from the cvars the server is running - flat,
-   then lifted by `pm_stepsize`, then lifted by `pm_jumpheight`, and drops
-   whatever it reaches onto the floor. The cheapest lift that works decides the
-   link type. A node is keyed by grid cell *and* floor height, so a catwalk over
-   a corridor is two nodes in the same column.
-3. **Off-mesh links.** `rvJumpPad` and teleporter `idTrigger_Multi` volumes get
-   a one-way link from the volume to their target. On a stock Quake 4
-   multiplayer map these are what keep the graph a single component - `q4dm1`
-   alone currently produces 18 of them.
-4. **Areas.** Connected components over the links treated as undirected. Two
-   nodes in different components definitely cannot reach each other, which lets
-   a bot reject an unreachable goal without paying for a search. The converse is
-   not guaranteed (a one-way drop leaves both ends in one component), so this is
-   only ever used to say no.
-
-Traversal types are `WALK`, `DROP`, `JUMP`, `JUMPPAD` and `TELEPORT`.
-
-**Routing** is A* with a euclidean heuristic over a binary heap, with the search
-scratch tagged by a serial number rather than cleared, so a query costs only the
-nodes it opens. The node chain is then string-pulled: a corner is dropped when a
-box sweep proves the shortcut is clear *and* the ground under it stays close, so
-a shortcut can never cut a corner across a pit. Smoothing never skips a link
-that has to be entered deliberately. Every jump, drop, jump pad and teleporter
-retains both its entry and exit, including when it is the first link in a route.
-
-Areas are a cheap negative test only. Item and roaming choices prove a directed
-route before committing to a goal, because a drop connects both floors into the
-same weak area without making the upper floor reachable from below. Random
-roaming walks the graph's outgoing links first and chooses uniformly from that
-directed closure.
-
-Typical output for `q4dm1` at the default 24-unit cell is about **8,350 nodes,
-60,000 links and one weak area**. Build time is machine-dependent; current
-development runs complete in under a second. Generation is lazy - it happens
-the first time a bot is added, so a server that never uses bots never pays for
-it.
-
-## The bot
-
-`src/mpgame/bots/Bot.{h,cpp}`. A bot is not an entity. It takes a real client
-slot through `idNetworkSystem::AllocateClientSlotForBot`, spawns a real
-`idPlayer`, and each server frame writes the user command that a remote player's
-packet would have delivered. Everything downstream - movement physics, weapons,
-damage, scoring, the scoreboard, game type rules, team logic - therefore treats
-it as an ordinary player with no special cases.
-
-Per frame a bot picks a goal (visible enemy, else the nearest directionally
-reachable item, else a random directionally reachable point), routes to it,
-steers through the corners, tracks whatever it can see, chooses a weapon, and
-decides whether it is yet allowed to pull the trigger. *How well* and *in what
-manner* it does each of those - how
-far it notices you, how long it takes to react, how steadily it holds an aim,
-how close it wants to fight and what it wants to fight with - is not written in
-the code at all. It comes from the bot's resolved personality, which is the next
-section. Dead or spectating, it holds attack, which is how `idPlayer` takes a
-respawn.
-
-Three things keep a bot from ever parking:
-
-- **Stuck detection.** Two consecutive samples without horizontal progress
-  trigger a sidestep, a jump and a fresh route. Vertical motion alone cannot
-  disguise a bot hopping in place, while a deliberate traversal gets a short
-  grace period in which to finish.
-- **Goal give-up.** A goal that has not resolved in 12 seconds is abandoned, and
-  arriving at an item that is *still sitting there* abandons it immediately -
-  that is a bot standing on its own CTF flag, or on a weapon it already has with
-  full ammo. Abandoned goals go on a short per-bot blacklist. The blacklist
-  holds several entries on purpose: with one slot a bot ping-pongs between two
-  items it cannot take.
-- **Off-mesh recovery.** If routing fails repeatedly the bot walks toward the
-  nearest node it does know about, and wanders if there is not one.
-
-Repathing is time-throttled rather than "whenever there is no path": an enemy
-standing somewhere genuinely unreachable would otherwise cost a full failed A*
-search every single frame. The throttle counts *attempts*, not successes —
-keying it off "am I currently chasing an enemy" leaves it dead on the failure
-path, which is the only path it exists for. Goal selection, which walks every
-spawned item, is throttled the same way.
-
-Non-walk links are committed movements rather than loose proximity corners. The
-bot first reaches the entry, suppresses combat strafing, generic unsticking and
-periodic replans during the action, then advances only after it has left the
-entry and reached the destination side. A jump specifically has to leave the
-ground and land on the destination floor; being one nearby grid cell below it
-does not count. Bounded forward overshoot is accepted so a natural jump need not
-stop on an exact sample.
-
-Jump input is pulsed on alternating grounded frames rather than held.
-`idPhysics_Player::CheckJump` only fires on a fresh press —
-`PMF_JUMP_HELD` blocks a held button and is cleared only on a frame where
-`upmove` is released. Grounded pulses provide a fresh edge within one frame
-without spraying jump input through the flight.
-
-## Characters
-
-`src/mpgame/bots/BotCharacter.{h,cpp}`. Difficulty used to be five numbers on a
-straight line, which made every bot at a given `bot_skill` identical and every
-match feel the same. It is now three layers of content that resolve, once per
-spawn, into one flat `botTraits_t` — 48 floats that are the only thing the
-per-frame combat code reads:
-
-1. **Skill level, 1 to 5.** The baseline curve. Every trait has a value at every
-   level, and the fractional levels `bot_skillVariance` produces are interpolated
-   between the two bracketing rows. This layer on its own is a complete, playable
-   bot, and it is exactly what `bot_characters 0` gives you.
-2. **Play style.** A named archetype that biases the baseline. A style says what
-   a bot *wants to do*, never *how well it does it*: a skill 1 sniper and a
-   skill 5 sniper both hold range and both reach for the rail gun, and only one
-   of them hits with it. Six ship — `rusher`, `sniper`, `roamer`, `hunter`,
-   `ambusher`, `skirmisher`.
-3. **Character.** Identity: display name, player model, the skill band it is
-   picked for, and its own per-trait bias and per-skill-level overrides. Its
-   voice is a separate chat bank joined to that identity by character name.
-
-Layers 2 and 3 do not restate the trait list. They carry sparse statements —
-`set`, `add`, `scale` — that name a trait by the same word the struct uses, and
-that resolve through one static field table. Adding a new trait is one row in
-that table and one number per skill level in the baseline curve; no parser and
-no content file has to learn it exists.
-
-Resolution order matters, because `scale` composes with whatever came before it:
+The canonical implementation lives in the companion GameLibs repository:
 
 ```
-baseline( skill level, after variance )
+OpenPrey-game/src/game/bots/BotCharacter.h
+OpenPrey-game/src/game/bots/BotCharacter.cpp
+OpenPrey-game/src/Prey/game_player.h
+OpenPrey-game/src/Prey/game_player.cpp
+```
+
+`rvBotCharacterManager` owns styles, named characters, skill resolution,
+weapon biases, chat banks, reply rules, and flood throttles. It is initialized
+from `idGameLocal::Init` and shut down from `idGameLocal::Shutdown`, so reloads
+and map changes do not leave content-owned pointers behind.
+
+Prey already declares `player_artificial_mp`, whose spawn class is
+`hhArtificialPlayer`. `idGameLocal::SpawnArtificialPlayer` places that entity
+in a free player slot, fills ordinary user info, and lets the normal
+multiplayer code spawn it. Each server frame `hhArtificialPlayer::Think`
+generates a `usercmd_t`; the established snapshot path mirrors that command to
+clients. Weapons, damage, respawn, scoring, team rules, and the scoreboard
+therefore continue through the same player code used by people.
+
+Artificial-player slots are not engine-owned network clients, so the game
+publishes their canonical `bot_character`, `bot_skill`, name, model, and team
+userinfo explicitly on spawn and reload. A late join receives that userinfo
+immediately before the existing reliable player-spawn message, while the first
+snapshot carries the same dictionary as a fallback. Team DM assigns a new bot
+to the less-populated team once and preserves that team across a content reload.
+
+This is an important compatibility choice. The old engine-side
+`OPENPREY_ENABLE_BOTS` path is compiled out because it expects callbacks and
+metadata absent from Prey's v7 game contract. The character system adds no
+virtual to the engine/game boundary and keeps `GAME_API_VERSION` at 7.
+
+`g_artificialPlayerCount` remains the compatibility count control. The server
+reconciles toward it one bot per frame, adding or removing as needed. The
+named commands below update that count after a manual change so the automatic
+reconciler does not immediately undo the command. It is explicitly non-cheat,
+so those count updates work on an ordinary multiplayer server without enabling
+developer cheats. A real network connection reserves its client slot from
+`ServerClientConnect` until `ServerClientBegin` has created the human player;
+manual and reconciled bot spawns both skip that pending slot. If the connection
+claims a game-only bot slot, the server also lowers the desired count, tells
+existing clients to delete the old bot entity, and only then gives the slot to
+the human. The handshake therefore cannot race bot creation or retain the
+wrong player class on another client.
+
+## Movement and current navigation limit
+
+Retail Prey multiplayer maps do not ship bot AAS files. This implementation
+does not claim to provide a full replacement navigation graph.
+
+The current bot movement is a bounded combat fallback:
+
+- enemies must be in the player's PVS and pass a line-of-sight trace before
+  they are treated as visible;
+- idle bots may choose a visible item and otherwise wander; a goal that makes
+  less than 16 units of net progress in four seconds is ignored for five
+  seconds, so line of sight alone cannot trap a bot on an unreachable pickup;
+- aiming and movement use untransformed view angles, `GetEyeAxis()`, and bounds
+  projection along the current gravity normal, so they remain meaningful when
+  local gravity changes;
+- combat range, retreat health, aggression, patience, strafing rhythm, dodge
+  reaction, and jump chance come from the resolved personality; and
+- a player-bounds sweep detects a nearby wall, reverses the strafe, turns the
+  wander direction, and may pulse jump.
+
+That is enough for bots to fight, dodge, collect exposed pickups, and avoid
+walking continuously into a wall. It is not route planning: a bot cannot
+deliberately solve a multi-room path, choose a portal sequence, plan a
+wall-walk transition, or pursue an objective through unseen geometry. A future
+navigation layer must model Prey's changing gravity and portals before it can
+honestly promise broad map coverage. `mp_bot_navigation.py` remains deferred
+for this reason.
+
+## Personality resolution
+
+Every spawn resolves three layers into one flat `botTraits_t`:
+
+1. **Skill, 1 through 5.** The baseline describes execution quality. A
+   deterministic `bot_skillVariance` offset may place one bot between the five
+   authored rows, and values are interpolated.
+2. **Play style.** An archetype describes intent: preferred range, willingness
+   to pursue or wait, movement rhythm, and weapon taste. A low-skill sniper and
+   a high-skill sniper want the same kind of fight; only one executes it well.
+3. **Character.** The identity adds a display name, retail model slot,
+   preferred skill band, sparse personal modifiers, weapon preferences, and a
+   separately authored voice.
+
+Resolution order is significant:
+
+```
+baseline( effective skill )
   -> style body
   -> style skill <n> { } block
   -> character body
   -> character skill <n> { } block
 ```
 
-Each statement is applied in file order and its field is clamped to the table's
-range immediately afterwards, so a typo in a content file cannot produce a bot
-that turns at 90000 degrees a second.
+`set`, `add`, and `scale` operations apply in file order. Every result is
+clamped through the single trait field table immediately after application.
+Weapon biases are named entries rather than scalar traits; they merge across
+layers so a character's opinion about one weapon does not erase the rest of
+its style.
 
-Weapon preferences are the one thing not reachable through the field table.
-They are named entries rather than scalars, and they *merge* rather than
-overwrite, so a character with an opinion about one weapon keeps the rest of its
-style's opinions intact.
+`bot_characters 0` is supported. It leaves bots on the complete skill baseline
+with a generated `Bot N` name, a slot-derived retail model, and no character
+voice.
 
-### What each skill level feels like
+## The 48 traits
 
-The point of the curve is that the levels differ in kind, not only in degree.
+All scalar personality fields are floats, including values expressed in
+milliseconds or degrees. This keeps parsing, sparse modifiers, interpolation,
+and clamping on one path. Weapon biases are separate and are not counted among
+the 48.
 
-- **1** is genuinely poor and should be beatable by someone who has never played
-  the map. It notices you inside a 130 degree cone at 1200 units, takes
-  460 ± 180 ms to react, and pays most of that again every time you break line
-  of sight. Its aim trails the truth by 0.4 seconds, carries 4.2 degrees of
-  wandering tremor, and swings at 170 deg/s on an underdamped slew that still
-  overshoots and hunts. Its 0.80 initiative turns the raw 14 degree / 240 ms
-  trigger values into an effective 18.2 degree cone and 96 ms settle instead
-  of waiting so long for bad aim to settle that it barely fires;
-  the extra attacks remain inaccurate. It barely leads a projectile and gets
-  roughly one combat decision in two wrong.
-- **2** is a distracted human. It reacts in about 0.39 s, tracks better, still
-  overshoots, and still sprays.
-- **3** is the default and is meant to read as a competent regular: 320 ms on a
-  fresh sighting, 224 ms on a re-peek, 2.1 degrees of tremor, a 6.5 degree cone
-  it settles into for 170 ms before shooting, and projectiles led at about 60 %
-  correctness.
-- **4** punishes standing still. It notices you at 2600 units across a 170
-  degree cone, reacts in 220 ms, holds a 4 degree cone, and leads well enough
-  that walking in a straight line at range is fatal.
-- **5** is sharp but deliberately not an aimbot: 140 ± 45 ms reaction that it
-  still re-pays at 40 % on a re-peek, a 0.08 s tracking lag, half a degree of
-  tremor it can never switch off, a 2 degree cone it refuses to shoot outside
-  of, and 97 % lead correctness with a 5 % random error — so a strafing target
-  at range still survives the occasional rocket.
+### Vision and reaction (8)
 
-Note the trigger duty cycle runs the other way from intuition: skill 1 holds the
-trigger down about 86 % of an engagement and skill 5 about 79 %. Low skill
-*fires more* and hits far less. That is the intended read — spray and pray, not
-a nerfed rate of fire.
-
-`combatRange`, `aggression`, `patience`, seven of the tactical-personality
-traits, and `chatiness` are deliberately flat across the whole curve. They are
-taste, not competence, and a skill curve that moved them would make every
-high-skill bot play identically, which is the thing this system exists to
-prevent. `initiative` and `suppressionMsec` are the two exceptions: novices
-take imperfect shots and waste rounds through recently crossed doorways, while
-high-skill bots default to waiting for a visible, settled shot.
-
-### The aim model
-
-Skill is legible in play because it is spent on the *shape* of the aim rather
-than on a hidden accuracy roll.
-
-- **Belief.** The bot aims at where it *thinks* you are, a first-order lag
-  behind where you actually are, with a time constant of 0.45 s at skill 1 and
-  0.08 s at skill 5. On a fresh acquisition the belief snaps to the truth, so
-  an engagement never opens with the bot aiming at the last fight.
-- **Lead.** Only for weapons that actually launch something. The test is
-  whether the weapon declares `def_projectile`, not the hitscan flag, because
-  that flag is false for the gauntlet and the lightning gun even though both are
-  instant-hit. Projectile speed is resolved through the entity def system so the
-  multiplayer retune applies (rocket 935, not 900). The grenade launcher and the
-  napalm gun are ballistic, so a linear lead is wrong for them and the weapon
-  choice biases away instead.
-- **Tracking error.** A lag *across* the view rather than noise: the faster you
-  cross the bot's screen, the further behind its aim sits.
-- **Tremor.** Two slow sine octaves, phase-seeded from the client number so no
-  two bots shake in step. Continuous and smooth, so it reads as an unsteady hand
-  rather than as white noise, which is what the old 400 ms step offset read as.
-- **Turn.** A damped second-order slew driven by `turnSpeed`, `turnAccel` and
-  `turnDamping`. Under-damping at low skill is what produces the visible
-  overshoot-and-hunt; skill 5 settles cleanly.
-- **Reaction.** Computed once per acquisition, never per frame, and it now
-  includes a peripheral penalty scaled by how far off centre you were when the
-  bot first saw you. A re-acquisition inside `reacquireMsec` still pays
-  `reacquireFraction` of the full cost. That fraction is the fix for the old
-  zero-reaction bug, in which a bot re-peeking a corner had already paid its
-  reaction once and fired instantly forever after — and it is why the skill 5
-  reaction time went *up*, from 70 ms to 140 ms.
-- **Trigger.** The aim has to sit inside the fire cone for `aimSettleMsec` and
-  the view has to be slewing slower than `holdFireTurnRate` before the trigger
-  is released. The cone is measured against the same point the bot is aiming at,
-  including the lead — a gate that tests the target centre while the aim sits on
-  the lead point produces a bot that aims correctly and then refuses to shoot.
-- **Mistakes.** Rolled on acquisition and periodically while engaged. One of:
-  lose tracking, mistime a shot, keep the wrong weapon, dodge late. A mistake is
-  a bounded, readable failure rather than a silent accuracy penalty.
-
-`bot_debugAim 1` logs the reaction, effective cone, settle, lead and whether a
-shot is suppression fire, which is how the curve is tuned.
-
-### Tactical personality traits
-
-The skill curve controls execution while these traits control intent. Seven
-stay flat and styles or characters move them independently. `initiative` and
-`suppressionMsec` also make the low-skill baseline more willing to shoot:
-
-| Trait | Range | Behavior |
-| --- | --- | --- |
-| `initiative` | 0..1 | How readily the bot accepts an imperfect shot. Higher values shorten reaction and settle time, widen its effective fire cone, and tolerate a faster view slew without improving where the aim points. Baseline skill 1 is 0.80; skills 4-5 are 0.50. |
-| `targetStickiness` | 0..1 | How much better a new opponent must be before the bot abandons its current target. |
-| `opportunism` | 0..1 | How strongly wounded opponents are preferred during target selection. |
-| `vengefulness` | 0..1 | How strongly the bot favors the opponent who last killed it. |
-| `suppressionMsec` | 0..2000 | How long it keeps shooting at the last believed position after an opponent crosses cover. The plain curve falls from 1200 ms at skill 1 to zero at skills 4-5. |
-| `strafeRhythmMsec` | 100..3000 | Base time between changes of combat strafe direction. |
-| `strafeRhythmVarianceMsec` | 0..3000 | Random spread added to that strafe rhythm, from clockwork movement to irregular footwork. |
-| `weaponSwitchMsec` | 100..3000 | How often the bot reconsiders its weapon for the current range. |
-| `aimHeight` | -0.4..0.4 | Personal vertical bias within the target bounds: low body, centre mass, or high chest. Skill accuracy still applies around it. |
-
-These make profiles tactically legible. Gunner and Rhodes suppress doorways,
-Sorg changes direction and weapons rapidly, Cortez holds one target and aims
-high, Bagby fires readily but is slow to correct a poor weapon choice, and
-Makron develops a persistent grudge.
-
-### Styles
-
-| Style | Wants to |
+| Trait | Meaning |
 | --- | --- |
-| `rusher` | Close to 220 units and stay there. Aggressive, impatient, short-range weapons, a wider cone because it is always moving. |
-| `sniper` | Hold 1400 units and trade with hitscan. Patient, still, rail gun first, and useless in a corridor - which is the point. |
-| `roamer` | Play the map. Near baseline everywhere, `itemFocus` up 40 %, fights what it meets on the way to the next item. |
-| `hunter` | Pick one opponent and keep going. Long pursuit and a long re-acquisition window, so it holds a target through cover; barely interested in items. |
-| `ambusher` | Sit on a choke point and wait. Very patient, cheap peripheral reaction and a quick trigger because it is already pre-aimed, and it dodges little. |
-| `skirmisher` | Trade and leave. High mobility, jumps often, breaks off early, short bursts. |
+| `sightRange` | Maximum distance at which a player can be noticed. |
+| `fov` | Full vision cone in degrees. |
+| `reactionMsec` | Delay paid on a fresh target acquisition. |
+| `reactionVarianceMsec` | Per-acquisition random spread around that delay. |
+| `reacquireMsec` | Time out of sight after which contact is considered fresh. |
+| `reacquireFraction` | Fraction of reaction delay paid for a quick reappearance. |
+| `peripheralAngle` | Off-axis angle at which the full peripheral penalty applies. |
+| `peripheralPenaltyMsec` | Additional reaction delay for peripheral contact. |
 
-### The roster
+### Aim (10)
 
-Sixteen characters ship, reusing the existing bot name pool so the cast still
-looks like Quake 4. Each has a skill band, and `PickCharacter` prefers an unused
-character whose band contains the current skill — falling back to the band, then
-to anyone at all, because a full roster must never stop a bot being added.
+| Trait | Meaning |
+| --- | --- |
+| `turnSpeed` | Hard view-slew cap in degrees per second. |
+| `turnAccel` | Rate at which view slew reaches its cap. |
+| `turnDamping` | Slew damping; low values visibly lag and hunt. |
+| `aimTrackTimeConst` | First-order lag of believed target position. |
+| `aimTremorDeg` | Continuous aim tremor amplitude. |
+| `aimTremorRateHz` | Rate at which the tremor wanders. |
+| `aimTrackError` | Cross-view tracking lag against a moving target. |
+| `aimSettleMsec` | Time aim must remain inside the firing cone. |
+| `aimLead` | Fraction of computed projectile lead applied. |
+| `aimLeadError` | Per-shot error applied to that lead. |
 
-| Character | Style | Band | Combat identity | Voice |
-| --- | --- | --- | --- | --- |
-| Voss | roamer | 3-5 | controls useful ground, protects his health and chooses threats carefully | calm field authority; disciplined, protective orders |
-| Cortez | sniper | 3-5 | holds long angles, relocates deliberately and favors economical rail shots | courteous, composed sharpshooter with quiet confidence |
-| Bidwell | rusher | 3-5 | applies disciplined forward pressure without throwing away his life | gruff, profane sergeant with little patience |
-| Rhodes | ambusher | 3-5 | controls weak points with predictive rockets and grenades | warm Texas demolition swagger and craftsman's pride |
-| Sledge | rusher | 4-5 | advances under deliberate mid-close heavy-weapons pressure | thoughtful, formal and dryly understated |
-| Morris | roamer | 3-5 | moves aggressively through the rotation and decides quickly | fast, crude commentary backed by real competence |
-| Strauss | ambusher | 2-4 | solves prepared lanes, guards equipment and retreats early | precise, vain technician whose temper breaks through |
-| Tetzlaff | sniper | 1-3 | fixates on static rail shots but reads moving fights poorly | self-promoting range ego with an excuse for everything |
-| Marsh | roamer | 2-4 | flexible generalist who takes useful fights without tunnel vision | warm, observant competitor who respects good play |
-| Hollenbeck | roamer | 2-4 | controls resources, consolidates gains and abandons wasteful chases | practical field officer who turns setbacks into orders |
-| Sorg | skirmisher | 2-4 | reads peripheral movement and rotates through evasive routes | restless pathfinder always reading the next opening |
-| Anderson | skirmisher | 1-3 | mobile, item-aware support fighter who breaks off to survive | reassuring young medic, proactive under pressure |
-| Gunner | rusher | 3-5 | maintains nailgun and grenade suppression while pursuing targets | translated Strogg combat reports: suppress and advance |
-| Makron | hunter | 5-5 | identifies the strongest threat and pursues it relentlessly | imperious ruler who issues threats, not conversation |
-| Kane | skirmisher | 4-5 | controlled mid-range survivor with unusually steady movement | sparse, plain human tactical speech |
-| Bagby | roamer | 1-2 | nervous logistics runner who fires readily, aims low and is slow to correct a poor weapon choice | chatty, candid novice who learns out loud |
+### Trigger discipline (5)
 
-Band coverage is intentionally broad rather than even: levels 1 through 5 have
-3, 7, 12, 12 and 9 preferred characters respectively. Anderson keeps a canon
-human in the level-1 pool, while Makron remains exclusive to level 5. The band
-only controls roster preference; the resolved baseline still determines how
-well every selected character sees, aims, reacts and decides.
+| Trait | Meaning |
+| --- | --- |
+| `fireConeDeg` | Maximum angular error accepted before firing. |
+| `holdFireTurnRate` | Maximum view slew allowed while firing. |
+| `burstMinMsec` | Shortest automatic-weapon burst. |
+| `burstMaxMsec` | Longest automatic-weapon burst. |
+| `burstPauseMsec` | Pause between bursts. |
 
-## The file format
+### Mistakes (2)
 
-Styles, character mechanics and character voices are plain text in brace
-blocks, read with `idLexer` under `DECL_LEXER_FLAGS`. They are deliberately
-*not* decl types: this needed no engine change, and those flags carry
-`LEXFL_NOFATALERRORS`, so a malformed content file warns and is skipped instead
-of killing a server.
+| Trait | Meaning |
+| --- | --- |
+| `mistakeChance` | Chance that a combat decision is deliberately spoiled. |
+| `mistakeMsec` | Duration of the resulting mistake window. |
+
+### Movement and engagement (10)
+
+| Trait | Meaning |
+| --- | --- |
+| `strafeChance` | Likelihood of using a combat strafe. |
+| `dodgeReactMsec` | Delay between taking damage and beginning a dodge. |
+| `jumpChance` | Likelihood that obstacle response or a dodge includes a jump. |
+| `combatRange` | Distance the bot tries to hold from an opponent. |
+| `rangeDiscipline` | Strength with which it corrects distance from that range. |
+| `aggression` | Preference for closing rather than yielding an even exchange. |
+| `patience` | Preference for holding rather than wandering. |
+| `retreatHealth` | Health fraction below which it tries to disengage. |
+| `pursuit` | Strength and duration of commitment to a lost target. |
+| `itemFocus` | Weight and scan distance given to visible pickup goals. |
+
+### Tactical personality (9)
+
+| Trait | Meaning |
+| --- | --- |
+| `initiative` | Willingness to move and take a less-than-perfect opportunity. |
+| `targetStickiness` | Reluctance to abandon the current opponent. |
+| `opportunism` | Preference for finishing a wounded opponent. |
+| `vengefulness` | Preference for the opponent that last killed the bot. |
+| `suppressionMsec` | Time it may fire at the last seen position through cover. |
+| `strafeRhythmMsec` | Base interval between changes of strafe direction. |
+| `strafeRhythmVarianceMsec` | Random spread added to that interval. |
+| `weaponSwitchMsec` | Delay between weapon-choice re-evaluations. |
+| `aimHeight` | Personal vertical bias within the target bounds. |
+
+### Decision quality (2)
+
+| Trait | Meaning |
+| --- | --- |
+| `weaponSkill` | Chance of choosing the range-appropriate available weapon. |
+| `targetSelection` | Chance of choosing the best scored opponent rather than the nearest. |
+
+### Chat (2)
+
+| Trait | Meaning |
+| --- | --- |
+| `chatiness` | Chance that a chat-worthy event queues a line. |
+| `chatDelayScale` | Multiplier on thinking and typing time before delivery. |
+
+The counts are 8 + 10 + 5 + 2 + 10 + 9 + 2 + 2 = 48. Competence-facing
+fields generally improve from skill 1 to skill 5. Taste fields such as
+`combatRange`, `aggression`, `patience`, and `chatiness` stay available to
+styles and characters so high difficulty does not collapse the cast into one
+personality.
+
+## Styles
+
+Six styles ship under `content/basepr/pak0/botfiles/styles/`:
+
+| Style | Behavior and weapon taste |
+| --- | --- |
+| `rusher` | Closes to brawling range, accepts imperfect shots, retreats late, and favors the wrench, Soul Leech, and autocannon. |
+| `sniper` | Holds long range, moves less, settles carefully, and favors the rifle, Hider weapon, and bow. |
+| `roamer` | Stays near the baseline, weights visible pickups heavily, and fights whatever it meets during the rotation. |
+| `hunter` | Commits to one opponent, preserves contact through brief cover, pursues strongly, and discounts items. |
+| `ambusher` | Holds a prepared route, watches the angle, reacts efficiently from that setup, and dodges less. |
+| `skirmisher` | Strafes and jumps readily, uses short bursts, changes its gravity-relative line, and disengages sooner. |
+
+Every style has skill-specific corrections where its intent would otherwise
+make a low-skill bot nonfunctional. Those blocks do not turn preference into
+accuracy; the baseline still owns how well the bot sees, aims, reacts, and
+chooses.
+
+## Roster and lore boundaries
+
+Prey selects multiplayer appearances through the integer `ui_modelNum`, not a
+Quake 4 `playerModel` declaration. The shipped character files use exactly the
+retail-selectable slots:
+
+| Slot | Character | Style | Band | Play and voice evidence |
+| ---: | --- | --- | --- | --- |
+| 0 | Tommy | hunter | 3-5 | Story identity. Relentless former soldier; blunt, humane, dryly restrained speech. |
+| 1 | Mutilated Human | rusher | 1-3 | Retail role label. Close pressure and sparse, dignified fragments; no invented former identity. |
+| 2 | Chuck | rusher | 1-3 | Roadhouse story NPC. Loud follower pressure and playful bravado without repeating the scene's abuse. |
+| 3 | Dalton | rusher | 2-4 | Roadhouse story NPC. The barroom instigator turns close exchanges into grudges while keeping his swagger about the match. |
+| 4 | Hider | ambusher | 2-4 | Hidden role label. Waits behind prepared cover and uses urgent, capable resistance coordination. |
+| 5 | Grandfather | sniper | 2-4 | Story identity. Patient teacher who sees the line before the shot; spiritually grounded without imitation folklore. |
+| 6 | Abducted | roamer | 1-3 | Circumstance label. Scavenges visible routes and speaks as a wary, self-directed survivor. |
+| 7 | Teacher | roamer | 2-4 | Retail label. Methodical observation and learning, with no invented biography. |
+| 8 | Edward | roamer | 1-3 | Retail named label. Cautious generalist with restrained, courteous speech. |
+| 9 | Trent | skirmisher | 2-4 | Retail named label. Takes short trades, changes angles, and speaks concisely about routes. |
+| 10 | Roy | ambusher | 2-4 | Retail named label. Dry lane-holder with an easygoing, sportsmanlike voice. |
+| 11 | Mohawk Hider | skirmisher | 3-5 | Retail model label. Bold, mobile Hidden scout; never presented as a claim about a real-world nation or community. |
+| 12 | Victim | ambusher | 2-4 | Circumstance label. Controls cover and exits with vigilance and agency; never a joke or a competence judgment. |
+| 13 | Post-op | skirmisher | 3-5 | Circumstance label. Controlled movement and focused speech; the label is never played for ridicule. |
+| 14 | Becky | skirmisher | 3-5 | Retail named label. Self-possessed marksman who relocates after an exchange; no invented biography. |
+| 15 | Elite Hunter | sniper | 4-5 | Enemy role. Precise long-range execution and sparse translated combat traffic. |
+| 16 | Elhuit | ambusher | 3-5 | Story identity. Hidden resistance leader who prepares ground and speaks with formal tactical authority. |
+| 17 | Hunter | hunter | 2-4 | Enemy role. Marks and drives down one target; clipped functional squad traffic with no fake alien language. |
+| 18 | Jen | skirmisher | 2-4 | Story identity. Mobile, grounded defender with practical and direct speech. |
+
+Mother is intentionally excluded. Some code and assets suggest a partial model
+19, but retail `player.def` does not expose a complete selectable `model_mp19`
+slot. The bot roster does not invent that contract or substitute another
+model.
+
+Lore discipline is part of the content contract. Story identities may use
+facts established by the game. Retail names, visual roles, and multiplayer-only
+labels support restrained gameplay inference, not invented biographies,
+relationships, accents, slurs, or fake alien vocabulary. Circumstance labels
+such as Victim, Abducted, Mutilated Human, and Post-op never define a
+character's worth. The stock phrase “Mohawk Hider” is treated only as the
+retail model label.
+
+Generic names such as Hunter, Hider, and Victim are also broad words in normal
+conversation. Their low-priority direct reply rules require an addressed name,
+and their responses stay restrained so an accidental match is not disruptive.
+
+## File format
+
+Personality files are text brace blocks parsed through `idLexer` with
+`DECL_LEXER_FLAGS`. They are not decl types and require no engine registration.
+A fresh lexer is used for each file, and all three file lists are freed through
+the filesystem API.
 
 ```
-content/baseoq4/pak0/botfiles/styles/<style>.style
-content/baseoq4/pak0/botfiles/characters/<name>.bot
-content/baseoq4/pak0/botfiles/chats/<name>.chat
+content/basepr/pak0/botfiles/styles/<style>.style
+content/basepr/pak0/botfiles/characters/<character>.bot
+content/basepr/pak0/botfiles/chats/<character>.chat
 ```
 
-These subdirectories and extensions are independent of the pre-existing Quake 3
-format prototypes in `botfiles/bots/*.c`, `botfiles/items.c` and
-`botfiles/weapons.c`. Nothing has ever parsed those old files, and the new
-readers can never pick them up. Files are enumerated through
-`fileSystem->ListFiles`, so a mod or a pk4 can add or replace styles, characters
-or voice banks without a build step; anything dropped under
-`content/baseoq4/pak0` is packed into `pak0.pk4` automatically.
+Styles load first, characters second, and chat banks third. Inheritance and
+character/chat ownership are resolved only after all relevant files have been
+enumerated, so package enumeration order cannot change the result. Unknown
+keys, traits, styles, owners, model slots, and malformed blocks warn and remain
+contained to the affected content instead of terminating the server.
 
-The grammar:
+The grammar is:
 
 ```
 style "<name>" {
-    description  "<text>"
-    inherit      "<other style>"        // optional; resolved after every file is read
+    description "<text>"
+    inherit "<other style>"              // optional
 
-    set    <trait> <number>             // trait  = number
-    add    <trait> <number>             // trait += number
-    scale  <trait> <number>             // trait *= number
+    set   <trait> <number>
+    add   <trait> <number>
+    scale <trait> <number>
+    weapon "<weapon class>" <bias>
 
-    weapon "<weapon class>" <bias>      // 1.0 neutral, 0.0 last resort
-
-    skill <1..5> { <same statements> }  // layered after this file's body
+    skill <1..5> { <same statements> }
 }
 
 character "<display name>" {
-    description  "<text>"
-    inherit      "<style>"
-    skillBand    <min> <max>
-    model        "<playerModel decl>"   // non-team games
-    modelMarine  "<playerModel decl>"   // team games, marine side
-    modelStrogg  "<playerModel decl>"   // team games, strogg side
+    description "<text>"
+    inherit "<style>"
+    skillBand <min> <max>
+    modelNum <0..18>
 
     set/add/scale <trait> <number>
     weapon "<weapon class>" <bias>
-    skill <n> { ... }
+    skill <1..5> { <same statements> }
 }
 
 characterChat "<display name>" {
     chat <event> {
         "line"
-        "line"
     }
 
-    reply <rule name> {
-        priority  <0..100>
-        source    any | player | bot
+    reply <category> {
+        priority <0..100>
+        source any | player | bot
         addressed either | required | forbidden
-
-        trigger "<word or phrase>"
-        trigger "<another phrase>"
-
+        trigger "<whole word or phrase>"
         "response line"
-        "another response"
     }
 }
 ```
 
-Nothing in a content file is allowed to be fatal. An unknown key warns and is
-skipped, and so does an unknown trait name or an out-of-range `skill <n>`. An
-unresolved `inherit` warns and leaves that layer empty. A `characterChat` owner
-is matched to the loaded character name case-insensitively; an owner with no
-matching character warns and is ignored rather than creating a half-character.
-The shipped `.bot` files contain mechanics and models only, and every shipped
-voice line lives under `botfiles/chats`.
+The supported multiplayer weapon classes are:
 
-Two chat errors are rejected at *load* rather than silently vanishing later: a
-line longer than `BOT_CHAT_MAX_LEN` (160 characters, because the broadcast path
-drops the whole line at 240 once the decorated name is added), and a line
-beginning with `#`, because chat text is passed through
-`common->GetLocalizedString` and `#str_` would be substituted out from under the
-author.
+- `weaponobj_wrench`
+- `weaponobj_rifle`
+- `weaponobj_crawlergrenade`
+- `weaponobj_soulstripper`
+- `weaponobj_autocannon`
+- `weaponobj_hiderweapon`
+- `weaponobj_rocketlauncher`
+- `weaponobj_bow`
 
-A style, abbreviated from the shipped `sniper.style`:
-
-```
-style "sniper" {
-	description	"holds range and trades with hitscan"
-
-	set	combatRange		1400
-	set	aggression		0.28
-	set	patience		0.85
-
-	// Takes its time and will not shoot at anything it is not sure of.
-	scale	aimSettleMsec		1.30
-	scale	fireConeDeg		0.70
-
-	weapon	"weapon_railgun"	2.00
-	weapon	"weapon_shotgun"	0.35
-
-	// A bad sniper is worse than a bad anything else: it stands still at
-	// range and cannot hit.  Give the low levels back some willingness to move.
-	skill 1 {
-		scale	strafeChance	1.50
-		scale	combatRange	0.75
-	}
-}
-```
-
-Character mechanics, abbreviated from `voss.bot`, contain no dialogue:
-
-```
-character "Voss" {
-	inherit		"roamer"
-	description	"calm field leader who values discipline over heroics"
-
-	skillBand	3 5
-
-	model		"model_player_marine_voss"
-	modelMarine	"model_player_marine_voss"
-	modelStrogg	"model_player_kane_strogg"
-
-	// Holds useful ground, protects his health and will not turn one kill into
-	// an undisciplined chase.
-	set	combatRange		720
-	scale	aggression		0.84
-	add	patience		0.15
-	scale	pursuit			0.75
-	add	retreatHealth		0.08
-
-	// His edge is judgment, not superhuman aim.
-	scale	targetSelection		1.06
-
-	// Talks rarely, but an order arrives while it can still matter.
-	set	chatiness		0.30
-	scale	chatDelayScale		0.90
-}
-```
-
-The corresponding voice bank is `botfiles/chats/voss.chat`:
-
-```
-characterChat "Voss" {
-	chat kill {
-		"$other overcommitted. Don't do the same."
-		"I had the angle."
-	}
-	chat death {
-		"Good shot. I gave you the angle."
-	}
-}
-```
+Weapon preferences influence selection among weapons the player actually has;
+they do not grant inventory. Named biases merge, and `1.0` is neutral.
 
 ## Chat
 
-Chat is event driven and entirely server-side. A line goes out through
-`idMultiplayerGame::ProcessChatMessage` with the bot's own client number, which
-is the same call the server makes for a human's `say`, so the result is
-indistinguishable from a player typing. Routing it through the `say` command
-instead would make every bot speak as the host, and hooking the obituary would
-make bots silent on a dedicated server, because that path's local branch never
-runs there.
+Chat is character-owned and server-side. Mechanics stay in `.bot` files while
+the corresponding `.chat` file joins to the character name
+case-insensitively. Event lines are sent through
+`idMultiplayerGame::ProcessChatMessage` with the artificial player's own client
+number, so display name, routing, and scoreboard identity remain consistent.
 
-Dialogue is character-owned without being mixed into the mechanics file. Each
-`botfiles/chats/*.chat` file names its owner in a
-`characterChat "<display name>"` header. Chat banks load after the character
-definitions and merge by that name case-insensitively, so the filename is a
-useful convention rather than the identity key.
+The events are: `entergame`, `levelstart`, `kill`, `killWrench`, `killStreak`, `revenge`, `death`, `deathAccident`, `itemDenied`, `leadTaken`, `leadLost`, `matchWin`, `matchLose`, `farewell`.
 
-The events are: `entergame`, `levelstart`, `kill`, `killGauntlet`,
-`killStreak`, `revenge`, `death`, `deathAccident`, `itemDenied`, `leadTaken`,
-`leadLost`, `matchWin`, `matchLose`, `farewell`. A character with no lines for
-an event simply says nothing — silence is a valid answer and nothing invents a
-fallback line.
+`itemDenied` fires from the authoritative multiplayer pickup path when another
+player takes the visible item the bot was pursuing. This supplies both the
+localized item name and the winning player's name before the item respawns or
+is removed.
 
-Every shipped character carries eight alternatives for each event: 112 lines
-per character and 1,792 across the roster. This is a content target, not a
-parser requirement; add-on characters may use smaller banks or intentional
-silence. The uniform depth keeps losses, lead changes and departures from
-becoming more repetitive than kills.
+Every shipped character provides exactly eight alternatives for every event:
+112 event lines per voice and 2,128 across the 19-character roster. Selection
+excludes the immediately previous usable line when another is available.
+`killWrench` is the Prey-specific close-combat event corresponding to the
+upstream humiliation line.
+
+Lines may use `$self`, `$other`, `$weapon`, `$map`, and `$item`. The loader and
+validation contract limit tokens to events that can supply them. At runtime a
+line whose required value is unavailable is skipped rather than sent as a
+broken sentence. Authored lines are limited to 160 characters and may not
+begin with `#`; substitution is checked again before delivery.
 
 ### Triggered replies
 
-The same voice file may also contain `reply` rules. They let a bot answer
-recognisable ideas in typed player chat and ordinary event-driven bot chat
-without putting dialogue or phrase lists in C++. The shipped rules cover
-requests for help, post-match sportsmanship, challenges, greetings, thanks,
-praise, apologies and farewells. A ninth low-priority rule lets each character
-answer when addressed by name. These are deliberately broad conversational
-signals, not a general language model.
+Each shipped voice has exactly nine reply categories: `help`, `goodGame`,
+`challenge`, `greeting`, `thanks`, `praise`, `apology`, `farewell`, and
+`direct`. Every category has exactly eight normalized triggers and four
+responses.
 
-Incoming text is stripped of Quake 4 colour escapes, folded to lower-case and
-split at punctuation. Triggers are normalised the same way and match only
-contiguous whole words: `hi` matches `Hi, Voss`, but never the `hi` inside
-`this`. Rules first filter on `source` and `addressed`; the highest `priority`
-then wins, followed by the longest matching phrase; file order breaks a
-remaining tie. The selected response cannot immediately repeat. A directly
-named bot is preferred as the responder. Otherwise at most one eligible bot
-answers, so one greeting cannot make the whole server speak.
+Incoming accepted chat is stripped of color escapes, folded to lower case,
+and matched as contiguous whole words. A higher priority wins, then a longer
+trigger, then file order. `source` limits a rule to people, bots, or either;
+`addressed` controls whether the character's whole display name must be
+present. The longest addressed character name owns the message, so “Elite
+Hunter” cannot accidentally call “Hunter”; if that character has no matching
+reply, the message does not fall through to a shorter or general responder.
+Otherwise at most one eligible bot answers. Team chat considers only bots on
+the speaker's team and the reply remains team-only.
 
-`source` accepts `any`, `player` or `bot`. `addressed` accepts `either`,
-`required` or `forbidden`; a bot is addressed when its display name appears as
-whole words in the message. Each character may contain at most 32 reply rules,
-with up to 32 triggers and 32 responses in each. Triggers are limited to 64
-characters after normalisation. Priorities are clamped to
-0 through 100. Invalid values, oversized rules and unknown keys warn and remain
-contained to the affected setting, trigger, line or rule rather than preventing
-the server from starting.
+A generated reply marks its own delivery and cannot recursively trigger another
+reply. A bot with a line already queued does not replace it. Delivery is
+subject to a six-second per-bot throttle and a 1.2-second server-wide throttle;
+chatty mode shortens both, and map init/restart resets both clocks. The delay
+combines `bot_chatDelay`, visible text length at `bot_chatCPM`, and the
+character's `chatDelayScale`.
 
-Replies use only `$self`, `$other` and `$map`: the speaker and map are always
-known, while `$other` is filled from the server's trusted player name rather
-than from chat-packet display text. Unknown or unavailable reply tokens are
-rejected when the bank loads.
+Chat files are raw bot content, not language-dictionary strings. Retail
+`<PROFANITY>` markup is not filtered through `idLangDict::GetString` here.
+Shipped voices therefore avoid strong profanity, slurs, invented derogatory
+language, and imitation accents even when a lore character is angry or
+hostile.
 
-Responses keep all normal chat safeguards. A bot with a line already queued
-does not lose it to a reply. Replies use the character's typing delay and the
-existing per-bot and global throttles, plus a per-speaker cooldown that prevents
-one chatter from rotating through the whole roster. Unaddressed bot-to-bot
-responses are intentionally much rarer than replies to people. A generated
-reply is explicitly marked in the send path and cannot trigger another reply;
-voice macros are excluded too, so acknowledgement loops cannot form.
+## Adding or tuning a character
 
-Global chat may choose any bot. Team chat can choose only a bot on the
-speaker's team and the response remains team-only. Spectator-only chat, server
-console text and malformed or rejected messages never reach reply matching.
-
-Each of the fifteen normally talkative characters ships four alternatives for
-each of the nine reply rules. Kane retains two terse alternatives per rule.
-That adds 558 reactive lines to the 1,792 event lines, for 2,350 authored lines
-across the roster.
-
-Lines may use `$self`, `$other`, `$weapon`, `$map` and `$item`. A line requiring
-a token that is unavailable for its event is skipped, preventing a partial or
-mangled sentence from reaching chat. `$map` is supplied for every event;
-opponent and weapon names come from combat events, while `$item` is specific to
-`itemDenied`. Match-end events do not identify the winner or loser as `$other`.
-Selection is uniform over the usable lines excluding whichever was used last,
-so a line never repeats back to back.
-
-Two delays keep the chatter believable and safe:
-
-- A bot never speaks on the frame of the event. The delay is `bot_chatDelay`
-  scaled by the bot's own `chatDelayScale`, which is worse at low skill, plus a
-  little jitter — a bad player takes longer to type. A bot that dies or leaves
-  before the timer expires drops the line.
-- Throttles, per bot and server wide. This is not politeness: **the engine has
-  no chat flood protection anywhere**, and `idAsyncServer::SendReliableMessage`
-  drops any client whose reliable queue overflows, so unbounded bot chatter can
-  kick real players off a server. `bot_chat 2` halves both throttles and makes
-  every bot more talkative; `bot_chat 0` silences them completely.
-
-Team chat is only ever used in a team game. `ProcessChatMessage` does not check
-that itself, and `team` set in a deathmatch colours everyone as Marine and
-restricts delivery by the team field.
-
-## Adding a character
-
-1. Write `content/baseoq4/pak0/botfiles/characters/<name>.bot`. Start from an
-   existing one; the only required keys are the `character "<name>"` header and
-   an `inherit` naming a style that exists. Keep this file to models, selection
-   metadata and play-style modifiers.
-2. Set `skillBand` to the range the character is meant to be picked for. A
-   character out of band is only used as a last resort, so a band of `5 5` means
-   "this one shows up when the server is set to hard".
-3. If it names a model, the name must be a real `playerModel` decl, and in a
-   team game its decl team has to match the side it spawns on — hence the
-   separate `modelMarine` and `modelStrogg` keys. `model_player_tactical_elite`,
-   `model_player_tactical_command` and `model_player_marine_tech` declare no
-   team and are legal on either side. An unknown model name makes the player
-   rewrite its own user info every update.
-4. Bias only what makes the character distinct. The style already covers how it
-   plays and the skill curve already covers how well; a `.bot` file that sets
-   twenty traits is fighting both.
-5. Write `content/baseoq4/pak0/botfiles/chats/<name>.chat` with a
-   `characterChat "<name>"` header. The owner name is matched
-   case-insensitively to the character header; matching filenames keep the pair
-   easy to find but are not used for ownership.
-6. Add lines for as many events as the voice supports. Keep them short, in
-   character and inoffensive. The shipped roster uses eight alternatives for
-   all fourteen events; add-ons may deliberately use fewer or stay silent. Add
-   `reply` rules when the voice should recognise typed phrases. Prefer
-   whole-word phrases over single common words, use `addressed required` for a
-   name-only fallback, and make every response sensible without knowing more
-   than the rule's conversational intent.
-7. `ninja -C builddir pak0.pk4` to repack, or run from a loose `fs_devpath`
-   tree, then `botreload` in the console. It rereads styles, character mechanics
-   and chat banks without a restart or map change.
+1. Add a mechanics file under
+   `content/basepr/pak0/botfiles/characters/`. Use the exact display name,
+   choose one existing style, set a truthful skill band, and choose a retail
+   model slot from 0 through 18.
+2. Bias only the traits that make the character distinct. The style already
+   owns broad intent and the baseline owns competence.
+3. Use only the eight supported `weaponobj_*` classes. Preference is taste,
+   not inventory or skill.
+4. Add the matching `characterChat` file under
+   `content/basepr/pak0/botfiles/chats/`. A shipped voice requires eight lines
+   for each of the 14 events and all nine reply categories with eight triggers
+   and four responses.
+5. Separate evidence from inference in comments. Cite a story role where one
+   exists; for a generic or multiplayer-only label, limit characterization to
+   visible role and gameplay behavior. Never manufacture a biography to make a
+   voice easier to write.
+6. Keep every line concise, self-contained, safe under token substitution, and
+   free of localization/profanity markup.
+7. Run the character contract test, build `pak0.pk4`, and use `botreload` on a
+   multiplayer server to inspect the loaded roster without restarting.
 
 ## Commands
 
 | Command | Effect |
 | --- | --- |
-| `addbot [name] [skill]` | Add one bot. Picks an unused name and character if none is given. The optional skill is a per-bot override that bypasses `bot_skill` and `bot_skillVariance`. Builds the navmesh on first use. |
-| `removebot [name]` | Remove one bot, by name or the last one added. |
-| `kickbots` | Remove every bot. |
-| `botlist` | List the bots with their character, style and effective skill, and the state of the navmesh. |
-| `botcharacters` | List every loaded character with its style, skill band and which bot currently has it. |
-| `botreload` | Re-read style, character and chat files without a map change. Bots keep the character they are wearing where the name survives. |
-| `navmesh build` | Rebuild the navmesh, picking up a changed `bot_navCellSize`. |
-| `navmesh info` | Report node, link and build-time counts. |
+| `addbot [character] [skill]` | Add one artificial player. The character is optional; the skill override must be 1..5 and becomes the center before configured variance. |
+| `removebot [character]` | Remove the named bot, or the last artificial player when no name is supplied. |
+| `removebots` | Remove every artificial player and set the compatibility bot count to zero. |
+| `kickbots` | Alias for `removebots`. |
+| `botlist` | List live bot slots, requested and effective skill, character, and style. |
+| `botcharacters` | List every loaded character with style, skill band, model slot, and whether it is in use. |
+| `botreload` | Re-read styles, mechanics, and chat, then always rebind live artificial players by character name or to the safe baseline when replacement content is unusable. |
+| `spawnArtificialPlayer` | Legacy cheat command that adds one automatically selected artificial player and synchronizes the count. |
+
+Bot mutation commands require a multiplayer server. `botcharacters` is also
+useful before a match for checking content load. `botreload` warns when no
+usable character content can be loaded and unconditionally rebinds live bots,
+preventing them from retaining pointers into the discarded data.
+Quote names that contain spaces, for example `addbot "Elite Hunter" 5` or
+`removebot "Mutilated Human"`.
 
 ## Cvars
 
 | Cvar | Default | Effect |
 | --- | --- | --- |
-| `bot_enable` | `1` | Allow bots to be added at all. |
-| `bot_minPlayers` | `0` | Top the match up to this many players with bots. `0` disables. |
-| `bot_skill` | `3` | 1 (harmless) to 5 (unpleasant). Selects the baseline row every trait is read from - vision, reaction, aim steadiness, trigger discipline, decision quality. See "What each skill level feels like". |
-| `bot_skillVariance` | `0` | Spread skill up to this many levels either side of `bot_skill`, per bot, so a match is not all one difficulty. The roll is seeded from the client number, so it is stable for the life of that bot. |
-| `bot_characters` | `1` | Use the character files. `0` leaves every bot on the plain skill curve with a name from the pool and nothing to say. |
-| `bot_forceCharacter` | `""` | Put every bot on this one character, by name. A tuning knob, deliberately not archived - a server that saved it would field a roster of clones. |
-| `bot_chat` | `1` | `0` silent, `1` normal, `2` chatty and with chat throttles halved. Applies to event lines and triggered replies. |
-| `bot_chatDelay` | `1200` | Milliseconds between a chat-worthy event and the line, before the bot's own delay scale. |
-| `bot_debug` | `0` | `1` logs navigation events, `2` adds a periodic per-bot status line. |
-| `bot_debugNav` | `0` | `1` draws the navmesh near the local player, `2` adds each bot's current route. |
-| `bot_debugAim` | `0` | Log the reaction, settle and lead values behind every shot. |
-| `bot_navCellSize` | `24` | Sampling resolution in world units. Smaller finds more ground and costs more to build. |
-| `bot_pause` | `0` | Freeze all bot input. |
+| `bot_skill` | `3` | Baseline difficulty from 1 (easiest) through 5 (hardest). |
+| `bot_characters` | `1` | Enable named style/model/voice content; 0 uses only the baseline curve. |
+| `bot_forceCharacter` | `` | Session-only tuning name that makes automatic selection choose one character. |
+| `bot_skillVariance` | `0` | Deterministic per-bot spread, from 0 through 2 skill levels around the requested skill. |
+| `bot_chat` | `1` | 0 silences bots, 1 is normal, and 2 increases chat chance while shortening throttles. |
+| `bot_chatDelay` | `600` | Initial thinking delay in milliseconds before visible-character typing time and character scaling. |
+| `bot_chatCPM` | `900` | Base visible-character typing speed in characters per minute, clamped to 60..6000. |
 
-Bots are server-side only. Everything a server operator is expected to set is
-archived - `bot_enable`, `bot_minPlayers`, `bot_skill`, `bot_skillVariance`,
-`bot_characters`, `bot_chat` and `bot_chatDelay` - so a dedicated server config
-can set them once. That is not cosmetic: a command-line `+set` never reaches a
-`CVAR_GAME` cvar, because the game module registers it after the engine has
-parsed the command line, so only archived values survive.
+All except `bot_forceCharacter` are archived game cvars so a server config can
+retain them. The forced character is intentionally session-only: archiving it
+would unexpectedly fill later matches with clones.
+
+## Packaging and validation
+
+Canonical game-library edits belong in `E:/Repositories/OpenPrey-game`.
+openPREY stages `src/game` and `src/Prey` from that repository at configure
+time; it must not grow an in-repository game-source mirror. The existing source
+enumeration discovers new `.cpp` files recursively.
+
+Bot content belongs under `content/basepr/pak0/botfiles/`. The normal pak build
+recursively includes `.style`, `.bot`, and `.chat` files in `pak0.pk4`, which
+is installed beneath `.install/basepr/`. Loose `botfiles` in the staged runtime
+are a packaging error; the content must be inside the pak.
+
+`tools/tests/mp_bot_characters.py` is active validation. It independently
+checks:
+
+- the v7 artificial-player architecture and manager lifetime;
+- all 48 trait fields, field-table entries, clamps, and baseline rows;
+- six usable styles and the exact 19-character/model-slot roster;
+- known Prey weapon names and valid style/character inheritance;
+- exactly eight lines for all 14 events in every shipped voice;
+- all nine reply categories with eight triggers and four responses;
+- allowed tokens, line limits, whole-word matching, throttles, team routing,
+  and reply recursion protection;
+- authoritative userinfo ordering for spawn, reload, late join, and the
+  bot-to-human slot handoff, including the pending-connection reservation;
+- gravity-relative aim/movement, usable-weapon filtering, bounded item-goal
+  progress, round-state cleanup, and clone-safe character reservations;
+- the seven documented cvars and the registered commands; and
+- packed-content and non-fatal parser contracts.
+
+`tools/tests/mp_bot_navigation.py` remains explicitly deferred. The current
+runtime has gravity-aware steering and wall avoidance, not the full navigation
+contract that the upstream test describes.
+
+For live validation, use a windowed multiplayer server/client launch with
+`+set r_fullscreen 0`. Exercise each style at low and high skill, verify every
+model slot and scoreboard name, add/remove/reload bots, trigger combat and
+typed-chat responses, then inspect the engine log for parser, snapshot,
+reliable-message, and shutdown warnings. Do not treat successful fighting in
+one room as evidence of general map navigation.
 
 ## Known limits
 
-- Bots fight; they do not play objectives. On CTF they will shoot each other
-  competently and ignore the flag. Styles bias *how* a bot fights and which
-  goals it prefers, not what the game type is asking for.
-- A jump pad's link lands on its target entity, but `rvJumpPad` aims the player
-  to *arrive* there with its vertical speed spent, so the real landing spot is a
-  little past it. Bots re-route on arrival, so this costs a moment, not a route.
-- The A* heuristic is not admissible across teleporters (see the comment on
-  `rvNavMesh::FindPath`); paths can be slightly longer than optimal, never
-  invalid.
-- `bot_debugNav` is implemented but has not been visually confirmed in this
-  build. The renderer's debug line pool is fixed at 16384 entries and the draw
-  is budgeted to stay inside it, but nothing on the server path calls
-  `DebugClear`, so lines accumulate rather than expire.
-- A character's preferred team is only ever a hint. With `si_autoBalance` on,
-  the server overrides the requested side whenever the teams are uneven, and a
-  team switch kills and respawns the player.
+- Bots do not have full map routing, portal planning, wall-walk transition
+  planning, or objective strategy.
+- Item goals are limited to currently visible candidates; a bot does not know
+  a hidden pickup route.
+- Aim lead uses a general projectile approximation and does not model every
+  alternate-fire or ballistic arc independently.
+- Personality content can make combat and communication distinct, but cannot
+  compensate for unreachable geometry.
+- The roster intentionally stops at retail-selectable model slot 18.
 
-## Testing
-
-`tools/tests/mp_bot_navigation.py` pins the agreements that make the navigation
-work and that the compiler cannot check: the engine handing back the allocated
-slot, bots being re-begun after a map change, user info being restored on every
-update, bots thinking before entities do, and the navmesh deriving its agent
-from the movement cvars rather than hardcoding a size. It also guards the
-directed goal searches and the action entry/airborne/grounded-exit contract that
-prevents a 24-unit-adjacent jump landing from being consumed as an ordinary
-corner.
-
-`tools/tests/mp_bot_characters.py` does the same for the personality layer: that
-the character manager is actually initialised and shut down, that style,
-character and chat content is read with the non-fatal lexer flags and every file
-list is freed, that the trait field table and the baseline curve agree with
-`botTraits_t`, and that the curve moves monotonically in the direction that
-means "better" for every accuracy trait. Its content checks cover every shipped
-`.style`, `.bot` and `.chat` file: character files use known traits and styles,
-carry no inline dialogue, and each chat bank names a real character and contains
-only lines the broadcast path can deliver. It independently parses reply rules,
-checks their caps, priorities, sources, addressing modes, triggers, allowed
-tokens and required shipped categories, exercises whole-word matcher vectors,
-rejects duplicate responses, and pins the provenance, team routing, one-speaker
-cooldown and recursion brakes in the server path.
-
-For a live check, run a dedicated server with `bot_debug 2` and read the status
-lines: each one carries the bot's position, health, armour, goal, path progress,
-current enemy and whether it is firing. Completed non-walk actions are logged
-with their entry, intended exit and observed landing position. For the combat
-model specifically, put two bots
-at `bot_skill 1` and two at `bot_skill 5` on `mp/q4dm1` with `bot_debugAim 1`,
-and read the per-shot reaction, settle and lead values. For obstacle traversal,
-watch the yellow armour beside the crates in `mp/q4dm1`: its intended approach
-is ground to the lower crate and then the upper crate, with two distinct jump
-actions before the pickup. For replies, address a bot by name in global chat,
-then repeat in team chat during a team game; exactly one eligible bot should
-answer after its typing delay, on the same route as the source message.
+The implementation history and acceptance gates are recorded in
+[`plans/2026-08-02-prey-bot-characters.md`](plans/2026-08-02-prey-bot-characters.md).

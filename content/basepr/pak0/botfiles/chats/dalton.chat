@@ -1,0 +1,297 @@
+// Dalton: a long-winded, confrontational regular whose swagger stays about the match.
+
+characterChat "Dalton" {
+	chat entergame {
+		"Dalton's here. Now we can stop pretending this was a quiet match."
+		"Make room. I came to settle every argument on the scoreboard."
+		"You wanted competition, and I brought more than you ordered."
+		"All right, contenders, show me which of you can back up the noise."
+		"I walked in ready; the rest of you can catch up."
+		"New round, same rule: talk is cheap until the shooting starts."
+		"Dalton reporting. Consider the easy part of your evening over."
+		"Let's get this contest moving before Chuck starts explaining it."
+	}
+	chat levelstart {
+		"$map has plenty of corners for somebody else to regret."
+		"Pick a route and commit; hesitation is just a slower defeat."
+		"The center belongs to whoever has the nerve to hold it."
+		"Watch the pickups, watch the exits, then watch me take both."
+		"I know the kind of player who hides here. I also know the counter."
+		"Every lane on this map ends in an argument. I'll finish mine."
+		"Start moving. A plan improves once somebody tests it."
+		"On $map, confidence needs directions; fortunately, mine has them."
+	}
+	chat kill {
+		"That's the difference between a threat and a demonstration."
+		"You challenged the angle, $other, and the angle won."
+		"The $weapon just put a period on that speech."
+		"I gave you room to reconsider. You used it to miss."
+		"Down already? I had a second point prepared."
+		"Remember that route; it leads straight back to me."
+		"Dalton takes the point, exactly as advertised."
+		"That exchange was shorter than your confidence suggested."
+	}
+	chat killWrench {
+		"A wrench ended the debate. That's almost too direct."
+		"You stepped into arm's reach and expected diplomacy."
+		"No ammunition needed when the lesson is this close."
+		"That tool was built for repairs, but you insisted."
+		"I walked right up and collected the point, $other."
+		"Next time, leave enough distance for an excuse."
+		"A close-range conclusion for a poorly spaced argument."
+		"The wrench spoke once. Apparently, that was sufficient."
+	}
+	chat killStreak {
+		"Three straight. Now the scoreboard is making my case for me."
+		"This is what happens when momentum finds somebody qualified."
+		"Another point, another challenger running out of answers."
+		"Count to three slowly; I want everyone to understand the pattern."
+		"The streak continues, and I haven't reached the good part yet."
+		"Three down. Keep sending objections through the same doorway."
+		"I said I would control this round. Consider that the evidence."
+		"Dalton is rolling now; interrupt at your own expense."
+	}
+	chat revenge {
+		"There, $other. Your earlier point just lost its value."
+		"I kept the receipt for that last defeat."
+		"You had a temporary advantage and mistook it for a conclusion."
+		"That's the response I promised, delivered without delay."
+		"Our score is balanced; my patience is not."
+		"I found you again and corrected the record."
+		"One good hit on me buys exactly one determined return."
+		"You started that conversation. Dalton just finished it."
+	}
+	chat death {
+		"Good hit, $other. Don't build a whole reputation on it."
+		"The $weapon caught me between better decisions."
+		"Enjoy the point; I intend to make it expensive."
+		"You earned that one, and now you have my attention."
+		"I overcommitted. That's a mistake, not a surrender."
+		"Fine angle. I'll close it next time."
+		"Dalton is down for the length of one respawn."
+		"That worked once. Let's see what happens when I'm ready."
+	}
+	chat deathAccident {
+		"That was the map collecting a cheap point."
+		"I took one step too far and found the final answer."
+		"Bad footing, worse timing, nobody else gets credit."
+		"The hazard won because I treated it like scenery."
+		"Put that mistake on my tab and close it immediately."
+		"I found the route that should stay untraveled."
+		"No opponent did that. I can admit the obvious."
+		"Dalton versus gravity ends one round to gravity."
+	}
+	chat itemDenied {
+		"You reached the $item first, $other. That's timing, not ownership."
+		"Take the pickup; I'll take the lane on the next cycle."
+		"The $item changed hands before my argument arrived."
+		"You won the race, so now defend the prize."
+		"That resource was scheduled for me; expect a correction."
+		"Pickup denied. Fine. I know where you have to leave."
+		"One item does not save a bad position."
+		"Enjoy it while I shorten the route back."
+	}
+	chat leadTaken {
+		"First place, right where the longest argument ends."
+		"Dalton has the lead; everyone else's explanation is pending."
+		"The board finally caught up with what I have been saying."
+		"I'm ahead because I kept moving when the rest kept guessing."
+		"Take a look at the score and choose your next excuse carefully."
+		"I own the pace now. Come take it if you can."
+		"The top position suits somebody willing to defend it."
+		"Lead secured. The challenging part is keeping up with me."
+	}
+	chat leadLost {
+		"Somebody moved ahead. That makes this interesting, not finished."
+		"The lead changed hands while I was proving a smaller point."
+		"First place wandered off; I know exactly where to retrieve it."
+		"Enjoy the top line briefly. Dalton is still in the match."
+		"I gave up the lead, not the pressure."
+		"The board shifted; my plan just became more direct."
+		"Somebody passed me. Now they have to stay there."
+		"A narrow deficit is merely an invitation to argue faster."
+	}
+	chat matchWin {
+		"Final score delivered. My opening statement stands."
+		"Dalton wins, and this time the board says it louder than I can."
+		"Good contest. You made me work hard enough to enjoy the result."
+		"That's how you close a match: pressure first, excuses never."
+		"The round is mine. Nobody can call the conclusion unclear."
+		"Well fought. I still took the last word and the top score."
+		"I promised competition and collected the win as interest."
+		"Match over. The challenge was real; the answer was Dalton."
+	}
+	chat matchLose {
+		"You won. I can respect a result I intend to reverse."
+		"Fair match. The board has the last word for tonight."
+		"I talked big and came up short; that part is mine."
+		"Good game. Next round, I trim the speech and sharpen the routes."
+		"You held up under pressure. That's a win worth acknowledging."
+		"The result stands, even if I dislike every digit."
+		"Dalton takes the loss without pretending it was luck."
+		"Well played. Bring that same game when I ask for the rematch."
+	}
+	chat farewell {
+		"Dalton is leaving. You can resume the smaller conversations."
+		"Good games. Keep your best challenge ready for next time."
+		"I'm calling it before Chuck invents another victory lap."
+		"That's enough competition for one night."
+		"See you around; the scoreboard will remember the argument."
+		"I'm out. Practice the routes before you practice the boasts."
+		"Until the rematch, try to make the quiet useful."
+		"Dalton signing off. The next round can wait."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Hold your ground, $other. I'm coming to make the other side reconsider."
+		"Fall back one corner; I'll contest the lane you just lost."
+		"Stay covered. Dalton is on the way with a stronger argument."
+		"You asked for backup; now give me a route worth defending."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. You made every point worth contesting."
+		"Well played. That was a proper fight from start to finish."
+		"A strong match on $map; I have no complaint with the effort."
+		"Good games. Bring that discipline back for the rematch."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Now that is an invitation I understand, $other."
+		"State your challenge once; I'll answer it on the board."
+		"Come find Dalton and bring more than a slogan."
+		"You want pressure? Step into the lane and earn it."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hello, $other. I hope the greeting comes with a game plan."
+		"Dalton here. Speak clearly and play even clearer."
+		"Evening. Let's see whether $map gives us a real contest."
+		"I hear you. Save the best part for the match."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You're welcome, $other. Make the advantage count."
+		"Acknowledged. I help because winning arguments needs witnesses."
+		"No debt owed; just hold your lane next time."
+		"Save the thanks and turn it into another point."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Good eye, $other. The angle deserved recognition."
+		"I appreciate accurate praise almost as much as accurate fire."
+		"That shot had planning behind it, not just volume."
+		"Noticed, did you? Keep watching; the follow-up matters."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Apology accepted, $other. Don't make me hear it twice."
+		"We're settled. Correct the move and continue."
+		"Fine. Owning the mistake is better than dressing it up."
+		"Let it go; the next decision is the one worth debating."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Goodbye, $other. Return ready to defend your score."
+		"Later. I'll keep the rematch argument prepared."
+		"Good night; leave the boasting here and take the practice home."
+		"See you next time. Bring a route I haven't challenged."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Dalton"
+		trigger "hey Dalton"
+		trigger "Dalton help"
+		trigger "Dalton hello"
+		trigger "Dalton listen"
+		trigger "Dalton there"
+		trigger "Dalton answer"
+		trigger "Dalton wait"
+		"Dalton is listening, $other. Make your point."
+		"You have my attention; use it well."
+		"Go ahead. I always appreciate a direct challenge."
+		"I heard my name. What needs settling?"
+	}
+}

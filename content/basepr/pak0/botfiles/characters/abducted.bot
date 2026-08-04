@@ -1,0 +1,29 @@
+// The Abducted model represents one of the Sphere's captives, not a named
+// protagonist. This survivor searches for supplies, avoids a bad trade and
+// talks more because silence aboard the Sphere is its own threat.
+character "Abducted" {
+	inherit		"roamer"
+	description	"anxious captive who scavenges every route for a way through"
+	skillBand	1 3
+	modelNum	6
+
+	set	combatRange		700
+	set	aggression		0.25
+	set	patience		0.35
+	set	targetStickiness	0.25
+	set	opportunism		0.90
+	add	retreatHealth		0.15
+	scale	itemFocus		1.25
+	scale	sightRange		0.90
+	set	chatiness		0.75
+	scale	chatDelayScale		1.10
+
+	weapon	"weaponobj_autocannon"		1.20
+	weapon	"weaponobj_rifle"		1.15
+	weapon	"weaponobj_soulstripper"	1.10
+
+	skill 1 {
+		add	retreatHealth		0.08
+		scale	pursuit			0.75
+	}
+}

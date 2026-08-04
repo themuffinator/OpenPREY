@@ -1,0 +1,29 @@
+// Dalton instigates the Roadhouse fight and keeps escalating it. He is the
+// more deliberate bully beside Chuck: still a brawler, but one who singles
+// out a grievance and comes back to settle it.
+character "Dalton" {
+	inherit		"rusher"
+	description	"barroom instigator who turns every exchange into a grudge"
+	skillBand	2 4
+	modelNum	3
+
+	set	combatRange		200
+	set	aggression		0.95
+	set	patience		0.08
+	set	initiative		0.90
+	set	targetStickiness	0.80
+	set	vengefulness		1.00
+	set	suppressionMsec	450
+	set	rangeDiscipline		0.80
+	set	chatiness		0.85
+	scale	chatDelayScale		0.80
+
+	weapon	"weaponobj_wrench"		1.80
+	weapon	"weaponobj_rocketlauncher"	1.25
+	weapon	"weaponobj_autocannon"		1.20
+
+	skill 4 {
+		scale	dodgeReactMsec		0.92
+		add	targetSelection		0.03
+	}
+}

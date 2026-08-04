@@ -1,0 +1,26 @@
+// Edward is a multiplayer-only identity using the Ted body variant. With no
+// story role to cite, his voice remains understated and his mechanics remain
+// a cautious, ordinary rotation rather than an invented specialism.
+character "Edward" {
+	inherit		"roamer"
+	description	"cautious regular who keeps moving and keeps his head down"
+	skillBand	1 3
+	modelNum	8
+
+	set	combatRange		600
+	set	aggression		0.40
+	set	patience		0.55
+	set	targetStickiness	0.40
+	add	retreatHealth		0.08
+	scale	itemFocus		1.15
+	set	chatiness		0.45
+
+	weapon	"weaponobj_rifle"		1.10
+	weapon	"weaponobj_soulstripper"	1.10
+	weapon	"weaponobj_autocannon"		1.05
+
+	skill 1 {
+		scale	pursuit			0.80
+		add	retreatHealth		0.05
+	}
+}

@@ -1,0 +1,26 @@
+// Trent is a multiplayer skin without campaign characterization. His identity
+// is intentionally modest: competitive movement, short trades and little ego.
+character "Trent" {
+	inherit		"skirmisher"
+	description	"mobile regular who takes a short trade and changes the angle"
+	skillBand	2 4
+	modelNum	9
+
+	set	combatRange		800
+	set	aggression		0.52
+	set	patience		0.30
+	scale	strafeChance		1.10
+	set	targetStickiness	0.35
+	set	opportunism		1.00
+	scale	itemFocus		1.10
+	set	chatiness		0.50
+
+	weapon	"weaponobj_autocannon"		1.30
+	weapon	"weaponobj_hiderweapon"		1.20
+	weapon	"weaponobj_rifle"		1.10
+
+	skill 4 {
+		scale	burstMaxMsec		0.92
+		add	strafeChance		0.04
+	}
+}

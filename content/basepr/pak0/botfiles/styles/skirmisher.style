@@ -1,0 +1,52 @@
+// skirmisher.style
+//
+// Trades in short bursts, changes its gravity-relative line and breaks off
+// before a longer exchange is decided.
+
+style "skirmisher" {
+	description	"hits, moves and breaks off early"
+
+	set	combatRange		850
+	set	aggression		0.45
+	set	patience		0.35
+	add	initiative		0.12
+	set	targetStickiness	0.30
+	set	opportunism		1.00
+	set	vengefulness		0.15
+	add	suppressionMsec	100
+	set	strafeRhythmMsec	220
+	set	strafeRhythmVarianceMsec	400
+	set	weaponSwitchMsec	280
+
+	scale	strafeChance		1.30
+	scale	jumpChance		1.45
+	scale	dodgeReactMsec		0.80
+	add	rangeDiscipline		0.08
+	scale	burstMaxMsec		0.75
+	scale	burstPauseMsec		0.85
+	add	retreatHealth		0.12
+	scale	pursuit			0.75
+	scale	itemFocus		1.15
+
+	weapon	"weaponobj_autocannon"		1.35
+	weapon	"weaponobj_hiderweapon"		1.30
+	weapon	"weaponobj_rocketlauncher"	1.25
+	weapon	"weaponobj_soulstripper"	1.20
+	weapon	"weaponobj_rifle"		1.05
+	weapon	"weaponobj_crawlergrenade"	0.80
+	weapon	"weaponobj_bow"			0.70
+	weapon	"weaponobj_wrench"		0.45
+
+	skill 1 {
+		scale	jumpChance		0.75
+		scale	strafeChance		0.85
+		scale	retreatHealth		0.85
+	}
+	skill 2 {
+		scale	jumpChance		0.85
+	}
+	skill 5 {
+		scale	burstMaxMsec		0.90
+		add	jumpChance		0.05
+	}
+}

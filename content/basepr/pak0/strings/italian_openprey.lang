@@ -6,6 +6,7 @@
 	"#str_04137"	"Supporto EAX abilitato."
 	"#str_100625"	"La modalita server dedicato e consigliata per i server Internet con piu di %d giocatori. Continuare in modalita listen?"
 	"#str_100626"	"Server dedicato consigliato"
+	"#str_107240"	"Avvia mappa"
 	"#str_107660"	"Limite frag"
 	"#str_107661"	"Limite catture"
 	"#str_107676"	"Torneo"

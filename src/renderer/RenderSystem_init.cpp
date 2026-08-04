@@ -1090,7 +1090,10 @@ static void R_CheckPortableExtensions( void ) {
 	}
 
 	// GL_EXT_shared_texture_palette
-	glConfig.sharedTexturePaletteAvailable = R_CheckExtension( "GL_EXT_shared_texture_palette" );
+	// This legacy fixed-function capability is optional and no active renderer
+	// path consumes it.  Probe it silently so modern drivers are not diagnosed
+	// for omitting an obsolete extension.
+	glConfig.sharedTexturePaletteAvailable = GLCapabilityProbe_HasExtension( "GL_EXT_shared_texture_palette" );
 	if ( glConfig.sharedTexturePaletteAvailable ) {
 	//	glColorTableEXT = ( void ( APIENTRY * ) ( int, int, int, int, int, const void * ) ) GLimp_ExtensionPointer( "glColorTableEXT" );
 	}
@@ -1132,10 +1135,12 @@ static void R_CheckPortableExtensions( void ) {
 	}
 
 	// GL_ATI_fragment_shader
-	glConfig.atiFragmentShaderAvailable = R_CheckExtension( "GL_ATI_fragment_shader" );
+	glConfig.atiFragmentShaderAvailable = GLCapabilityProbe_HasExtension( "GL_ATI_fragment_shader" );
 	if (! glConfig.atiFragmentShaderAvailable ) {
 		// only on OSX: ATI_fragment_shader is faked through ATI_text_fragment_shader (macosx_glimp.cpp)
-		glConfig.atiFragmentShaderAvailable = R_CheckExtension( "GL_ATI_text_fragment_shader" );
+		#if defined( MACOS_X )
+		glConfig.atiFragmentShaderAvailable = GLCapabilityProbe_HasExtension( "GL_ATI_text_fragment_shader" );
+		#endif
 	}
 	if ( glConfig.atiFragmentShaderAvailable ) {
 		//glGenFragmentShadersATI = (PFNGLGENFRAGMENTSHADERSATIPROC)GLimp_ExtensionPointer( "glGenFragmentShadersATI" );
@@ -1797,8 +1802,8 @@ void R_InitOpenGL( void ) {
 	R_RenderGraphResources_Init( glConfig.backendCaps, glConfig.renderFeatures );
 	R_MaterialResourceTable_Init( glConfig.backendCaps, glConfig.renderFeatures );
 
-	cmdSystem->AddCommand( "reloadARBprograms", R_ReloadARBPrograms_f, CMD_FL_RENDERER, "reloads ARB programs" );
-	R_ReloadARBPrograms_f( idCmdArgs() );
+	cmdSystem->AddCommand( "reloadARBprograms", R_ReloadARBPrograms_f, CMD_FL_RENDERER, "reloads and validates all registered ARB programs" );
+	R_LoadARBProgramsForStartup();
 	R_GLDebugOutput_FlushMessages();
 
 	R_RendererUpload_Init( glConfig.backendCaps );

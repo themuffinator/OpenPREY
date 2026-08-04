@@ -94,12 +94,27 @@ idRenderModel *idRenderModelPrt::InstantiateDynamicModel( const struct renderEnt
 	g.origin.Zero();
 	g.axis.Identity();
 
+	// Particle declarations may be reloaded with fewer stages.  Cached snapshot
+	// surfaces use the stage number as their id, so discard any ids that no
+	// longer name a stage before updating the remaining surfaces.
+	for ( int surfaceNum = staticModel->surfaces.Num() - 1; surfaceNum >= 0; --surfaceNum ) {
+		const int surfaceId = staticModel->surfaces[ surfaceNum ].id;
+		if ( surfaceId < 0 || surfaceId >= particleSystem->stages.Num() ) {
+			staticModel->DeleteSurfaceWithId( surfaceId );
+		}
+	}
+
 	for ( int stageNum = 0; stageNum < particleSystem->stages.Num(); ++stageNum ) {
 		idParticleStage *stage = particleSystem->stages[ stageNum ];
-		if ( stage->material == NULL || stage->cycleMsec == 0 ) {
+		if ( stage == NULL || stage->material == NULL || stage->cycleMsec == 0 ||
+			stage->particleLife <= 0.0f || stage->hidden ) {
+			staticModel->DeleteSurfaceWithId( stageNum );
 			continue;
 		}
-		if ( stage->hidden ) {
+
+		particleGeometryCounts_t geometryCounts;
+		if ( !R_GetParticleGeometryCounts( stage->totalParticles, stage->NumQuadsPerParticle(),
+			idMath::INT_MAX - 16, geometryCounts ) ) {
 			staticModel->DeleteSurfaceWithId( stageNum );
 			continue;
 		}
@@ -109,24 +124,35 @@ idRenderModel *idRenderModelPrt::InstantiateDynamicModel( const struct renderEnt
 		const int stageAge = g.renderView->time + renderEntity->shaderParms[ SHADERPARM_TIMEOFFSET ] * 1000 - stage->timeOffset * 1000;
 		const int stageCycle = stageAge / stage->cycleMsec;
 		const int diversitySeed = static_cast<int>( renderEntity->shaderParms[ SHADERPARM_DIVERSITY ] * idRandom::MAX_RAND );
-		steppingRandom.SetSeed( ( ( stageCycle << 10 ) & idRandom::MAX_RAND ) ^ diversitySeed );
-		previousCycleRandom.SetSeed( ( ( ( stageCycle - 1 ) << 10 ) & idRandom::MAX_RAND ) ^ diversitySeed );
+		steppingRandom.SetSeed( R_ParticleCycleSeed( stageCycle, false, diversitySeed ) );
+		previousCycleRandom.SetSeed( R_ParticleCycleSeed( stageCycle, true, diversitySeed ) );
 
-		const int count = stage->totalParticles * stage->NumQuadsPerParticle();
 		int surfaceNum;
 		modelSurface_t *surf;
 		if ( staticModel->FindSurfaceWithId( stageNum, surfaceNum ) ) {
 			surf = &staticModel->surfaces[ surfaceNum ];
-			R_FreeStaticTriSurfVertexCaches( surf->geometry );
+			if ( surf->geometry == NULL ||
+				surf->geometry->numAllocedVerts < geometryCounts.numVerts ||
+				surf->geometry->numAllocedIndices < geometryCounts.numIndexes ) {
+				staticModel->DeleteSurfaceWithId( stageNum );
+				surf = NULL;
+			} else {
+				R_FreeStaticTriSurfVertexCaches( surf->geometry );
+			}
 		} else {
+			surf = NULL;
+		}
+		if ( surf == NULL ) {
 			surf = &staticModel->surfaces.Alloc();
 			surf->id = stageNum;
-			surf->shader = stage->material;
 			surf->geometry = R_AllocStaticTriSurf();
-			R_AllocStaticTriSurfVerts( surf->geometry, 4 * count );
-			R_AllocStaticTriSurfIndexes( surf->geometry, 6 * count );
-			R_AllocStaticTriSurfPlanes( surf->geometry, 6 * count );
+			R_AllocStaticTriSurfVerts( surf->geometry, geometryCounts.numVerts );
+			R_AllocStaticTriSurfIndexes( surf->geometry, geometryCounts.numIndexes );
+			R_AllocStaticTriSurfPlanes( surf->geometry, geometryCounts.numIndexes );
 		}
+		// A declaration reload can change a stage's material without changing its
+		// geometry requirements, so cached surfaces must refresh the shader too.
+		surf->shader = stage->material;
 
 		int numVerts = 0;
 		idDrawVert *verts = surf->geometry->verts;
@@ -157,7 +183,7 @@ idRenderModel *idRenderModelPrt::InstantiateDynamicModel( const struct renderEnt
 			numVerts += stage->CreateParticle( &g, verts + numVerts );
 		}
 
-		assert( ( numVerts & 3 ) == 0 && numVerts <= 4 * count );
+		assert( ( numVerts & 3 ) == 0 && numVerts <= geometryCounts.numVerts );
 		int numIndexes = 0;
 		glIndex_t *indexes = surf->geometry->indexes;
 		for ( int i = 0; i < numVerts; i += 4 ) {

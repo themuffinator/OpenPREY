@@ -228,7 +228,7 @@ def validate_renderer_startup_order() -> None:
             "RB_ResetARB2InteractionHandoffBreadcrumb();",
             "R_CheckPortableExtensions();",
             "R_ARB2_Init();",
-            "R_ReloadARBPrograms_f( idCmdArgs() );",
+            "R_LoadARBProgramsForStartup();",
             "R_RendererUpload_Init( glConfig.backendCaps );",
             "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_VERTEX_CACHE_INIT );",
             "vertexCache.Init();",

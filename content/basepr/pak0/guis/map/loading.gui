@@ -75,6 +75,7 @@ windowDef Desktop {
 	windowDef ObjectivesBack {
 		rect		20, 348, 430, 74
 		screenaligny bottom
+		visible		"gui::loading_objectives_visible"
 		background	"textures/gfx/colors/white"
 		matcolor	0.0, 0.0, 0.0, 0.45
 	}
@@ -82,6 +83,7 @@ windowDef Desktop {
 	windowDef Objectives {
 		rect		32, 356, 406, 58
 		screenaligny bottom
+		visible		"gui::loading_objectives_visible"
 		forecolor	0.86, 0.9, 1.0, 0.82
 		text		"gui::loading_objectives"
 		textscale	0.28

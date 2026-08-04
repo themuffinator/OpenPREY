@@ -67,8 +67,8 @@ idCVar Win32Vars_t::in_mouse("in_mouse", "1", CVAR_SYSTEM | CVAR_BOOL, "enable m
 idCVar Win32Vars_t::win_allowAltTab("win_allowAltTab", "0", CVAR_SYSTEM | CVAR_BOOL, "allow Alt-Tab when fullscreen");
 idCVar Win32Vars_t::win_notaskkeys("win_notaskkeys", "0", CVAR_SYSTEM | CVAR_INTEGER, "disable windows task keys");
 idCVar Win32Vars_t::win_username("win_username", "", CVAR_SYSTEM | CVAR_INIT, "windows user name");
-idCVar Win32Vars_t::win_xpos("win_xpos", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "horizontal position of window");
-idCVar Win32Vars_t::win_ypos("win_ypos", "22", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "vertical position of window");
+idCVar Win32Vars_t::win_xpos("win_xpos", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "horizontal position of the window's outer frame");
+idCVar Win32Vars_t::win_ypos("win_ypos", "22", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "vertical position of the window's outer frame");
 idCVar Win32Vars_t::win_outputDebugString("win_outputDebugString", "1", CVAR_SYSTEM | CVAR_BOOL, "");
 idCVar Win32Vars_t::win_outputEditString("win_outputEditString", "1", CVAR_SYSTEM | CVAR_BOOL, "");
 idCVar Win32Vars_t::win_viewlog("win_viewlog", "0", CVAR_SYSTEM | CVAR_INTEGER, "");

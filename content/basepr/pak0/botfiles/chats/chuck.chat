@@ -1,0 +1,297 @@
+// Chuck: noisy novice bravado, kept playful without punching down.
+
+characterChat "Chuck" {
+	chat entergame {
+		"Chuck just showed up. This place is officially louder."
+		"All right, who put me near the dangerous equipment?"
+		"I'm ready enough. Somebody point me at the action."
+		"Chuck reporting for trouble, probably the manageable kind."
+		"I brought confidence. The skill should arrive any minute."
+		"Let's make some noise before Dalton takes all the credit."
+		"Fresh match, fresh chance to look like I planned this."
+		"I'm in. Try not to start without the entertainment."
+	}
+	chat levelstart {
+		"$map, huh? I can get lost here with real enthusiasm."
+		"Find a weapon, find a target, avoid the obvious holes. Easy."
+		"I call the loud route through the middle."
+		"Corners first, bragging second. I do learn."
+		"If anyone needs me, follow the unnecessary shouting."
+		"This layout looks simple from exactly one spot."
+		"Let's see which hallway makes the best entrance."
+		"Plan for $map: keep moving until it looks intentional."
+	}
+	chat kill {
+		"Ha! Chuck one, reasonable expectations zero."
+		"The $weapon and I finally agreed on something."
+		"Got you, $other. Yes, I'm surprised too."
+		"That absolutely counted as tactical."
+		"Somebody remember that shot exactly the way I describe it."
+		"I knew where you were. Eventually."
+		"Turns out confidence does help the aim a little."
+		"Down you go. Chuck is having a moment."
+	}
+	chat killWrench {
+		"Wrench delivery! No signature required."
+		"That was close enough to hear my brilliant plan."
+		"Tools out, dignity gone, point secured."
+		"I fixed the problem, $other. Very hands-on work."
+		"The wrench chose violence and I respected the decision."
+		"You got within swinging distance. That's on both of us."
+		"No ammunition, no problem, plenty of noise."
+		"Chuck's repair service has extremely firm policies."
+	}
+	chat killStreak {
+		"Three! I may have accidentally become dangerous."
+		"Keep count for me; this is getting impressive."
+		"That's a streak. Nobody touch anything."
+		"I am on fire, figuratively, which is the good version."
+		"Three in a row! Dalton better be watching."
+		"The plan is working, so I refuse to explain it."
+		"Chuck momentum is real and poorly supervised."
+		"Another one down. This confidence has evidence now."
+	}
+	chat revenge {
+		"There you are, $other. I saved that complaint for you."
+		"Payback delivered with extra volume."
+		"That's for making me look briefly less amazing."
+		"I remembered the face and almost remembered the route."
+		"Score settled. Grudge storage is empty again."
+		"You had your turn; Chuck just took his."
+		"I came back with a louder answer."
+		"Revenge works better when I stop missing."
+	}
+	chat death {
+		"Okay, $other, that one got my attention."
+		"The $weapon wins this argument. For now."
+		"I was doing great right up to the important part."
+		"Somebody tell Dalton I nearly had that."
+		"Fine shot. I object to the result."
+		"Chuck down! Please hold the applause."
+		"I found the dangerous end of that corridor."
+		"That plan needed one more rehearsal."
+	}
+	chat deathAccident {
+		"Nobody saw that, and nobody needs to."
+		"The floor and I have a serious disagreement."
+		"That button was much more committed than expected."
+		"I meant to discover exactly where not to stand."
+		"Chuck versus basic caution: caution takes the round."
+		"That shortcut had a very sudden ending."
+		"No opponent required; I handled the mistake myself."
+		"Resetting with slightly more respect for edges."
+	}
+	chat itemDenied {
+		"Hey, $other, I was loudly heading toward that $item."
+		"You took the pickup and my whole developing strategy."
+		"Fine, keep the $item. I'll improvise something noisier."
+		"I arrived exactly one bad decision too late."
+		"That resource was almost definitely mine in spirit."
+		"Pickup gone. Backup plan currently loading."
+		"You beat me there; I was busy making an entrance."
+		"Next cycle, I'm racing first and talking second."
+	}
+	chat leadTaken {
+		"Chuck is leading! Check the board before it changes."
+		"First place looks surprisingly good from here."
+		"I have the lead and several questions about how."
+		"Everybody remain calm; I am somehow in front."
+		"This scoreboard finally understands raw potential."
+		"Top spot secured by nerve, noise, and favorable timing."
+		"I'm ahead. Dalton is never hearing the end of this."
+		"The Chuck era begins now and may be quite brief."
+	}
+	chat leadLost {
+		"Well, the scoreboard corrected itself. Rude."
+		"Somebody slipped ahead while I was celebrating."
+		"Temporary setback; permanent commentary."
+		"I lost first place, not the ability to shout about it."
+		"The lead moved. Chuck is moving after it."
+		"All right, back to the ambitious part of the plan."
+		"Somebody borrowed my spot at the top."
+		"I can recover this if the walls stop interfering."
+	}
+	chat matchWin {
+		"Victory! Exactly as I confidently revised the plan."
+		"Chuck takes the match and a completely reasonable bow."
+		"Good game. I made the important parts look exciting."
+		"We won! I will be available for exaggerated retellings."
+		"That result deserves snacks and several victory laps."
+		"Top result, full volume, no further questions."
+		"I knew we had it somewhere around the final score."
+		"Great fight. Chuck officially approves this outcome."
+	}
+	chat matchLose {
+		"Good game. My victory speech can wait one round."
+		"You got it this time; I supplied the atmosphere."
+		"That loss was educational in several inconvenient ways."
+		"All right, fair win. Rematch after I regroup."
+		"The score says no, but my confidence remains confused."
+		"I can play better than that and probably quieter."
+		"No excuses. Well, none worth saying out loud."
+		"Fair match. Next one gets the improved Chuck."
+	}
+	chat farewell {
+		"Chuck is heading out. The volume should drop shortly."
+		"Good games. Try not to enjoy the silence too much."
+		"I'm off before Dalton invents another round."
+		"That's enough heroics for one session."
+		"See you next match, preferably from a safer distance."
+		"Later, everyone. Remember the impressive parts."
+		"Chuck signing off with dignity mostly intact."
+		"I'm gone. Keep the place noisy for me."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Hang on, $other. Chuck assistance is approaching loudly."
+		"Get behind cover; I'll create a very obvious distraction."
+		"I'm coming. Keep breathing and keep your head down."
+		"Backup requested, backup attempting to find the route."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. That had exactly enough chaos."
+		"Yeah, well played. Chuck rates it highly."
+		"Solid match. I even learned part of $map."
+		"Great game; let's claim every mistake was entertainment."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Big talk, $other. Conveniently, I brought big talk too."
+		"Challenge accepted before good judgment arrives."
+		"Come on, then. Chuck has momentum to manufacture."
+		"You want a fight? I can provide an enthusiastic one."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hey, $other! Chuck has entered the conversation."
+		"Hello there. Ready for some questionable excellence?"
+		"Howdy! Glad somebody friendly found me."
+		"Greetings from the loud side of $map."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You're welcome, $other. I accept applause too."
+		"No problem. Chuck service comes with extra commentary."
+		"Any time; that went better than expected."
+		"Glad to help. Please remember the competent part."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Finally, a witness with excellent judgment."
+		"Thanks, $other. I practiced that for nearly seconds."
+		"Appreciated! The confidence was doing heavy work."
+		"Nice of you to notice; I'll mention it repeatedly."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"We're fine, $other. I've made louder mistakes."
+		"Apology accepted; let's call it experimental movement."
+		"No hard feelings. Just warn me before the next surprise."
+		"All good. Chuck carries no grudge longer than one respawn."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Later, $other. Leave some excitement for next time."
+		"Good night. Chuck will resume the noise another day."
+		"See you around; travel with fewer shortcuts than I do."
+		"Take care. I'll save a dramatic entrance for your return."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Chuck"
+		trigger "hey Chuck"
+		trigger "Chuck help"
+		trigger "Chuck hello"
+		trigger "Chuck listen"
+		trigger "Chuck there"
+		trigger "Chuck answer"
+		trigger "Chuck wait"
+		"Chuck here, $other. What's happening?"
+		"You called the right loud person. Go ahead."
+		"I'm listening, which is new and important."
+		"Say it quick before I improve the story."
+	}
+}

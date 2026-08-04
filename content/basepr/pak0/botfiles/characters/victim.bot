@@ -1,0 +1,28 @@
+// Victim is another circumstance rather than a canon biography. The play and
+// voice focus on concealment, exits and surviving the next contact.
+character "Victim" {
+	inherit		"ambusher"
+	description	"vigilant survivor who controls cover and keeps an exit open"
+	skillBand	2 4
+	modelNum	12
+
+	set	combatRange		900
+	set	aggression		0.15
+	set	patience		0.98
+	set	initiative		0.30
+	set	targetStickiness	0.45
+	add	retreatHealth		0.25
+	scale	pursuit			0.45
+	scale	strafeChance		0.80
+	set	chatiness		0.35
+	scale	chatDelayScale		1.40
+
+	weapon	"weaponobj_rifle"		1.30
+	weapon	"weaponobj_hiderweapon"		1.25
+	weapon	"weaponobj_crawlergrenade"	1.10
+
+	skill 1 {
+		scale	patience		0.80
+		add	aggression		0.08
+	}
+}

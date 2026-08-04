@@ -1,0 +1,298 @@
+// mutilated_human.chat
+// Sparse, dignified fragments. Never played for horror or ridicule.
+
+characterChat "Mutilated Human" {
+	chat entergame {
+		"Here. Ready."
+		"I enter by choice."
+		"Still standing."
+		"Present for the match."
+		"Quiet now. Begin."
+		"I can fight."
+		"No introduction needed."
+		"Forward, in my own time."
+	}
+	chat levelstart {
+		"$map. I see the routes."
+		"Breathe. Choose ground."
+		"One corner at a time."
+		"Close the gap when the opening comes."
+		"Watch. Then move."
+		"The path is enough."
+		"Keep the field clear."
+		"Begin. Keep the pressure close."
+	}
+	chat kill {
+		"$other fell. I continue."
+		"The $weapon answered."
+		"Target finished."
+		"A clear result."
+		"One exchange won."
+		"$other gave me the moment."
+		"No celebration. Move."
+		"That fight is over."
+	}
+	chat killWrench {
+		"The wrench was enough."
+		"Close. Decisive."
+		"$other came within reach."
+		"One direct answer."
+		"No distance left."
+		"The near fight ended."
+		"A simple strike."
+		"Close ground is still ground."
+	}
+	chat killStreak {
+		"Three. I remain steady."
+		"A strong passage."
+		"Three fights concluded."
+		"Momentum, held quietly."
+		"No need to boast."
+		"The field opened three times."
+		"I keep my balance."
+		"Results speak already."
+	}
+	chat revenge {
+		"$other, we are even."
+		"I returned prepared."
+		"The earlier loss is answered."
+		"Second meeting. Different end."
+		"I remembered."
+		"That debt is closed."
+		"Anger focused. Exchange answered."
+		"$other found me standing."
+	}
+	chat death {
+		"I am down, not gone."
+		"$other won that moment."
+		"The $weapon found its mark."
+		"A fair loss."
+		"I will stand again."
+		"This round ends here."
+		"They earned the exchange."
+		"Silence, then return."
+	}
+	chat deathAccident {
+		"My own misstep."
+		"The ground was honest."
+		"A poor choice."
+		"No opponent to blame."
+		"I judged the route badly."
+		"One avoidable fall."
+		"Reset. Nothing more."
+		"I know better now."
+	}
+	chat itemDenied {
+		"$other took the $item."
+		"The $item is gone. Continue."
+		"I arrived second."
+		"No resource is owed."
+		"Another route will provide."
+		"$other timed it well."
+		"The empty place can wait."
+		"Missed supply. Kept purpose."
+	}
+	chat leadTaken {
+		"I hold the lead."
+		"First, for now."
+		"The score speaks clearly."
+		"Advantage without noise."
+		"I reached the front."
+		"Lead taken. Focus kept."
+		"Steady work placed me here."
+		"Ahead. Still careful."
+	}
+	chat leadLost {
+		"$other leads now."
+		"First place moved away."
+		"I can recover."
+		"The score changed. I adapt."
+		"Behind, not defeated."
+		"No panic in a deficit."
+		"The lead is worth pursuing."
+		"I lost ground. I move again."
+	}
+	chat matchWin {
+		"A quiet victory."
+		"I earned this result."
+		"The match ends well."
+		"Good opposition. My win."
+		"Steady choices carried through."
+		"Victory needs no spectacle."
+		"I stood through the finish."
+		"Complete. Well fought."
+	}
+	chat matchLose {
+		"A loss, honestly taken."
+		"They were better today."
+		"The match ends against me."
+		"I remain myself in defeat."
+		"Good opposition. Their win."
+		"There is more to learn."
+		"No excuse needed."
+		"I will return steady."
+	}
+	chat farewell {
+		"Leaving now."
+		"My matches are done."
+		"Good fighting. Goodbye."
+		"I choose rest."
+		"Until another match."
+		"Quiet departure."
+		"Thank you for the contest."
+		"I go as I came."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "can anyone help"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		trigger "assist me"
+		"I hear you, $other. Hold on."
+		"Find cover. I will help."
+		"You do not face it alone."
+		"I am moving toward you."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Yes. A good match."
+		"Well played, $other."
+		"The contest was worthwhile."
+		"Good games. Fair outcomes."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"I have nothing to prove in words."
+		"If we meet, we fight."
+		"I received your challenge, $other."
+		"Keep your voice. I keep my ground."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "whats up"
+		"Hello, $other."
+		"I hear your greeting."
+		"You are seen. Welcome."
+		"A quiet hello in return."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "appreciate it"
+		trigger "cheers"
+		trigger "thanks a lot"
+		"My help was freely given, $other."
+		"No thanks required."
+		"I was glad to help."
+		"Keep the kindness moving."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you. I chose well."
+		"Your respect is returned."
+		"I appreciate the words, $other."
+		"The result was enough, but thank you."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "that was my fault"
+		trigger "i messed up"
+		"I accept it."
+		"We can move beyond that."
+		"Thank you for saying so, $other."
+		"Let the next choice be better."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "take care"
+		"Goodbye, $other."
+		"Go in peace."
+		"Take care of yourself."
+		"Until we meet again."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Mutilated Human"
+		trigger "Mutilated Human respond"
+		trigger "Mutilated Human report"
+		trigger "Mutilated Human status"
+		trigger "Mutilated Human listen"
+		trigger "Mutilated Human answer"
+		trigger "Mutilated Human come in"
+		trigger "Mutilated Human are you there"
+		"I am here, $other."
+		"Speak. I am listening."
+		"You called. I answer."
+		"My attention is yours."
+	}
+}

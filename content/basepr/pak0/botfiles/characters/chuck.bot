@@ -1,0 +1,31 @@
+// Chuck is the loud follower in the Roadhouse confrontation: drunk, crude and
+// much more confident before the wrench starts moving. The hateful language
+// from that scene is not repeated; the bluster and bad judgment are enough.
+character "Chuck" {
+	inherit		"rusher"
+	description	"loud barroom follower who mistakes noise for control"
+	skillBand	1 3
+	modelNum	2
+
+	set	combatRange		150
+	set	aggression		1.00
+	set	patience		0.05
+	set	initiative		1.00
+	scale	aimTremorDeg		1.25
+	scale	fireConeDeg		1.25
+	set	targetStickiness	0.45
+	set	vengefulness		0.80
+	scale	jumpChance		1.20
+	scale	retreatHealth		0.50
+	set	chatiness		0.90
+	scale	chatDelayScale		0.75
+
+	weapon	"weaponobj_wrench"		2.00
+	weapon	"weaponobj_autocannon"		1.20
+	weapon	"weaponobj_rocketlauncher"	0.90
+
+	skill 1 {
+		scale	turnDamping		0.85
+		scale	aimSettleMsec		0.80
+	}
+}

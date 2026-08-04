@@ -1,0 +1,27 @@
+// The ordinary Hunter is a Sphere soldier: advance, report and keep the prey
+// under pressure. Its voice uses clipped field traffic rather than banter.
+character "Hunter" {
+	inherit		"hunter"
+	description	"Sphere trooper that marks one target and drives it down"
+	skillBand	2 4
+	modelNum	17
+
+	set	combatRange		450
+	set	aggression		0.82
+	set	patience		0.20
+	set	targetStickiness	0.95
+	set	vengefulness		0.70
+	scale	pursuit			1.30
+	scale	retreatHealth		0.70
+	set	suppressionMsec	600
+	set	chatiness		0.38
+
+	weapon	"weaponobj_rifle"		1.90
+	weapon	"weaponobj_crawlergrenade"	1.25
+	weapon	"weaponobj_autocannon"		1.05
+
+	skill 4 {
+		add	targetStickiness	0.03
+		scale	reacquireMsec		1.10
+	}
+}

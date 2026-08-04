@@ -1,0 +1,61 @@
+// rusher.style
+//
+// openPREY bot personality format, version 1.
+// Format and trait reference: docs/dev/mp-bots.md
+//
+// Closes the distance and refuses to give it back. Prey's wrench, leech gun
+// and autocannon make this a pressure archetype rather than a precision one.
+
+style "rusher" {
+	description	"closes to brawling range and keeps the pressure on"
+
+	set	combatRange		220
+	set	aggression		0.88
+	set	patience		0.15
+	add	initiative		0.30
+	set	targetStickiness	0.72
+	set	opportunism		0.55
+	set	vengefulness		0.35
+	add	suppressionMsec	300
+	set	strafeRhythmMsec	280
+	set	strafeRhythmVarianceMsec	450
+	set	weaponSwitchMsec	300
+	set	aimHeight		-0.04
+
+	scale	rangeDiscipline		0.70
+	scale	strafeChance		0.85
+	scale	jumpChance		1.35
+	scale	dodgeReactMsec		0.85
+	scale	fireConeDeg		1.30
+	scale	aimSettleMsec		0.65
+	scale	burstMaxMsec		1.25
+	scale	burstPauseMsec		0.80
+	scale	retreatHealth		0.65
+	scale	pursuit			1.30
+	scale	itemFocus		0.80
+	scale	reacquireMsec		0.85
+
+	weapon	"weaponobj_wrench"		1.90
+	weapon	"weaponobj_soulstripper"	1.55
+	weapon	"weaponobj_autocannon"		1.45
+	weapon	"weaponobj_rocketlauncher"	1.15
+	weapon	"weaponobj_hiderweapon"		0.90
+	weapon	"weaponobj_crawlergrenade"	0.75
+	weapon	"weaponobj_rifle"		0.60
+	weapon	"weaponobj_bow"			0.45
+
+	// Low-skill pressure still needs to be an opponent rather than a free frag.
+	skill 1 {
+		scale	combatRange		1.60
+		add	retreatHealth		0.08
+		scale	aggression		0.85
+	}
+	skill 2 {
+		scale	combatRange		1.30
+		add	retreatHealth		0.04
+	}
+	skill 5 {
+		scale	dodgeReactMsec		0.85
+		add	aggression		0.05
+	}
+}

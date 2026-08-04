@@ -45,10 +45,12 @@ jobs:
             tools/build/openq4_pak.py \
             tools/build/stage_gamelibs.py \
             tools/build/write_pak_manifest.py \
+            tools/tests/openprey_rebase_contract.py \
             tools/tests/linux_sanitizer_source_contract.py
           bash -n tools/build/meson_setup.sh
           python tools/build/sync_icons.py --check
           python tools/tests/gamelibs_staging.py
+          python tools/tests/openprey_rebase_contract.py
           python tools/tests/linux_sanitizer_source_contract.py
 
       - name: Validate pak0 and pak1 inputs
@@ -81,9 +83,17 @@ jobs:
           - platform: Windows x64
             os: windows-2025
             module: game_x64.dll
+            client: openPREY-client_x64.exe
+            dedicated: openPREY-ded_x64.exe
+            renderer_gl: renderer-gl_x64.dll
+            renderer_vk: renderer-vk_x64.dll
           - platform: Linux x64
             os: ubuntu-24.04
             module: game_x64.so
+            client: openPREY-client_x64
+            dedicated: openPREY-ded_x64
+            renderer_gl: renderer-gl_x64.so
+            renderer_vk: renderer-vk_x64.so
 
     steps:
       - name: Checkout openPREY
@@ -109,7 +119,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype debug --wrap-mode=forcefallback -Dbuild_engine=false -Dbuild_games=true -Dbuild_renderer_gl=false -Dbuild_renderer_vk=false
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype debug --wrap-mode=forcefallback -Dbuild_engine=true -Dbuild_games=true -Dbuild_renderer_gl=true -Dbuild_renderer_vk=true
           powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
           powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
 
@@ -118,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype debug --wrap-mode=forcefallback -Dbuild_engine=false -Dbuild_games=true -Dbuild_renderer_gl=false -Dbuild_renderer_vk=false
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype debug --wrap-mode=forcefallback -Dbuild_engine=true -Dbuild_games=true -Dbuild_renderer_gl=true -Dbuild_renderer_vk=true
           bash tools/build/meson_setup.sh compile -C builddir
           bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 
@@ -126,6 +136,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -f ".install/${{ matrix.client }}"
+          test -f ".install/${{ matrix.dedicated }}"
+          test -f ".install/${{ matrix.renderer_gl }}"
+          test -f ".install/${{ matrix.renderer_vk }}"
           test -f ".install/basepr/${{ matrix.module }}"
           test -f ".install/basepr/pak0.pk4"
           test -f ".install/basepr/pak1.pk4"

@@ -2039,7 +2039,7 @@ void R_FinalizeDrawSurf( drawSurf_t *drawSurf ) {
 
 	R_DeformDrawSurf( drawSurf );
 
-	switch( drawSurf->material->Texgen() ) {
+	switch( drawSurf->material->GetSurfaceTexgen() ) {
 		case TG_SKYBOX_CUBE:
 			R_SkyboxTexGen( drawSurf, tr.viewDef->renderView.vieworg );
 			break;

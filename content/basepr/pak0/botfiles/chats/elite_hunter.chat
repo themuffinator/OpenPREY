@@ -1,0 +1,298 @@
+// elite_hunter.chat
+// Precise, sparse translated combat traffic; no fake alien vocabulary.
+
+characterChat "Elite Hunter" {
+	chat entergame {
+		"Elite unit active."
+		"Deployment verified."
+		"Entering combat grid."
+		"Elite Hunter ready."
+		"Systems aligned."
+		"Engagement authorized."
+		"Operational state confirmed."
+		"Search protocol active."
+	}
+	chat levelstart {
+		"$map indexed. Execute."
+		"Routes measured. Begin."
+		"Sector geometry acquired."
+		"Advance on optimal lanes."
+		"No wasted motion."
+		"Priority: control."
+		"Threat scan complete."
+		"Engagement window open."
+	}
+	chat kill {
+		"$other terminated."
+		"$weapon result confirmed."
+		"Target state: inactive."
+		"Removal complete."
+		"One precise hit."
+		"Hostile response ended."
+		"Target solution valid."
+		"Elimination recorded."
+	}
+	chat killWrench {
+		"Wrench impact sufficient."
+		"Close breach sealed."
+		"$other crossed minimum range."
+		"Direct contact resolved."
+		"Melee option validated."
+		"Proximity error punished."
+		"Close target ended."
+		"Strike interval complete."
+	}
+	chat killStreak {
+		"Three sequential removals."
+		"Efficiency threshold exceeded."
+		"Target chain complete."
+		"Three solutions, three results."
+		"Momentum remains controlled."
+		"Opposition density reduced."
+		"Sequence recorded as optimal."
+		"Continue at current precision."
+	}
+	chat revenge {
+		"$other correction complete."
+		"Prior imbalance removed."
+		"Reacquisition successful."
+		"Previous victor now inactive."
+		"Countermeasure exact."
+		"Outstanding target cleared."
+		"Response debt closed."
+		"Second contact favored precision."
+	}
+	chat death {
+		"Elite unit disabled."
+		"$other found the solution."
+		"$weapon defeated current defense."
+		"Operational interruption."
+		"Loss recorded without dispute."
+		"This exchange is conceded."
+		"Failure point identified."
+		"Reentry will correct it."
+	}
+	chat deathAccident {
+		"Unforced failure."
+		"Path calculation was wrong."
+		"Environmental loss recorded."
+		"Execution error."
+		"No opponent earns this point."
+		"Vector invalidated too late."
+		"Route model requires correction."
+		"Reset after avoidable loss."
+	}
+	chat itemDenied {
+		"$item timing lost to $other."
+		"Resource window closed."
+		"Denied pickup recalculated."
+		"$item control belongs elsewhere."
+		"Supply option removed."
+		"Resource race conceded."
+		"Next availability will be measured."
+		"$other reached the asset first."
+	}
+	chat leadTaken {
+		"Primary position verified."
+		"Score control attained."
+		"Lead state stable."
+		"Elite unit ranks first."
+		"Advantage measured and held."
+		"Current outcome trends positive."
+		"First place is operational."
+		"Pressure produced the lead."
+	}
+	chat leadLost {
+		"$other displaced the lead."
+		"Score control interrupted."
+		"Primary position must be restored."
+		"Deficit measured."
+		"Leader now marked as priority."
+		"Temporary reversal detected."
+		"Advantage transferred. Correcting."
+		"First place requires reacquisition."
+	}
+	chat matchWin {
+		"Victory condition satisfied."
+		"Final state: dominant."
+		"Match solution complete."
+		"Opposition performance insufficient."
+		"Elite execution prevailed."
+		"Result conforms to objective."
+		"Engagement closed successfully."
+		"No further action required."
+	}
+	chat matchLose {
+		"Defeat condition confirmed."
+		"Final state: inadequate."
+		"Opponent execution was superior."
+		"Match solution failed."
+		"Correction set will be applied."
+		"Result accepted, not repeated."
+		"Operational standard was not met."
+		"Engagement closes against projection."
+	}
+	chat farewell {
+		"Elite unit disengaging."
+		"Operational link ended."
+		"Leaving combat grid."
+		"Termination of session confirmed."
+		"Elite Hunter offline."
+		"Final transmission."
+		"Withdrawal executed."
+		"No additional traffic."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "can anyone help"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		trigger "assist me"
+		"Support vector acquired."
+		"Survive until contact, $other."
+		"Move behind hard cover."
+		"Assistance allocated."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Performance recognized."
+		"Your assessment is accurate."
+		"Competition met standards."
+		"Acknowledged with precision, $other."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Challenge signal triangulated."
+		"$other is now prioritized."
+		"Words add no protection."
+		"Acceptance requires no speech."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "whats up"
+		"Identity received."
+		"Channel active, $other."
+		"Presence noted."
+		"Signal acknowledged."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "appreciate it"
+		trigger "cheers"
+		trigger "thanks a lot"
+		"Gratitude registered."
+		"Acknowledgment is sufficient."
+		"Resource exchange complete."
+		"Resume effective action."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Accuracy was intentional."
+		"Assessment logged."
+		"Result met expectation."
+		"Your observation is valid, $other."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "that was my fault"
+		trigger "i messed up"
+		"Apology has zero tactical cost."
+		"Correct the source error."
+		"Fault attribution accepted."
+		"Do not spend another interval on it."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "take care"
+		"Your session termination is noted."
+		"Withdraw without exposure."
+		"Channel with $other closing."
+		"End of exchange."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Elite Hunter"
+		trigger "Elite Hunter respond"
+		trigger "Elite Hunter report"
+		trigger "Elite Hunter status"
+		trigger "Elite Hunter listen"
+		trigger "Elite Hunter answer"
+		trigger "Elite Hunter come in"
+		trigger "Elite Hunter are you there"
+		"Elite Hunter receiving."
+		"Transmit concise request."
+		"$other has this unit's attention."
+		"Response channel available."
+	}
+}

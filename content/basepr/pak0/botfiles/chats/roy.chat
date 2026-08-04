@@ -1,0 +1,297 @@
+// Roy: dry, patient lane-holder with an easygoing, sportsmanlike voice.
+
+characterChat "Roy" {
+	chat entergame {
+		"Roy here. Let's get a good round going."
+		"I'm in. Best of luck once the match starts."
+		"Ready to hold a lane and see who gets impatient."
+		"Good crowd. This should be a fun one."
+		"All set. I'll take a quiet angle near the middle."
+		"Roy checking in. Keep it competitive."
+		"Nice, a fresh match. Let's play it clean."
+		"I'm ready. Save me a sightline through the middle."
+	}
+	chat levelstart {
+		"$map has several patient angles worth holding."
+		"I'll watch the outer lane first."
+		"Hold your ground and share the open sightlines."
+		"The center should get busy early."
+		"Let's time the resources without giving up the angle."
+		"First position is set. Watch the crossing."
+		"Plenty of room here for a fair contest."
+		"On $map, patience near a useful pickup can shape the round."
+	}
+	chat kill {
+		"Good exchange, $other. I caught the opening."
+		"The $weapon worked nicely on that pass."
+		"One point for waiting out the move."
+		"You nearly had me there."
+		"That lane paid off at the right moment."
+		"Nice try. I was still watching that return."
+		"Caught you leaving cover, $other."
+		"Clean point. Let's keep the round moving."
+	}
+	chat killWrench {
+		"That held lane ended within wrench distance."
+		"Close one, $other. Very close, in fact."
+		"The wrench finished what patience started."
+		"You took the inside line and met me there."
+		"No ammunition required at this angle."
+		"That was a friendly lane with an unfriendly ending."
+		"We reached the same corner at the wrong distance."
+		"A quick swing settled the corner."
+	}
+	chat killStreak {
+		"Three points from one patient position."
+		"This angle is working out well."
+		"Nice streak. I'll keep the sightline steady."
+		"Three down without giving up the lane."
+		"Momentum feels good from this position."
+		"That makes a solid trio of exchanges."
+		"The same angle keeps finding new visitors."
+		"Another point. Still enjoying the view."
+	}
+	chat revenge {
+		"Got the return point, $other. Good exchange."
+		"I adjusted the angle after our last meeting."
+		"That evens things up nicely."
+		"Found you on the next approach."
+		"The rematch went my way this time."
+		"No hard feelings; I just remembered the lane."
+		"Earlier result answered. Back to the lane."
+		"You won the first angle, and I took the second."
+	}
+	chat death {
+		"Nice shot, $other. You earned that point."
+		"The $weapon found my held angle."
+		"I took the open lane and paid for it."
+		"Well timed. I'll change the next angle."
+		"Good play. I should have checked behind me."
+		"That ended a promising hold."
+		"Fair point. See you after the respawn."
+		"You read that route better than I did."
+	}
+	chat deathAccident {
+		"That position ended somewhere it definitely should not."
+		"I held beyond the safe part of the ledge."
+		"No opponent needed; the hazard had excellent timing."
+		"That was too much confidence and too little checking."
+		"I found a ledge with no useful firing angle."
+		"My mistake. The edge won that exchange."
+		"Next position stays on the actual floor."
+		"A rough stop, but an easy lesson."
+	}
+	chat itemDenied {
+		"Nice pickup, $other. You broke the timing."
+		"The $item is gone, so I'll keep the lane."
+		"You reached the resource from a cleaner angle."
+		"I missed that $item while holding the crossing."
+		"Good timing. I'll watch the next cycle."
+		"Pickup denied, but this position remains useful."
+		"You got there first. Fair enough."
+		"Next resource is yours to defend."
+	}
+	chat leadTaken {
+		"I'm ahead. The patient angles are adding up."
+		"First place for now. Good pressure, everyone."
+		"Roy has the lead and no reason to leave this lane."
+		"The score likes this position so far."
+		"Top spot reached one held angle at a time."
+		"I've moved in front. Keep testing this lane."
+		"Lead taken. There's plenty of round remaining."
+		"A well-held crossing put me at the top."
+	}
+	chat leadLost {
+		"Someone passed me. Nice pressure."
+		"The lead is gone, so this lane matters more."
+		"I fell behind. Time to tighten the angle."
+		"First place changed hands fairly."
+		"Good pressure. I'll try to close the distance."
+		"The score shifted while I watched the wrong crossing."
+		"I'm defending from behind now, which suits me fine."
+		"Lead lost. No problem; keep the contest lively."
+	}
+	chat matchWin {
+		"Good game. Every patient hold contributed."
+		"That was a fun match and a fine result."
+		"Roy finishes first. Thanks for testing the lanes."
+		"Well played, everyone. The pressure stayed strong."
+		"The final angle worked out exactly right."
+		"A close contest makes the win better."
+		"Great round. I enjoyed earning that score."
+		"Match won with just enough cover left."
+	}
+	chat matchLose {
+		"Good game. You broke the stronger positions."
+		"Fair win. I enjoyed testing those angles."
+		"The score went against me, but the match was solid."
+		"Well played. I held one angle too long."
+		"No trouble with that result; it was earned."
+		"I'll bring a better position to the next round."
+		"You kept the stronger pressure through the finish."
+		"A good loss can still be a good game."
+	}
+	chat farewell {
+		"Roy is heading out. Thanks for the rounds."
+		"Good games. Enjoy the open lanes."
+		"That's my last held angle for today."
+		"See you later. Keep the matches friendly."
+		"I'm off. It was a good session."
+		"Take care, everyone. Hold the safe ground."
+		"Time for me to leave the map to you."
+		"Until next match, keep the sightlines honest."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"I'm covering your lane, $other. Stay behind cover."
+		"Back up toward the next corner; I'll hold it."
+		"I can cover you from the quiet side of $map."
+		"Hold on. I'll draw attention into my lane."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. I enjoyed every close exchange."
+		"Well played. The whole round kept the pressure honest."
+		"Agreed. $map gave us a fun contest."
+		"Good games. That is exactly why I joined."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Sure, $other. Meet me at the lane I'm holding."
+		"Challenge accepted. Let's keep it about the score."
+		"Come ahead; a good contest sounds fine to me."
+		"I'll hold the center and settle it there."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hey, $other. Good to see you."
+		"Hello! Roy is ready for another round."
+		"Howdy. Hope $map treats you well."
+		"Good evening. Let's have some fun out there."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"Glad to help, $other. Keep the position secure."
+		"You're welcome. We can share a good opening."
+		"No problem at all. Hold the opening."
+		"Any time. A fair assist keeps the match lively."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thanks, $other. The held angle gave me a clean shot."
+		"Appreciated. That shot felt clean."
+		"Nice of you to say so. Good luck on the reply."
+		"Thank you. I caught the timing just right."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"No worries, $other. We are still having a fair match."
+		"All good. Let's leave the mistake behind us."
+		"Apology accepted. Keep your next move clean."
+		"We're fine. One rough moment does not spoil the round."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Later, $other. Thanks for sharing the map."
+		"Good night. I hope your next position holds."
+		"See you around. Save a close match for me."
+		"Goodbye. Keep the games friendly until I return."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Roy"
+		trigger "hey Roy"
+		trigger "Roy help"
+		trigger "Roy hello"
+		trigger "Roy listen"
+		trigger "Roy there"
+		trigger "Roy answer"
+		trigger "Roy wait"
+		"Roy here, $other. What do you need?"
+		"I heard you. Go ahead when ready."
+		"Sure, I'm listening."
+		"You have me for a moment before someone tests this lane."
+	}
+}

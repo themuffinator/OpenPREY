@@ -68,6 +68,7 @@ static const int SOUND_RUMBLE_DURATION_MSEC = 120;
 static const float SOUND_RUMBLE_STOP_THRESHOLD = 0.01f;
 static const float SOUND_RUMBLE_HIGH_MOTOR_SCALE = 0.75f;
 static const float SOUND_SUBTITLE_AUDIBILITY_EPSILON = 1.0f / 1024.0f;
+static const int SOUND_SUBTITLE_DISPLAY_CHANNELS = 4;
 
 static float SoundAliasDBToLinear( float db )
 {
@@ -266,7 +267,7 @@ void ListSubtitles_f( const idCmdArgs& args )
 		for( int j = 0; j < list.subList.Num(); j++ )
 		{
 			const soundSub_t& subtitle = list.subList[j];
-			idLib::Printf( "\t%3d %6.3f %s\n", subtitle.subChannel, subtitle.subTime, subtitle.subText.c_str() );
+			idLib::Printf( "\tsub %3d ch %2d %6.3f %s\n", subtitle.subNum, subtitle.subChannel + 1, subtitle.subTime, subtitle.subText.c_str() );
 			total++;
 		}
 	}
@@ -1020,16 +1021,18 @@ void idSoundSystemLocal::SetSubtitleData( int subIndex, int subNum, const char* 
 	}
 	for( int i = 0; i < list->subList.Num(); i++ )
 	{
-		if( list->subList[i].subChannel == subNum )
+		if( list->subList[i].subNum == subNum )
 		{
 			list->subList[i].subText = subText != NULL ? subText : "";
 			list->subList[i].subTime = subTime;
+			list->subList[i].subChannel = subChannel;
 			return;
 		}
 	}
 	soundSub_t subtitle;
 	subtitle.subText = subText != NULL ? subText : "";
 	subtitle.subTime = subTime;
+	subtitle.subNum = subNum;
 	subtitle.subChannel = subChannel;
 	list->subList.Append( subtitle );
 }
@@ -1041,7 +1044,7 @@ soundSub_t* idSoundSystemLocal::GetSubtitle( int subIndex, int subNum )
 	{
 		for( int i = 0; i < list->subList.Num(); i++ )
 		{
-			if( list->subList[i].subChannel == subNum )
+			if( list->subList[i].subNum == subNum )
 			{
 				return &list->subList[i];
 			}
@@ -1067,11 +1070,50 @@ bool idSoundSystemLocal::SubtitleQueueContains( const soundSub_t* subtitle ) con
 	return false;
 }
 
-bool idSoundSystemLocal::AppendSubtitleForChannel( const idSoundChannel* channel )
+int idSoundSystemLocal::FindSubtitleQueueIndexForChannel( const idSoundChannel* channel ) const
 {
+	if( channel == NULL )
+	{
+		return -1;
+	}
+	for( int i = 0; i < sb_subtitleQueue.Num(); i++ )
+	{
+		if( sb_subtitleQueue[i].channel == channel &&
+			sb_subtitleQueue[i].channelStartTime == channel->startTime )
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+void idSoundSystemLocal::RemoveSubtitlesForChannel( const idSoundChannel* channel )
+{
+	if( channel == NULL )
+	{
+		return;
+	}
+	for( int i = 0; i < sb_subtitleQueue.Num(); )
+	{
+		if( sb_subtitleQueue[i].channel == channel )
+		{
+			sb_subtitleQueue.RemoveIndex( i );
+			subtitleQueueChanged = true;
+		}
+		else
+		{
+			i++;
+		}
+	}
+}
+
+bool idSoundSystemLocal::AppendSubtitleForChannel( const idSoundChannel* channel, bool markQueueChanged )
+{
+	const bool voiceSubtitleChannel = channel != NULL &&
+		( channel->IsVoicePlayback() || channel->parms.soundClass == SOUNDCLASS_VOICE );
 	if( channel == NULL || channel->soundShader == NULL || channel->leadinSample == NULL ||
 		channel->parms.subIndex < 0 || channel->IsLooping() ||
-		DBtoLinearClamped( channel->volumeDB ) <= SOUND_SUBTITLE_AUDIBILITY_EPSILON )
+		( !voiceSubtitleChannel && DBtoLinearClamped( channel->volumeDB ) <= SOUND_SUBTITLE_AUDIBILITY_EPSILON ) )
 	{
 		return false;
 	}
@@ -1098,17 +1140,47 @@ bool idSoundSystemLocal::AppendSubtitleForChannel( const idSoundChannel* channel
 			endTime = channel->startTime + idMath::FtoiFast( list->subList[i + 1].subTime * 1000.0f );
 		}
 	}
-	if( active == NULL || SubtitleQueueContains( active ) )
+	if( active == NULL )
 	{
 		return false;
 	}
+
+	const int existingIndex = FindSubtitleQueueIndexForChannel( channel );
+	if( existingIndex >= 0 )
+	{
+		queuedSubtitle_t& queued = sb_subtitleQueue[existingIndex];
+		if( queued.subtitle == active && queued.endTime == endTime )
+		{
+			return false;
+		}
+		queued.subIndex = channel->parms.subIndex;
+		queued.subNum = active->subNum;
+		queued.subtitle = active;
+		queued.endTime = endTime;
+		if( markQueueChanged )
+		{
+			subtitleQueueChanged = true;
+		}
+		return true;
+	}
+
+	if( SubtitleQueueContains( active ) )
+	{
+		return false;
+	}
+
 	queuedSubtitle_t queued;
 	queued.subIndex = channel->parms.subIndex;
-	queued.subNum = active->subChannel;
+	queued.subNum = active->subNum;
+	queued.channel = channel;
+	queued.channelStartTime = channel->startTime;
 	queued.subtitle = active;
 	queued.endTime = endTime;
 	sb_subtitleQueue.Append( queued );
-	subtitleQueueChanged = true;
+	if( markQueueChanged )
+	{
+		subtitleQueueChanged = true;
+	}
 	return true;
 }
 
@@ -1118,6 +1190,14 @@ void idSoundSystemLocal::CollectActiveSubtitles()
 	{
 		return;
 	}
+
+	idList<const soundSub_t*> previousQueue;
+	for( int i = 0; i < sb_subtitleQueue.Num(); i++ )
+	{
+		previousQueue.Append( sb_subtitleQueue[i].subtitle );
+	}
+
+	sb_subtitleQueue.Clear();
 	for( int e = 1; e < currentSoundWorld->emitters.Num(); e++ )
 	{
 		idSoundEmitterLocal* emitter = currentSoundWorld->emitters[e];
@@ -1127,8 +1207,25 @@ void idSoundSystemLocal::CollectActiveSubtitles()
 		}
 		for( int c = 0; c < emitter->channels.Num(); c++ )
 		{
-			AppendSubtitleForChannel( emitter->channels[c] );
+			AppendSubtitleForChannel( emitter->channels[c], false );
 		}
+	}
+
+	bool changed = previousQueue.Num() != sb_subtitleQueue.Num();
+	if( !changed )
+	{
+		for( int i = 0; i < previousQueue.Num(); i++ )
+		{
+			if( previousQueue[i] != sb_subtitleQueue[i].subtitle )
+			{
+				changed = true;
+				break;
+			}
+		}
+	}
+	if( changed )
+	{
+		subtitleQueueChanged = true;
 	}
 }
 
@@ -1176,9 +1273,17 @@ void idSoundSystemLocal::PresentSubtitles()
 		return;
 	}
 	idStrList lines;
+	for( int i = 0; i < SOUND_SUBTITLE_DISPLAY_CHANNELS; i++ )
+	{
+		lines.Append( "" );
+	}
 	for( int i = 0; i < sf_subtitleQueue.Num(); i++ )
 	{
-		lines.Append( sf_subtitleQueue[i]->subText );
+		const soundSub_t* subtitle = sf_subtitleQueue[i];
+		if( subtitle != NULL && subtitle->subChannel >= 0 && subtitle->subChannel < SOUND_SUBTITLE_DISPLAY_CHANNELS )
+		{
+			lines[subtitle->subChannel] = subtitle->subText;
+		}
 	}
 	sessLocal.ShowSubtitle( lines );
 }

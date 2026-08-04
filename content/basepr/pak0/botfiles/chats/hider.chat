@@ -1,0 +1,298 @@
+// hider.chat
+// Urgent, capable Hidden resistance coordination.
+
+characterChat "Hider" {
+	chat entergame {
+		"Hider in. Keep the route open."
+		"I'm here. We move before they close in."
+		"Hidden scout ready to run."
+		"Found the fight. Let's make room."
+		"I'm moving with you. Stay quick."
+		"Resistance eyes are up."
+		"Ready. Mark danger when you see it."
+		"We have a way through. Follow close."
+	}
+	chat levelstart {
+		"$map has narrow exits. Watch them."
+		"Find cover, then find the next path."
+		"Keep moving. A still target gets surrounded."
+		"Call the safe lanes as they open."
+		"We know how to survive tight ground."
+		"Take space together, not alone."
+		"Check behind us before we push."
+		"Route first, firefight second."
+	}
+	chat kill {
+		"$other is down. Our path is clear."
+		"The $weapon opened that lane."
+		"One less guard on our route."
+		"Contact stopped. Keep moving."
+		"I caught $other crossing."
+		"Clean opening. Use it now."
+		"Threat gone from this corridor."
+		"That position belongs to us."
+	}
+	chat killWrench {
+		"Too close, $other. I had to swing."
+		"Wrench clear. Passage open."
+		"Close quarters favor the ready."
+		"You blocked the wrong exit."
+		"No room to aim, so I didn't."
+		"Direct hit. Move through."
+		"$other crowded our route."
+		"That gap is ours again."
+	}
+	chat killStreak {
+		"Three down. This is our opening."
+		"Their line is thin. Push through."
+		"Three clear lanes and counting."
+		"We're breaking their hold."
+		"Keep pace. I have momentum."
+		"They can't seal every route."
+		"Three contacts stopped in sequence."
+		"Use the space while it's ours."
+	}
+	chat revenge {
+		"$other, you didn't close that path."
+		"I found the return route."
+		"You stopped me once. Not twice."
+		"That settles the ambush."
+		"I remembered your firing lane."
+		"Came back by another way."
+		"The resistance route held."
+		"$other met me ready this time."
+	}
+	chat death {
+		"I'm down. Keep the exit clear."
+		"$other caught me. Change routes."
+		"The $weapon covers this lane. Avoid it."
+		"Lost this crossing. Take another."
+		"Don't wait here for me."
+		"They closed my route. Reopening soon."
+		"I fell at contact. Keep moving."
+		"Mark this position unsafe."
+	}
+	chat deathAccident {
+		"Bad footing. My mistake."
+		"I chose the wrong ledge."
+		"Route looked safer than it was."
+		"Missed the landing. Resetting."
+		"That hazard caught me alone."
+		"No enemy did that. Learn the path."
+		"I moved too fast for the ground."
+		"Wrong turn. I'll map it better."
+	}
+	chat itemDenied {
+		"$other took the $item. Watch the next cycle."
+		"$item is gone. I know another supply route."
+		"They beat us there. Rotate now."
+		"Resource lost. Don't defend an empty spot."
+		"$other controls that pickup for now."
+		"Missed the $item window. Keep pressure elsewhere."
+		"Supply point closed. Move on."
+		"We'll take the next resource from another angle."
+	}
+	chat leadTaken {
+		"We're ahead. Keep every route alive."
+		"Lead secured through movement."
+		"First place. Don't let them pen us in."
+		"Our pressure is working."
+		"I have the lead and a path forward."
+		"They are chasing now. Make them choose badly."
+		"Advantage ours. Stay mobile."
+		"We took the front. Hold it together."
+	}
+	chat leadLost {
+		"$other moved ahead. Find the weak lane."
+		"We lost first place, not the route back."
+		"Lead slipped. Spread their attention."
+		"They boxed us out once. Rotate."
+		"We're behind. Keep thinking, keep moving."
+		"Score turned. Our plan can turn with it."
+		"Follow the open side and recover."
+		"No panic. Their lead has an exit."
+	}
+	chat matchWin {
+		"We found the way through. Good fight."
+		"Victory, and everyone kept moving."
+		"Their net had gaps. We used them."
+		"The resistance line held today."
+		"Good coordination. That's how we survive."
+		"Match won by keeping our options open."
+		"We made space and kept it."
+		"Well fought. The route belongs to us."
+	}
+	chat matchLose {
+		"They closed us down. We'll find another way."
+		"Loss taken. The next route will be better."
+		"Good fight. We adapt from here."
+		"They read our movement this time."
+		"We're outscored, not out of options."
+		"Remember where they held us."
+		"That approach failed. We have others."
+		"Reset together. Nobody faces the next one alone."
+	}
+	chat farewell {
+		"Hider out. Keep your escape open."
+		"I'm leaving the route to you."
+		"Good fighting. Move safely."
+		"Resistance scout signing off."
+		"I have to go. Watch the crossings."
+		"Keep finding ways through."
+		"That's my last run for now."
+		"Stay quick. Hider is leaving."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "can anyone help"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		trigger "assist me"
+		"Take the side route, $other. I'm coming across."
+		"Break sight and move. I'll cover the gap."
+		"Don't freeze there. Reach the next corner."
+		"Help is moving; give me a safe approach."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good match, $other. You kept every lane dangerous."
+		"Well played. I had to change routes often."
+		"That fight stayed alive to the end."
+		"Good competition. We all found openings."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Come looking, $other. I won't use the obvious path."
+		"You can guard one route. I have more."
+		"Challenge accepted. Keep checking behind you."
+		"If you want me, leave your safe angle."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "whats up"
+		"Hey, $other. Keep your eyes on the exits."
+		"Good to see another friendly moving."
+		"Hello. Call the route you take."
+		"Hider here. You're heard."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "appreciate it"
+		trigger "cheers"
+		trigger "thanks a lot"
+		"You're welcome, $other. Keep the path open."
+		"Any time. We get through together."
+		"Save thanks for safe ground."
+		"Glad it helped. Now keep moving."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thanks, $other. You saw the opening too."
+		"Good eyes. That lane mattered."
+		"I appreciate it. Keep watching the flanks."
+		"That shot made room for all of us."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "that was my fault"
+		trigger "i messed up"
+		"Leave it behind, $other. Choose the next move."
+		"Mistakes happen when routes close. Adapt."
+		"We're still moving, so we're fine."
+		"Apology heard. Watch my side next time."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "take care"
+		"Safe route out, $other."
+		"Until next time. Don't get cornered."
+		"Go carefully; we'll hold this crossing."
+		"Goodbye. Keep one exit in sight."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Hider"
+		trigger "Hider respond"
+		trigger "Hider report"
+		trigger "Hider status"
+		trigger "Hider listen"
+		trigger "Hider answer"
+		trigger "Hider come in"
+		trigger "Hider are you there"
+		"Hider hears you, $other."
+		"I'm listening. Which route?"
+		"Call it quickly; I'm ready."
+		"Here. Tell me where the gap is."
+	}
+}

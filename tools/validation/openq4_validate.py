@@ -20,6 +20,7 @@ import sys
 import time
 import unicodedata
 from pathlib import Path
+from zipfile import BadZipFile, ZipFile
 
 BUILD_TOOLS_DIR = Path(__file__).resolve().parents[1] / "build"
 if str(BUILD_TOOLS_DIR) not in sys.path:
@@ -74,6 +75,9 @@ STAGED_REQUIRED_GAME_FILES = (
     "mod.json",
     "pak0.pk4",
     "pak1.pk4",
+)
+STAGED_FORBIDDEN_PK4_MEMBER_SUBSTRINGS = (
+    "roadhouse_quick",
 )
 
 STAGED_FORBIDDEN_LOOSE_GAME_PATHS = (
@@ -198,14 +202,13 @@ INHERITED_OPENQ4_ONLY_TESTS = frozenset(
     )
 )
 
-# TODO-D9 keeps MVD/bot/repeater integration disabled until it is adapted
-# without extending Prey's v7 game API. These tests assert the enabled OpenQ4
-# UI, schemas, and companion-game implementation, so they are explicit API
-# deferrals rather than active openPREY checks.
+# TODO-D9 keeps the remaining MVD/bot-navigation/repeater integration disabled
+# until it is adapted without extending Prey's v7 game API.  The bot character
+# contract now targets hhArtificialPlayer and is therefore active; these tests
+# still assert unported OpenQ4 UI, navigation, or companion-game behavior.
 DEFERRED_PREY_API_V7_TESTS = frozenset(
     (
         "demo_playback.py",
-        "mp_bot_characters.py",
         "mp_bot_navigation.py",
         "multiview_demo.py",
     )
@@ -582,6 +585,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "multiview_demo.py",
         root / "tools" / "tests" / "native_glx_shutdown.py",
         root / "tools" / "tests" / "openq4_pure_pack.py",
+        root / "tools" / "tests" / "openprey_rebase_contract.py",
         root / "tools" / "tests" / "openprey_runtime_branding.py",
         root / "tools" / "tests" / "openprey_tool_branding.py",
         root / "tools" / "tests" / "packaging_safety.py",
@@ -1492,6 +1496,26 @@ def validate_staged_payload(root: Path, *, dry_run: bool) -> None:
         required_file = game_dir / relative_name
         if not required_file.is_file():
             raise ValidationError(f"Required staged game file is missing: {rel(required_file, root)}")
+
+    forbidden_pk4_members: list[str] = []
+    for relative_name in STAGED_REQUIRED_GAME_FILES:
+        if not relative_name.endswith(".pk4"):
+            continue
+        pk4_path = game_dir / relative_name
+        try:
+            with ZipFile(pk4_path, "r") as archive:
+                for member_name in archive.namelist():
+                    member_lower = member_name.lower()
+                    if any(token in member_lower for token in STAGED_FORBIDDEN_PK4_MEMBER_SUBSTRINGS):
+                        forbidden_pk4_members.append(f"{rel(pk4_path, root)}:{member_name}")
+        except BadZipFile as exc:
+            raise ValidationError(f"Staged PK4 is not a valid archive: {rel(pk4_path, root)}") from exc
+    if forbidden_pk4_members:
+        formatted = "\n".join(f"  - {member}" for member in forbidden_pk4_members)
+        raise ValidationError(
+            "Staged PK4s contain development-only roadhouse_quick fixture content:\n"
+            f"{formatted}"
+        )
 
     stale_loose_content = [
         game_dir / relative_name

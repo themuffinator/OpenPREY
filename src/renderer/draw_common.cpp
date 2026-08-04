@@ -1407,8 +1407,7 @@ static bool RB_ViewHasSkyBackdropSurfaces( const viewDef_t *viewDef ) {
 		if ( surf == NULL || surf->material == NULL ) {
 			continue;
 		}
-		const texgen_t texgen = surf->material->Texgen();
-		if ( texgen == TG_SKYBOX_CUBE || texgen == TG_WOBBLESKY_CUBE ) {
+		if ( surf->material->HasTexgen( TG_SKYBOX_CUBE ) || surf->material->HasTexgen( TG_WOBBLESKY_CUBE ) ) {
 			return true;
 		}
 	}
@@ -6464,8 +6463,7 @@ static bool RB_MaterialIsSkyForSSAODepth( const idMaterial *material ) {
 		return true;
 	}
 
-	const texgen_t texgen = material->Texgen();
-	return texgen == TG_SKYBOX_CUBE || texgen == TG_WOBBLESKY_CUBE;
+	return material->HasTexgen( TG_SKYBOX_CUBE ) || material->HasTexgen( TG_WOBBLESKY_CUBE );
 }
 
 static bool RB_SSAOWorldDepthSurfFilter( const drawSurf_t *surf ) {

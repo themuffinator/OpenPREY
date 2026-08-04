@@ -6,6 +6,7 @@
 	"#str_04137"	"EAX support enabled."
 	"#str_100625"	"Dedicated server mode is recommended for Internet servers with more than %d players. Continue in listen mode?"
 	"#str_100626"	"Dedicated server mode recommended"
+	"#str_107240"	"Map Start"
 	"#str_107660"	"Frag Limit"
 	"#str_107661"	"Capture Limit"
 	"#str_107676"	"Tournament"

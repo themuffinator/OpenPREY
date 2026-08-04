@@ -1,0 +1,30 @@
+// A Mutilated Human is a harvested person remade into a hostile body. The
+// character is close, erratic and angry; the voice stays fragmented without
+// making the victim's condition a punchline.
+character "Mutilated Human" {
+	inherit		"rusher"
+	description	"tormented converted human that lashes out at arm's length"
+	skillBand	1 3
+	modelNum	1
+
+	set	combatRange		180
+	set	aggression		1.00
+	set	patience		0.05
+	set	initiative		1.00
+	set	vengefulness		1.00
+	scale	aimTremorDeg		1.25
+	scale	fireConeDeg		1.15
+	set	suppressionMsec	900
+	set	rangeDiscipline		0.40
+	scale	retreatHealth		0.40
+	set	chatiness		0.30
+
+	weapon	"weaponobj_wrench"		2.10
+	weapon	"weaponobj_soulstripper"	1.35
+	weapon	"weaponobj_autocannon"		1.05
+
+	skill 1 {
+		scale	combatRange		1.45
+		scale	aggression		0.88
+	}
+}

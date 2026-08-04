@@ -1,0 +1,28 @@
+// The Hidden survived by staying unheard and striking from prepared cover.
+// This generic Hider is cautious even after it has a weapon in hand.
+character "Hider" {
+	inherit		"ambusher"
+	description	"quiet Hidden scout that waits behind a prepared angle"
+	skillBand	2 4
+	modelNum	4
+
+	set	combatRange		850
+	set	aggression		0.25
+	set	patience		1.00
+	scale	strafeChance		0.70
+	scale	jumpChance		0.65
+	scale	pursuit			0.50
+	scale	reacquireMsec		1.30
+	set	aimHeight		0.12
+	set	chatiness		0.22
+	scale	chatDelayScale		1.25
+
+	weapon	"weaponobj_hiderweapon"		2.00
+	weapon	"weaponobj_crawlergrenade"	1.20
+	weapon	"weaponobj_rifle"		1.10
+
+	skill 2 {
+		scale	patience		0.90
+		add	strafeChance		0.05
+	}
+}

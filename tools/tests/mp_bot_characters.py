@@ -6,10 +6,9 @@ text file resolve into one flat botTraits_t that the combat code reads.  That
 only works while a set of agreements holds between the engine repo, the game
 repo and the shipped content, and none of them is anything a compiler can see:
 
-  * The character manager is the first heap-owning bot state, and it is
-    initialised and shut down from idGameLocal.  rvBotManager::Init already
-    exists, is defined, and is dead code because nobody ever called it - that is
-    exactly the failure this pins.
+  * The character manager is heap-owning game state and is initialised and shut
+    down from idGameLocal.  Prey's existing hhArtificialPlayer remains the
+    network-compatible player entity; personalities do not change game API 7.
   * Content is read with DECL_LEXER_FLAGS, whose LEXFL_NOFATALERRORS is what
     makes a mod's malformed .bot file a warning instead of a dead server, and
     every ListFiles is paired with a FreeFileList, because the list crosses the
@@ -18,14 +17,13 @@ repo and the shipped content, and none of them is anything a compiler can see:
     three parallel lists in two files; nothing but this notices when one of them
     grows a row and the others do not.
   * The baseline curve actually gets better as the skill number rises.  A sign
-    flipped in one row of forty is invisible in review and produces a skill 5
+    flipped in one row of 48 is invisible in review and produces a skill 5
     bot that reacts more slowly than a skill 1 bot.
-  * Every shipped character names a style that exists and owns one separate
-    .chat file with eight alternatives for every event.  Dialogue may not leak
-    back into the mechanics-only .bot files, and no chat line is one the
-    broadcast path would silently drop - over the length budget, or starting
-    with '#', which the localisation pass would substitute out from under the
-    author.
+  * The 19 shipped characters map exactly to retail player.def model slots,
+    name one of six reachable styles, and own one separate .chat file.  Every
+    voice has eight alternatives for 14 events plus the same nine bounded reply
+    intents.  Dialogue may not leak back into mechanics-only .bot files, and no
+    line may violate the broadcast token or length contract.
   * Bot chat passes a throttle first.  The engine has no chat flood protection
     anywhere, and a client whose reliable queue overflows is dropped, so
     unthrottled bot chatter can kick real players off a server.
@@ -44,10 +42,36 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT.parent / "openQ4-game")).resolve()
+GAME_LIBS_ROOT = Path(
+    os.environ.get("OPENPREY_GAMELIBS_REPO", ROOT.parent / "OpenPrey-game")
+).resolve()
 
-BOTFILES = ROOT / "content" / "baseoq4" / "pak0" / "botfiles"
+BOTFILES = ROOT / "content" / "basepr" / "pak0" / "botfiles"
 DOC = ROOT / "docs" / "dev" / "mp-bots.md"
+GAME_SOURCE = GAME_LIBS_ROOT / "src" / "game"
+PREY_SOURCE = GAME_LIBS_ROOT / "src" / "Prey"
+
+EXPECTED_ROSTER = {
+    "Tommy": (0, (3, 5)),
+    "Mutilated Human": (1, (1, 3)),
+    "Chuck": (2, (1, 3)),
+    "Dalton": (3, (2, 4)),
+    "Hider": (4, (2, 4)),
+    "Grandfather": (5, (2, 4)),
+    "Abducted": (6, (1, 3)),
+    "Teacher": (7, (2, 4)),
+    "Edward": (8, (1, 3)),
+    "Trent": (9, (2, 4)),
+    "Roy": (10, (2, 4)),
+    "Mohawk Hider": (11, (3, 5)),
+    "Victim": (12, (2, 4)),
+    "Post-op": (13, (3, 5)),
+    "Becky": (14, (3, 5)),
+    "Elite Hunter": (15, (4, 5)),
+    "Elhuit": (16, (3, 5)),
+    "Hunter": (17, (2, 4)),
+    "Jen": (18, (2, 4)),
+}
 
 # Traits whose curve has a direction: +1 means a higher number is a better
 # player, -1 means a lower one is.  Only the vision, aim, trigger and mistake
@@ -97,16 +121,38 @@ TRAIT_FLAT = (
     "chatiness",
 )
 
-TACTICAL_TRAITS = (
-    "initiative",
-    "targetStickiness",
-    "opportunism",
-    "vengefulness",
-    "suppressionMsec",
-    "strafeRhythmMsec",
-    "strafeRhythmVarianceMsec",
-    "weaponSwitchMsec",
-    "aimHeight",
+CHAT_EVENTS = (
+    "entergame",
+    "levelstart",
+    "kill",
+    "killWrench",
+    "killStreak",
+    "revenge",
+    "death",
+    "deathAccident",
+    "itemDenied",
+    "leadTaken",
+    "leadLost",
+    "matchWin",
+    "matchLose",
+    "farewell",
+)
+
+CHAT_EVENT_ENUM = (
+    "BOTCHAT_ENTERGAME",
+    "BOTCHAT_LEVELSTART",
+    "BOTCHAT_KILL",
+    "BOTCHAT_KILL_WRENCH",
+    "BOTCHAT_KILL_STREAK",
+    "BOTCHAT_KILL_REVENGE",
+    "BOTCHAT_DEATH",
+    "BOTCHAT_DEATH_ACCIDENT",
+    "BOTCHAT_ITEM_DENIED",
+    "BOTCHAT_LEAD_TAKEN",
+    "BOTCHAT_LEAD_LOST",
+    "BOTCHAT_MATCH_WIN",
+    "BOTCHAT_MATCH_LOSE",
+    "BOTCHAT_FAREWELL",
 )
 
 # Triggered replies deliberately use a small, common vocabulary.  The names
@@ -128,23 +174,18 @@ REPLY_SOURCES = frozenset(("any", "player", "bot"))
 REPLY_ADDRESS_MODES = frozenset(("either", "required", "forbidden"))
 REPLY_ALLOWED_TOKENS = frozenset(("$self", "$other", "$map"))
 
-# Weapon class names a content file may express an opinion about, taken from the
-# preference lists already in Bot.cpp plus the two multiplayer weapons those
-# lists leave out.  A misspelled class is silently neutral at runtime.
+# Weapon object class names exposed by Prey's retail multiplayer player def.  A
+# misspelled class is silently neutral at runtime.
 KNOWN_WEAPONS = frozenset(
     {
-        "weapon_blaster",
-        "weapon_machinegun",
-        "weapon_shotgun",
-        "weapon_hyperblaster",
-        "weapon_nailgun",
-        "weapon_grenadelauncher",
-        "weapon_rocketlauncher",
-        "weapon_railgun",
-        "weapon_lightninggun",
-        "weapon_gauntlet",
-        "weapon_dmg",
-        "weapon_napalmgun",
+        "weaponobj_wrench",
+        "weaponobj_rifle",
+        "weaponobj_crawlergrenade",
+        "weaponobj_soulstripper",
+        "weaponobj_autocannon",
+        "weaponobj_hiderweapon",
+        "weaponobj_rocketlauncher",
+        "weaponobj_bow",
     }
 )
 
@@ -297,7 +338,7 @@ class Block:
         self.description = ""
         self.inherit = ""
         self.skill_band: tuple[int, int] | None = None
-        self.models: dict[str, str] = {}
+        self.model_num: int | None = None
         self.traits: list[str] = []
         self.weapons: list[str] = []
         self.skill_blocks: list[int] = []
@@ -446,8 +487,18 @@ def parse_statements(reader: Reader, block: Block, skill_levels: int, nested: bo
                 high = reader.expect("number", "the highest skill")
                 block.skill_band = (int(float(low.text)), int(float(high.text)))
                 continue
-            if key in ("model", "modelMarine", "modelStrogg"):
-                block.models[key] = reader.expect("string", "a playerModel decl name").text
+            if key == "modelNum":
+                value = reader.expect("number", "a retail multiplayer model number")
+                if not re.fullmatch(r"\d+", value.text):
+                    raise AssertionError(
+                        f"{reader.name}:{value.line}: modelNum must be an integer, "
+                        f"found {value.text!r}"
+                    )
+                if block.model_num is not None:
+                    raise AssertionError(
+                        f"{reader.name}:{token.line}: character repeats modelNum"
+                    )
+                block.model_num = int(value.text)
                 continue
             if key == "chat":
                 parse_chat_block(reader, block)
@@ -515,14 +566,14 @@ def parse_chat_file(path: Path) -> Block:
     return block
 
 
-Q4_COLOR_RE = re.compile(r"\^(?:[cC][0-9]{3}|[rR]|[^^])")
+IDTECH_COLOR_RE = re.compile(r"\^(?:[cC][0-9]{3}|[rR]|[^^])")
 REPLY_WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 def normalize_reply_words(text: str) -> tuple[str, ...]:
     """Mirror the runtime's colour-free, ASCII, case-insensitive word view."""
 
-    without_colors = Q4_COLOR_RE.sub("", text)
+    without_colors = IDTECH_COLOR_RE.sub("", text)
     return tuple(REPLY_WORD_RE.findall(without_colors.lower()))
 
 
@@ -545,7 +596,7 @@ def validate_reply_matcher_vectors() -> None:
     """Pin the player-facing matching semantics independently of C++."""
 
     vectors = (
-        ("hello", "^1HeLLo, ^7Voss!", True, "colours, case and punctuation"),
+        ("hello", "^1HeLLo, ^7Tommy!", True, "colours, case and punctuation"),
         ("hi", "HI!", True, "case-insensitive exact word"),
         ("hi", "this should not match", False, "short word is not a substring"),
         ("hi", "a high ledge", False, "word prefix is not a match"),
@@ -597,48 +648,69 @@ def chat_event_enum(header: str) -> list[str]:
 
 
 def validate_wiring() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
-    if not mp.is_dir():
+    if not GAME_SOURCE.is_dir():
         print(f"mp_bot_characters: skipped game checks (no GameLibs checkout at {GAME_LIBS_ROOT})")
         return
 
-    # rvBot gains a character pointer and a trait struct, so the contract header
-    # has to be visible before Bot.h is read.
-    game_local_h = read(mp / "Game_local.h")
-    require_order(
-        game_local_h,
-        '#include "bots/BotCharacter.h"',
-        '#include "bots/Bot.h"',
-        "Game_local.h include order",
-    )
+    # Character data is game-module state.  Prey's existing artificial-player
+    # class remains the player/network implementation, so the public game ABI
+    # must remain the retail-compatible version 7.
+    game_local_h = read(GAME_SOURCE / "Game_local.h")
+    require(game_local_h, '#include "bots/BotCharacter.h"', "Game_local.h")
+    game_api = read(GAME_SOURCE / "Game.h")
+    require_regex(game_api, r"GAME_API_VERSION\s*=\s*7\s*;", "Prey game API")
 
-    # rvBotManager::Init has been defined and uncalled since the bots landed.
-    # The character manager owns heap memory, so this one has to be wired.
-    game_local = read(mp / "Game_local.cpp")
+    player_header = read(PREY_SOURCE / "game_player.h")
+    require(
+        player_header,
+        "class hhArtificialPlayer : public hhPlayer",
+        "Prey artificial-player foundation",
+    )
+    for needle in (
+        "const rvBotCharacter *botCharacter",
+        "botTraits_t",
+        "BindBotCharacter(",
+        "RebindBotCharacter(",
+        "TryQueueBotReply(",
+        "OnBotItemPickedUp(",
+        "botPendingChatIsReply",
+    ):
+        require(player_header, needle, "hhArtificialPlayer character state/API")
+
+    # The manager owns loaded style, character and chat data.
+    game_local = read(GAME_SOURCE / "Game_local.cpp")
     init = game_local[game_local.index("void idGameLocal::Init") :][:6000]
     require(init, "botCharacterManager.Init();", "idGameLocal::Init")
     shutdown = game_local[game_local.index("void idGameLocal::Shutdown") :][:6000]
     require(shutdown, "botCharacterManager.Shutdown();", "idGameLocal::Shutdown")
 
-    # A bot speaks through the same call the server makes for a human's say, so
-    # the line is indistinguishable from a player's.  It ships private.
-    mp_header = read(mp / "MultiplayerGame.h")
+    # A bot speaks through the same server call as a human, so the line is
+    # indistinguishable from an ordinary player chat line.
+    mp_header = read(GAME_SOURCE / "MultiplayerGame.h")
     at = mp_header.index("ProcessChatMessage")
     access = None
     for match in re.finditer(r"^\s*(public|protected|private)\s*:", mp_header[:at], re.MULTILINE):
         access = match.group(1)
     if access != "public":
         raise AssertionError(
-            f"idMultiplayerGame::ProcessChatMessage is {access}; rvBot cannot reach it"
+            f"idMultiplayerGame::ProcessChatMessage is {access}; hhArtificialPlayer cannot reach it"
         )
 
 
 def validate_manager() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
-    if not mp.is_dir():
+    if not GAME_SOURCE.is_dir():
         return
 
-    source = read(mp / "bots" / "BotCharacter.cpp")
+    source = read(GAME_SOURCE / "bots" / "BotCharacter.cpp")
+    header = read(GAME_SOURCE / "bots" / "BotCharacter.h")
+
+    # The implementation is a Prey schema, not a compatibility parser for
+    # upstream Quake 4 identities or weapon lore.
+    for forbidden in ("modelMarine", "modelStrogg", "rail gun", '"Voss"'):
+        if forbidden.lower() in (source + header).lower():
+            raise AssertionError(
+                f"Prey bot-character source retains upstream-only token {forbidden!r}"
+            )
 
     # A mod's malformed character file must warn, not kill the server.
     # LEXFL_NOFATALERRORS is what buys that, and it comes with these flags.
@@ -763,6 +835,13 @@ def validate_manager() -> None:
         "ParseChatBlock( lexer, sourceName )",
         "rvBotCharacter legacy inline chat compatibility",
     )
+    require(
+        character_parse,
+        'token.Icmp( "modelNum" )',
+        "rvBotCharacter retail modelNum parser",
+    )
+    require(character_parse, "parsedModelNum", "rvBotCharacter integer modelNum parser")
+    require(character_parse, "parsedModelNum > 18", "rvBotCharacter modelNum upper bound")
 
     # The dead Quake 3 prototypes share the botfiles tree; nothing may read them.
     for dead in ('"botfiles/bots"', '"botfiles/items.c"', '"botfiles/weapons.c"'):
@@ -774,9 +853,17 @@ def validate_manager() -> None:
     for constant in ("BOT_CHAT_CLIENT_THROTTLE_MSEC", "BOT_CHAT_GLOBAL_THROTTLE_MSEC"):
         require(source, constant, "BotCharacter.cpp chat throttle")
 
-    header = read(mp / "bots" / "BotCharacter.h")
+    header = read(GAME_SOURCE / "bots" / "BotCharacter.h")
     constants = header_constants(header)
     fields = trait_fields(header)
+    if constants["BOT_SKILL_LEVELS"] != 5:
+        raise AssertionError(
+            f"BOT_SKILL_LEVELS is {constants['BOT_SKILL_LEVELS']}; the shipped curve is 1..5"
+        )
+    if len(fields) != 48:
+        raise AssertionError(
+            f"botTraits_t has {len(fields)} float traits; the authored contract has 48"
+        )
 
     # The trait table is how a content file names a trait.  Every row has to
     # point at a real field, and every field wants a row or it can never be
@@ -941,7 +1028,7 @@ def validate_baseline(curve: dict[str, list[float]], levels: int) -> None:
 
 
 def validate_content() -> None:
-    header_path = GAME_LIBS_ROOT / "src" / "mpgame" / "bots" / "BotCharacter.h"
+    header_path = GAME_SOURCE / "bots" / "BotCharacter.h"
     if not header_path.is_file():
         print(f"mp_bot_characters: skipped content checks (no BotCharacter.h at {header_path})")
         return
@@ -951,8 +1038,13 @@ def validate_content() -> None:
     levels = constants["BOT_SKILL_LEVELS"]
     fields = set(trait_fields(header))
     events = chat_event_enum(header)
+    if tuple(events) != CHAT_EVENT_ENUM:
+        raise AssertionError(
+            "rvBotChatEvent order differs from the content word table; "
+            f"expected {list(CHAT_EVENT_ENUM)}, found {events}"
+        )
 
-    manager = GAME_LIBS_ROOT / "src" / "mpgame" / "bots" / "BotCharacter.cpp"
+    manager = GAME_SOURCE / "bots" / "BotCharacter.cpp"
     words = chat_event_words(manager, len(events))
 
     style_dir = BOTFILES / "styles"
@@ -968,14 +1060,29 @@ def validate_content() -> None:
     styles = {}
     for path in sorted(style_dir.glob("*.style")):
         block = parse_file(path, "style", levels)
-        styles[block.name.lower()] = block
-    if len(styles) < 6:
-        raise AssertionError(f"{rel(style_dir)} holds {len(styles)} styles; six were designed")
+        if path.stem.lower() != block.name.lower():
+            raise AssertionError(
+                f"{rel(path)}: file name must match style {block.name!r}"
+            )
+        style_key = block.name.lower()
+        if style_key in styles:
+            raise AssertionError(
+                f"{rel(path)}: style {block.name!r} is declared by more than one file"
+            )
+        styles[style_key] = block
+    expected_styles = {"rusher", "sniper", "roamer", "hunter", "ambusher", "skirmisher"}
+    if set(styles) != expected_styles:
+        raise AssertionError(
+            f"{rel(style_dir)} styles differ from the six-style contract; "
+            f"missing {sorted(expected_styles - set(styles))}, "
+            f"unknown {sorted(set(styles) - expected_styles)}"
+        )
 
     characters = [parse_file(path, "character", levels) for path in sorted(character_dir.glob("*.bot"))]
-    if len(characters) < 10:
+    if len(characters) != len(EXPECTED_ROSTER):
         raise AssertionError(
-            f"{rel(character_dir)} holds {len(characters)} characters; ten is the floor"
+            f"{rel(character_dir)} holds {len(characters)} characters; "
+            f"the retail-selectable roster has exactly {len(EXPECTED_ROSTER)}"
         )
     chat_blocks = [parse_chat_file(path) for path in sorted(chat_dir.glob("*.chat"))]
 
@@ -1006,6 +1113,28 @@ def validate_content() -> None:
                     f"{block.source}: skillBand {low} {high} is outside 1..{levels}"
                 )
 
+            if block.name not in EXPECTED_ROSTER:
+                raise AssertionError(
+                    f"{block.source}: {block.name!r} is not one of Prey's 19 "
+                    "retail-selectable multiplayer models"
+                )
+            expected_model, expected_band = EXPECTED_ROSTER[block.name]
+            if block.model_num != expected_model:
+                raise AssertionError(
+                    f"{block.source}: {block.name!r} uses modelNum {block.model_num!r}; "
+                    f"retail player.def assigns modelNum {expected_model}"
+                )
+            if block.skill_band != expected_band:
+                raise AssertionError(
+                    f"{block.source}: {block.name!r} uses skillBand "
+                    f"{block.skill_band!r}; the authored roster expects {expected_band}"
+                )
+            expected_stem = re.sub(r"[^a-z0-9]+", "_", block.name.lower()).strip("_")
+            if Path(block.source).stem.lower() != expected_stem:
+                raise AssertionError(
+                    f"{block.source}: file name must match character {block.name!r}"
+                )
+
             if block.chat:
                 raise AssertionError(
                     f"{block.source}: character mechanics files may not contain chat blocks; "
@@ -1022,15 +1151,22 @@ def validate_content() -> None:
         word: {"$self", "$map"}
         for word in words
     }
-    for word in ("kill", "killGauntlet", "killStreak", "revenge", "death"):
+    actual_roster = set(seen)
+    expected_roster = {name.lower() for name in EXPECTED_ROSTER}
+    if actual_roster != expected_roster:
+        raise AssertionError(
+            "character roster differs from retail player.def; "
+            f"missing {sorted(expected_roster - actual_roster)}, "
+            f"unknown {sorted(actual_roster - expected_roster)}"
+        )
+
+    for word in ("kill", "killWrench", "killStreak", "revenge", "death"):
         allowed_tokens[word].update(("$other", "$weapon"))
     allowed_tokens["itemDenied"].update(("$other", "$item"))
-    allowed_tokens["leadTaken"].add("$other")
     allowed_tokens["leadLost"].add("$other")
 
     chats_by_owner: dict[str, Block] = {}
     normalized_lines: dict[str, tuple[str, str, int]] = {}
-    normalized_reply_lines: dict[str, tuple[str, str, int]] = {}
     for block in chat_blocks:
         check_block(block, fields, constants)
         owner = block.name.lower()
@@ -1048,7 +1184,8 @@ def validate_content() -> None:
             )
 
         file_stem = Path(block.source).stem.lower()
-        if file_stem != owner:
+        owner_stem = re.sub(r"[^a-z0-9]+", "_", owner).strip("_")
+        if file_stem != owner_stem:
             raise AssertionError(
                 f"{block.source}: file name must match its chat owner {block.name!r}"
             )
@@ -1092,7 +1229,7 @@ def validate_content() -> None:
                     )
                 normalized_lines[normalized] = (block.name, event, line)
 
-            if event in ("leadTaken", "leadLost") and token_free < 4:
+            if event == "leadLost" and token_free < 4:
                 raise AssertionError(
                     f"{block.source}: chat {event} needs at least four lines that do not "
                     "require $other, because the lead event may have no named rival"
@@ -1134,9 +1271,10 @@ def validate_content() -> None:
                     f"{block.source}:{rule.line}: reply {rule.name!r} has addressed "
                     f"{rule.addressed!r}, expected one of {sorted(REPLY_ADDRESS_MODES)}"
                 )
-            if not rule.triggers:
+            if len(rule.triggers) != 8:
                 raise AssertionError(
-                    f"{block.source}:{rule.line}: reply {rule.name!r} declares no triggers"
+                    f"{block.source}:{rule.line}: reply {rule.name!r} has "
+                    f"{len(rule.triggers)} triggers; the shipped contract requires exactly 8"
                 )
             if len(rule.triggers) > constants["BOT_MAX_REPLY_TRIGGERS"]:
                 raise AssertionError(
@@ -1175,12 +1313,10 @@ def validate_content() -> None:
                     )
                 normalized_triggers[normalized] = (rule.name, line)
 
-            expected_line_count = 2 if owner == "kane" else 4
-            if len(rule.lines) != expected_line_count:
+            if len(rule.lines) != 4:
                 raise AssertionError(
                     f"{block.source}:{rule.line}: reply {rule.name!r} has "
-                    f"{len(rule.lines)} lines; shipped characters require "
-                    f"{expected_line_count}"
+                    f"{len(rule.lines)} lines; shipped characters require exactly 4"
                 )
 
             for text, line in rule.lines:
@@ -1193,14 +1329,16 @@ def validate_content() -> None:
                     )
 
                 normalized = re.sub(r"[^a-z0-9$]+", " ", text.lower()).strip()
-                previous = normalized_reply_lines.get(normalized)
+                previous = normalized_lines.get(normalized)
                 if previous is not None:
-                    previous_owner, previous_rule, previous_line = previous
+                    previous_owner, previous_context, previous_line = previous
                     raise AssertionError(
                         f"{block.source}:{line}: {block.name}/{rule.name} repeats the "
-                        f"reply at {previous_owner}/{previous_rule}:{previous_line}"
+                        f"authored line at {previous_owner}/{previous_context}:{previous_line}"
                     )
-                normalized_reply_lines[normalized] = (block.name, rule.name, line)
+                normalized_lines[normalized] = (
+                    block.name, f"reply {rule.name}", line
+                )
 
         missing_replies = sorted(set(REPLY_CATEGORIES) - set(replies_by_name))
         unknown_replies = sorted(set(replies_by_name) - set(REPLY_CATEGORIES))
@@ -1254,15 +1392,27 @@ def chat_event_words(manager: Path, count: int) -> list[str]:
         raise AssertionError(
             f"docs/dev/mp-bots.md lists {len(words)} chat events but rvBotChatEvent declares {count}"
         )
+    if tuple(words) != CHAT_EVENTS:
+        raise AssertionError(
+            "docs/dev/mp-bots.md chat event list differs from the shipped Prey contract; "
+            f"expected {list(CHAT_EVENTS)}, found {words}"
+        )
 
     if not manager.is_file():
         raise AssertionError(f"{rel(manager)} does not exist")
     source = read(manager)
-    unknown = [word for word in words if f'"{word}"' not in source]
-    if unknown:
+    table = re.search(r"\bbotChatEventNames\s*\[[^\]]*\]\s*=", source)
+    if table is None:
         raise AssertionError(
-            f"BotCharacter.cpp knows no chat event word for {unknown}, so a character file "
-            "using one would parse and then never say anything"
+            "BotCharacter.cpp has no botChatEventNames table mapping content words to events"
+        )
+    runtime_words = re.findall(
+        r'"(\w+)"', braced_body(source, table.end(), "botChatEventNames")
+    )
+    if runtime_words != words:
+        raise AssertionError(
+            "BotCharacter.cpp chat event word order disagrees with the enum/docs; "
+            f"runtime {runtime_words}, docs {words}"
         )
     return words
 
@@ -1297,6 +1447,8 @@ def check_block(block: Block, fields: set[str], constants: dict[str, int]) -> No
         if not lines:
             raise AssertionError(f"{block.source}: chat {event} declares no lines")
         for text, line in lines:
+            if not text.strip():
+                raise AssertionError(f"{block.source}:{line}: chat {event} has an empty line")
             if text.startswith("#"):
                 raise AssertionError(
                     f"{block.source}:{line}: chat lines may not start with '#'; the broadcast "
@@ -1319,6 +1471,10 @@ def check_block(block: Block, fields: set[str], constants: dict[str, int]) -> No
                 f"{block.source}:{rule.line}: reply {rule.name!r} declares no lines"
             )
         for text, line in rule.lines:
+            if not text.strip():
+                raise AssertionError(
+                    f"{block.source}:{line}: reply {rule.name!r} has an empty line"
+                )
             if text.startswith("#"):
                 raise AssertionError(
                     f"{block.source}:{line}: reply lines may not start with '#'; the "
@@ -1341,30 +1497,51 @@ def validate_cvars_and_commands() -> None:
     cvar_table = doc[doc.index("\n## Cvars") :]
     cvar_table = cvar_table[: cvar_table.index("\n## ", 1)]
     documented = re.findall(r"^\|\s*`(bot_\w+)`\s*\|\s*`([^`]*)`\s*\|", cvar_table, re.MULTILINE)
-    if len(documented) < 13:
+    expected_defaults = {
+        "bot_skill": "3",
+        "bot_characters": "1",
+        "bot_forceCharacter": "",
+        "bot_skillVariance": "0",
+        "bot_chat": "1",
+        "bot_chatDelay": "600",
+        "bot_chatCPM": "900",
+    }
+    documented_defaults = {name: default.strip('"') for name, default in documented}
+    if len(documented) != len(expected_defaults) or documented_defaults != expected_defaults:
         raise AssertionError(
-            f"docs/dev/mp-bots.md documents {len(documented)} bot cvars; the block has thirteen"
+            "docs/dev/mp-bots.md bot cvars/defaults differ from the seven-cvar contract; "
+            f"expected {expected_defaults}, found {documented_defaults}"
         )
 
     command_table = doc[doc.index("\n## Commands") :]
     command_table = command_table[: command_table.index("\n## ", 1)]
     commands = {row.split()[0] for row in re.findall(r"^\|\s*`([^`]+)`", command_table, re.MULTILINE)}
-    for expected in ("addbot", "botcharacters", "botreload", "botlist"):
+    for expected in (
+        "addbot",
+        "removebot",
+        "removebots",
+        "botcharacters",
+        "botreload",
+        "botlist",
+    ):
         if expected not in commands:
             raise AssertionError(f"docs/dev/mp-bots.md does not document the {expected!r} command")
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
-    if not mp.is_dir():
+    if not GAME_SOURCE.is_dir():
         return
 
-    declared = read(mp / "gamesys" / "SysCvar.cpp")
-    exported = read(mp / "gamesys" / "SysCvar.h")
+    declared = read(GAME_SOURCE / "gamesys" / "SysCvar.cpp")
+    exported = read(GAME_SOURCE / "gamesys" / "SysCvar.h")
 
     for name, default in documented:
         match = re.search(rf'^idCVar {name}\(\s*"{name}",\s*"([^"]*)",\s*([^,]+),', declared, re.MULTILINE)
         if match is None:
-            raise AssertionError(f"{name} is documented but not defined in mpgame SysCvar.cpp")
-        require(exported, f"extern idCVar {name};", "mpgame SysCvar.h")
+            raise AssertionError(f"{name} is documented but not defined in game SysCvar.cpp")
+        require_regex(
+            exported,
+            rf"\bextern\s+idCVar\s+{re.escape(name)}\s*;",
+            "game SysCvar.h",
+        )
         documented_default = default.strip('"')
         if match.group(1) != documented_default:
             raise AssertionError(
@@ -1375,15 +1552,7 @@ def validate_cvars_and_commands() -> None:
     # A command line +set never reaches a CVAR_GAME cvar, because the game module
     # registers it after the engine has parsed the command line.  Anything an
     # operator or a test harness has to set therefore has to be archived.
-    for name in (
-        "bot_enable",
-        "bot_minPlayers",
-        "bot_skill",
-        "bot_skillVariance",
-        "bot_characters",
-        "bot_chat",
-        "bot_chatDelay",
-    ):
+    for name in expected_defaults.keys() - {"bot_forceCharacter"}:
         line = re.search(rf"^idCVar {name}\(.*$", declared, re.MULTILINE)
         if line is None or "CVAR_ARCHIVE" not in line.group(0):
             raise AssertionError(
@@ -1391,99 +1560,284 @@ def validate_cvars_and_commands() -> None:
                 "command line +set will not reach it either"
             )
 
-    # And the two tuning knobs deliberately are not: an archived
-    # bot_forceCharacter would field a whole roster of clones.
-    for name in ("bot_forceCharacter", "bot_debugAim"):
-        line = re.search(rf"^idCVar {name}\(.*$", declared, re.MULTILINE)
-        if line is None:
-            raise AssertionError(f"{name} is not defined in mpgame SysCvar.cpp")
-        if "CVAR_ARCHIVE" in line.group(0):
-            raise AssertionError(f"{name} is archived; it is a debugging knob and must not be")
+    # A forced personality is a one-session tuning aid; archiving it would
+    # unexpectedly fill later matches with clones.
+    forced = re.search(r"^idCVar bot_forceCharacter\(.*$", declared, re.MULTILINE)
+    if forced is None:
+        raise AssertionError("bot_forceCharacter is not defined in game SysCvar.cpp")
+    if "CVAR_ARCHIVE" in forced.group(0):
+        raise AssertionError("bot_forceCharacter is archived; it is a session tuning knob")
 
-    source = read(mp / "gamesys" / "SysCmds.cpp")
+    # addbot/removebot keep this legacy reconciler cvar in step with the live
+    # roster.  A plain CVAR_GAME becomes CVAR_CHEAT automatically, which makes
+    # those writes fail on a normal multiplayer server and causes the next
+    # frame to retire every bot because the desired count remains zero.
+    desired_count = re.search(
+        r"^idCVar g_artificialPlayerCount\(.*$", declared, re.MULTILINE
+    )
+    if desired_count is None or "CVAR_NOCHEAT" not in desired_count.group(0):
+        raise AssertionError(
+            "g_artificialPlayerCount is not CVAR_NOCHEAT, so normal multiplayer "
+            "addbot/removebot commands cannot maintain the desired roster"
+        )
+
+    source = read(GAME_SOURCE / "gamesys" / "SysCmds.cpp")
     for command in sorted(commands):
-        require(source, f'"{command}",', "idGameLocal::InitConsoleCommands")
+        require_regex(
+            source,
+            rf'AddCommand\(\s*"{re.escape(command)}"\s*,',
+            "idGameLocal::InitConsoleCommands",
+        )
 
     # addbot grew an optional per-bot skill override; the handler has to read it.
-    handler = source[source.index("void Cmd_AddBot_f") :][:1200]
+    handler = source[source.index("Cmd_AddBot_f") :][:1800]
     require(handler, "args.Argv( 2 )", "Cmd_AddBot_f skill argument")
     require(handler, "BOT_SKILL_LEVELS", "Cmd_AddBot_f skill argument")
+    require(handler, "SpawnArtificialPlayer( character, skill )", "Cmd_AddBot_f spawn")
+
+    for function in (
+        "Cmd_RemoveBot_f",
+        "Cmd_RemoveBots_f",
+        "Cmd_BotList_f",
+        "Cmd_BotCharacters_f",
+        "Cmd_BotReload_f",
+    ):
+        require(source, function, "Prey bot command handlers")
 
 
 def validate_chat_path() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
-    if not mp.is_dir():
+    """Guard Prey's artificial-player personality and delayed-chat path."""
+
+    if not GAME_SOURCE.is_dir():
         return
 
-    # Comments are stripped throughout: Bot.cpp explains at length why it does
-    # NOT use the hitscan flag, and a check that read the prose would fire on
-    # the code that got it right.
-    sources = {
-        path.name: strip_comments(read(path))
-        for path in (mp / "bots" / "Bot.cpp", mp / "bots" / "BotCharacter.cpp")
-        if path.is_file()
-    }
-    callers = {name: text for name, text in sources.items() if "ProcessChatMessage(" in text}
-    if not callers:
+    player = strip_comments(read(PREY_SOURCE / "game_player.cpp"))
+    manager = strip_comments(read(GAME_SOURCE / "bots" / "BotCharacter.cpp"))
+    manager_header = read(GAME_SOURCE / "bots" / "BotCharacter.h")
+    game_local = strip_comments(read(GAME_SOURCE / "Game_local.cpp"))
+    commands = strip_comments(read(GAME_SOURCE / "gamesys" / "SysCmds.cpp"))
+
+    # A removed player must return its character reservation.  Assignment and
+    # live reload must also rebuild resolved traits rather than carrying a stale
+    # pointer into the next frame.
+    destructor_at = player.index("hhArtificialPlayer::~hhArtificialPlayer")
+    destructor = braced_body(player, destructor_at, "hhArtificialPlayer destructor")
+    require(destructor, "ReleaseCharacter(", "hhArtificialPlayer destructor")
+
+    bind_at = player.index("void hhArtificialPlayer::BindBotCharacter")
+    bind = braced_body(player, bind_at, "hhArtificialPlayer::BindBotCharacter")
+    for needle in ("ReleaseCharacter(", "MarkCharacterUsed(", "ResolveBotTraits("):
+        require(bind, needle, "hhArtificialPlayer::BindBotCharacter")
+    require(
+        bind,
+        "botCharacter != character",
+        "skill-only bot rebind leaves the character reservation count unchanged",
+    )
+
+    # Forced-character sessions intentionally allow clones. Reservations must
+    # therefore be counted: releasing one clone cannot make its still-live
+    # siblings look available to ordinary random selection.
+    require(manager_header, "reservationCount", "reference-counted character ownership")
+    if re.search(r"\bbool\s+inUse\b", manager_header):
+        raise AssertionError("bot character ownership is still a clone-unsafe boolean")
+    mark_at = manager.index("void rvBotCharacterManager::MarkCharacterUsed")
+    mark = braced_body(manager, mark_at, "rvBotCharacterManager::MarkCharacterUsed")
+    release_at = manager.index("void rvBotCharacterManager::ReleaseCharacter")
+    release = braced_body(manager, release_at, "rvBotCharacterManager::ReleaseCharacter")
+    release_all_at = manager.index("void rvBotCharacterManager::ReleaseAllCharacters")
+    release_all = braced_body(
+        manager, release_all_at, "rvBotCharacterManager::ReleaseAllCharacters"
+    )
+    require(mark, "++", "character reservation acquisition")
+    require(release, "reservationCount > 0", "bounded character reservation release")
+    require(release, "--", "character reservation release")
+    require(release_all, "reservationCount = 0", "character reservation reset")
+
+    rebind_at = player.index("void hhArtificialPlayer::RebindBotCharacter")
+    rebind = braced_body(player, rebind_at, "hhArtificialPlayer::RebindBotCharacter")
+    for needle in ("FindCharacter(", "PickCharacter(", "MarkCharacterUsed(", "ResolveBotTraits("):
+        require(rebind, needle, "hhArtificialPlayer::RebindBotCharacter")
+
+    spawn_at = game_local.index("bool idGameLocal::SpawnArtificialPlayer")
+    spawn = braced_body(game_local, spawn_at, "idGameLocal::SpawnArtificialPlayer")
+    for needle in (
+        "botCharacterManager.FindCharacter(",
+        "botCharacterManager.PickCharacter(",
+        '"player_artificial_mp"',
+        '"bot_character"',
+        '"bot_skill"',
+        "mpGame.SpawnPlayer(",
+    ):
+        require(spawn, needle, "idGameLocal::SpawnArtificialPlayer")
+
+    userinfo_at = game_local.index("void idGameLocal::GetAPUserInfo")
+    userinfo = braced_body(game_local, userinfo_at, "idGameLocal::GetAPUserInfo")
+    for needle in (
+        '"ui_name"',
+        '"bot_character"',
+        '"bot_skill"',
+        "GetModelNum()",
+        '"ui_modelNum"',
+        "ClampInt( 0, 18",
+    ):
+        require(userinfo, needle, "idGameLocal::GetAPUserInfo")
+
+    display_name_at = player.index("const char *hhArtificialPlayer::BotDisplayName")
+    display_name = braced_body(
+        player, display_name_at, "hhArtificialPlayer::BotDisplayName"
+    )
+    require(display_name, "gameLocal.GetUserInfo(", "trusted bot chat display name")
+    require(display_name, 'GetString( "ui_name"', "trusted bot chat display name")
+
+    remove_at = game_local.index("bool idGameLocal::RemoveArtificialPlayer")
+    remove = braced_body(game_local, remove_at, "idGameLocal::RemoveArtificialPlayer")
+    require(remove, "SayBotFarewell(", "idGameLocal::RemoveArtificialPlayer")
+    require(remove, "ServerClientDisconnect(", "idGameLocal::RemoveArtificialPlayer")
+
+    live_rebind_at = game_local.index("void idGameLocal::RebindArtificialPlayers")
+    live_rebind = braced_body(
+        game_local, live_rebind_at, "idGameLocal::RebindArtificialPlayers"
+    )
+    require(live_rebind, "ReleaseAllCharacters(", "idGameLocal::RebindArtificialPlayers")
+    require(live_rebind, "RebindBotCharacter(", "idGameLocal::RebindArtificialPlayers")
+    require_order(
+        live_rebind,
+        "ReleaseAllCharacters(",
+        "RebindBotCharacter(",
+        "idGameLocal::RebindArtificialPlayers reservation reset",
+    )
+
+    reload_at = commands.index("static void Cmd_BotReload_f")
+    reload_command = braced_body(commands, reload_at, "Cmd_BotReload_f")
+    require_order(
+        reload_command,
+        "botCharacterManager.Reload()",
+        "RebindArtificialPlayers()",
+        "Cmd_BotReload_f reload/rebind order",
+    )
+    require_order(
+        reload_command,
+        "RebindArtificialPlayers()",
+        "if ( loaded )",
+        "Cmd_BotReload_f unconditional live-bot rebind",
+    )
+    if reload_command.count("RebindArtificialPlayers()") != 1:
         raise AssertionError(
-            "Nothing under bots/ calls ProcessChatMessage; bot chat has to go out through the "
-            "same server-side call a human's say uses, or every bot speaks as the host"
+            "Cmd_BotReload_f must rebind live bots exactly once, outside the reload-result arm"
         )
 
-    for name, text in callers.items():
-        at = text.index("ProcessChatMessage(")
-        window = text[max(0, at - 2500) : at]
-        require(window, "AllowChat(", f"{name} before ProcessChatMessage")
-        require(window, "IsTeamGame()", f"{name} before ProcessChatMessage")
+    # Both routes that reset or replace map state clear absolute chat throttle
+    # stamps.  Otherwise a timestamp from a long prior map can mute the new one.
+    restart_at = game_local.index("void idGameLocal::LocalMapRestart")
+    restart_end = game_local.index("void idGameLocal::MapRestart", restart_at)
+    local_restart = game_local[restart_at:restart_end]
+    require(
+        local_restart,
+        "botCharacterManager.ResetChatThrottle();",
+        "idGameLocal::LocalMapRestart chat clock reset",
+    )
 
-    bot = sources["Bot.cpp"]
+    new_map_at = game_local.index("void idGameLocal::InitFromNewMap")
+    new_map_end = game_local.index("bool idGameLocal::InitFromSaveGame", new_map_at)
+    new_map = game_local[new_map_at:new_map_end]
+    require(
+        new_map,
+        "botCharacterManager.ResetChatThrottle();",
+        "idGameLocal::InitFromNewMap chat clock reset",
+    )
 
-    # A kicked bot has to give its identity back, in Shutdown specifically, or
-    # the roster drains and every later bot falls through to "any character at
-    # all".  Releasing it somewhere else does not cover the kick.
-    teardown = bot[bot.index("void rvBot::Shutdown") :][:1500]
-    require(teardown, "ReleaseCharacter(", "rvBot::Shutdown")
+    # Every advertised axis must reach behavior code.  Parser support alone
+    # would otherwise let content validate while a tuning choice does nothing.
+    runtime_traits = trait_fields(read(GAME_SOURCE / "bots" / "BotCharacter.h"))
+    for trait in runtime_traits:
+        require(player, f"botTraits.{trait}", f"hhArtificialPlayer runtime trait {trait}")
 
-    # The gauntlet and the lightning gun set neither def_projectile nor
-    # def_hitscan, so attackHitscan is false for both even though they are
-    # instant-hit.  A bot that leads whenever !attackHitscan misses everything.
-    if "attackHitscan" in bot:
-        raise AssertionError(
-            "Bot.cpp tests wfl.attackHitscan; it is false for the gauntlet and the lightning "
-            "gun, so the projectile test has to be def_projectile instead"
-        )
-    require(bot, '"def_projectile"', "rvBot aim lead")
+    think_at = player.index("void hhArtificialPlayer::Think")
+    think_end = player.index("void hhArtificialPlayer::ClientPredictionThink", think_at)
+    think = player[think_at:think_end]
+    for needle in (
+        "FindBotEnemy(",
+        "UpdateBotWeapon(",
+        "UpdateBotMovement(",
+        "UpdateBotAimAndFire(",
+        "UpdateBotChat(",
+        "BOTCHAT_LEAD_TAKEN",
+        "BOTCHAT_LEAD_LOST",
+    ):
+        require(think, needle, "hhArtificialPlayer::Think")
 
-    # Every multiplayer projectile is retuned by a _mp decl, which only
-    # FindEntityDef's fallback picks up.  A hardcoded speed leads by the wrong
-    # amount on every shot.
-    require(bot, "FindEntityDefDict(", "rvBot projectile speed lookup")
+    # Retail MP maps do not ship bot AAS.  The fallback still has to respect
+    # wall-walk gravity and avoid blindly walking into collision.
+    if "GetEyeAxis()" not in player and "GetGravityAxis()" not in player:
+        raise AssertionError("hhArtificialPlayer has no gravity-aware steering axis")
+    movement_at = player.index("void hhArtificialPlayer::UpdateBotMovement")
+    movement = braced_body(player, movement_at, "hhArtificialPlayer::UpdateBotMovement")
+    require(movement, "TraceBounds(", "hhArtificialPlayer wall avoidance")
 
-    # Every tactical personality field must reach behavior code.  The parser
-    # accepting a content key is not enough: an unconsumed float would let the
-    # roster validate while every character still played identically.
-    for trait in TACTICAL_TRAITS:
-        require(bot, f"traits.{trait}", f"rvBot tactical trait {trait}")
+    weapon_at = player.index("void hhArtificialPlayer::UpdateBotWeapon")
+    weapon = braced_body(player, weapon_at, "hhArtificialPlayer::UpdateBotWeapon")
+    for needle in ("GetWeaponName(", "WeaponBias(", "SelectWeapon("):
+        require(weapon, needle, "hhArtificialPlayer weapon preference")
 
-    # The manager reads the same source files a warning would name, and the
-    # dead Quake 3 prototypes sit in the same tree.
-    require(sources["BotCharacter.cpp"], "ReleaseCharacter", "rvBotCharacterManager")
+    # Event and reply lines share the manager's flood throttle, but are delayed
+    # by a character-specific typing time before using the normal server chat
+    # route.  The pending-reply bit is provenance for the recursion brake.
+    event_at = player.index("bool hhArtificialPlayer::QueueBotChat")
+    event_queue = braced_body(player, event_at, "hhArtificialPlayer::QueueBotChat")
+    for needle in (
+        "!botPendingChat.IsEmpty()",
+        "ChatLine(",
+        "AllowChat(",
+        "bot_chatDelay",
+        "bot_chatCPM",
+        "botTraits.chatDelayScale",
+        "botPendingChatIsReply = false",
+    ):
+        require(event_queue, needle, "hhArtificialPlayer::QueueBotChat")
+
+    reply_at = player.index("bool hhArtificialPlayer::TryQueueBotReply")
+    reply_queue = braced_body(player, reply_at, "hhArtificialPlayer::TryQueueBotReply")
+    for needle in (
+        "!botPendingChat.IsEmpty()",
+        "ReplyLine(",
+        "AllowChat(",
+        "bot_chatDelay",
+        "bot_chatCPM",
+        "botTraits.chatDelayScale",
+        "botPendingChatIsReply = true",
+    ):
+        require(reply_queue, needle, "hhArtificialPlayer::TryQueueBotReply")
+
+    update_at = player.index("void hhArtificialPlayer::UpdateBotChat")
+    update = braced_body(player, update_at, "hhArtificialPlayer::UpdateBotChat")
+    for needle in (
+        "gameLocal.time < botPendingChatTime",
+        "wasReply",
+        "ReplyDispatchSuppressed",
+        "ProcessChatMessage(",
+        "botPendingChat.Clear()",
+    ):
+        require(update, needle, "hhArtificialPlayer::UpdateBotChat")
+    require_order(
+        update,
+        "ReplyDispatchSuppressed",
+        "ProcessChatMessage(",
+        "hhArtificialPlayer::UpdateBotChat recursion guard",
+    )
+
+    require(manager, "ReleaseCharacter", "rvBotCharacterManager")
 
 
 def validate_reply_runtime() -> None:
     """Guard the server-only conversational-reply path and its loop brakes."""
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
-    if not mp.is_dir():
+    if not GAME_SOURCE.is_dir():
         return
 
-    bot = strip_comments(read(mp / "bots" / "Bot.cpp"))
-    bot_header = strip_comments(read(mp / "bots" / "Bot.h"))
-    character = strip_comments(read(mp / "bots" / "BotCharacter.cpp"))
-    multiplayer = strip_comments(read(mp / "MultiplayerGame.cpp"))
-    multiplayer_header = strip_comments(read(mp / "MultiplayerGame.h"))
-    commands = strip_comments(read(mp / "gamesys" / "SysCmds.cpp"))
-    network = strip_comments(read(mp / "Game_network.cpp"))
+    character = strip_comments(read(GAME_SOURCE / "bots" / "BotCharacter.cpp"))
+    multiplayer = strip_comments(read(GAME_SOURCE / "MultiplayerGame.cpp"))
+    player = strip_comments(read(PREY_SOURCE / "game_player.cpp"))
+    prey_items = strip_comments(read(PREY_SOURCE / "prey_items.cpp"))
 
     normalize_at = character.index("void rvBotCharacterManager::NormalizeReplyText")
     phrase_at = character.index(
@@ -1505,151 +1859,558 @@ def validate_reply_runtime() -> None:
     require(phrase, "leftBoundary", "ReplyPhraseMatches whole-word left boundary")
     require(phrase, "rightBoundary", "ReplyPhraseMatches whole-word right boundary")
 
-    require(
-        multiplayer_header,
-        "bool triggerBotReplies",
-        "ProcessChatMessage reply provenance parameter",
-    )
-
     process_at = multiplayer.index("void idMultiplayerGame::ProcessChatMessage")
     process = braced_body(multiplayer, process_at, "idMultiplayerGame::ProcessChatMessage")
-    require(process, "triggerBotReplies", "idMultiplayerGame::ProcessChatMessage")
-    require(process, "botManager.OnChatMessage(", "idMultiplayerGame::ProcessChatMessage")
-    require(
-        process,
-        "triggerBotReplies && clientNum >= 0 && send_to != 1",
-        "ProcessChatMessage typed/non-system/non-spectator reply gate",
-    )
-    require(
-        process,
-        "common->GetLocalizedString( text )",
-        "ProcessChatMessage visible reply-match text",
-    )
-    require_order(
-        process,
-        "suffixed_name.Length() + prefixed_text.Length()",
-        "botManager.OnChatMessage(",
-        "ProcessChatMessage validates before offering a reply",
-    )
-    require_order(
-        process,
-        "for ( i = 0; i < gameLocal.numClients; i++ )",
-        "botManager.OnChatMessage(",
-        "ProcessChatMessage fans out accepted chat before offering a reply",
-    )
-
-    # Typed say is eligible.  Voice-command text is not: its canned phrases
-    # should not make a bot answer the voice menu, and both voice branches need
-    # the false provenance even when one has no sound shader.
-    say_at = commands.index("static void Cmd_Say(")
-    say = braced_body(commands, say_at, "Cmd_Say")
-    require_regex(
-        say,
-        r"ProcessChatMessage\s*\([^;]*NULL\s*,\s*true\s*\)",
-        "Cmd_Say typed-chat provenance",
-    )
-
-    remote_at = network.index("void idGameLocal::ServerProcessReliableMessage")
-    remote = braced_body(network, remote_at, "idGameLocal::ServerProcessReliableMessage")
-    require_regex(
-        remote,
-        r"ProcessChatMessage\s*\(\s*clientNum\s*,[^;]*NULL\s*,\s*true\s*\)",
-        "remote client typed-chat provenance",
-    )
-
-    voice_at = multiplayer.index("void idMultiplayerGame::ProcessVoiceChat")
-    voice = braced_body(multiplayer, voice_at, "idMultiplayerGame::ProcessVoiceChat")
-    voice_calls = re.findall(r"ProcessChatMessage\s*\((.*?)\)\s*;", voice, re.DOTALL)
-    if len(voice_calls) < 2:
-        raise AssertionError(
-            "ProcessVoiceChat no longer has both sound and no-sound chat branches"
-        )
-    for call in voice_calls:
-        if not re.search(r",\s*false\s*$", call):
-            raise AssertionError(
-                "ProcessVoiceChat calls ProcessChatMessage without false reply provenance"
-            )
-
-    update_at = bot.index("void rvBot::UpdateChat")
-    update = braced_body(bot, update_at, "rvBot::UpdateChat")
-    require(update, "chatPendingIsReply", "rvBot::UpdateChat reply provenance")
-    require(update, "!wasReply", "rvBot::UpdateChat recursion suppression")
-    require_regex(
-        update,
-        r"ProcessChatMessage\s*\([^;]*!\s*wasReply\s*\)",
-        "rvBot::UpdateChat recursion suppression",
-    )
-
-    queue_event_at = bot.index("void rvBot::QueueChat")
-    queue_reply_at = bot.index("bool rvBot::TryQueueReply", queue_event_at)
-    queue_event = bot[queue_event_at:queue_reply_at]
-    require(
-        queue_event,
-        "chatPendingIsReply = false",
-        "rvBot::QueueChat event-chat provenance",
-    )
-
-    queue_at = bot.index("bool rvBot::TryQueueReply")
-    update_signature_at = bot.index("void rvBot::UpdateChat", queue_at)
-    queue = bot[queue_at:update_signature_at]
-    require(
-        queue,
-        "!chatPending.IsEmpty()",
-        "rvBot::TryQueueReply pending-line preservation",
-    )
-    require(queue, "ReplyLine(", "rvBot::TryQueueReply content selection")
-    require(queue, "AllowChat(", "rvBot::TryQueueReply existing flood throttle")
-    require(queue, "chatPendingIsReply = true", "rvBot::TryQueueReply provenance stamp")
-    require_order(
-        queue,
-        "ReplyLine(",
-        "AllowChat(",
-        "rvBot::TryQueueReply usable-line-before-throttle ordering",
-    )
-
-    on_chat_at = bot.index("void rvBotManager::OnChatMessage")
-    num_bots_at = bot.index("int rvBotManager::NumBots", on_chat_at)
-    on_chat = bot[on_chat_at:num_bots_at]
     for needle, context in (
-        ("BOT_REPLY_SOURCE_THROTTLE_MSEC", "source cooldown"),
-        ("nextReplySourceTime[sourceClientNum]", "per-source cooldown"),
-        ("i == sourceClientNum", "speaker exclusion"),
-        ("candidatePlayer->spectating", "spectator exclusion"),
-        ("candidatePlayer->team != sourcePlayer->team", "team visibility filter"),
-        ("candidatePlayer->IsPlayerMuted( sourcePlayer )", "mute visibility filter"),
+        ("clientNum >= 0", "real-player source gate"),
+        ("hhArtificialPlayer::ReplyDispatchSuppressed()", "generated-reply recursion gate"),
+        ("rvBotCharacterManager::ReplyNameMatches(", "addressed-name matching"),
+        ("HasReply(", "reply eligibility before responder selection"),
+        ("TryQueueBotReply(", "reply queue dispatch"),
+        ("hhArtificialPlayer::Type", "bot source/candidate classification"),
+        ("team", "team-chat visibility"),
         ("addressedCandidates", "addressed responder preference"),
-        ("generalCandidates", "unaddressed responder pool"),
-        ("sourceIsBot = IsBot( sourceClientNum )", "player/bot source classification"),
-        ("NormalizeReplyText( visibleText", "live-message normalization"),
-        ('gameLocal.userInfo[sourceClientNum].GetString( "ui_name"', "trusted source name"),
+        ("generalCandidates", "general responder pool"),
     ):
-        require(on_chat, needle, f"rvBotManager::OnChatMessage {context}")
+        require(process, needle, f"idMultiplayerGame::ProcessChatMessage {context}")
 
-    require(
-        on_chat,
-        "addressedCandidates.Num() ? &addressedCandidates : &generalCandidates",
-        "rvBotManager::OnChatMessage addressed preference",
-    )
-    if on_chat.count(".TryQueueReply(") != 1:
+    if not any(
+        call in process
+        for call in (
+            "botCharacterManager.NormalizeReplyText(",
+            "rvBotCharacterManager::NormalizeReplyText(",
+        )
+    ):
         raise AssertionError(
-            "rvBotManager::OnChatMessage must call TryQueueReply exactly once, so one "
+            "ProcessChatMessage does not normalize accepted text before reply matching"
+        )
+    if "spectating" not in process and "IsHidden()" not in process:
+        raise AssertionError(
+            "ProcessChatMessage does not exclude non-playing bot reply candidates"
+        )
+
+    if process.count("TryQueueBotReply(") != 1:
+        raise AssertionError(
+            "ProcessChatMessage must have one TryQueueBotReply call site, so one "
             "incoming line cannot make several bots answer"
         )
-    require(on_chat, "RandomInt( candidates->Num() )", "one random reply responder")
-    require_order(
-        on_chat,
-        ".TryQueueReply(",
-        "nextReplySourceTime[sourceClientNum] =",
-        "rvBotManager::OnChatMessage cooldown only after a queued reply",
+    require(
+        process,
+        "foundAddressedName ?",
+        "ProcessChatMessage addressed-name preference without shorter-name fallback",
+    )
+    require(
+        process,
+        "RandomInt( candidates->Num() )",
+        "ProcessChatMessage selects one reply responder",
+    )
+    require_regex(
+        process,
+        r"TryQueueBotReply\s*\([^;]*\bp\s*,\s*team\s*\)",
+        "ProcessChatMessage passes the authoritative source player to the responder",
     )
 
+    # Combat and match transitions are the authoritative hooks for voice-bank
+    # events; polling scores or health would duplicate lines around snapshots.
+    death_at = multiplayer.index("void idMultiplayerGame::PlayerDeath")
+    death = braced_body(multiplayer, death_at, "idMultiplayerGame::PlayerDeath")
+    require(death, "OnBotKill(", "idMultiplayerGame::PlayerDeath kill hook")
+    require(death, "OnBotDeath(", "idMultiplayerGame::PlayerDeath death hook")
+    require(death, "GetWeaponName(", "idMultiplayerGame::PlayerDeath weapon context")
+
+    state_at = multiplayer.index("void idMultiplayerGame::NewState")
+    state = braced_body(multiplayer, state_at, "idMultiplayerGame::NewState")
+    require(state, "OnBotMatchStart(", "idMultiplayerGame::NewState GAMEON hook")
+    require(state, "OnBotMatchEnd(", "idMultiplayerGame::NewState GAMEREVIEW hook")
+
+    # The item-denied bank is reachable only when an authoritative successful
+    # multiplayer pickup tells bots which visible goal and player won the race.
+    denied_at = player.index("void hhArtificialPlayer::OnBotItemPickedUp")
+    denied = braced_body(player, denied_at, "hhArtificialPlayer::OnBotItemPickedUp")
     for needle in (
-        "TryQueueReply(",
-        "OnChatMessage(",
-        "nextReplySourceTime[MAX_CLIENTS]",
-        "chatPendingIsReply",
+        "botItemGoal.GetEntity() != item",
+        "picker == this",
+        'GetString( "inv_name"',
+        'GetString( "classname"',
+        "QueueBotChat( BOTCHAT_ITEM_DENIED, picker, NULL, itemName.c_str() )",
     ):
-        require(bot_header, needle, "Bot.h reply state/API")
+        require(denied, needle, "hhArtificialPlayer::OnBotItemPickedUp")
+
+    pickup_at = prey_items.index("bool hhItem::MultiplayerPickup")
+    pickup = braced_body(prey_items, pickup_at, "hhItem::MultiplayerPickup")
+    require(pickup, "hhArtificialPlayer::Type", "multiplayer item-denied bot fanout")
+    require(pickup, "OnBotItemPickedUp( this, player )", "multiplayer item-denied hook")
+    require_order(
+        pickup,
+        "GiveToPlayer(player)",
+        "OnBotItemPickedUp( this, player )",
+        "hhItem::MultiplayerPickup successful-pickup ordering",
+    )
+    require_order(
+        pickup,
+        "OnBotItemPickedUp( this, player )",
+        "DetermineRemoveOrRespawn(",
+        "hhItem::MultiplayerPickup item lifetime ordering",
+    )
+
+
+def validate_bot_runtime_regressions() -> None:
+    """Guard network identity and the easy-to-regress combat safety fixes."""
+
+    if not GAME_SOURCE.is_dir():
+        return
+
+    player = strip_comments(read(PREY_SOURCE / "game_player.cpp"))
+    player_header = strip_comments(read(PREY_SOURCE / "game_player.h"))
+    game_local = strip_comments(read(GAME_SOURCE / "Game_local.cpp"))
+    game_header = strip_comments(read(GAME_SOURCE / "Game_local.h"))
+    game_network = strip_comments(read(GAME_SOURCE / "Game_network.cpp"))
+    multiplayer = strip_comments(read(GAME_SOURCE / "MultiplayerGame.cpp"))
+
+    # Engine-free AP slots may be claimed by a real async connection.  Lower
+    # the desired count before deleting the AP so the per-frame reconciler
+    # cannot refill the slot during the SCS_CONNECTED -> ServerClientBegin gap.
+    connect_at = game_network.index("void idGameLocal::ServerClientConnect")
+    connect = braced_body(game_network, connect_at, "idGameLocal::ServerClientConnect")
+    for needle in (
+        "clientConnectionPending[ clientNum ] = true",
+        "hhArtificialPlayer::Type",
+        "NumArtificialPlayers()",
+        "g_artificialPlayerCount.SetInteger(",
+        "GAME_RELIABLE_MESSAGE_DELETE_ENT",
+        "GetSpawnId( entities[ clientNum ] )",
+        "ServerSendReliableMessageExcluding( clientNum, deleteMsg )",
+        "delete entities[ clientNum ]",
+    ):
+        require(connect, needle, "real-client artificial-player displacement")
+    require_order(
+        connect,
+        "g_artificialPlayerCount.SetInteger(",
+        "delete entities[ clientNum ]",
+        "real-client bot displacement before reconciliation can refill the slot",
+    )
+    require_order(
+        connect,
+        "ServerSendReliableMessageExcluding( clientNum, deleteMsg )",
+        "delete entities[ clientNum ]",
+        "existing clients delete a displaced AP before the slot becomes human",
+    )
+
+    # A connection can also claim an empty slot while the desired bot count is
+    # nonzero.  Reserve the SCS_CONNECTED -> ServerClientBegin gap explicitly,
+    # or the per-frame reconciler can spawn a bot into the pending human slot.
+    require_regex(
+        game_header,
+        r"\bbool\s+clientConnectionPending\s*\[\s*MAX_CLIENTS\s*\]",
+        "pending async-client slot state",
+    )
+    require(
+        game_local,
+        "memset( clientConnectionPending, 0, sizeof( clientConnectionPending ) )",
+        "pending async-client slot state initialization",
+    )
+    require(
+        game_local,
+        "!clientConnectionPending[clientNum]",
+        "manual bot spawn excludes pending async-client slots",
+    )
+    require(
+        game_local,
+        "if ( clientConnectionPending[i] )",
+        "bot reconciler counts pending async-client slots",
+    )
+    pending_slot = game_local.index("if ( clientConnectionPending[i] )")
+    pending_body = braced_body(
+        game_local, pending_slot, "pending async-client slot reconciliation"
+    )
+    require(
+        pending_body,
+        "continue",
+        "pending async-client slot is not double-counted as an entity slot",
+    )
+    begin_at = game_network.index("void idGameLocal::ServerClientBegin")
+    begin = braced_body(game_network, begin_at, "idGameLocal::ServerClientBegin")
+    require(
+        begin,
+        "clientConnectionPending[ clientNum ] = false",
+        "client begin releases slot reservation",
+    )
+    require_order(
+        begin,
+        "SpawnPlayer( clientNum )",
+        "clientConnectionPending[ clientNum ] = false",
+        "client slot remains reserved until its player exists",
+    )
+    disconnect_at = game_network.index("void idGameLocal::ServerClientDisconnect")
+    disconnect = braced_body(
+        game_network, disconnect_at, "idGameLocal::ServerClientDisconnect"
+    )
+    require(
+        disconnect,
+        "clientConnectionPending[ clientNum ] = false",
+        "client disconnect releases slot reservation",
+    )
+
+    # Artificial-player spawn args exist only on the authoritative server.  A
+    # client must therefore receive the resolved character, skill, model and
+    # team, rather than independently selecting whatever local content happens
+    # to be free.  Keep the dictionary first in the entity snapshot: Prey's
+    # idBitMsgDelta::WriteDict/ReadDict assign the shared `changed` flag, so
+    # placing it after the parent fields can erase a real parent delta.
+    write_at = player.index("void hhArtificialPlayer::WriteToSnapshot")
+    write_snapshot = braced_body(
+        player, write_at, "hhArtificialPlayer::WriteToSnapshot"
+    )
+    read_at = player.index("void hhArtificialPlayer::ReadFromSnapshot")
+    read_snapshot = braced_body(
+        player, read_at, "hhArtificialPlayer::ReadFromSnapshot"
+    )
+    write_dict = require_regex(
+        write_snapshot, r"\bmsg\s*\.\s*WriteDict\s*\(",
+        "artificial-player identity snapshot",
+    )
+    require(
+        write_snapshot,
+        "gameLocal.GetUserInfo(",
+        "full authoritative artificial-player userinfo snapshot",
+    )
+    read_dict = require_regex(
+        read_snapshot, r"\.\s*ReadDict\s*\(",
+        "artificial-player identity snapshot",
+    )
+    parent_write = write_snapshot.find("hhPlayer::WriteToSnapshot(")
+    parent_read = read_snapshot.find("hhPlayer::ReadFromSnapshot(")
+    if parent_write == -1 or write_dict.start() > parent_write:
+        raise AssertionError(
+            "artificial-player dictionary must precede hhPlayer::WriteToSnapshot"
+        )
+    if parent_read == -1 or read_dict.start() > parent_read:
+        raise AssertionError(
+            "artificial-player dictionary must precede hhPlayer::ReadFromSnapshot"
+        )
+    first_write = re.search(r"\.\s*(Write\w*)\s*\(", write_snapshot)
+    if first_write is None or first_write.group(1) != "WriteDict":
+        raise AssertionError(
+            "hhArtificialPlayer::WriteToSnapshot writes a field before its identity "
+            "dictionary; WriteDict must be the first msg write"
+        )
+    first_read = re.search(r"\.\s*(Read\w*)\s*\(", read_snapshot)
+    if first_read is None or first_read.group(1) != "ReadDict":
+        raise AssertionError(
+            "hhArtificialPlayer::ReadFromSnapshot reads a field before its identity "
+            "dictionary; ReadDict must be the first msg read"
+        )
+    require(read_snapshot, "idDict", "artificial-player snapshot dictionary staging")
+    require(read_snapshot, "gameLocal.SetUserInfo(", "artificial-player snapshot identity apply")
+    if read_dict.start() > read_snapshot.find("gameLocal.SetUserInfo("):
+        raise AssertionError(
+            "artificial-player snapshot dictionary is applied before it is read"
+        )
+    require_order(
+        read_snapshot,
+        "gameLocal.SetUserInfo(",
+        "hhPlayer::ReadFromSnapshot(",
+        "artificial-player identity before parent snapshot",
+    )
+
+    userinfo_at = game_local.index("void idGameLocal::GetAPUserInfo")
+    userinfo = braced_body(game_local, userinfo_at, "idGameLocal::GetAPUserInfo")
+    for key in ("ui_name", "ui_modelNum", "ui_team"):
+        require(userinfo, f'"{key}"', f"artificial-player {key} publication")
+    require(read_snapshot, "ApplyBotUserInfo(", "authoritative bot identity snapshot apply")
+    require(read_snapshot, "SetPlayerModel(", "authoritative bot model snapshot apply")
+    apply_at = player.index("void hhArtificialPlayer::ApplyBotUserInfo")
+    apply_userinfo = braced_body(
+        player, apply_at, "hhArtificialPlayer::ApplyBotUserInfo"
+    )
+    require(
+        apply_userinfo,
+        'GetString( "bot_character"',
+        "authoritative bot character snapshot apply",
+    )
+    require(
+        apply_userinfo,
+        'GetInt( "bot_skill"',
+        "authoritative bot skill snapshot apply",
+    )
+    require(apply_userinfo, "BindBotCharacter(", "authoritative bot trait rebind")
+
+    ap_spawn_at = player.index("void hhArtificialPlayer::Spawn")
+    ap_spawn = braced_body(player, ap_spawn_at, "hhArtificialPlayer::Spawn")
+    for key in ("bot_character", "bot_skill"):
+        require(ap_spawn, f'"{key}"', f"artificial-player Spawn {key} publication")
+
+    # A late joiner receives reliable player-spawn messages before it can rely
+    # on PVS snapshots.  Synthetic slots are absent from the engine's normal
+    # client-info loop, so invoke the engine's synchronous updateUI publisher
+    # immediately before asking the client to spawn that slot.
+    initial_at = game_network.index("void idGameLocal::ServerWriteInitialReliableMessages")
+    initial_messages = braced_body(
+        game_network, initial_at, "idGameLocal::ServerWriteInitialReliableMessages"
+    )
+    require(initial_messages, "hhArtificialPlayer::Type", "late-join artificial-player gate")
+    require(initial_messages, '"updateUI %d', "late-join bot userinfo publication")
+    require(initial_messages, "CMD_EXEC_NOW", "synchronous late-join bot userinfo publication")
+    require_regex(
+        initial_messages,
+        r'"updateUI %d\\n"\s*,\s*i\s*\)',
+        "late-join bot userinfo targets the artificial-player slot",
+    )
+    require_order(
+        initial_messages,
+        "hhArtificialPlayer::Type",
+        '"updateUI %d',
+        "late-join artificial-player gate/publication order",
+    )
+    require_order(
+        initial_messages,
+        '"updateUI %d',
+        "GAME_RELIABLE_MESSAGE_SPAWN_PLAYER",
+        "late-join bot userinfo before artificial-player spawn",
+    )
+
+    # Prove that updateUI is not merely a similarly named console command: it
+    # must synchronously reach the server's reliable, send-to-all clientinfo
+    # path.  The subsequent first entity snapshot carries the AP type and
+    # recycles the temporary player placeholder through the supported path.
+    async_network_path = ROOT / "src" / "framework" / "async" / "AsyncNetwork.cpp"
+    async_server_path = ROOT / "src" / "framework" / "async" / "AsyncServer.cpp"
+    async_network = strip_comments(read(async_network_path))
+    async_server = strip_comments(read(async_server_path))
+    update_f_at = async_network.index("void idAsyncNetwork::UpdateUI_f")
+    update_f = braced_body(async_network, update_f_at, "idAsyncNetwork::UpdateUI_f")
+    require(update_f, "server.UpdateUI(", "updateUI server bridge")
+    update_at = async_server.index("void idAsyncServer::UpdateUI")
+    update_ui = braced_body(async_server, update_at, "idAsyncServer::UpdateUI")
+    require(update_ui, "SendUserInfoBroadcast(", "updateUI reliable clientinfo publication")
+    require_regex(
+        update_ui,
+        r"SendUserInfoBroadcast\s*\([^;]*\btrue\s*\)",
+        "updateUI send-to-all publication",
+    )
+    client_snapshot_at = game_network.index("void idGameLocal::ClientReadSnapshot")
+    client_snapshot = braced_body(
+        game_network, client_snapshot_at, "idGameLocal::ClientReadSnapshot"
+    )
+    for needle in (
+        "ent->GetType()->typeNum != typeNum",
+        "delete ent",
+        "SpawnEntityDef(",
+    ):
+        require(client_snapshot, needle, "snapshot artificial-player type recycling")
+    for needle in (
+        "expectedArtificialPlayerRecycle",
+        "hhArtificialPlayer::Type.typeNum",
+        'userInfo[i].GetString( "bot_character" )',
+        "common->DPrintf(",
+        "common->Warning(",
+    ):
+        require(
+            client_snapshot,
+            needle,
+            "expected artificial-player placeholder upgrade diagnostics",
+        )
+
+    # The same reliable publication must be reachable both when a bot is added
+    # and when botreload changes its resolved identity/model.  Accept a shared
+    # helper or the proven synchronous updateUI path.
+    spawn_at = game_local.index("bool idGameLocal::SpawnArtificialPlayer")
+    spawn = braced_body(game_local, spawn_at, "idGameLocal::SpawnArtificialPlayer")
+    rebind_at = game_local.index("void idGameLocal::RebindArtificialPlayers")
+    rebind = braced_body(game_local, rebind_at, "idGameLocal::RebindArtificialPlayers")
+    for body, context, slot in (
+        (spawn, "bot spawn", "clientNum"),
+        (rebind, "botreload", "i"),
+    ):
+        require(body, "GetAPUserInfo(", f"{context} canonical bot userinfo publication")
+        require(body, '"updateUI %d', f"{context} reliable identity publication")
+        require(body, "CMD_EXEC_NOW", f"{context} synchronous identity publication")
+        require_regex(
+            body,
+            rf'"updateUI %d\\n"\s*,\s*{slot}\s*\)',
+            f"{context} identity publication targets the bot slot",
+        )
+        require_order(
+            body,
+            "SetUserInfo(",
+            '"updateUI %d',
+            f"{context} identity apply/publication order",
+        )
+    require(rebind, "SetPlayerModel(", "botreload model refresh")
+
+    # Team DM bots need an explicit least-populated-team choice.  GetAPUserInfo
+    # must also preserve an existing ui_team during botreload rather than
+    # silently moving a live bot.
+    bot_setup = game_local[max(0, userinfo_at - 5000):spawn_at]
+    for needle in ("GAME_TDM", '"ui_team"', '"Red"', '"Blue"'):
+        require(bot_setup, needle, "balanced Team DM bot assignment")
+    if not re.search(r"(?:FindKey|GetString)\s*\(\s*\"ui_team\"", userinfo):
+        raise AssertionError(
+            "idGameLocal::GetAPUserInfo overwrites ui_team instead of preserving a "
+            "bot's assigned team across reload"
+        )
+    counted_balance = all(needle in bot_setup for needle in (
+        "numClients", "entities[", "idPlayer::Type", 'GetString( "ui_team"'
+    )) and re.search(r"\+\+\s*\w*team\w*\s*\[", bot_setup, re.IGNORECASE)
+    if not counted_balance and "BalanceTDM(" not in bot_setup:
+        raise AssertionError(
+            "Team DM bot assignment does not count the live teams or use BalanceTDM"
+        )
+
+    # GetViewAngles is already in world space.  Multiplying it by the gravity
+    # axis a second time breaks FOV and steering on wall-walk surfaces; vision,
+    # aiming and usercmd steering instead start in the untransformed local frame
+    # and project through the interpolated eye axis exactly once.
+    can_see_at = player.index("bool hhArtificialPlayer::BotCanSee")
+    can_see = braced_body(player, can_see_at, "hhArtificialPlayer::BotCanSee")
+    require(can_see, "GetUntransformedViewAngles(", "gravity-local artificial-player FOV")
+    require(can_see, "GetEyeAxis(", "artificial-player FOV projected to world")
+    if "GetViewAngles(" in can_see or "GetGravityAxis(" in can_see:
+        raise AssertionError(
+            "hhArtificialPlayer::BotCanSee mixes the world view or raw gravity axis "
+            "with its gravity-local eye frame"
+        )
+    movement_at = player.index("void hhArtificialPlayer::UpdateBotMovement")
+    movement = braced_body(player, movement_at, "hhArtificialPlayer::UpdateBotMovement")
+    if not any(name in movement for name in (
+        "GetUntransformedViewAngles(", "GetUntransformedViewAxis("
+    )):
+        raise AssertionError(
+            "hhArtificialPlayer::UpdateBotMovement does not build steering from the "
+            "gravity-local view frame"
+        )
+    if "GetEyeAxis(" not in movement and "GetGravityAxis(" not in movement:
+        raise AssertionError(
+            "hhArtificialPlayer::UpdateBotMovement never projects local steering to world"
+        )
+    aim_at = player.index("void hhArtificialPlayer::UpdateBotAimAndFire")
+    aim = braced_body(player, aim_at, "hhArtificialPlayer::UpdateBotAimAndFire")
+    require(aim, "GetUntransformedViewAngles(", "gravity-local artificial-player aim")
+    require(aim, "AxisProjection(", "gravity-relative enemy target height")
+    if "GetViewAngles(" in aim:
+        raise AssertionError(
+            "hhArtificialPlayer::UpdateBotAimAndFire mixes world view angles with a "
+            "gravity-local desired direction"
+        )
+    bad_double_transform = re.compile(
+        r"GetViewAngles\s*\(\s*\)\s*\.ToMat3\s*\(\s*\)\s*\*\s*"
+        r"(?:physicsObj\.)?GetGravityAxis\s*\("
+    )
+    if bad_double_transform.search(player):
+        raise AssertionError(
+            "artificial-player code still double-applies gravity to world view angles"
+        )
+
+    # Several valid roster names contain another valid name (Elite Hunter /
+    # Hunter and Mohawk Hider / Hider).  A direct reply must go to the longest
+    # matching addressed name, independent of entity iteration order.
+    process_at = multiplayer.index("void idMultiplayerGame::ProcessChatMessage")
+    process = braced_body(multiplayer, process_at, "idMultiplayerGame::ProcessChatMessage")
+    require(process, "GetBotCharacterName(", "addressed bot-name matching")
+    require(process, ".Length()", "longest addressed bot-name matching")
+    longest_markers = (
+        "addressedCandidates.Clear(",
+        "longestAddress",
+        "longestName",
+        "maxAddress",
+        "bestAddress",
+    )
+    if not any(marker.lower() in process.lower() for marker in longest_markers):
+        raise AssertionError(
+            "ProcessChatMessage does not retain only the longest matching addressed "
+            "bot name"
+        )
+
+    # Weapon ownership alone is insufficient: SelectWeapon rejects locked,
+    # spirit-only and empty weapons.  Preference scoring must use the same
+    # eligibility facts so bots do not repeatedly select a weapon that can
+    # never become active.
+    weapon_at = player.index("void hhArtificialPlayer::UpdateBotWeapon")
+    weapon = braced_body(player, weapon_at, "hhArtificialPlayer::UpdateBotWeapon")
+    for needle in (
+        "SkipWeapon(",
+        "weaponFlags",
+        "inventory.HasAmmo(",
+        "inventory.HasAltAmmo(",
+        "weapon%d_allowempty",
+    ):
+        require(weapon, needle, "artificial-player usable weapon filtering")
+
+    # A new match cannot inherit revenge targeting, a stale enemy/item handle,
+    # old aim acquisition or a half-complete burst from the previous round.
+    match_at = player.index("void hhArtificialPlayer::OnBotMatchStart")
+    match_start = braced_body(player, match_at, "hhArtificialPlayer::OnBotMatchStart")
+    reset_scope = match_start
+    reset_call = re.search(r"\b((?:Reset|Clear)Bot\w*)\s*\(\s*\)\s*;", match_start)
+    if reset_call:
+        helper_signature = f"void hhArtificialPlayer::{reset_call.group(1)}"
+        helper_at = player.index(helper_signature)
+        reset_scope += braced_body(player, helper_at, helper_signature)
+    for needle in (
+        "botLastKiller = -1",
+        "botEnemy = NULL",
+        "botItemGoal = NULL",
+        "botIgnoredItem = NULL",
+        "botLastSeenPosition = vec3_origin",
+        "botBelievedTarget = vec3_origin",
+        "botTargetAcquiredTime = 0",
+        "botLastSeenTime = 0",
+        "botAimSettledTime = 0",
+        "botBurstEndTime = 0",
+        "botNextBurstTime = 0",
+        "botMistakeEndTime = 0",
+        "botItemLastProgressTime = -1",
+        "botItemBestDistance = idMath::INFINITY",
+        "botPendingChat.Clear()",
+        "botPendingChatTime = 0",
+        "botPendingChatTeam = false",
+        "botPendingChatIsReply = false",
+    ):
+        require(reset_scope, needle, "new-match artificial-player state reset")
+    require_order(
+        match_start,
+        "botPendingChat.Clear()",
+        "QueueBotChat( BOTCHAT_LEVELSTART )",
+        "new-match stale chat cleared before level-start chat",
+    )
+
+    # An active-looking pickup can still be unusable or unreachable.  Goal
+    # selection and continued steering must both consult an eligibility/progress
+    # check, and abandoning a failed goal needs memory so the next 500 ms scan
+    # does not immediately select it again.
+    for marker in (
+        "botIgnoredItem",
+        "botItemCloseTime",
+        "botItemIgnoreUntil",
+        "botItemLastProgressTime",
+        "botItemBestDistance",
+    ):
+        require(player_header, marker, "failed item-goal memory")
+        require(movement, marker, "failed item-goal abandonment")
+    for needle in (
+        "BOT_ITEM_PROGRESS_DISTANCE",
+        "BOT_ITEM_PROGRESS_TIMEOUT",
+        "itemDistance + BOT_ITEM_PROGRESS_DISTANCE < botItemBestDistance",
+        "botItemLastProgressTime >= 0",
+        "gameLocal.time - botItemLastProgressTime >= BOT_ITEM_PROGRESS_TIMEOUT",
+    ):
+        require(movement, needle, "unreachable visible item progress timeout")
+    ignore_at = movement.find("botIgnoredItem = botItemGoal")
+    if ignore_at == -1 or movement.find("botItemGoal = NULL", ignore_at) == -1:
+        raise AssertionError(
+            "failed item goal is cleared without first being remembered for exclusion"
+        )
+    require_regex(
+        movement,
+        r"item\s*==\s*botIgnoredItem\.GetEntity\s*\(\s*\)[^)]*"
+        r"gameLocal\.time\s*<\s*botItemIgnoreUntil",
+        "failed item excluded from subsequent scans",
+    )
+    if movement.count("botItemGoal = NULL") < 2:
+        raise AssertionError(
+            "hhArtificialPlayer::UpdateBotMovement does not abandon an invalid/stalled "
+            "item goal after selecting it"
+        )
 
 
 def main() -> int:
@@ -1661,6 +2422,7 @@ def main() -> int:
         validate_cvars_and_commands()
         validate_chat_path()
         validate_reply_runtime()
+        validate_bot_runtime_regressions()
     except AssertionError as error:
         print(f"mp_bot_characters: FAILED - {error}")
         return 1

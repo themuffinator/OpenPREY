@@ -1093,13 +1093,13 @@ static int GetListenServerPlayerWarningLimit( const int serverRatePreset, const 
 	}
 
 	// Manual mode: infer a safe listen target from net_serverMaxClientRate.
-	if ( maxClientRate <= 8000 ) {
+	if ( maxClientRate <= 12000 ) {
 		return 3;
 	}
-	if ( maxClientRate <= 9500 ) {
+	if ( maxClientRate <= 16000 ) {
 		return 4;
 	}
-	if ( maxClientRate <= 10500 ) {
+	if ( maxClientRate <= 24000 ) {
 		return 5;
 	}
 	return LISTEN_SERVER_MAX_PLAYERS;
@@ -2762,28 +2762,24 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 					int maxclients = 0;
 					switch ( gui_configServerRate.GetInteger() ) {
 						case 1:
-							// 128 kbits
-							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 8000 );
+							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 12000 );
 							maxclients = 2;
 							break;
 						case 2:
-							// 256 kbits
-							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 9500 );
+							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 16000 );
 							maxclients = 3;
 							break;
 						case 3:
-							// 384 kbits
-							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 10500 );
+							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 24000 );
 							maxclients = 4;
 							break;
 						case 4:
-							// highest internet preset: treat as modern high-bandwidth connection
-							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 25600 );
+							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 32000 );
 							maxclients = LISTEN_SERVER_MAX_PLAYERS;
 							break;
 						default:
 							// unknown preset: fall back to modern defaults
-							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 16000 );
+							cvarSystem->SetCVarInteger( "net_serverMaxClientRate", 32000 );
 							maxclients = LISTEN_SERVER_MAX_PLAYERS;
 							break;
 					}

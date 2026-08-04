@@ -1,0 +1,28 @@
+// Teacher is a retail multiplayer label on the Paul model, with no narrative
+// dialogue to support a more specific biography. The characterization stays
+// at that boundary: calm observation, correction and methodical rotation.
+character "Teacher" {
+	inherit		"roamer"
+	description	"methodical observer who treats each mistake as information"
+	skillBand	2 4
+	modelNum	7
+
+	set	combatRange		750
+	set	aggression		0.40
+	set	patience		0.65
+	set	targetStickiness	0.55
+	set	opportunism		1.00
+	scale	itemFocus		1.25
+	scale	weaponSwitchMsec	0.90
+	set	chatiness		0.58
+	scale	chatDelayScale		1.05
+
+	weapon	"weaponobj_rifle"		1.30
+	weapon	"weaponobj_autocannon"		1.15
+	weapon	"weaponobj_crawlergrenade"	1.05
+
+	skill 4 {
+		add	rangeDiscipline		0.05
+		scale	reactionVarianceMsec	0.95
+	}
+}

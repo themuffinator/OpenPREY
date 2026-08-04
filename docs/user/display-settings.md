@@ -42,8 +42,8 @@ For package or platform validation, `performancePresetSelfTest` checks that the 
 | `r_borderless` | `1` | Borderless window mode when `r_fullscreen 0`. |
 | `r_windowWidth` | `1280` | Windowed width. |
 | `r_windowHeight` | `720` | Windowed height. |
-| `win_xpos` | (auto) | Window X position (updated automatically when you move the window). |
-| `win_ypos` | (auto) | Window Y position (updated automatically when you move the window). |
+| `win_xpos` | (auto) | Outer window-frame X position (updated automatically when you move the window). |
+| `win_ypos` | (auto) | Outer window-frame Y position (updated automatically when you move the window). |
 | `r_mode` | `-2` | Fullscreen sizing selector (`-2` = desktop native/current display, `-1` = custom, `0+` = legacy preset index). |
 | `r_customWidth` | `1920` | Custom exclusive-fullscreen width used when `r_mode -1`. |
 | `r_customHeight` | `1080` | Custom exclusive-fullscreen height used when `r_mode -1`. |
@@ -304,11 +304,11 @@ Notes:
 
 - `Settings -> System -> Display Sizing` exposes `r_windowWidth`, `r_windowHeight`, `r_customWidth`, `r_customHeight`, and `r_displayRefresh`. Leaving Refresh Rate on `Auto` writes `r_displayRefresh 0`.
 - New Windows installs, and legacy Windows configs migrated from the old default, use borderless windowed presentation when `r_fullscreen 0` to avoid OpenGL bordered-window frame pacing stalls. Set `r_borderless 0` and run `vid_restart` if you specifically want a resizable bordered window.
-- When bordered windowed mode is active (`r_fullscreen 0`, `r_borderless 0`), resizing updates `r_windowWidth`/`r_windowHeight` automatically.
-- Moving the window updates `win_xpos`/`win_ypos` automatically.
+- When bordered windowed mode is active (`r_fullscreen 0`, `r_borderless 0`), resizing updates `r_windowWidth`/`r_windowHeight` from the client area automatically. Maximizing or minimizing does not overwrite the remembered normal size.
+- Moving the window updates `win_xpos`/`win_ypos` from the outer frame, including the title bar and borders. Borderless/fullscreen placement does not overwrite the remembered normal position.
 - When switching fullscreen -> windowed, openPREY restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
-- If you unplug/rearrange monitors and the saved window position becomes off-screen, openPREY will recover by clamping/recentering the window back onto a valid display.
-- If you set `r_screen` to an explicit display index (`0..N`), window placement is constrained to that display's usable area. With `r_screen -1`, placement is respected unless it becomes invalid/off-screen.
+- If you unplug/rearrange monitors and the saved window position becomes off-screen, openPREY will recover by clamping/recentering the complete outer frame back onto a valid display.
+- If you set `r_screen` to an explicit display index (`0..N`), the complete window frame is constrained to that display's usable area. Client sizing accounts for the platform's current title bar/border extents, including after display-scale or work-area changes. With `r_screen -1`, placement is respected unless it becomes invalid/off-screen.
 - SDL3 tip: hold `Shift` while resizing to snap the window aspect ratio to common targets (4:3, 16:9, 16:10, 21:9, etc.).
 
 ## Aspect Ratio and FOV

@@ -1,0 +1,298 @@
+// Tommy: blunt, reactive, humane, and dryly restrained.
+
+characterChat "Tommy" {
+	chat entergame {
+		"Tommy's here. Let's get moving."
+		"I'm ready. Keep this clean."
+		"All right. Time to work."
+		"Weapons checked. I'm in."
+		"Let's see what this place throws at us."
+		"I'm set. Nobody gets left behind."
+		"Tommy reporting. Save the speeches."
+		"Ready when you are."
+	}
+	chat levelstart {
+		"$map. Watch the corners and the ceiling."
+		"Stay sharp. This place has teeth."
+		"Find the exits before you need them."
+		"$map looks bad. I've seen worse."
+		"Keep moving and don't get boxed in."
+		"Check your weapon. Then check it again."
+		"Open ground won't do us any favors."
+		"Pick a route. Be ready to change it."
+	}
+	chat kill {
+		"You gave me the opening, $other."
+		"That's one down."
+		"The $weapon did its job."
+		"You should've kept moving, $other."
+		"Nothing personal."
+		"Had to be done."
+		"Clean enough. Keep going."
+		"Caught you looking the wrong way."
+	}
+	chat killWrench {
+		"Too close, $other."
+		"The wrench isn't just for repairs."
+		"You walked right into that."
+		"No ammo needed."
+		"Back up next time."
+		"That got rough fast."
+		"Should've kept your distance."
+		"A wrench works when it has to."
+	}
+	chat killStreak {
+		"Three down. Don't get comfortable."
+		"I'm still standing."
+		"Found my rhythm."
+		"Keep sending them."
+		"Three openings, three answers."
+		"No time to count. Move."
+		"This run isn't over yet."
+		"Momentum's useful. Pride isn't."
+	}
+	chat revenge {
+		"We're square now, $other."
+		"I remembered that shot."
+		"You don't get me twice."
+		"Debt paid."
+		"I learned your angle, $other."
+		"That settles the last round."
+		"Found you again."
+		"I don't forget a fight."
+	}
+	chat death {
+		"Good hit, $other."
+		"I'm down. Keep moving."
+		"That $weapon found me."
+		"Stayed exposed too long."
+		"You earned that one."
+		"Wrong angle. My mistake."
+		"I'll adjust on the next run."
+		"That stopped me cold."
+	}
+	chat deathAccident {
+		"That was on me."
+		"Bad step. Reset."
+		"I should've checked the floor."
+		"Nobody to blame for that one."
+		"Took the wrong turn too fast."
+		"Careless. Won't repeat it."
+		"I misread the drop."
+		"Well, that was ugly."
+	}
+	chat itemDenied {
+		"You reached the $item first, $other."
+		"Keep it. I'll find another way."
+		"Missed the timing on that $item."
+		"You knew the faster route."
+		"Fine. I can work without it."
+		"That pickup cost me a second."
+		"$other got there before I did."
+		"The $item's yours for now."
+	}
+	chat leadTaken {
+		"I've got the lead. Staying focused."
+		"First place doesn't mean safe."
+		"I'm ahead. Keep coming."
+		"The score's mine for now."
+		"Got the advantage. Holding it."
+		"No celebrating yet."
+		"I'm out front. That's all it is."
+		"Lead secured. Eyes up."
+	}
+	chat leadLost {
+		"You took the lead, $other."
+		"I'm behind. Not finished."
+		"That gap can close."
+		"Score changed. The plan changes too."
+		"All right, $other. My turn to chase."
+		"Lost first. Still in the fight."
+		"I let that slip."
+		"You moved ahead. I'll answer."
+	}
+	chat matchWin {
+		"Good fight. That's done."
+		"We made the right moves."
+		"I'll take the win."
+		"Solid match, everyone."
+		"Kept our heads and finished it."
+		"That's enough trouble for one round."
+		"Hard work paid off."
+		"Good. Everybody still breathing?"
+	}
+	chat matchLose {
+		"You earned it. Good fight."
+		"I know where that went wrong."
+		"Next round, I fix it."
+		"Lost this one. Learned something."
+		"Could've made better choices."
+		"No excuses. Run it again."
+		"That result's mine to carry."
+		"Fair win. Don't expect another."
+	}
+	chat farewell {
+		"Tommy out. Take care."
+		"I'm heading off. Good games."
+		"That's enough for now."
+		"See you on the next run."
+		"I'm done here. Stay sharp."
+		"Good fight. I'm leaving it there."
+		"Time to go. Watch yourselves."
+		"Until next time."
+	}
+	// Shared trigger vocabulary keeps replies predictable; responses carry the voice.
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Get behind something solid, $other."
+		"I'm moving your way. Stay alive."
+		"Break contact and catch your breath."
+		"Keep your head down. I'll watch the route."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. Hard fought."
+		"Yeah. That one was worth playing."
+		"Well played. I'd run it again."
+		"Fair match and a fair result."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"All right, $other. Your move."
+		"Come find me. I won't hide."
+		"Save the noise for after the fight."
+		"You asked for a contest. You've got one."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hey, $other. You ready?"
+		"Tommy here. Good to see you."
+		"Hello. Let's keep each other moving."
+		"I hear you. What's up?"
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"Any time, $other."
+		"Don't mention it."
+		"We're good. Keep moving."
+		"Glad it helped."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thanks. Had a clear angle."
+		"Appreciate it, $other."
+		"Good eyes. You saw the hard part."
+		"I'll try to make the next one count too."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"It's done. Let it go."
+		"We're square, $other."
+		"Apology accepted. Watch the next move."
+		"No harm worth carrying."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Take care, $other."
+		"See you around. Stay safe."
+		"Good games. Catch you next time."
+		"All right. Get home in one piece."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Tommy"
+		trigger "hey Tommy"
+		trigger "Tommy help"
+		trigger "Tommy hello"
+		trigger "Tommy listen"
+		trigger "Tommy there"
+		trigger "Tommy answer"
+		trigger "Tommy wait"
+		"Yeah, $other?"
+		"Tommy here. Go ahead."
+		"I'm listening."
+		"Say what you need to say."
+	}
+}

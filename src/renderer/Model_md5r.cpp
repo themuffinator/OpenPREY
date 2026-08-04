@@ -226,10 +226,9 @@ static bool R_MD5R_ModelHasSky( const idRenderModelStatic &model ) {
 		if ( surface.shader == NULL ) {
 			continue;
 		}
-		const texgen_t texgen = surface.shader->Texgen();
 		if ( surface.shader->IsPortalSky()
-			|| texgen == TG_SKYBOX_CUBE
-			|| texgen == TG_WOBBLESKY_CUBE
+			|| surface.shader->HasTexgen( TG_SKYBOX_CUBE )
+			|| surface.shader->HasTexgen( TG_WOBBLESKY_CUBE )
 			|| idStr::Icmp( surface.shader->GetName(), "textures/smf/portal_sky" ) == 0 ) {
 			return true;
 		}

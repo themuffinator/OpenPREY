@@ -3706,6 +3706,14 @@ static bool CM_ModelNamesMatchIgnoreExtension( const char *lhs, const char *rhs 
 	return lhsNormalized.Icmp( rhsNormalized ) == 0;
 }
 
+static bool CM_IsWorldModelAlias( const char *leafName ) {
+	// Standalone retail deathwalk collision maps retain the name used when
+	// Human Head appended them to another level. With per-map model names this
+	// legacy alias can safely share the canonical worldMap identity.
+	return idStr::Icmp( leafName, "world" ) == 0 ||
+		idStr::Icmp( leafName, "dw_worldMap" ) == 0;
+}
+
 static bool CM_CanReuseModelSlot( const idCollisionModelLocal *model, bool allowProcClipSlotReuse ) {
 	if ( model == NULL ) {
 		return true;
@@ -3899,7 +3907,7 @@ const char *idCollisionModelManagerLocal::GetFullModelName( const char *mapName,
 	if ( canonicalModelName.Length() > 0 ) {
 		const int lastSlash = canonicalModelName.Last( '/' );
 		const char *leafName = lastSlash >= 0 ? canonicalModelName.c_str() + lastSlash + 1 : canonicalModelName.c_str();
-		if ( idStr::Icmp( leafName, "world" ) == 0 ) {
+		if ( CM_IsWorldModelAlias( leafName ) ) {
 			if ( lastSlash >= 0 ) {
 				canonicalModelName = canonicalModelName.Left( lastSlash + 1 );
 				canonicalModelName += WORLD_MODEL_NAME;

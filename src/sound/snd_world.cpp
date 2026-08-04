@@ -438,6 +438,7 @@ idSoundWorldLocal::FreeSoundChannel
 */
 void idSoundWorldLocal::FreeSoundChannel( idSoundChannel* channel )
 {
+	soundSystemLocal.RemoveSubtitlesForChannel( channel );
 	channel->Mute();
 	channelAllocator.Free( channel );
 }

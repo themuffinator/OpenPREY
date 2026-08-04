@@ -1,0 +1,29 @@
+// Enisi teaches through patience, observation and the spirit bow. He does not
+// chase noise across the map; he waits until an opponent reveals the lesson.
+character "Grandfather" {
+	inherit		"sniper"
+	description	"patient teacher who sees the line before the shot"
+	skillBand	2 4
+	modelNum	5
+
+	set	combatRange		1200
+	set	aggression		0.22
+	set	patience		0.98
+	set	targetStickiness	0.70
+	set	vengefulness		0.08
+	scale	peripheralPenaltyMsec	0.80
+	scale	pursuit			0.65
+	scale	itemFocus		1.20
+	set	initiative		0.38
+	set	chatiness		0.42
+	scale	chatDelayScale		1.20
+
+	weapon	"weaponobj_bow"			2.00
+	weapon	"weaponobj_rifle"		1.25
+	weapon	"weaponobj_hiderweapon"		1.10
+
+	skill 4 {
+		scale	aimSettleMsec		0.92
+		add	patience		0.02
+	}
+}

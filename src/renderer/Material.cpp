@@ -2742,6 +2742,26 @@ void idMaterial::ParseDeform( idLexer &src ) {
 		deform = DFRM_EYEBALL;
 		return;
 	}
+	if ( !token.Icmp( "particle" ) ) {
+		deform = DFRM_PARTICLE;
+		if ( !src.ExpectAnyToken( &token ) ) {
+			src.Warning( "deform particle missing particle name" );
+			SetMaterialFlag( MF_DEFAULTED );
+			return;
+		}
+		deformDecl = declManager->FindType( DECL_PARTICLE, token.c_str(), true );
+		return;
+	}
+	if ( !token.Icmp( "particle2" ) ) {
+		deform = DFRM_PARTICLE2;
+		if ( !src.ExpectAnyToken( &token ) ) {
+			src.Warning( "deform particle2 missing particle name" );
+			SetMaterialFlag( MF_DEFAULTED );
+			return;
+		}
+		deformDecl = declManager->FindType( DECL_PARTICLE, token.c_str(), true );
+		return;
+	}
 	
 	src.Warning( "Bad deform type '%s'", token.c_str() );
 	SetMaterialFlag( MF_DEFAULTED );
@@ -3321,16 +3341,21 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		}
 	}
 
-	// currently a surface can only have one unique texgen for all the stages on old hardware
-	texgen_t firstGen = TG_EXPLICIT;
+	// Reflect/screen texgen is evaluated per stage, and retail Prey intentionally
+	// combines those modes in mutually exclusive stages.  Sky, wobble-sky, and
+	// POT correction instead share one surface-generated coordinate stream, so
+	// only conflicting combinations of those modes are unsupported.
+	texgen_t surfaceTexgen = TG_EXPLICIT;
 	for ( i = 0; i < numStages; i++ ) {
-		if ( pd->parseStages[i].texture.texgen != TG_EXPLICIT ) {
-			if ( firstGen == TG_EXPLICIT ) {
-				firstGen = pd->parseStages[i].texture.texgen;
-			} else if ( firstGen != pd->parseStages[i].texture.texgen ) {
-				common->Warning( "material '%s' has multiple stages with a texgen", GetName() );
-				break;
-			}
+		const texgen_t stageTexgen = pd->parseStages[i].texture.texgen;
+		if ( stageTexgen != TG_SKYBOX_CUBE && stageTexgen != TG_WOBBLESKY_CUBE && stageTexgen != TG_POT_CORRECTION ) {
+			continue;
+		}
+		if ( surfaceTexgen == TG_EXPLICIT ) {
+			surfaceTexgen = stageTexgen;
+		} else if ( surfaceTexgen != stageTexgen ) {
+			common->Warning( "material '%s' combines incompatible surface-wide texgen modes", GetName() );
+			break;
 		}
 	}
 }
@@ -3956,6 +3981,42 @@ texgen_t idMaterial::Texgen() const {
 		}
 	}
 	
+	return TG_EXPLICIT;
+}
+
+/*
+=============
+idMaterial::HasTexgen
+=============
+*/
+bool idMaterial::HasTexgen( texgen_t texgen ) const {
+	if ( stages ) {
+		for ( int i = 0; i < numStages; i++ ) {
+			if ( stages[i].texture.texgen == texgen ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/*
+=============
+idMaterial::GetSurfaceTexgen
+
+Returns the first mode that requires surface-generated texture coordinates.
+ParseMaterial diagnoses declarations that combine incompatible such modes.
+=============
+*/
+texgen_t idMaterial::GetSurfaceTexgen() const {
+	if ( stages ) {
+		for ( int i = 0; i < numStages; i++ ) {
+			const texgen_t texgen = stages[i].texture.texgen;
+			if ( texgen == TG_SKYBOX_CUBE || texgen == TG_WOBBLESKY_CUBE || texgen == TG_POT_CORRECTION ) {
+				return texgen;
+			}
+		}
+	}
 	return TG_EXPLICIT;
 }
 

@@ -1,0 +1,52 @@
+// ambusher.style
+//
+// Holds a portal, gravity transition or pickup lane and lets opponents enter
+// a prepared shot. Mobility is deliberately traded for that early reaction.
+
+style "ambusher" {
+	description	"holds a route and shoots what walks into the prepared angle"
+
+	set	combatRange		700
+	set	aggression		0.30
+	set	patience		0.95
+	add	initiative		-0.04
+	set	targetStickiness	0.78
+	set	opportunism		0.85
+	set	vengefulness		0.20
+	add	suppressionMsec	450
+	set	strafeRhythmMsec	900
+	set	strafeRhythmVarianceMsec	450
+	set	weaponSwitchMsec	700
+	set	aimHeight		0.04
+
+	scale	peripheralPenaltyMsec	0.60
+	scale	reactionMsec		0.85
+	scale	aimSettleMsec		0.85
+	scale	strafeChance		0.55
+	scale	jumpChance		0.60
+	scale	pursuit			0.55
+	add	rangeDiscipline		0.10
+	add	itemFocus		0.20
+
+	weapon	"weaponobj_rocketlauncher"	1.50
+	weapon	"weaponobj_crawlergrenade"	1.40
+	weapon	"weaponobj_rifle"		1.25
+	weapon	"weaponobj_soulstripper"	1.10
+	weapon	"weaponobj_hiderweapon"		1.10
+	weapon	"weaponobj_bow"			1.00
+	weapon	"weaponobj_autocannon"		0.90
+	weapon	"weaponobj_wrench"		0.55
+
+	skill 1 {
+		scale	patience		0.80
+		add	aggression		0.10
+		scale	strafeChance		1.30
+	}
+	skill 2 {
+		scale	patience		0.90
+	}
+	skill 5 {
+		scale	reactionMsec		0.90
+		scale	fireConeDeg		0.90
+	}
+}

@@ -1887,6 +1887,7 @@ void	RB_ARB2_ClearPreparedPackedMD5RDraw( void );
 bool	RB_ARB2_DrawPreparedPackedMD5RStageBatches( const srfTriangles_t *tri );
 bool	RB_ARB2_DrawPreparedPackedMD5RDirectBatches( const srfTriangles_t *tri );
 void	R_ReloadARBPrograms_f( const idCmdArgs &args );
+void	R_LoadARBProgramsForStartup( void );
 void	R_ReportShaderPrograms_f( const idCmdArgs &args );
 
 // Stable identities for the stock ARB newStage program families.  Vulkan
@@ -2212,6 +2213,54 @@ TR_DEFORM
 
 =============================================================
 */
+
+typedef struct particleGeometryCounts_s {
+	int			numVerts;
+	int			numIndexes;
+	int			vertexBytes;
+	int			indexBytes;
+} particleGeometryCounts_t;
+
+ID_INLINE int R_ParticleCycleSeed( int stageCycle, bool previousCycle, int diversitySeed ) {
+	const unsigned int cycleBits = static_cast<unsigned int>( stageCycle ) - ( previousCycle ? 1u : 0u );
+	const unsigned int randomMask = static_cast<unsigned int>( idRandom::MAX_RAND );
+	const unsigned int seedBits = ( ( cycleBits << 10 ) & randomMask ) ^ static_cast<unsigned int>( diversitySeed );
+	return ( seedBits & 0x80000000u )
+		? -1 - static_cast<int>( ~seedBits )
+		: static_cast<int>( seedBits );
+}
+
+ID_INLINE bool R_GetParticleGeometryCounts( int totalParticles, int quadsPerParticle,
+											int maxAllocationBytes, particleGeometryCounts_t &counts ) {
+	counts.numVerts = 0;
+	counts.numIndexes = 0;
+	counts.vertexBytes = 0;
+	counts.indexBytes = 0;
+
+	if ( totalParticles <= 0 || quadsPerParticle <= 0 || maxAllocationBytes <= 0 ) {
+		return false;
+	}
+
+	// Multiplying two positive ints fits in int64. Bound that result before the
+	// per-quad vertex/index multiplications so every later conversion remains safe.
+	const int64 totalQuads = static_cast<int64>( totalParticles ) * static_cast<int64>( quadsPerParticle );
+	const int64 vertexBytesPerQuad = 4 * static_cast<int64>( sizeof( idDrawVert ) );
+	const int64 indexBytesPerQuad = 6 * static_cast<int64>( sizeof( glIndex_t ) );
+	const int64 planeBytesPerQuad = 2 * static_cast<int64>( sizeof( idPlane ) );
+	const int64 allocationLimit = static_cast<int64>( maxAllocationBytes );
+	if ( totalQuads <= 0 ||
+		totalQuads > allocationLimit / vertexBytesPerQuad ||
+		totalQuads > allocationLimit / indexBytesPerQuad ||
+		totalQuads > allocationLimit / planeBytesPerQuad ) {
+		return false;
+	}
+
+	counts.numVerts = static_cast<int>( totalQuads * 4 );
+	counts.numIndexes = static_cast<int>( totalQuads * 6 );
+	counts.vertexBytes = static_cast<int>( totalQuads * vertexBytesPerQuad );
+	counts.indexBytes = static_cast<int>( totalQuads * indexBytesPerQuad );
+	return true;
+}
 
 void R_DeformDrawSurf( drawSurf_t *drawSurf );
 

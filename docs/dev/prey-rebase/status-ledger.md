@@ -30,12 +30,13 @@ records what the rebase actually did.
 | Windows engine-only | **767/767 build targets completed** |
 | Linux | **1001/1001 build targets completed** |
 | Retail single-player | Stock menu plus Roadhouse, Feeding Tower, deathwalk/spirit, Shuttle, and `girlfriendx`/portal gameplay; save/load and config-casing migration; neutral-directory install auto-discovery |
-| Modules/render selection | Unified module and legacy loader aliases reached gameplay; stale renderer ABI failed closed; an explicit Vulkan request fell back to GL |
+| Modules/render selection | Unified module and legacy loader aliases reached gameplay; stale renderer ABI failed closed; explicit Vulkan requests now reach the Vulkan module on focused Roadhouse/Biolabsa smoke coverage |
 | Multiplayer/input | Listen server plus two clients; network `_attackalt` reached the game through the merged `usercmd_t` layout |
 | Filesystem layouts | Digital retail layout passed. A **synthetic** numbered-pak layout reached the settled menu; this is not evidence of genuine CD-era checksums |
 | Quick fixture/tool runtime | Two fresh dmap runs produced byte-identical `.cm`/`.proc` output which loaded successfully; bounded light-grid bake completed; zero-probe `-quit` exited cleanly |
-| Renderer foundation | Foundation self-tests pass. They do not establish full ModernGL/Vulkan Prey feature parity or complete manual visual parity |
+| Renderer foundation | Foundation self-tests pass. Focused Vulkan Roadhouse/Biolabsa gameplay smoke passes with zero Vulkan warning counters; this still does not establish exhaustive ModernGL/Vulkan Prey feature parity or complete manual visual parity |
 | Package/validator closure | Windows x64 archive production, manifest/payload inspection, isolated Roadhouse runtime smoke, and engine screenshot passed; the root push validator passed every active check including staged-payload validation |
+| Post-closure audit | All 137 catalog IDs reconcile exactly with this ledger. `openprey_rebase_contract.py` guards the corrected FW-19/FW-38 behavior, WP5.7 GUI stream/flag contracts, RD-22 structural replacement, removal of the old external-BSE workflow vocabulary, the autosave string overlay, loading-music decl-load scope, and benchmark post-map command path. The corrected Windows tree built **951/951** targets; its fresh GUI-marker save/load passed. A final staging/content audit added plain-install cleanup and guards preventing development-only `roadhouse_quick` fixture content from shipping in PK4s. A final Roadhouse clean-log launch wrote an engine screenshot and shut down with zero warnings/errors; the repaired renderer gameplay smoke profile passed. Follow-up audio/script validation fixed default OpenAL device selection, restored `waitForSilence` for `$player1`/all speaking entities, verified Roadhouse intro script timing, and passed clean Roadhouse/Biolabsa GL plus Vulkan smoke runs. Active CI is configured to build engine, dedicated, GL/Vulkan renderers, and the unified game module on Windows/Linux; hosted execution remains CI-pending. |
 
 The retail runs above are representative, not an exhaustive per-map, localization,
 subtitle/censor/audio, platform, or renderer-backend matrix. Item rows therefore retain
@@ -82,13 +83,13 @@ conservative validation states unless that evidence directly exercises them.
 | `FW-10` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-11` | PORTED | IMPLEMENTED | RUNTIME-CHECKED | The unified module loaded through canonical and legacy aliases and reached representative SP and MP gameplay. |
 | `FW-12` | PORTED | IMPLEMENTED | RUNTIME-CHECKED | Representative retail SP plus a listen server/two-client session exercised the Prey v7 call-site contract. |
-| `FW-13` | DROPPED | NOT-APPLICABLE | RUNTIME-CHECKED | The dropped delta was the external closed-source companion workflow. In-tree BSE is actively built, linked, attached, and initialized; nested `SEG_EFFECT` spawning remains TODO-BSE-NESTED-EFFECTS. |
+| `FW-13` | DROPPED | NOT-APPLICABLE | STATIC/RUNTIME-CHECKED | The external closed-source companion workflow and its residual naming are absent. In-tree BSE is actively built, linked, attached, and initialized; nested `SEG_EFFECT` spawning remains TODO-BSE-NESTED-EFFECTS. |
 | `FW-14` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-15` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-16` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-17` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-18` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream skin parsing/remapping already supplies the required safe behavior. |
-| `FW-19` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
+| `FW-19` | PORTED | IMPLEMENTED | STATIC-CHECKED; RUNTIME-PENDING | Current `openPREY RDEMO` plus interim `OpenPREY RDEMO` and legacy `OpenPrey RDEMO` wrappers are accepted with compile-time equal-length guards; the active rebase-contract test rejects the stale OpenQ4/Quake4 set. |
 | `FW-20` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-21` | PORTED | IMPLEMENTED | MP-RUNTIME-CHECKED | Two-client multiplayer delivered network `_attackalt` through the merged 16-bit `usercmd_t` layout. |
 | `FW-22` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
@@ -107,7 +108,7 @@ conservative validation states unless that evidence directly exercises them.
 | `FW-35` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream already provides English dictionary fallback. |
 | `FW-36` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `FW-37` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream machine-spec logic was retained. |
-| `FW-38` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
+| `FW-38` | PORTED | IMPLEMENTED | STATIC-CHECKED; RUNTIME-PENDING | Client/server defaults are 32000; internet presets and manual warning thresholds are 12000/16000/24000/32000 and use `LISTEN_SERVER_MAX_PLAYERS`; the active rebase-contract test guards the values. |
 | `FW-39` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `RD-01` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `RD-02` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
@@ -130,7 +131,7 @@ conservative validation states unless that evidence directly exercises them.
 | `RD-19` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `RD-20` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `RD-21` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
-| `RD-22` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream portability fixes retained; no older casts reapplied. |
+| `RD-22` | DROPPED | NOT-APPLICABLE | STATIC-CHECKED | Upstream replaced the old pointer-as-surface-index trick with the integer `surfIndex` field, so the historical `uintptr_t` casts are obsolete; the active rebase-contract test guards that structure. |
 | `RD-23` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `sound-01-subtitle-system` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `sound-02-profanity-censor` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
@@ -140,14 +141,14 @@ conservative validation states unless that evidence directly exercises them.
 | `sound-06-prey-sound-api-shims` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `sound-07-iseax-available` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream OpenAL capability path retained. |
 | `sound-08-openal-device-selection` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream OpenAL device-selection and initialization path retained. |
-| `ui-01-retail-gui-def-dialect` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
+| `ui-01-retail-gui-def-dialect` | PORTED | IMPLEMENTED | STATIC-CHECKED; RUNTIME-PENDING | The retail dialect is present and the complete GUI window-bit set now has a compile-time no-overlap assertion; full retail GUI navigation remains pending. |
 | `ui-02-retail-spline-text-effect` | PORTED | IMPLEMENTED | COMPILE-CHECKED; RUNTIME-PENDING | Bitmap-font spline/credit path is ported and its objects compile. `r_useTrueTypeFonts=0` is the default; TODO-D10 covers the TTF variant, which currently no-ops/warns. |
 | `ui-03-gui-events-startup` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `ui-04-guiscript-inc-resetcapture` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `ui-05-slider-volume-thumb` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `ui-06-prey-font-cursor-assets` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `ui-07-background-expansion` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
-| `ui-08-shear-winvar` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
+| `ui-08-shear-winvar` | PORTED | IMPLEMENTED | STATIC/RUNTIME-CHECKED | The animatable shear winvar is serialized behind an explicit openPREY GUI magic/version marker, preventing the changed layout from being mistaken for another GUI stream. A fresh post-change Roadhouse save contained 54 `PGUI` v1 markers and restored through `Game Map Init SaveGame` without GUI stream errors. |
 | `ui-09-text-shadow-choice-fixes` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `ui-10-ui-header-shims` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `ui-11-worldgui-aspect-bypass` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Superseded by current UI viewport/aspect call-site handling. |
@@ -157,7 +158,7 @@ conservative validation states unless that evidence directly exercises them.
 | `toolchain-warn-suppression` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `unified-game-module` | PORTED | IMPLEMENTED | RUNTIME-CHECKED | One staged `game_<arch>` module served representative SP and a listen server/two-client MP session; canonical and legacy aliases loaded it successfully. |
 | `gamelib-sync-scripts` | PORTED | IMPLEMENTED | BUILD/PACKAGE-CHECKED | Windows and Linux builds consumed the isolated build-local GameLib stage; package provenance recorded the clean canonical companion commit and emitted one unified module. |
-| `nightly-ci-overhaul` | PORTED | IMPLEMENTED | STATIC-CHECKED; CI-PENDING | Active YAML parses and asserts `OpenPrey-game`, `basepr`, one `game_<arch>` module, and openPREY icon/desktop payloads. Inherited split-module lanes were removed; hosted CI has not run on this tree yet. |
+| `nightly-ci-overhaul` | PORTED | IMPLEMENTED | STATIC-CHECKED; CI-PENDING | Active YAML parses and builds engine, dedicated server, GL/Vulkan renderer modules, and one staged `game_<arch>` module on Windows/Linux; it also asserts `OpenPrey-game`, `basepr`, rebase source contracts, and openPREY icon/desktop payloads. Hosted CI has not run on this tree yet. |
 | `package-nightly-prey` | PORTED | IMPLEMENTED | TOOL/PACKAGE/RUNTIME-CHECKED | Pak/release tooling passed; a Windows x64 archive was produced and inspected, then launched in isolation to Roadhouse and wrote an engine screenshot. |
 | `openal-dll-staging` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Upstream OpenAL staging retained. |
 | `linux-desktop-icons` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
@@ -175,10 +176,10 @@ conservative validation states unless that evidence directly exercises them.
 | `assets-01-prey-gui-suite` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
 | `assets-02-postprocess-shader-mirror` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Local shader mirrors were superseded; current upstream shader assets were retained under `content/basepr/`. |
 | `assets-03-interaction-vfp` | PORTED | IMPLEMENTED | VALIDATION-PENDING | Rebased implementation is present; final automated and retail-runtime matrix evidence has not yet been recorded. |
-| `assets-04-menu-strings-999` | PORTED | IMPLEMENTED | STATIC-CHECKED; RUNTIME-PENDING | Decision executed: retain `#str_122xxx`; four packs renamed to `<lang>_openprey.lang`, present in pak0 sources, with no `*999.lang` residual. GUI localization still needs runtime navigation. |
+| `assets-04-menu-strings-999` | PORTED | IMPLEMENTED | STATIC/RUNTIME-CHECKED | Decision executed: retain `#str_122xxx`; four packs renamed to `<lang>_openprey.lang`, present in pak0 sources, with no `*999.lang` residual. The clean-log Roadhouse launch also proved the overlay carries the inherited `#str_107240` autosave label. Full GUI localization navigation remains broader than this rebase gate. |
 | `assets-05-aspect-expand-backgrounds` | PORTED | IMPLEMENTED | TOOL/RUNTIME-CHECKED; PARTIAL | Tile extractor passed a synthetic 3×3 TGA smoke and the stock menu was captured through the engine screenshot command. Broader loading-screen presentation remains unrun. |
-| `assets-06-prey-map-cm-fixtures` | PORTED | IMPLEMENTED | PARTIAL-TOOL/RUNTIME-CHECKED | Fresh quick-fixture `.cm`/`.proc` generation was deterministic and loaded; committed retail mirror regeneration/comparison remains a separate pending check. |
-| `assets-07-install-tree-artifacts` | DROPPED | NOT-APPLICABLE | NOT-APPLICABLE | Generated `.install/` content was removed from version control. |
+| `assets-06-prey-map-cm-fixtures` | PORTED | IMPLEMENTED | PARTIAL-TOOL/RUNTIME-CHECKED | Fresh quick-fixture `.cm`/`.proc` generation was deterministic and loaded. The complete `roadhouse_quick` fixture, including its script, is dev-only loose content guarded against runtime PK4 leakage. Committed retail mirror regeneration/comparison remains a separate pending check. |
+| `assets-07-install-tree-artifacts` | DROPPED | NOT-APPLICABLE | TOOL-CHECKED | Generated `.install/` content was removed from version control, and plain Meson installs now scrub non-runtime import/build artifacts before staged-payload validation. |
 | `assets-08-prey-branding-packaging-assets` | PORTED | IMPLEMENTED | STATIC/PACKAGE-CHECKED | Branding validators pass and the produced archive payload carries openPREY identities and documentation. |
 | `assets-09-prey-docs-adaptation` | PORTED | IMPLEMENTED | STATIC-CHECKED | Rebase evidence is rehomed, active public docs are Prey-focused, and `docs_link_integrity.py` passes. |
 | `assets-10-basepy-meson-unified-module` | PORTED | IMPLEMENTED | BUILD/PACKAGE/RUNTIME-CHECKED | All build matrices, staged install, archive inspection, and isolated retail runtime used `basepr` with one unified game module. |

@@ -1,0 +1,299 @@
+// mohawk_hider.chat
+// Resolute, mobile Hidden scout voice. The retail model label is not treated
+// as an identity claim about any real-world nation or community.
+
+characterChat "Mohawk Hider" {
+	chat entergame {
+		"Scout in. Keep pace."
+		"Mohawk Hider ready. Routes first."
+		"I know the work. Move."
+		"Scout eyes on the lanes."
+		"I'm in. Stay off the obvious path."
+		"Hidden line is moving."
+		"Ready to cut through."
+		"Scout present. No delay."
+	}
+	chat levelstart {
+		"$map. Short routes win."
+		"Read the exits. Then strike."
+		"Keep one wall at your back."
+		"Cross fast. Hold only what matters."
+		"Find their blind side."
+		"No crowding. Give each other room."
+		"We move when their aim turns."
+		"One clean route is enough."
+	}
+	chat kill {
+		"$other crossed badly."
+		"$weapon cleared the turn."
+		"Target ended. Route open."
+		"One guard less."
+		"Caught the weak angle."
+		"$other missed the scout."
+		"Clean contact. Keep pace."
+		"Their lane just failed."
+	}
+	chat killWrench {
+		"Wrench was faster."
+		"Close work, finished."
+		"$other stepped into reach."
+		"No distance. No problem."
+		"Direct strike opened the turn."
+		"That corner belonged to me."
+		"You chased too close, $other."
+		"One swing. Passage clear."
+	}
+	chat killStreak {
+		"Three down. Move now."
+		"Their watch has holes."
+		"Three routes broken open."
+		"Scout has the tempo."
+		"They keep turning too late."
+		"Three contacts, no stop."
+		"Their formation is gone."
+		"Keep the pressure narrow."
+	}
+	chat revenge {
+		"I marked your route, $other."
+		"Second crossing was mine."
+		"You taught me once. Enough."
+		"Returned by the quiet side."
+		"Old contact settled."
+		"I don't miss the same angle twice."
+		"$other was waiting in the wrong place."
+		"Lesson answered. Move on."
+	}
+	chat death {
+		"Scout down. Change lanes."
+		"$other read that route."
+		"$weapon controls this crossing."
+		"Lost the corner. Don't follow."
+		"I'm out. Keep the line moving."
+		"Good trap. I return soon."
+		"Contact got me. Mark it."
+		"Route closed behind me."
+	}
+	chat deathAccident {
+		"Bad step. Logged."
+		"Ground won that one."
+		"Route error. Reset."
+		"Missed the edge."
+		"Too fast through the hazard."
+		"No trap. Just my mistake."
+		"Wrong angle on the jump."
+		"Scout misread the terrain."
+	}
+	chat itemDenied {
+		"$other reached the $item. Rotate."
+		"$item gone. Take the next route."
+		"Resource lost. Time another."
+		"They own that corner for now."
+		"No pickup is worth a trap."
+		"$other won the supply race."
+		"Leave the empty spawn behind."
+		"Next $item window, different angle."
+	}
+	chat leadTaken {
+		"Lead ours. Stay sharp."
+		"First place, no comfort."
+		"Scout holds the front."
+		"We're ahead through clean movement."
+		"Advantage set. Keep it lean."
+		"Their chase begins now."
+		"Top score. Watch the flank."
+		"We took control without stopping."
+	}
+	chat leadLost {
+		"$other leads. Hunt the gap."
+		"Front lost. Route remains."
+		"Behind now. Move smarter."
+		"They took control, briefly."
+		"Score turned. So do we."
+		"Find one weak crossing."
+		"Lead gone. Discipline stays."
+		"We recover by moving clean."
+	}
+	chat matchWin {
+		"Good route. Good result."
+		"We stayed moving and won."
+		"Their hold broke."
+		"Victory through the weak side."
+		"Match finished clean."
+		"Hidden scouts held the way."
+		"No wasted ground. Well fought."
+		"We found every opening needed."
+	}
+	chat matchLose {
+		"They read us. Learn it."
+		"Loss accepted. Route revised."
+		"Good opposition. Next time, another angle."
+		"We stopped too often."
+		"Their control held today."
+		"Remember the closed lanes."
+		"Outscored. Not outthought."
+		"Reset and travel lighter."
+	}
+	chat farewell {
+		"Scout out. Keep moving."
+		"Mohawk Hider leaving."
+		"My route ends here."
+		"Stay away from the obvious exit."
+		"Good fights. I'm gone."
+		"Hidden scout signing off."
+		"Hold the open lane."
+		"Hidden line, carry on."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "can anyone help"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		trigger "assist me"
+		"Move to cover, $other. I'll cross."
+		"Keep an exit open. Help is near."
+		"Break their view. I have the side."
+		"Hold one moment, then move with me."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good match. Strong routes, $other."
+		"Well fought. You stayed difficult to read."
+		"A clean contest."
+		"Good games. Every crossing mattered."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Come find the scout, $other."
+		"You'll watch the wrong door."
+		"Accepted. Keep turning."
+		"Talk ends when the route bends."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "whats up"
+		"Hello, $other. Eyes forward."
+		"Scout hears you."
+		"Good. Another voice on the route."
+		"Hey. Keep the channel useful."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "appreciate it"
+		trigger "cheers"
+		trigger "thanks a lot"
+		"Use the opening well, $other."
+		"No debt. Keep pace."
+		"Thanks heard. Route on."
+		"We help because the line must move."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"You noticed the angle, $other."
+		"Good. Keep watching that lane."
+		"Clean work gets clean results."
+		"Praise heard. Focus stays."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "that was my fault"
+		trigger "i messed up"
+		"Own it, fix it, move."
+		"No time for regret on open ground."
+		"I heard you. Don't repeat the route."
+		"Fault accepted, $other. Stay useful."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "take care"
+		"Leave by the clear side, $other."
+		"Goodbye. Travel quiet."
+		"Until the next crossing."
+		"Go safe. Scout will hold."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Mohawk Hider"
+		trigger "Mohawk Hider respond"
+		trigger "Mohawk Hider report"
+		trigger "Mohawk Hider status"
+		trigger "Mohawk Hider listen"
+		trigger "Mohawk Hider answer"
+		trigger "Mohawk Hider come in"
+		trigger "Mohawk Hider are you there"
+		"Mohawk Hider listening."
+		"Speak, $other. Keep it short."
+		"Scout ready for your call."
+		"I hear you. Name the lane."
+	}
+}

@@ -1,0 +1,297 @@
+// Edward: a restrained, courteous multiplayer voice without invented backstory.
+
+characterChat "Edward" {
+	chat entergame {
+		"Edward here. Ready when everyone else is."
+		"Hello. I am set for the match."
+		"I've joined. Let's have a fair round."
+		"All ready on my side."
+		"Good to be here. We can begin."
+		"Edward reporting in, with nothing further to add."
+		"I'm prepared. Best of luck to everyone."
+		"Ready now. Let's see how the round develops."
+	}
+	chat levelstart {
+		"$map is open. I will start by checking the near route."
+		"Let's keep an eye on the main pickups."
+		"A steady start should be sufficient."
+		"I will avoid the center until I know the traffic."
+		"First route selected. Moving now."
+		"The exits appear clear for the moment."
+		"No need to rush the opening on $map."
+		"I will learn the timing as we go."
+	}
+	chat kill {
+		"That worked out in my favor, $other."
+		"The $weapon was well placed that time."
+		"One point secured. Moving on."
+		"You left an opening, and I took it."
+		"A clean enough exchange."
+		"I had the better angle there."
+		"That engagement is settled."
+		"Good attempt, $other. I was ready for it."
+	}
+	chat killWrench {
+		"That became a close contest rather quickly."
+		"The wrench was enough at that distance."
+		"You came nearer than was advisable, $other."
+		"A simple tool and a fortunate opening."
+		"Close range decided that exchange."
+		"I did not need to complicate the matter."
+		"That was direct, if not especially elegant."
+		"The last step brought you within reach."
+	}
+	chat killStreak {
+		"Three in succession. I will try to maintain the pace."
+		"The current approach is working reliably."
+		"A useful run of points so far."
+		"That makes three without interruption."
+		"I have some momentum now."
+		"The round is going well; I should remain careful."
+		"Three results, all from sensible positioning."
+		"I will continue without changing too much."
+	}
+	chat revenge {
+		"That returns the earlier point, $other."
+		"I was better prepared for you this time."
+		"The second meeting went differently."
+		"I corrected the mistake from before."
+		"We are even on that exchange now."
+		"I expected that route on the return."
+		"The adjustment was worthwhile."
+		"No grudge, $other. Merely a better response."
+	}
+	chat death {
+		"Well done, $other. You had the angle."
+		"The $weapon ended that attempt cleanly."
+		"I stayed exposed a little too long."
+		"That point was fairly earned."
+		"I should have changed direction sooner."
+		"A reasonable shot. I will reset."
+		"You anticipated me correctly."
+		"Edward down. I will return shortly."
+	}
+	chat deathAccident {
+		"That was entirely my error."
+		"I misjudged the safe edge."
+		"The route was less forgiving than expected."
+		"No one else is responsible for that."
+		"A careless step. I will avoid repeating it."
+		"I chose the wrong side of the hazard."
+		"That outcome was unnecessary."
+		"I should have taken the longer path."
+	}
+	chat itemDenied {
+		"You reached the $item first, $other. Well timed."
+		"The pickup is gone; I will use the next option."
+		"I was a moment late to that resource."
+		"The $item timing belongs to you this cycle."
+		"No matter. There are other useful routes."
+		"That was an efficient pickup, $other."
+		"I will arrive sooner on the next rotation."
+		"Resource unavailable. Adjusting course."
+	}
+	chat leadTaken {
+		"I have moved into first place."
+		"The lead is mine at present."
+		"A good position, though not a permanent one."
+		"I am ahead. I will keep the same pace."
+		"The score currently favors me."
+		"First place secured for the moment."
+		"Edward leads. There is still plenty of match left."
+		"The steady approach has produced a lead."
+	}
+	chat leadLost {
+		"Another player has passed me. I will adjust."
+		"I no longer hold first place."
+		"The lead changed, but the margin is manageable."
+		"I need a cleaner next rotation."
+		"The score now favors someone else."
+		"I fell behind while taking the safer route."
+		"First place is available again."
+		"A small setback; I can still respond."
+	}
+	chat matchWin {
+		"Good game. I am pleased with that result."
+		"The match went well from my perspective."
+		"A fair contest and a welcome win."
+		"Thank you for the round. That was enjoyable."
+		"The final score favors Edward this time."
+		"I managed the pace well enough to finish first."
+		"Well played, everyone. The result is settled."
+		"A satisfactory finish to a close match."
+	}
+	chat matchLose {
+		"Good game. You were more consistent."
+		"The better result belongs elsewhere this round."
+		"A fair loss. I know which decisions cost me."
+		"Well played. I will try again."
+		"The final score is clear, and I accept it."
+		"I needed stronger timing near the end."
+		"No complaint from me. That was earned."
+		"A useful match despite the outcome."
+	}
+	chat farewell {
+		"Edward signing off. Good games."
+		"I am leaving now. Thank you for the matches."
+		"Goodbye, everyone. Enjoy the next round."
+		"That will be all for me today."
+		"I should go. It was a fair session."
+		"Until next time, take care."
+		"I'm finished for now. See you again."
+		"Thank you for playing. Edward out."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"I am on my way, $other. Stay near cover."
+		"Fall back if possible; I will approach from the side."
+		"I can assist. Give me a moment to cross $map."
+		"Hold there. I will try to make the route safer."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. Thank you for playing fairly."
+		"Well played. That was a worthwhile round."
+		"Agreed. $map produced a close contest."
+		"Good games. I would be glad to join another."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Very well, $other. We can settle it in the match."
+		"I accept the challenge, without the extra noise."
+		"Come ahead when ready. I will do the same."
+		"We will let the score provide the answer."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hello, $other. I hope you are well."
+		"Edward here. Good to meet you."
+		"Good evening. I am ready for $map."
+		"Hi. Thank you for the greeting."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You are quite welcome, $other. I was glad to assist."
+		"Glad I could be of assistance."
+		"Of course. Please make good use of it."
+		"No trouble at all; we can continue."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you, $other. The timing was fortunate."
+		"I appreciate that. It was a clean opportunity."
+		"Kind of you to say so."
+		"Thanks. I was pleased with the placement."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Apology accepted, $other. We can move on."
+		"It is all right. Thank you for saying so."
+		"No lasting harm done. Please continue."
+		"Understood. We need not dwell on it."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Goodbye, $other. Thank you for the company."
+		"Good night. I hope the next match goes well."
+		"See you later. Take care on the way out."
+		"Farewell. I look forward to another fair round."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Edward"
+		trigger "hey Edward"
+		trigger "Edward help"
+		trigger "Edward hello"
+		trigger "Edward listen"
+		trigger "Edward there"
+		trigger "Edward answer"
+		trigger "Edward wait"
+		"Yes, $other? Edward is listening."
+		"I heard you. What do you need?"
+		"Go ahead, please."
+		"You have my attention. Speak when ready."
+	}
+}

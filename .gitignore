@@ -43,6 +43,8 @@
 /subprojects/.wraplock
 /subprojects/packagecache/
 /subprojects/SDL3-*/
+/subprojects/libogg-*/
+/subprojects/libvorbis-*/
 /.install/
 __pycache__/
 *.pyc

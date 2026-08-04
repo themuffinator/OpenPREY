@@ -1356,7 +1356,7 @@ int idSoundEmitterLocal::StartSound( const idSoundShader* shader, const s_channe
 	// kill any sound that is currently playing on this channel after no_dups sees the outgoing sample
 	if( channel != SCHANNEL_ANY )
 	{
-		for( int i = 0; i < channels.Num(); i++ )
+		for( int i = channels.Num() - 1; i >= 0; i-- )
 		{
 			idSoundChannel* chan = channels[i];
 			if( chan->soundShader && chan->logicalChannel == channel )
@@ -1367,7 +1367,6 @@ int idSoundEmitterLocal::StartSound( const idSoundShader* shader, const s_channe
 				}
 				channels.RemoveIndex( i );
 				soundWorld->FreeSoundChannel( chan );
-				break;
 			}
 		}
 	}

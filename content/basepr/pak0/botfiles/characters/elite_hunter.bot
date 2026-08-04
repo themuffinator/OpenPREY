@@ -1,0 +1,31 @@
+// Retail Elite Hunter AI extends the ordinary Hunter with sniping and evasive
+// movement. This arena version holds deliberate long lanes, then moves cleanly
+// when pressure reaches it, and has little need to announce itself.
+character "Elite Hunter" {
+	inherit		"sniper"
+	description	"disciplined Sphere sniper that controls long lanes and relocates under pressure"
+	skillBand	4 5
+	modelNum	15
+
+	set	combatRange		1200
+	set	aggression		0.38
+	set	patience		0.78
+	scale	aimTremorDeg		0.88
+	scale	aimTrackTimeConst	0.90
+	scale	turnDamping		1.12
+	set	targetStickiness	0.98
+	set	opportunism		0.95
+	set	vengefulness		0.40
+	set	suppressionMsec	500
+	set	chatiness		0.20
+	scale	chatDelayScale		0.90
+
+	weapon	"weaponobj_rifle"		1.85
+	weapon	"weaponobj_crawlergrenade"	1.35
+	weapon	"weaponobj_hiderweapon"		1.30
+
+	skill 5 {
+		scale	aimTrackError		0.90
+		add	targetSelection		0.05
+	}
+}

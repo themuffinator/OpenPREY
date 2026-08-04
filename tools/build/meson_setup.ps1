@@ -284,100 +284,6 @@ function Test-WindowsStaticCRTReconfigureNeeded {
     return [string]$configuredValue -ne $requiredValue
 }
 
-function Test-ObsoleteBSEBuildOptionPresent {
-    param([string]$BuildDir)
-
-    if ([string]::IsNullOrWhiteSpace($BuildDir) -or -not (Test-Path $BuildDir)) {
-        return $false
-    }
-
-    return $null -ne (Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "build_libbse")
-}
-
-function Format-MesonOptionValue {
-    param([object]$Value)
-
-    if ($Value -is [bool]) {
-        return $Value.ToString().ToLowerInvariant()
-    }
-
-    return [string]$Value
-}
-
-function Get-SetupArgsForExistingBuildDir {
-    param(
-        [string]$BuildDir,
-        [string]$RepoRoot
-    )
-
-    $setupArgs = @(
-        "setup",
-        $BuildDir,
-        $RepoRoot,
-        "--backend",
-        "ninja"
-    )
-
-    $buildtype = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "buildtype"
-    if (-not [string]::IsNullOrWhiteSpace([string]$buildtype)) {
-        $setupArgs += "--buildtype=$(Format-MesonOptionValue -Value $buildtype)"
-    }
-
-    $wrapMode = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "wrap_mode"
-    if (-not [string]::IsNullOrWhiteSpace([string]$wrapMode)) {
-        $setupArgs += "--wrap-mode=$(Format-MesonOptionValue -Value $wrapMode)"
-    }
-
-    $optionNames = @(
-        "platform_backend",
-        "linux_x11",
-        "macos_graphics_bridge",
-        "macos_openal_provider",
-        "version_track",
-        "version_iteration",
-        "version_base_override",
-        "openal_root_override",
-        "use_pch",
-        "build_engine",
-        "build_games",
-        "build_game_sp",
-        "build_game_mp",
-        "enforce_msvc_2026"
-    )
-
-    foreach ($optionName in $optionNames) {
-        $value = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName $optionName
-        if ($null -eq $value) {
-            continue
-        }
-
-        $formattedValue = Format-MesonOptionValue -Value $value
-        if ([string]::IsNullOrWhiteSpace($formattedValue)) {
-            continue
-        }
-
-        $setupArgs += "-D$optionName=$formattedValue"
-    }
-
-    return @(Ensure-WindowsStaticCRTSetupArgs -MesonArgs $setupArgs)
-}
-
-function Recreate-MesonBuildDirectory {
-    param(
-        [string]$BuildDir,
-        [string[]]$SetupArgs,
-        [string]$VsDevCmdPath,
-        [pscustomobject]$MesonCommand
-    )
-
-    if (Test-Path $BuildDir) {
-        Remove-Item -LiteralPath $BuildDir -Recurse -Force
-    }
-
-    Invoke-Meson -MesonArgs $SetupArgs -VsDevCmdPath $VsDevCmdPath -MesonCommand $MesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
-    return [int]$LASTEXITCODE
-}
-
 function Get-LatestFileWriteTimeUtc {
     param([string]$DirectoryPath)
 
@@ -482,35 +388,6 @@ function Test-GamelibsStageRefreshNeeded {
     }
 
     return $sourceLatest -gt $stageLatest
-}
-
-function Remove-BSEArtifacts {
-    param([string]$DirectoryPath)
-
-    if ([string]::IsNullOrWhiteSpace($DirectoryPath) -or -not (Test-Path $DirectoryPath)) {
-        return
-    }
-
-    $patterns = @(
-        "openQ4-BSE_*.dll",
-        "openQ4-BSE_*.dylib",
-        "openQ4-BSE_*.so",
-        "openQ4-BSE_*.lib",
-        "openQ4-BSE_*.pdb",
-        "openQ4-BSE_*.dll",
-        "openQ4-BSE_*.dylib",
-        "openQ4-BSE_*.so",
-        "openQ4-BSE_*.lib",
-        "openQ4-BSE_*.pdb"
-    )
-
-    foreach ($pattern in $patterns) {
-        $matches = @(Get-ChildItem -Path $DirectoryPath -Filter $pattern -File -ErrorAction SilentlyContinue)
-        foreach ($match in $matches) {
-            Write-Host "Removing stale BSE artifact '$($match.FullName)'"
-            Remove-Item -LiteralPath $match.FullName -Force
-        }
-    }
 }
 
 function Remove-NonRuntimeInstallArtifacts {
@@ -705,20 +582,6 @@ if ($commandName -eq "setup") {
     $effectiveArgs = Ensure-WindowsStaticCRTSetupArgs -MesonArgs $effectiveArgs
 }
 
-if ($commandName -eq "setup" -and ($effectiveArgs -contains "--reconfigure")) {
-    $reconfigureIndex = [Array]::IndexOf($effectiveArgs, "--reconfigure")
-    if ($reconfigureIndex -ge 0 -and ($reconfigureIndex + 1) -lt $effectiveArgs.Length) {
-        $candidateBuildDir = [System.IO.Path]::GetFullPath($effectiveArgs[$reconfigureIndex + 1])
-        if (Test-ObsoleteBSEBuildOptionPresent -BuildDir $candidateBuildDir) {
-            Write-Host "Meson build directory '$candidateBuildDir' still uses the removed build_libbse option. Recreating it..."
-            $effectiveArgs = @($effectiveArgs | Where-Object { $_ -ne "--reconfigure" })
-            if (Test-Path $candidateBuildDir) {
-                Remove-Item -LiteralPath $candidateBuildDir -Recurse -Force
-            }
-        }
-    }
-}
-
 $buildGameLibs = $env:OPENPREY_BUILD_GAMELIBS -eq "1" -or $env:OPENQ4_BUILD_GAMELIBS -eq "1"
 $skipGameLibsBuild = $env:OPENPREY_SKIP_GAMELIBS_BUILD -eq "1" -or $env:OPENQ4_SKIP_GAMELIBS_BUILD -eq "1"
 if ($commandName -eq "compile" -and $buildGameLibs -and -not $skipGameLibsBuild) {
@@ -745,37 +608,19 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
 
     if ($isCompile -and -not (Test-MesonBuildDirectory $buildInfo.BuildDir)) {
         Write-Host "Meson build directory '$($buildInfo.BuildDir)' is missing or invalid. Running meson setup..."
-        $setupArgs = if (Test-ObsoleteBSEBuildOptionPresent -BuildDir $buildInfo.BuildDir) {
-            Write-Host "Meson build directory '$($buildInfo.BuildDir)' still uses the removed build_libbse option. Recreating it..."
-            Get-SetupArgsForExistingBuildDir -BuildDir $buildInfo.BuildDir -RepoRoot $repoRoot
-        } else {
-            @(
-                "setup",
-                $buildInfo.BuildDir,
-                $repoRoot,
-                "--backend",
-                "ninja",
-                "--buildtype=debug",
-                "--wrap-mode=forcefallback"
-            )
-        }
+        $setupArgs = @(
+            "setup",
+            $buildInfo.BuildDir,
+            $repoRoot,
+            "--backend",
+            "ninja",
+            "--buildtype=debug",
+            "--wrap-mode=forcefallback"
+        )
         $setupArgs = Ensure-WindowsStaticCRTSetupArgs -MesonArgs $setupArgs
 
-        if (Test-ObsoleteBSEBuildOptionPresent -BuildDir $buildInfo.BuildDir) {
-            $setupCode = Recreate-MesonBuildDirectory -BuildDir $buildInfo.BuildDir -SetupArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
-        } else {
-            Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
-            $setupCode = [int]$LASTEXITCODE
-        }
+        Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
         $setupCode = [int]$LASTEXITCODE
-        if ($setupCode -ne 0) {
-            exit $setupCode
-        }
-    }
-    elseif (Test-ObsoleteBSEBuildOptionPresent -BuildDir $buildInfo.BuildDir) {
-        Write-Host "Meson build directory '$($buildInfo.BuildDir)' still uses the removed build_libbse option. Recreating it..."
-        $setupArgs = Get-SetupArgsForExistingBuildDir -BuildDir $buildInfo.BuildDir -RepoRoot $repoRoot
-        $setupCode = Recreate-MesonBuildDirectory -BuildDir $buildInfo.BuildDir -SetupArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
         if ($setupCode -ne 0) {
             exit $setupCode
         }
@@ -868,12 +713,8 @@ if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENPREY_INSTALL_R
 if ($exitCode -eq 0 -and ($commandName -eq "compile" -or $commandName -eq "install")) {
     $includeInstallRoot = $commandName -eq "install"
     $buildInfo = Get-CompileBuildDirInfo -MesonArgs $effectiveArgs -DefaultBuildDir $defaultBuildDir
-    Remove-BSEArtifacts -DirectoryPath $buildInfo.BuildDir
     $installRootPath = Join-Path $repoRoot ".install"
     Remove-NonRuntimeInstallArtifacts -InstallRoot $installRootPath
-    if ($includeInstallRoot) {
-        Remove-BSEArtifacts -DirectoryPath $installRootPath
-    }
 
     if (-not (Test-Path $stageWindowsRuntimeScript)) {
         throw "Windows runtime staging script not found: '$stageWindowsRuntimeScript'."

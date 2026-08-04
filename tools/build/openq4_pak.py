@@ -67,6 +67,7 @@ OPENQ4_REQUIRED_LOOSE_GAME_FILES = {
 OPENQ4_PK4_FORBIDDEN_FILES = {
     "addon.conf",
     "binary.conf",
+    "script/map_roadhouse_quick.script",
 }
 OPENQ4_PK4_EXCLUDED_FILES = {
     "meson.build",

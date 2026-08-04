@@ -5578,7 +5578,7 @@ static void openPREY_BuildGameModuleCandidateList( idStrList &candidates ) {
 	openPREY_AddUniqueGameModuleCandidate( candidates, "game" );
 }
 
-static void openQ4_DisableBSEWithWarning( const char *reason, bool showDialog = true ) {
+static void openPREY_DisableBSEWithWarning( const char *reason, bool showDialog = true ) {
 	static bool warnedConsole = false;
 	if ( !warnedConsole ) {
 		warnedConsole = true;
@@ -5602,7 +5602,7 @@ static void openQ4_DisableBSEWithWarning( const char *reason, bool showDialog = 
 #endif
 
 	::declEffectEdit = NULL;
-	::bseAllocDeclEffect = openQ4_AllocIntegratedBSEDeclEffect;
+	::bseAllocDeclEffect = openPREY_AllocIntegratedBSEDeclEffect;
 	::bse = &bseDisabledLocal;
 }
 
@@ -5615,12 +5615,12 @@ void idCommonLocal::AttachBSE( void ) {
 #ifdef __DOOM_DLL__
 	::bse = &bseDisabledLocal;
 	::declEffectEdit = NULL;
-	::bseAllocDeclEffect = openQ4_AllocIntegratedBSEDeclEffect;
+	::bseAllocDeclEffect = openPREY_AllocIntegratedBSEDeclEffect;
 
 #if !defined( ID_DEDICATED )
 	common->DPrintf( "Attaching integrated BSE.\n" );
-	::bse = openQ4_GetIntegratedBSEManager();
-	::declEffectEdit = openQ4_GetIntegratedBSEDeclEffectEdit();
+	::bse = openPREY_GetIntegratedBSEManager();
+	::declEffectEdit = openPREY_GetIntegratedBSEDeclEffectEdit();
 #else
 	common->DPrintf( "Attaching integrated BSE decl allocator with disabled runtime manager.\n" );
 #endif
@@ -6373,7 +6373,7 @@ void idCommonLocal::InitGame( void ) {
 
 	// initialize the BSE system before the game DLL starts creating effects
 	if ( bse && !bse->Init() ) {
-		openQ4_DisableBSEWithWarning( "BSE initialization failed" );
+		openPREY_DisableBSEWithWarning( "BSE initialization failed" );
 	}
 
 	// startup the script debugger

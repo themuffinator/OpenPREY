@@ -4,8 +4,20 @@ Status: the rebase implementation is complete (2026-08-01). It was developed on
 `prey-on-oq4`; the local `new-prey` branch is cut over to the closing head while the
 `pre-oq4-rebase` tag preserves the former branch tip. Windows full, Windows engine-only,
 and Linux build matrices pass, and representative retail, fixture, package, and validator
-evidence is recorded below. Supporting change-by-change
-analysis lives in this directory — six subsystem catalogs (137 dispositioned changes), a
+evidence is recorded below. A post-closure catalog/source audit then found and corrected
+FW-19 render-demo casing compatibility, FW-38 network-rate defaults, the GUI stream
+marker/flag-overlap guards required by WP5.7, and residual closed-source BSE workflow
+naming. Those decisions are now protected by an active rebase-contract test. Supporting
+change-by-change analysis lives in this directory. A final repo-layout audit also closed
+two staging/content gaps: plain Meson installs now scrub non-runtime import artifacts from
+`.install/`, and the `roadhouse_quick` fixture script lives with the rest of that
+development-only fixture instead of shipping in `pak0.pk4`. Those guards are covered by
+the packaging and staged-payload validators. A final clean-log Roadhouse audit then fixed
+the missing autosave label string, marked pre-map loading-music decl reads as legitimate
+level-load media, and repaired the renderer gameplay benchmark harness so it uses
+`g_skipCinematics` plus `exec_savepath` instead of non-existent autoexec cvars. The
+supporting materials are six subsystem
+catalogs (137 dispositioned changes), a
 game/engine interface map, an upstream architecture survey, a port-history narrative, and a
 coverage audit. The execution-level companion —
 [`implementation.md`](implementation.md) — breaks this plan
@@ -288,7 +300,8 @@ Recorded validation evidence:
 - Retail runtime: stock menu; Roadhouse, Feeding Tower, deathwalk/spirit, Shuttle, and
   `girlfriendx`/portal gameplay; save/load and config-casing migration; neutral-directory
   install auto-discovery; unified-module loading through canonical and legacy aliases;
-  stale renderer-ABI rejection; and an explicit Vulkan request falling back to GL.
+  stale renderer-ABI rejection; Roadhouse/Biolabsa GL smoke; and focused Vulkan
+  Roadhouse/Biolabsa smoke with `requested=vulkan active=vulkan`.
 - Multiplayer: listen server plus two clients, including network `_attackalt` delivery
   through the merged `usercmd_t` layout.
 - Filesystem compatibility: a synthetic numbered-pak layout reaches the settled menu.
@@ -300,12 +313,32 @@ Recorded validation evidence:
   were inspected, and an isolated windowed launch reached Roadhouse and wrote an engine
   screenshot. The root push validator passed every active check, including staged-payload
   validation.
-
+- Post-closure source audit: catalog/ledger coverage was reconciled at all 137 IDs; the
+  four missed implementation/hardening areas named in the status paragraph were fixed;
+  a static contract now guards them; the corrected Windows tree completed all **951/951**
+  build targets; and active hosted jobs are now configured to compile the engine, dedicated
+  server, both renderer modules, and unified game module on Windows and Linux.
+- Post-audit save compatibility: a fresh windowed Roadhouse save/load using the new GUI
+  marker reached `Game Map Init SaveGame`, emitted no GUI stream error, wrote an engine
+  screenshot after restore, and shut down cleanly.
+- Final staging/content audit: plain Meson install now removes non-runtime import/build
+  artifacts from `.install/`, and `roadhouse_quick` is entirely development-only loose
+  content; runtime PK4 source/build/staged validators reject that fixture if it leaks back
+  into `pak0.pk4`.
+- Final Roadhouse clean-log audit: the staged Windows runtime launched windowed into
+  `game/roadhouse`, skipped the loading gate/cinematic path, wrote an engine screenshot,
+  and shut down with zero warnings/errors. The renderer gameplay smoke harness also
+  passed using the repaired post-map `exec_savepath` path.
+- Audio/script follow-up: default OpenAL device selection now treats stale placeholders
+  and `"default"`/`"system default"` as the system default; `waitForSilence` is tracked
+  on every speaking entity so `$player1` voice scripts pause correctly; Roadhouse intro
+  timing was verified, clean Roadhouse/Biolabsa GL smoke passed, and focused Vulkan
+  Roadhouse/Biolabsa smoke passed with `requested=vulkan active=vulkan`.
 Explicitly deferred or broader than rebase closure:
 
-- Exhaustive per-map, localization, subtitle/censor/audio, renderer-backend, portal/mirror,
-  and platform parity. Representative runtime evidence above must not be read as a full
-  manual matrix.
+- Exhaustive per-map, localization, full subtitle/censor/audio matrix, renderer-backend,
+  direct retail/openPREY mirror/portal image comparison, and platform parity.
+  Representative runtime evidence above must not be read as a full manual matrix.
 - macOS/ARM64/signing/manual-publish release-lane reconstruction, remote default-branch
   retargeting, and upstream PR submission.
 

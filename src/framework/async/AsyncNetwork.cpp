@@ -45,8 +45,8 @@ idCVar				idAsyncNetwork::serverDedicated( "net_serverDedicated", "1", CVAR_SERV
 idCVar				idAsyncNetwork::serverDedicated( "net_serverDedicated", "0", CVAR_SERVERINFO | CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "1 = text console dedicated server, 2 = graphical dedicated server", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 #endif
 idCVar				idAsyncNetwork::serverSnapshotDelay( "net_serverSnapshotDelay", "50", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "delay between snapshots in milliseconds" );
-idCVar				idAsyncNetwork::serverMaxClientRate( "net_serverMaxClientRate", "25600", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE | CVAR_NOCHEAT, "maximum rate to a client in bytes/sec" );
-idCVar				idAsyncNetwork::clientMaxRate( "net_clientMaxRate", "25600", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE | CVAR_NOCHEAT, "maximum rate requested by client from server in bytes/sec" );
+idCVar				idAsyncNetwork::serverMaxClientRate( "net_serverMaxClientRate", "32000", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE | CVAR_NOCHEAT, "maximum rate to a client in bytes/sec" );
+idCVar				idAsyncNetwork::clientMaxRate( "net_clientMaxRate", "32000", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE | CVAR_NOCHEAT, "maximum rate requested by client from server in bytes/sec" );
 idCVar				idAsyncNetwork::serverMaxUsercmdRelay( "net_serverMaxUsercmdRelay", "5", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "maximum number of usercmds from other clients the server relays to a client", 1, MAX_USERCMD_RELAY, idCmdSystem::ArgCompletion_Integer<1,MAX_USERCMD_RELAY> );
 idCVar				idAsyncNetwork::serverZombieTimeout( "net_serverZombieTimeout", "5", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "disconnected client timeout in seconds" );
 idCVar				idAsyncNetwork::serverClientTimeout( "net_serverClientTimeout", "40", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "client time out in seconds" );

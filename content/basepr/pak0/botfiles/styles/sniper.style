@@ -1,0 +1,52 @@
+// sniper.style
+//
+// Holds range for rifle scope shots and carefully placed Hider projectiles.
+
+style "sniper" {
+	description	"holds range and waits for a clean rifle shot"
+
+	set	combatRange		1400
+	set	aggression		0.28
+	set	patience		0.85
+	add	initiative		-0.25
+	set	targetStickiness	0.82
+	set	opportunism		1.00
+	set	vengefulness		0.20
+	set	suppressionMsec	0
+	set	strafeRhythmMsec	1000
+	set	strafeRhythmVarianceMsec	500
+	set	weaponSwitchMsec	800
+	set	aimHeight		0.10
+
+	scale	strafeChance		0.65
+	scale	jumpChance		0.55
+	add	rangeDiscipline		0.15
+	scale	aimSettleMsec		1.30
+	scale	fireConeDeg		0.70
+	scale	reactionMsec		1.08
+	scale	aimTrackTimeConst	0.85
+	add	retreatHealth		0.08
+	scale	itemFocus		1.10
+	scale	pursuit			0.70
+
+	weapon	"weaponobj_rifle"		2.00
+	weapon	"weaponobj_hiderweapon"		1.45
+	weapon	"weaponobj_bow"			1.20
+	weapon	"weaponobj_rocketlauncher"	0.85
+	weapon	"weaponobj_autocannon"		0.75
+	weapon	"weaponobj_soulstripper"	0.60
+	weapon	"weaponobj_crawlergrenade"	0.50
+	weapon	"weaponobj_wrench"		0.20
+
+	skill 1 {
+		scale	strafeChance		1.50
+		scale	combatRange		0.75
+	}
+	skill 2 {
+		scale	strafeChance		1.25
+	}
+	skill 5 {
+		scale	aimSettleMsec		1.10
+		add	aimLead			0.02
+	}
+}

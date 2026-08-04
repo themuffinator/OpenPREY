@@ -1131,6 +1131,14 @@ bool idRenderModelStatic::ConvertASEToModelSurfaces( const struct aseModel_s *as
 	return true;
 }
 
+static bool R_IsCollisionOnlyLwoMaterial( const idMaterial *material ) {
+	// SURF_COLLISION selects a preferred collision surface when a model mixes
+	// render and clip geometry; it is not required for collision admission.
+	// Retail player_clip materials instead use contents keywords alone.
+	return material != NULL && !material->IsDrawn() && !material->SurfaceCastsShadow() &&
+		( material->GetContentFlags() & CONTENTS_REMOVE_UTIL ) != 0;
+}
+
 /*
 =================
 idRenderModelStatic::ConvertLWOToModelSurfaces
@@ -1155,6 +1163,8 @@ bool idRenderModelStatic::ConvertLWOToModelSurfaces( const struct st_lwObject *l
 	int *			mergeTo;
 	byte			color[4];
 	modelSurface_t	surf, *modelSurf;
+	bool			warnedOversizedPolygon = false;
+	bool			allSurfacesAreCollisionOnly = true;
 
 	if ( !lwo ) {
 		return false;
@@ -1168,6 +1178,10 @@ bool idRenderModelStatic::ConvertLWOToModelSurfaces( const struct st_lwObject *l
 	// count the number of surfaces
 	i = 0;
 	for ( lwoSurf = lwo->surf; lwoSurf; lwoSurf = lwoSurf->next ) {
+		const idMaterial *material = declManager->FindMaterial( lwoSurf->name );
+		if ( !R_IsCollisionOnlyLwoMaterial( material ) ) {
+			allSurfacesAreCollisionOnly = false;
+		}
 		i++;
 	}
 
@@ -1256,7 +1270,12 @@ bool idRenderModelStatic::ConvertLWOToModelSurfaces( const struct st_lwObject *l
 			}
 		}
 	} else {
-		common->Warning( "ConvertLWOToModelSurfaces: model \'%s\' has bad or missing uv data", name.c_str() );
+		// Stock Prey collision hulls can intentionally omit texture coordinates.
+		// Keep diagnosing drawable, shadow-casting, and non-colliding surfaces: only
+		// a model whose every material is genuinely collision-only is exempt.
+		if ( !allSurfacesAreCollisionOnly ) {
+			common->Warning( "ConvertLWOToModelSurfaces: model \'%s\' has bad or missing uv data", name.c_str() );
+		}
 	  	numTVertexes = 1;
 		tvList = (idVec2 *)Mem_ClearedAlloc( numTVertexes * sizeof( tvList[0] ) );
 	}
@@ -1351,8 +1370,17 @@ bool idRenderModelStatic::ConvertLWOToModelSurfaces( const struct st_lwObject *l
 				continue;
 			}
 
-			if ( poly->nverts != 3 ) {
-				common->Warning( "ConvertLWOToModelSurfaces: model %s has too many verts for a poly! Make sure you triplet it down", name.c_str() );
+			// LightWave files may contain two-vertex line primitives alongside
+			// renderable faces.  They are authoring metadata, not malformed
+			// triangles, and can be skipped without a diagnostic.
+			if ( poly->nverts < 3 ) {
+				continue;
+			}
+			if ( poly->nverts > 3 ) {
+				if ( !warnedOversizedPolygon ) {
+					common->Warning( "ConvertLWOToModelSurfaces: model %s contains a polygon with more than three vertices; unsupported faces will be skipped", name.c_str() );
+					warnedOversizedPolygon = true;
+				}
 				continue;
 			}
 
@@ -1492,6 +1520,7 @@ idRenderModelStatic::ConvertLWOToASE
 struct aseModel_s *idRenderModelStatic::ConvertLWOToASE( const struct st_lwObject *obj, const char *fileName ) {
 	int j, k;
 	aseModel_t *ase;
+	bool warnedOversizedPolygon = false;
 
 	if ( !obj ) {
 		return NULL;
@@ -1580,8 +1609,14 @@ struct aseModel_s *idRenderModelStatic::ConvertLWOToASE( const struct st_lwObjec
 				continue;
 			}
 
-			if ( poly->nverts != 3 ) {
-				common->Warning( "ConvertLWOToASE: model %s has too many verts for a poly! Make sure you triplet it down", fileName );
+			if ( poly->nverts < 3 ) {
+				continue;
+			}
+			if ( poly->nverts > 3 ) {
+				if ( !warnedOversizedPolygon ) {
+					common->Warning( "ConvertLWOToASE: model %s contains a polygon with more than three vertices; unsupported faces will be skipped", fileName );
+					warnedOversizedPolygon = true;
+				}
 				continue;
 			}
 	

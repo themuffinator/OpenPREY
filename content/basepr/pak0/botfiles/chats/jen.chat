@@ -1,0 +1,297 @@
+// Jen: independent, grounded, practical, and direct.
+
+characterChat "Jen" {
+	chat entergame {
+		"Jen here. I'm ready."
+		"Let's start before anyone gets comfortable."
+		"I'm in. Keep up if you can."
+		"Everything works. That's good enough."
+		"Ready. Let's make our own luck."
+		"I'm set. Show me the map."
+		"Jen reporting, whether you asked or not."
+		"All right. Let's get to it."
+	}
+	chat levelstart {
+		"$map has options. I'm taking one."
+		"Look for the route nobody expects."
+		"Keep an exit behind you."
+		"Wide lanes, tight corners. Pick your problem."
+		"I'll stay mobile. You do what works."
+		"No point admiring $map. Move."
+		"Supplies first, heroics later."
+		"Watch the crossings. That's where they'll wait."
+	}
+	chat kill {
+		"You hesitated, $other."
+		"The $weapon was the practical choice."
+		"Found your weak side."
+		"You almost had that angle."
+		"One clean opening was enough."
+		"That's what staying mobile gets me."
+		"Sorry, $other. I needed the point."
+		"Picked the right moment."
+	}
+	chat killWrench {
+		"Didn't expect the wrench, did you?"
+		"Tools solve all kinds of problems."
+		"You got much too close, $other."
+		"That was cheaper than ammunition."
+		"A little blunt, but effective."
+		"Next time, give me some space."
+		"The wrench wins this argument."
+		"Close range works too."
+	}
+	chat killStreak {
+		"Three in a row. Stay useful, momentum."
+		"This pace suits me."
+		"Still moving, still scoring."
+		"I'm not slowing down now."
+		"Three good decisions."
+		"The route keeps paying off."
+		"Looks like I've got their timing."
+		"That makes three. Next problem."
+	}
+	chat revenge {
+		"Now we're even, $other."
+		"I fixed the mistake you found."
+		"Your last trick only worked once."
+		"I knew you'd try that route again."
+		"Consider that returned."
+		"You taught me where to look."
+		"I kept the receipt, $other."
+		"That answer was overdue."
+	}
+	chat death {
+		"Nice angle, $other."
+		"That $weapon ended the plan."
+		"I'm down. Don't make it dramatic."
+		"I stayed one second too long."
+		"Fair hit. I'll change routes."
+		"You read me correctly."
+		"That one hurt. Point taken."
+		"Resetting. Try it again next time."
+	}
+	chat deathAccident {
+		"I did that to myself. Great."
+		"Wrong step, obvious result."
+		"That shortcut needed more thought."
+		"Nobody saw that, right?"
+		"I trusted bad footing."
+		"Fine. Lesson learned."
+		"That was avoidable."
+		"I'll take the blame and a better route."
+	}
+	chat itemDenied {
+		"You grabbed the $item, $other. Good timing."
+		"I can manage without that pickup."
+		"The $item was useful, not essential."
+		"You beat me there by one turn."
+		"Fine. I'll take the next resource."
+		"That route belongs to $other for now."
+		"Missed it. Changing priorities."
+		"Keep the $item. I'll keep the pressure."
+	}
+	chat leadTaken {
+		"Lead's mine. I'm not parking here."
+		"First place, still moving."
+		"I'm ahead because I kept adapting."
+		"The score finally caught up."
+		"I've got first. Come change it."
+		"Advantage secured, for the moment."
+		"I'm leading. No victory speech."
+		"Good position. Better keep earning it."
+	}
+	chat leadLost {
+		"$other slipped ahead. I noticed."
+		"Lost the lead, not the map."
+		"All right. Time for a faster route."
+		"That advantage didn't last."
+		"I'm chasing now. Fine by me."
+		"First place moved. So will I."
+		"You got ahead, $other. Stay alert."
+		"The score says behind. I say close."
+	}
+	chat matchWin {
+		"Good match. We earned that."
+		"That's a result I can live with."
+		"Smart routes, clean finish."
+		"Victory without a rescue story. Perfect."
+		"That worked better than expected."
+		"Solid effort. I'll take it."
+		"We kept moving and it paid off."
+		"Nice work. Nobody overcomplicated it."
+	}
+	chat matchLose {
+		"Fair result. I made the wrong calls."
+		"You won this one. Enjoy it."
+		"I have a better route for next time."
+		"No excuses. I got outplayed."
+		"That loss was useful information."
+		"Good match. I'll adapt."
+		"Not the finish I wanted."
+		"I can fix what went wrong."
+	}
+	chat farewell {
+		"Jen signing off. Good games."
+		"I'm leaving before this gets sentimental."
+		"See you next match."
+		"That's my last round. Take care."
+		"I'm out. Try not to break anything."
+		"Enough for tonight."
+		"Good fight. I'm heading home."
+		"Later. Keep your options open."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Find cover first, $other. Then call the route."
+		"I'm coming. Don't stand where they expect."
+		"Fall back toward me and keep moving."
+		"Use the nearest exit. I'll meet you there."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. You made me work."
+		"That was worth the effort."
+		"Well played. The result felt fair."
+		"I'd take another match like that."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Pick a lane, $other. I'll be there."
+		"Confident talk. Let's test it."
+		"Sure. Just don't expect me to wait still."
+		"Challenge accepted. Keep up."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hey, $other. Good timing."
+		"Jen here. What did I miss?"
+		"Hello. Ready to get moving?"
+		"I heard you. Hi."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You're welcome. Use the advantage."
+		"Sure thing, $other."
+		"No problem. Just return the favor sometime."
+		"Happy to help. That's all."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thanks. The timing finally behaved."
+		"I'll take the compliment, $other."
+		"Good. I was hoping someone noticed."
+		"Appreciated. Your turn next."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"Accepted. Don't make me regret it."
+		"We're fine, $other. Keep going."
+		"Mistake noted and finished."
+		"Thanks for saying it. We're clear."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Later, $other. Take the smart route home."
+		"Goodbye. That was fun enough."
+		"See you next time. Stay independent."
+		"Good night. Don't wait around for trouble."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Jen"
+		trigger "hey Jen"
+		trigger "Jen help"
+		trigger "Jen hello"
+		trigger "Jen listen"
+		trigger "Jen there"
+		trigger "Jen answer"
+		trigger "Jen wait"
+		"What is it, $other?"
+		"Jen here. Go on."
+		"I'm paying attention."
+		"Say it straight."
+	}
+}

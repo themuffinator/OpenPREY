@@ -1,0 +1,299 @@
+// hunter.chat
+// Clipped, functional Sphere squad traffic. No invented language or jokes.
+
+characterChat "Hunter" {
+	chat entergame {
+		"Hunter deployed."
+		"Combat unit online."
+		"Entering the engagement."
+		"Hunter present. Begin sweep."
+		"Area contact expected."
+		"Weapons ready. Advancing."
+		"Deployment complete."
+		"Target search initiated."
+	}
+	chat levelstart {
+		"$map loaded. Sweep begins."
+		"Hold angles. Advance by cover."
+		"Map sector active."
+		"Check lanes. Expect contact."
+		"Movement order: forward."
+		"Establish firing lines."
+		"Locate opposition. Engage."
+		"Sector entry. Stay alert."
+	}
+	chat kill {
+		"$other eliminated."
+		"Target down by $weapon."
+		"Contact resolved."
+		"One hostile removed."
+		"Confirmed hit on $other."
+		"$weapon strike effective."
+		"Target neutralized. Continue."
+		"Firing lane clear."
+	}
+	chat killWrench {
+		"Close target suppressed."
+		"Wrench strike confirmed."
+		"$other entered reach."
+		"Contact range: zero."
+		"Melee response effective."
+		"Close engagement complete."
+		"$other breached the line."
+		"Direct strike. Target down."
+	}
+	chat killStreak {
+		"Three contacts removed."
+		"Engagement tempo maintained."
+		"Multiple targets down. Advance."
+		"Firing pattern effective."
+		"Hostile count reduced by three."
+		"Sweep proceeding without delay."
+		"Three confirmed. Search continues."
+		"Opposition line is breaking."
+	}
+	chat revenge {
+		"$other reacquired and removed."
+		"Previous contact resolved."
+		"Threat record closed."
+		"Correction delivered to $other."
+		"Repeat target neutralized."
+		"Earlier loss answered."
+		"Counter-engagement complete."
+		"$other no longer has initiative."
+	}
+	chat death {
+		"Unit down to $other."
+		"$weapon impact decisive."
+		"Hunter lost. Reinitializing."
+		"Contact won this exchange."
+		"Position compromised."
+		"$other achieved the hit."
+		"Combat unit interrupted."
+		"Respawn cycle required."
+	}
+	chat deathAccident {
+		"Movement error logged."
+		"Hazard misread."
+		"Route failure. Correcting."
+		"No hostile involved."
+		"Terrain error confirmed."
+		"Fault was internal."
+		"Bad vector. Resetting."
+		"Navigation correction pending."
+	}
+	chat itemDenied {
+		"$other secured the $item first."
+		"$item unavailable. Rerouting."
+		"Resource denied. Continue mission."
+		"Pickup lost to $other."
+		"Alternative supply required."
+		"Resource timing missed."
+		"$item claim failed."
+		"Enemy controls that resource."
+	}
+	chat leadTaken {
+		"Lead established. Maintain pressure."
+		"Hunter holds first position."
+		"Score advantage confirmed."
+		"Opposition trails. Continue sweep."
+		"Control achieved. Do not pause."
+		"Current combat lead secured."
+		"First position acquired."
+		"Advantage belongs to this unit."
+	}
+	chat leadLost {
+		"Lead transferred to $other."
+		"Score deficit detected."
+		"First position lost. Recover it."
+		"Opposition advanced. Increase pressure."
+		"Control slipped. Re-engage."
+		"Hunter now pursuing the leader."
+		"Advantage lost, not final."
+		"$other leads temporarily."
+	}
+	chat matchWin {
+		"Mission result: victory."
+		"Opposition defeated."
+		"Combat objective secured."
+		"Final score confirms success."
+		"Sweep complete. Hunter prevails."
+		"Engagement concluded in our favor."
+		"Victory recorded."
+		"All objectives for this match met."
+	}
+	chat matchLose {
+		"Mission result: defeat."
+		"Opposition earned this outcome."
+		"Combat objective lost."
+		"Failure recorded. Adaptation follows."
+		"Final score unfavorable."
+		"Hunter performance insufficient."
+		"Engagement lost. Data retained."
+		"Withdraw and correct."
+	}
+	chat farewell {
+		"Hunter leaving combat."
+		"Deployment terminated."
+		"Unit withdrawing."
+		"Combat link closing."
+		"Hunter signing off."
+		"Sweep ended."
+		"Exiting the engagement."
+		"Unit offline."
+	}
+	// Common intent triggers stay stable across characters; responses carry voice.
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "can anyone help"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		trigger "assist me"
+		"Assistance request received, $other."
+		"Take cover. Support is moving."
+		"Hold position if viable."
+		"Backup response initiated."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Acknowledged. Effective engagement."
+		"Match quality acceptable, $other."
+		"Well fought."
+		"Competition recognized."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"Challenge registered. Locating $other."
+		"Remain visible."
+		"Engagement accepted."
+		"Your transmission exposed intent."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "whats up"
+		"Hunter acknowledges $other."
+		"Contact recognized."
+		"Greeting received."
+		"Communications open."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "appreciate it"
+		trigger "cheers"
+		trigger "thanks a lot"
+		"Acknowledgment received."
+		"No response required, $other."
+		"Assistance was tactical."
+		"Continue the objective."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Positive assessment received."
+		"Weapon result was within tolerance."
+		"Acknowledged, $other."
+		"Combat execution confirmed."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "that was my fault"
+		trigger "i messed up"
+		"Error acknowledged. Proceed."
+		"Correction matters more than apology."
+		"Incident closed, $other."
+		"Return attention to combat."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "take care"
+		"Departure noted, $other."
+		"End communication."
+		"Leave the sector safely."
+		"Hunter acknowledges your withdrawal."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Hunter"
+		trigger "Hunter respond"
+		trigger "Hunter report"
+		trigger "Hunter status"
+		trigger "Hunter listen"
+		trigger "Hunter answer"
+		trigger "Hunter come in"
+		trigger "Hunter are you there"
+		"Hunter receiving, $other."
+		"State your request."
+		"Report follows when required."
+		"This unit is listening."
+	}
+}

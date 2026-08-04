@@ -11,6 +11,7 @@ import sys
 import uuid
 from pathlib import Path
 from types import ModuleType
+from zipfile import ZIP_STORED, ZipFile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +42,13 @@ VALIDATOR = load_module("openprey_validation_hardening_test", ROOT / "tools" / "
 def write_file(path: Path, data: bytes = b"x\n") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
+
+
+def write_pk4(path: Path, entries: tuple[str, ...] = ("manifest.txt",)) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with ZipFile(path, "w", compression=ZIP_STORED) as archive:
+        for entry in entries:
+            archive.writestr(entry, b"x\n")
 
 
 def expect_validation_error(callback, text: str, label: str) -> None:
@@ -591,12 +599,25 @@ def validate_windows_unified_staged_payload() -> None:
         game_dir / "game_x64.dll",
         game_dir / "game_x64.pdb",
         game_dir / "mod.json",
-        game_dir / "pak0.pk4",
-        game_dir / "pak1.pk4",
     ):
         write_file(path)
+    write_pk4(game_dir / "pak0.pk4")
+    write_pk4(game_dir / "pak1.pk4")
 
     with_host_flags(True, False, False, lambda: VALIDATOR.validate_staged_payload(root, dry_run=False))
+
+    write_pk4(game_dir / "pak0.pk4", ("script/map_roadhouse_quick.script",))
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_payload(root, dry_run=False),
+            "development-only roadhouse_quick fixture",
+            "roadhouse_quick fixture in staged PK4",
+        ),
+    )
+    write_pk4(game_dir / "pak0.pk4")
 
     split_module = game_dir / "game-mp_x64.dll"
     write_file(split_module)
@@ -762,7 +783,6 @@ def validate_validation_wiring() -> None:
         )
     expected_api_v7_deferrals = {
         "demo_playback.py",
-        "mp_bot_characters.py",
         "mp_bot_navigation.py",
         "multiview_demo.py",
     }

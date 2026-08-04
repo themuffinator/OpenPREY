@@ -622,15 +622,30 @@ idSoundHardware_OpenAL::idSoundHardware_OpenAL()
 }
 
 bool idSoundHardware_OpenAL::IsDefaultDeviceChoiceValue( const char* deviceName ) {
-	return deviceName != NULL && idStr::Icmp( deviceName, OPENQ4_AUDIO_DEVICE_DEFAULT_CHOICE ) == 0;
+	if( deviceName == NULL )
+	{
+		return true;
+	}
+
+	idStr choice = deviceName;
+	choice.StripLeading( ' ' );
+	choice.StripTrailingWhitespace();
+	return choice.IsEmpty() ||
+		idStr::Icmp( choice.c_str(), OPENQ4_AUDIO_DEVICE_DEFAULT_CHOICE ) == 0 ||
+		idStr::Icmp( choice.c_str(), "default" ) == 0 ||
+		idStr::Icmp( choice.c_str(), "system default" ) == 0 ||
+		idStr::Icmp( choice.c_str(), "<system default>" ) == 0;
 }
 
 idStr idSoundHardware_OpenAL::NormalizeRequestedDeviceName( const char* deviceName ) {
-	if( deviceName == NULL || IsDefaultDeviceChoiceValue( deviceName ) ) {
+	if( IsDefaultDeviceChoiceValue( deviceName ) ) {
 		return "";
 	}
 
-	return deviceName;
+	idStr normalized = deviceName;
+	normalized.StripLeading( ' ' );
+	normalized.StripTrailingWhitespace();
+	return normalized;
 }
 
 idStr idSoundHardware_OpenAL::SanitizeDeviceLabel( const char* deviceName ) {

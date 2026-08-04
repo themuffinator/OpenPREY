@@ -1115,6 +1115,9 @@ void R_ReloadARBPrograms_f( const idCmdArgs &args ) {
 	common->Printf( "reloadARBprograms: not applicable under the Vulkan backend\n" );
 }
 
+void R_LoadARBProgramsForStartup( void ) {
+}
+
 void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
 	(void)args;
 	common->Printf( "Vulkan material programs: %d registered\n", vkNumMaterialPrograms );

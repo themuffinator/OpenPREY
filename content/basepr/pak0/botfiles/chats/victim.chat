@@ -1,0 +1,297 @@
+// Victim: quiet, vigilant, and agentic; survival informs the voice without defining its worth.
+
+characterChat "Victim" {
+	chat entergame {
+		"I'm here. I choose what happens next."
+		"Ready. I'll keep an exit open."
+		"I made it in. Now I move."
+		"Stay alert. I intend to last."
+		"I'm set. No wasted steps."
+		"This match does not decide who I am."
+		"Ready to act, not wait."
+		"I have a route. Begin."
+	}
+	chat levelstart {
+		"$map has cover. Use it with purpose."
+		"Find the exits before the pressure arrives."
+		"I will move where I can choose the fight."
+		"No blind corners. No careless pauses."
+		"The safe route is the one I control."
+		"Watch the center; I will take the edge."
+		"Resources matter, but a clear retreat matters too."
+		"On $map, I decide when to be seen."
+	}
+	chat kill {
+		"I saw the opening and took it, $other."
+		"The $weapon kept the distance I needed."
+		"You pressed. I answered."
+		"That route was mine to defend."
+		"I did not freeze this time."
+		"One threat handled. Keep moving."
+		"You expected retreat and found resistance."
+		"The choice was mine, and it worked."
+	}
+	chat killWrench {
+		"You forced the distance closed. I held."
+		"The wrench gave me the answer at hand."
+		"Too near, $other. I will defend my space."
+		"I did not yield the corner."
+		"Close range does not mean no options."
+		"I kept my footing and finished the exchange."
+		"You stepped within reach. I acted."
+		"The last line of defense was enough."
+	}
+	chat killStreak {
+		"Three threats passed. I remain."
+		"The plan is holding under pressure."
+		"Three points from choosing the moment."
+		"I can keep control of this pace."
+		"No panic. Three clean decisions."
+		"The route stays secure."
+		"Momentum belongs to the one still moving."
+		"Third exchange won. Stay focused."
+	}
+	chat revenge {
+		"You found me once, $other. Not again."
+		"I remembered the danger and changed the outcome."
+		"That earlier loss does not own the next moment."
+		"I returned prepared to choose the terms."
+		"We met again on terms I chose."
+		"I learned your approach and stopped it."
+		"The old mistake ends here."
+		"This time, I kept the way out."
+	}
+	chat death {
+		"You got through, $other. I will reset."
+		"The $weapon found the opening I left."
+		"I lost that exchange, not my resolve."
+		"The route failed. I can choose another."
+		"I stayed too long. Next time, I move."
+		"That point is yours. The next is undecided."
+		"I was caught, but I am not finished."
+		"Good angle. I will not offer it twice."
+	}
+	chat deathAccident {
+		"I misread the hazard. That is mine to correct."
+		"Bad footing. I still choose the next route."
+		"No one forced that step."
+		"The edge was hidden, not inevitable."
+		"I took a risk without checking it."
+		"That path failed. Cross it off."
+		"A mistake ended the run; a lesson starts the next."
+		"I will return with the ground mapped."
+	}
+	chat itemDenied {
+		"You reached the $item first, $other. I have alternatives."
+		"The pickup is gone. My route remains mine."
+		"I will not overextend for one $item."
+		"Resource denied. I keep the safer position."
+		"You won that timing. I choose the next cycle."
+		"No pickup is worth surrendering every exit."
+		"I arrived late and left on my own terms."
+		"The $item can wait; control cannot."
+	}
+	chat leadTaken {
+		"I am ahead because I kept my choices open."
+		"First place. I will not give away the route."
+		"The lead is mine to defend calmly."
+		"I moved in front without standing still."
+		"The score reflects every careful escape."
+		"I hold the lead and the next decision."
+		"Top position. Pressure does not change the plan."
+		"I survived the chase and passed the field."
+	}
+	chat leadLost {
+		"Someone moved ahead. I still have options."
+		"The lead is gone, not the match."
+		"I can recover without chasing blindly."
+		"First place changed. My route will change too."
+		"I fell behind. I will not rush into a trap."
+		"The score shifted; my control remains."
+		"A setback is information, not a command."
+		"I choose patience over a desperate pursuit."
+	}
+	chat matchWin {
+		"I made my own way through that match."
+		"Good game. Care and action carried the result."
+		"The win is mine because I kept deciding."
+		"I held every important route long enough."
+		"Final score secured. I am still standing by choice."
+		"A quiet plan reached a strong finish."
+		"Well played. I earned the space to win."
+		"The match is over, and I leave on my terms."
+	}
+	chat matchLose {
+		"You won. I still chose how I fought."
+		"Good game. I can learn without surrendering ground."
+		"The score is settled; my next move is not."
+		"I lost the round and kept my resolve."
+		"Well played. You closed the routes I needed."
+		"No shame in a result faced clearly."
+		"I will use this loss, not carry it."
+		"The match ends here. I decide where to begin again."
+	}
+	chat farewell {
+		"I'm leaving because I choose to. Good games."
+		"The exits are clear. I am going now."
+		"Enough for today. I kept my ground."
+		"Goodbye. Keep your choices open."
+		"I am done with this match, not diminished by it."
+		"Until next time, stay aware."
+		"I will take the quiet route out."
+		"This session ends on my terms."
+	}
+	reply help {
+		priority 40
+		source any
+		addressed either
+		trigger "help me"
+		trigger "need help"
+		trigger "medic"
+		trigger "need a medic"
+		trigger "need health"
+		trigger "need armor"
+		trigger "cover me"
+		trigger "need backup"
+		"Keep your nearest exit open, $other. I am coming."
+		"Move to cover you can leave; I will meet you there."
+		"I can help. Do not let the pressure choose your route."
+		"Stay mobile. I will clear a path across $map."
+	}
+	reply goodGame {
+		priority 30
+		source any
+		addressed either
+		trigger "gg"
+		trigger "ggwp"
+		trigger "good game"
+		trigger "great game"
+		trigger "good match"
+		trigger "great match"
+		trigger "well played"
+		trigger "good games"
+		"Good game, $other. Every choice felt earned."
+		"Well played. The pressure never made it careless."
+		"A fair match on $map. I respect the result."
+		"Good games. We each made our own way through."
+	}
+	reply challenge {
+		priority 25
+		source any
+		addressed either
+		trigger "bring it"
+		trigger "come get me"
+		trigger "fight me"
+		trigger "try me"
+		trigger "come on then"
+		trigger "you suck"
+		trigger "noob"
+		trigger "ez"
+		"You may challenge me, $other. You do not choose my response."
+		"Come closer if you wish. I decide where I stand."
+		"Noise does not control me. The match can answer."
+		"I accept, but I will fight on ground I choose."
+	}
+	reply greeting {
+		priority 20
+		source any
+		addressed either
+		trigger "hi"
+		trigger "hello"
+		trigger "hey"
+		trigger "greetings"
+		trigger "good morning"
+		trigger "good evening"
+		trigger "howdy"
+		trigger "yo"
+		"Hello, $other. Keep a clear way out."
+		"I hear you. I am ready."
+		"Greetings. May your choices stay your own."
+		"Good evening. I will see you across $map."
+	}
+	reply thanks {
+		priority 20
+		source any
+		addressed either
+		trigger "thanks"
+		trigger "thank you"
+		trigger "thx"
+		trigger "ty"
+		trigger "much appreciated"
+		trigger "cheers"
+		trigger "thanks a lot"
+		trigger "thank you very much"
+		"You are welcome, $other. Keep the advantage."
+		"Acknowledged. Use the opening while it is yours."
+		"No debt. We each decide to help."
+		"I am glad the choice was useful."
+	}
+	reply praise {
+		priority 20
+		source any
+		addressed either
+		trigger "nice shot"
+		trigger "good shot"
+		trigger "great shot"
+		trigger "nice kill"
+		trigger "good kill"
+		trigger "nice one"
+		trigger "well done"
+		trigger "good work"
+		"Thank you, $other. I waited for my opening."
+		"I appreciate that. The decision was deliberate."
+		"Noted. I kept control of the angle."
+		"Your praise is heard; my focus stays forward."
+	}
+	reply apology {
+		priority 20
+		source any
+		addressed either
+		trigger "sorry"
+		trigger "my bad"
+		trigger "apologies"
+		trigger "oops"
+		trigger "whoops"
+		trigger "forgive me"
+		trigger "didn't mean that"
+		trigger "pardon me"
+		"I accept the apology, $other. Respect the boundary next time."
+		"We can move on because I choose not to carry it."
+		"Thank you for acknowledging the mistake."
+		"Understood. Let the next action show the correction."
+	}
+	reply farewell {
+		priority 20
+		source any
+		addressed either
+		trigger "bye"
+		trigger "goodbye"
+		trigger "good night"
+		trigger "gtg"
+		trigger "gotta go"
+		trigger "see ya"
+		trigger "see you later"
+		trigger "later"
+		"Goodbye, $other. Leave by the route you trust."
+		"Good night. May the quiet be yours."
+		"See you again, when you decide to return."
+		"Farewell. Keep control of your next step."
+	}
+	reply direct {
+		priority 0
+		source any
+		addressed required
+		trigger "Victim"
+		trigger "hey Victim"
+		trigger "Victim help"
+		trigger "Victim hello"
+		trigger "Victim listen"
+		trigger "Victim there"
+		trigger "Victim answer"
+		trigger "Victim wait"
+		"I hear the name, $other. Speak to me, not the label."
+		"I am here. Say what you need."
+		"Listening, by my own choice."
+		"You have my attention. Use it with respect."
+	}
+}

@@ -47,6 +47,10 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include <cmath>
 #include <cstdint>
 
+#if defined(OPENQ4_SDL3_DARWIN_HOST)
+extern "C" bool Sys_MacOSGetWindowChrome(void *nativeWindow, int *top, int *left, int *bottom, int *right);
+#endif
+
 #if defined(OPENQ4_SDL3_POSIX_HOST)
 struct PosixSDL3Compat_t {
 	void *hWnd;
@@ -83,8 +87,8 @@ struct PosixSDL3Compat_t {
 		, smpData(NULL)
 		, wglErrors(0)
 		, in_mouse("in_mouse", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "enable mouse input")
-		, win_xpos("win_xpos", "50", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "horizontal position of window")
-		, win_ypos("win_ypos", "50", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "vertical position of window") {
+		, win_xpos("win_xpos", "50", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "horizontal position of the window's outer frame")
+		, win_ypos("win_ypos", "50", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "vertical position of the window's outer frame") {
 	}
 };
 
@@ -331,14 +335,21 @@ static sdl3VideoDriver_t s_sdlVideoDriver = SDL3_VIDEO_DRIVER_UNKNOWN;
 static char s_sdlVideoDriverName[32] = "unknown";
 
 typedef struct {
-	int x;
-	int y;
+	int frameX;
+	int frameY;
 	int width;
 	int height;
 	bool valid;
 } sdl3WindowedPlacement_t;
 
 static sdl3WindowedPlacement_t s_windowedPlacement = { 0, 0, 0, 0, false };
+
+typedef struct {
+	int top;
+	int left;
+	int bottom;
+	int right;
+} sdl3WindowChrome_t;
 
 void* GLimp_ExtensionPointer(const char* name);
 
@@ -3186,23 +3197,109 @@ static bool SDL3_GetVirtualDisplayBounds(SDL_Rect &bounds) {
 }
 
 static bool SDL3_RectsOverlap(const SDL_Rect &a, const SDL_Rect &b) {
-	const int overlapLeft = (a.x > b.x) ? a.x : b.x;
-	const int overlapTop = (a.y > b.y) ? a.y : b.y;
-	const int overlapRight = ((a.x + a.w) < (b.x + b.w)) ? (a.x + a.w) : (b.x + b.w);
-	const int overlapBottom = ((a.y + a.h) < (b.y + b.h)) ? (a.y + a.h) : (b.y + b.h);
+	const int64_t aRight = static_cast<int64_t>(a.x) + static_cast<int64_t>(a.w);
+	const int64_t aBottom = static_cast<int64_t>(a.y) + static_cast<int64_t>(a.h);
+	const int64_t bRight = static_cast<int64_t>(b.x) + static_cast<int64_t>(b.w);
+	const int64_t bBottom = static_cast<int64_t>(b.y) + static_cast<int64_t>(b.h);
+	const int64_t overlapLeft = (a.x > b.x) ? a.x : b.x;
+	const int64_t overlapTop = (a.y > b.y) ? a.y : b.y;
+	const int64_t overlapRight = (aRight < bRight) ? aRight : bRight;
+	const int64_t overlapBottom = (aBottom < bBottom) ? aBottom : bBottom;
 	return overlapRight > overlapLeft && overlapBottom > overlapTop;
 }
 
-static bool SDL3_WindowRectIntersectsAnyDisplay(int x, int y, int width, int height) {
+static sdl3WindowChrome_t SDL3_GetWindowChrome(void) {
+	sdl3WindowChrome_t chrome = { 0, 0, 0, 0 };
+	if (!s_sdlWindow) {
+		return chrome;
+	}
+
+	const SDL_WindowFlags flags = SDL_GetWindowFlags(s_sdlWindow);
+	if ((flags & (SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN)) != 0) {
+		return chrome;
+	}
+
+	int top = 0;
+	int left = 0;
+	int bottom = 0;
+	int right = 0;
+	bool haveChrome = SDL_GetWindowBordersSize(s_sdlWindow, &top, &left, &bottom, &right);
+#if defined(OPENQ4_SDL3_DARWIN_HOST)
+	if (!haveChrome) {
+		const SDL_PropertiesID props = SDL_GetWindowProperties(s_sdlWindow);
+		void *nativeWindow = props != 0
+			? SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL)
+			: NULL;
+		haveChrome = nativeWindow != NULL &&
+			Sys_MacOSGetWindowChrome(nativeWindow, &top, &left, &bottom, &right);
+	}
+#endif
+	if (!haveChrome) {
+		// Some compositors do not report decorations until the window has been
+		// shown. The post-show reconciliation path queries them again.
+		return chrome;
+	}
+
+	chrome.top = (top > 0) ? top : 0;
+	chrome.left = (left > 0) ? left : 0;
+	chrome.bottom = (bottom > 0) ? bottom : 0;
+	chrome.right = (right > 0) ? right : 0;
+	return chrome;
+}
+
+static void SDL3_GetWindowFrameFromClient(
+	int clientX,
+	int clientY,
+	int clientWidth,
+	int clientHeight,
+	const sdl3WindowChrome_t &chrome,
+	SDL_Rect &frame) {
+	frame.x = clientX - chrome.left;
+	frame.y = clientY - chrome.top;
+	frame.w = clientWidth + chrome.left + chrome.right;
+	frame.h = clientHeight + chrome.top + chrome.bottom;
+}
+
+static void SDL3_GetWindowClientPosition(
+	int frameX,
+	int frameY,
+	const sdl3WindowChrome_t &chrome,
+	int &clientX,
+	int &clientY) {
+	clientX = frameX + chrome.left;
+	clientY = frameY + chrome.top;
+}
+
+static SDL_DisplayID SDL3_GetDisplayForWindowFrame(
+	int frameX,
+	int frameY,
+	int clientWidth,
+	int clientHeight,
+	const sdl3WindowChrome_t &chrome) {
+	if (clientWidth <= 0 || clientHeight <= 0) {
+		return 0;
+	}
+
+	SDL_Rect frame;
+	frame.x = frameX;
+	frame.y = frameY;
+	frame.w = clientWidth + chrome.left + chrome.right;
+	frame.h = clientHeight + chrome.top + chrome.bottom;
+	return SDL_GetDisplayForRect(&frame);
+}
+
+static bool SDL3_WindowFrameIntersectsAnyDisplay(int frameX, int frameY, int clientWidth, int clientHeight, const sdl3WindowChrome_t &chrome) {
+	SDL_Rect windowFrame;
+	windowFrame.x = frameX;
+	windowFrame.y = frameY;
+	windowFrame.w = clientWidth + chrome.left + chrome.right;
+	windowFrame.h = clientHeight + chrome.top + chrome.bottom;
+
+	const int width = windowFrame.w;
+	const int height = windowFrame.h;
 	if (width <= 0 || height <= 0) {
 		return false;
 	}
-
-	SDL_Rect windowRect;
-	windowRect.x = x;
-	windowRect.y = y;
-	windowRect.w = width;
-	windowRect.h = height;
 
 	int displayCount = 0;
 	SDL_DisplayID *displays = SDL_GetDisplays(&displayCount);
@@ -3216,7 +3313,7 @@ static bool SDL3_WindowRectIntersectsAnyDisplay(int x, int y, int width, int hei
 	bool intersects = false;
 	for (int i = 0; i < displayCount; ++i) {
 		SDL_Rect displayBounds;
-		if (SDL_GetDisplayBounds(displays[i], &displayBounds) && SDL3_RectsOverlap(windowRect, displayBounds)) {
+		if (SDL_GetDisplayBounds(displays[i], &displayBounds) && SDL3_RectsOverlap(windowFrame, displayBounds)) {
 			intersects = true;
 			break;
 		}
@@ -3234,61 +3331,59 @@ static int SDL3_ClampWindowDimension(int value, int minValue, int maxValue) {
 	return idMath::ClampInt(effectiveMin, maxValue, value);
 }
 
-static void SDL3_ConstrainWindowRectToBounds(int &x, int &y, int &width, int &height, const SDL_Rect &bounds, bool recenterIfOutside) {
-	width = SDL3_ClampWindowDimension(width, 320, bounds.w);
-	height = SDL3_ClampWindowDimension(height, 240, bounds.h);
+static void SDL3_ConstrainWindowFrameToBounds(
+	int &frameX,
+	int &frameY,
+	int &clientWidth,
+	int &clientHeight,
+	const sdl3WindowChrome_t &chrome,
+	const SDL_Rect &bounds,
+	bool recenterIfOutside) {
+	const int horizontalChrome = chrome.left + chrome.right;
+	const int verticalChrome = chrome.top + chrome.bottom;
+	const int maxClientWidth = (bounds.w > horizontalChrome) ? bounds.w - horizontalChrome : 1;
+	const int maxClientHeight = (bounds.h > verticalChrome) ? bounds.h - verticalChrome : 1;
 
-	const int maxX = bounds.x + bounds.w - width;
-	const int maxY = bounds.y + bounds.h - height;
+	clientWidth = SDL3_ClampWindowDimension(clientWidth, 320, maxClientWidth);
+	clientHeight = SDL3_ClampWindowDimension(clientHeight, 240, maxClientHeight);
 
-	if (maxX < bounds.x) {
-		x = bounds.x;
+	const int frameWidth = clientWidth + horizontalChrome;
+	const int frameHeight = clientHeight + verticalChrome;
+	const int maxFrameX = bounds.x + bounds.w - frameWidth;
+	const int maxFrameY = bounds.y + bounds.h - frameHeight;
+
+	if (maxFrameX < bounds.x) {
+		frameX = bounds.x;
 	} else {
-		if (recenterIfOutside && (x < bounds.x || x > maxX)) {
-			x = bounds.x + ((bounds.w - width) / 2);
+		if (recenterIfOutside && (frameX < bounds.x || frameX > maxFrameX)) {
+			frameX = bounds.x + ((bounds.w - frameWidth) / 2);
 		}
-		x = idMath::ClampInt(bounds.x, maxX, x);
+		frameX = idMath::ClampInt(bounds.x, maxFrameX, frameX);
 	}
 
-	if (maxY < bounds.y) {
-		y = bounds.y;
+	if (maxFrameY < bounds.y) {
+		frameY = bounds.y;
 	} else {
-		if (recenterIfOutside && (y < bounds.y || y > maxY)) {
-			y = bounds.y + ((bounds.h - height) / 2);
+		if (recenterIfOutside && (frameY < bounds.y || frameY > maxFrameY)) {
+			frameY = bounds.y + ((bounds.h - frameHeight) / 2);
 		}
-		y = idMath::ClampInt(bounds.y, maxY, y);
+		frameY = idMath::ClampInt(bounds.y, maxFrameY, frameY);
 	}
 }
 
 static void SDL3_GetWindowPositionOnDisplay(SDL_DisplayID display, int width, int height, int &targetX, int &targetY) {
-	targetX = win32.win_xpos.GetInteger();
-	targetY = win32.win_ypos.GetInteger();
+	int frameX = win32.win_xpos.GetInteger();
+	int frameY = win32.win_ypos.GetInteger();
+	const sdl3WindowChrome_t chrome = SDL3_GetWindowChrome();
 
-	if (display == 0) {
-		return;
-	}
-
-	SDL_Rect bounds;
-	if (!SDL_GetDisplayBounds(display, &bounds)) {
-		return;
-	}
-
-	if (r_screen.GetInteger() >= 0) {
-		const int maxX = bounds.x + bounds.w - width;
-		const int maxY = bounds.y + bounds.h - height;
-
-		if (maxX < bounds.x) {
-			targetX = bounds.x;
-		} else {
-			targetX = idMath::ClampInt(bounds.x, maxX, targetX);
-		}
-
-		if (maxY < bounds.y) {
-			targetY = bounds.y;
-		} else {
-			targetY = idMath::ClampInt(bounds.y, maxY, targetY);
+	if (display != 0 && r_screen.GetInteger() >= 0) {
+		SDL_Rect bounds;
+		if (SDL_GetDisplayBounds(display, &bounds)) {
+			SDL3_ConstrainWindowFrameToBounds(frameX, frameY, width, height, chrome, bounds, true);
 		}
 	}
+
+	SDL3_GetWindowClientPosition(frameX, frameY, chrome, targetX, targetY);
 }
 
 static bool SDL3_SetWindowPositionCompat(int x, int y, SDL_DisplayID display, bool centerOnWayland, const char *description) {
@@ -3605,13 +3700,70 @@ static void SDL3_UpdateFullWindowViewport(int pixelWidth, int pixelHeight) {
 	SDL3_SetUIViewport( 0, 0, pixelWidth, pixelHeight );
 }
 
-static void SDL3_RecordWindowedPlacement(int x, int y, int width, int height) {
+static bool SDL3_ConstrainCurrentWindowFrameToDisplay(SDL_DisplayID display, bool recenterIfOutside) {
+	if (!s_sdlWindow || display == 0 || !SDL3_UseAbsoluteWindowPlacement()) {
+		return false;
+	}
+
+	const SDL_WindowFlags flags = SDL_GetWindowFlags(s_sdlWindow);
+	if ((flags & (SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_HIDDEN |
+		SDL_WINDOW_MINIMIZED | SDL_WINDOW_MAXIMIZED)) != 0) {
+		return false;
+	}
+
+	SDL_Rect bounds;
+	if (!SDL3_GetDisplayWindowedPlacementBounds(display, bounds)) {
+		return false;
+	}
+
+	int clientX = 0;
+	int clientY = 0;
+	int clientWidth = 0;
+	int clientHeight = 0;
+	if (!SDL_GetWindowPosition(s_sdlWindow, &clientX, &clientY) ||
+		!SDL_GetWindowSize(s_sdlWindow, &clientWidth, &clientHeight) ||
+		clientWidth <= 0 || clientHeight <= 0) {
+		return false;
+	}
+
+	const sdl3WindowChrome_t chrome = SDL3_GetWindowChrome();
+	SDL_Rect frame;
+	SDL3_GetWindowFrameFromClient(clientX, clientY, clientWidth, clientHeight, chrome, frame);
+
+	int constrainedClientWidth = clientWidth;
+	int constrainedClientHeight = clientHeight;
+	SDL3_ConstrainWindowFrameToBounds(
+		frame.x,
+		frame.y,
+		constrainedClientWidth,
+		constrainedClientHeight,
+		chrome,
+		bounds,
+		recenterIfOutside);
+
+	int constrainedClientX = 0;
+	int constrainedClientY = 0;
+	SDL3_GetWindowClientPosition(frame.x, frame.y, chrome, constrainedClientX, constrainedClientY);
+
+	const bool sizeChanged = constrainedClientWidth != clientWidth || constrainedClientHeight != clientHeight;
+	const bool positionChanged = constrainedClientX != clientX || constrainedClientY != clientY;
+	if (sizeChanged && !SDL_SetWindowSize(s_sdlWindow, constrainedClientWidth, constrainedClientHeight)) {
+		common->Printf("SDL3: failed to resize window within the display work area: %s\n", SDL_GetError());
+	}
+	if (positionChanged && !SDL_SetWindowPosition(s_sdlWindow, constrainedClientX, constrainedClientY)) {
+		common->Printf("SDL3: failed to move window frame within the display work area: %s\n", SDL_GetError());
+	}
+
+	return sizeChanged || positionChanged;
+}
+
+static void SDL3_RecordWindowedPlacement(int frameX, int frameY, int width, int height) {
 	if (width <= 0 || height <= 0) {
 		return;
 	}
 
-	s_windowedPlacement.x = x;
-	s_windowedPlacement.y = y;
+	s_windowedPlacement.frameX = frameX;
+	s_windowedPlacement.frameY = frameY;
 	s_windowedPlacement.width = width;
 	s_windowedPlacement.height = height;
 	s_windowedPlacement.valid = true;
@@ -3621,9 +3773,11 @@ static void SDL3_SnapshotCurrentWindowedPlacement(void) {
 	if (!s_sdlWindow || win32.cdsFullscreen || r_borderless.GetBool() || !SDL3_UseAbsoluteWindowPlacement()) {
 		return;
 	}
-	if ((SDL_GetWindowFlags(s_sdlWindow) & SDL_WINDOW_FULLSCREEN) != 0) {
+	const SDL_WindowFlags flags = SDL_GetWindowFlags(s_sdlWindow);
+	if ((flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_MAXIMIZED)) != 0) {
 		// OS-initiated fullscreen (not tracked by win32.cdsFullscreen) must
-		// never be recorded as a windowed placement.
+		// never be recorded as a windowed placement. Keep the normal frame
+		// while hidden, minimized, or maximized as well.
 		return;
 	}
 
@@ -3632,7 +3786,10 @@ static void SDL3_SnapshotCurrentWindowedPlacement(void) {
 	int width = 0;
 	int height = 0;
 	if (SDL_GetWindowPosition(s_sdlWindow, &x, &y) && SDL_GetWindowSize(s_sdlWindow, &width, &height)) {
-		SDL3_RecordWindowedPlacement(x, y, width, height);
+		const sdl3WindowChrome_t chrome = SDL3_GetWindowChrome();
+		SDL_Rect frame;
+		SDL3_GetWindowFrameFromClient(x, y, width, height, chrome, frame);
+		SDL3_RecordWindowedPlacement(frame.x, frame.y, width, height);
 	}
 }
 
@@ -3654,20 +3811,30 @@ static void SDL3_RefreshWindowPlacement(void) {
 	// button) never set win32.cdsFullscreen, and persisting the fullscreen
 	// space's forced move/resize would corrupt the saved windowed placement.
 	const bool windowIsFullscreen = (windowFlags & SDL_WINDOW_FULLSCREEN) != 0;
-	const bool canPersistWindowedPlacement = !windowIsHidden && !windowIsFullscreen && !win32.cdsFullscreen && !s_screenParmTransitionActive;
+	const bool windowIsMinimized = (windowFlags & SDL_WINDOW_MINIMIZED) != 0;
+	const bool windowIsMaximized = (windowFlags & SDL_WINDOW_MAXIMIZED) != 0;
 	const bool isWindowedResizable = !r_borderless.GetBool();
+	const bool canPersistWindowedPlacement = !windowIsHidden && !windowIsFullscreen &&
+		!windowIsMinimized && !windowIsMaximized && !win32.cdsFullscreen &&
+		!s_screenParmTransitionActive && isWindowedResizable;
 
 	const bool haveWindowPosition = SDL_GetWindowPosition(s_sdlWindow, &x, &y);
+	const bool haveWindowSize = SDL_GetWindowSize(s_sdlWindow, &width, &height);
+	const sdl3WindowChrome_t chrome = SDL3_GetWindowChrome();
+	SDL_Rect frame = { x, y, width, height };
+	if (haveWindowPosition && haveWindowSize) {
+		SDL3_GetWindowFrameFromClient(x, y, width, height, chrome, frame);
+	}
+
 	if (haveWindowPosition && canPersistWindowedPlacement && SDL3_UseAbsoluteWindowPlacement()) {
-		win32.win_xpos.SetInteger(x);
-		win32.win_ypos.SetInteger(y);
+		win32.win_xpos.SetInteger(frame.x);
+		win32.win_ypos.SetInteger(frame.y);
 		win32.win_xpos.ClearModified();
 		win32.win_ypos.ClearModified();
 	}
 
-	const bool haveWindowSize = SDL_GetWindowSize(s_sdlWindow, &width, &height);
 	if (haveWindowSize && canPersistWindowedPlacement) {
-		if (isWindowedResizable && width > 0 && height > 0) {
+		if (width > 0 && height > 0) {
 			r_windowWidth.SetInteger(width);
 			r_windowHeight.SetInteger(height);
 			r_windowWidth.ClearModified();
@@ -3675,8 +3842,8 @@ static void SDL3_RefreshWindowPlacement(void) {
 		}
 	}
 
-	if (canPersistWindowedPlacement && isWindowedResizable && haveWindowPosition && haveWindowSize && SDL3_UseAbsoluteWindowPlacement()) {
-		SDL3_RecordWindowedPlacement(x, y, width, height);
+	if (canPersistWindowedPlacement && haveWindowPosition && haveWindowSize && SDL3_UseAbsoluteWindowPlacement()) {
+		SDL3_RecordWindowedPlacement(frame.x, frame.y, width, height);
 	}
 
 	if (!SDL_GetWindowSizeInPixels(s_sdlWindow, &pixelWidth, &pixelHeight)) {
@@ -4017,23 +4184,47 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 		} else {
 			int restoredWidth = parms.width;
 			int restoredHeight = parms.height;
-			int restoredX = win32.win_xpos.GetInteger();
-			int restoredY = win32.win_ypos.GetInteger();
+			int restoredFrameX = win32.win_xpos.GetInteger();
+			int restoredFrameY = win32.win_ypos.GetInteger();
 
 			if (s_windowedPlacement.valid) {
 				restoredWidth = s_windowedPlacement.width;
 				restoredHeight = s_windowedPlacement.height;
-				restoredX = s_windowedPlacement.x;
-				restoredY = s_windowedPlacement.y;
+				restoredFrameX = s_windowedPlacement.frameX;
+				restoredFrameY = s_windowedPlacement.frameY;
 			}
 
-			const bool needsRecoveryPlacement = !SDL3_WindowRectIntersectsAnyDisplay(restoredX, restoredY, restoredWidth, restoredHeight);
+			const sdl3WindowChrome_t chrome = SDL3_GetWindowChrome();
+			if (r_screen.GetInteger() < 0 && SDL3_UseAbsoluteWindowPlacement()) {
+				const SDL_DisplayID restoredDisplay = SDL3_GetDisplayForWindowFrame(
+					restoredFrameX,
+					restoredFrameY,
+					restoredWidth,
+					restoredHeight,
+					chrome);
+				if (restoredDisplay != 0) {
+					display = restoredDisplay;
+				}
+			}
+			const bool needsRecoveryPlacement = !SDL3_WindowFrameIntersectsAnyDisplay(
+				restoredFrameX,
+				restoredFrameY,
+				restoredWidth,
+				restoredHeight,
+				chrome);
 			bool constrainedToDisplay = false;
 			if (display != 0) {
 				SDL_Rect bounds;
 				if (SDL3_GetDisplayWindowedPlacementBounds(display, bounds)) {
 					const bool recenterIfOutside = (r_screen.GetInteger() >= 0) || needsRecoveryPlacement;
-					SDL3_ConstrainWindowRectToBounds(restoredX, restoredY, restoredWidth, restoredHeight, bounds, recenterIfOutside);
+					SDL3_ConstrainWindowFrameToBounds(
+						restoredFrameX,
+						restoredFrameY,
+						restoredWidth,
+						restoredHeight,
+						chrome,
+						bounds,
+						recenterIfOutside);
 					constrainedToDisplay = true;
 				}
 			}
@@ -4047,8 +4238,9 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 				common->Printf("SDL3: failed to resize window: %s\n", SDL_GetError());
 			}
 
-			int targetX = restoredX;
-			int targetY = restoredY;
+			int targetX = 0;
+			int targetY = 0;
+			SDL3_GetWindowClientPosition(restoredFrameX, restoredFrameY, chrome, targetX, targetY);
 
 			(void)SDL3_SetWindowPositionCompat(
 				targetX,
@@ -4075,6 +4267,12 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 
 	if (!parms.hiddenWindow) {
 		SDL3_SyncWindowAfterScreenChange(parms.fullScreen ? "fullscreen change" : "windowed change");
+		if (!parms.fullScreen && !useBorderlessWindow &&
+			SDL3_ConstrainCurrentWindowFrameToDisplay(display, r_screen.GetInteger() >= 0)) {
+			// X11 decorations may not be known until the first show/composite.
+			// Reconcile once more now that the actual frame extents are available.
+			SDL3_SyncWindowAfterScreenChange("window chrome reconciliation");
+		}
 	}
 	s_screenParmTransitionActive = false;
 	SDL3_RefreshWindowPlacement();
@@ -4151,6 +4349,10 @@ static void SDL3_HandleDisplayEvent(const SDL_DisplayEvent &event) {
 		SDL3_DisplayEventName(event.type),
 		static_cast<unsigned int>(event.displayID));
 	SDL3_InitDesktopMode();
+	const SDL_DisplayID targetDisplay = SDL3_ResolveTargetDisplay(false).id;
+	if (SDL3_ConstrainCurrentWindowFrameToDisplay(targetDisplay, false)) {
+		SDL3_SyncWindowAfterScreenChange("display work-area change");
+	}
 	SDL3_RefreshWindowPlacement();
 	SDL3_InvalidateMenuMouseRouting();
 	SDL3_UpdateCursorVisibility();
@@ -4218,6 +4420,9 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 		case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
 		case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 			SDL3_InitDesktopMode();
+			if (SDL3_ConstrainCurrentWindowFrameToDisplay(SDL3_ResolveTargetDisplay(false).id, false)) {
+				SDL3_SyncWindowAfterScreenChange("window display/scale change");
+			}
 			SDL3_RefreshWindowPlacement();
 			SDL3_InvalidateMenuMouseRouting();
 			SDL3_UpdateCursorVisibility();
@@ -4250,6 +4455,13 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 			if (session != NULL) {
 				session->SetPlayingSoundWorld();
 			}
+			break;
+
+		case SDL_EVENT_WINDOW_MAXIMIZED:
+			// Update the drawable size, but SDL3_RefreshWindowPlacement keeps the
+			// normal frame/client geometry intact while maximized.
+			SDL3_RefreshWindowPlacement();
+			SDL3_InvalidateMenuMouseRouting();
 			break;
 
 		case SDL_EVENT_WINDOW_RESIZED:
@@ -5680,22 +5892,49 @@ static bool SDL3_WindowServices_CreateWindowForFramebuffer(const renderFramebuff
 		s_sdlWindowSurfaceKind = requestedSurfaceKind;
 
 		if (!parms->fullScreen && !parms->hiddenWindow) {
-			int targetX = win32.win_xpos.GetInteger();
-			int targetY = win32.win_ypos.GetInteger();
+			int targetFrameX = win32.win_xpos.GetInteger();
+			int targetFrameY = win32.win_ypos.GetInteger();
 			int targetWidth = parms->width;
 			int targetHeight = parms->height;
+			const sdl3WindowChrome_t chrome = SDL3_GetWindowChrome();
 
-			const sdl3DisplaySelection_t selectedDisplay = SDL3_ResolveTargetDisplay(false);
+			sdl3DisplaySelection_t selectedDisplay = SDL3_ResolveTargetDisplay(false);
+			if (r_screen.GetInteger() < 0 && SDL3_UseAbsoluteWindowPlacement()) {
+				const SDL_DisplayID savedDisplay = SDL3_GetDisplayForWindowFrame(
+					targetFrameX,
+					targetFrameY,
+					targetWidth,
+					targetHeight,
+					chrome);
+				if (savedDisplay != 0) {
+					selectedDisplay.id = savedDisplay;
+				}
+			}
 			if (selectedDisplay.id != 0) {
 				SDL_Rect bounds;
 				if (SDL3_GetDisplayWindowedPlacementBounds(selectedDisplay.id, bounds)) {
-					const bool needsRecoveryPlacement = !SDL3_WindowRectIntersectsAnyDisplay(targetX, targetY, targetWidth, targetHeight);
+					const bool needsRecoveryPlacement = !SDL3_WindowFrameIntersectsAnyDisplay(
+						targetFrameX,
+						targetFrameY,
+						targetWidth,
+						targetHeight,
+						chrome);
 					const bool recenterIfOutside = (r_screen.GetInteger() >= 0) || needsRecoveryPlacement;
-					SDL3_ConstrainWindowRectToBounds(targetX, targetY, targetWidth, targetHeight, bounds, recenterIfOutside);
+					SDL3_ConstrainWindowFrameToBounds(
+						targetFrameX,
+						targetFrameY,
+						targetWidth,
+						targetHeight,
+						chrome,
+						bounds,
+						recenterIfOutside);
 				}
 			}
 
 			(void)SDL_SetWindowSize(s_sdlWindow, targetWidth, targetHeight);
+			int targetX = 0;
+			int targetY = 0;
+			SDL3_GetWindowClientPosition(targetFrameX, targetFrameY, chrome, targetX, targetY);
 			(void)SDL3_SetWindowPositionCompat(
 				targetX,
 				targetY,
