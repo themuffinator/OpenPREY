@@ -547,7 +547,7 @@ void idLexer::CreatePunctuationTable( const punctuation_t *punctuations ) {
 		newp = &punctuations[i];
 		lastp = -1;
 		//sort the punctuations in this table entry on length (longer punctuations first)
-		for (n = idLexer::punctuationtable[(unsigned int) newp->p[0]]; n >= 0; n = idLexer::nextpunctuation[n] ) {
+		for (n = idLexer::punctuationtable[(unsigned char) newp->p[0]]; n >= 0; n = idLexer::nextpunctuation[n] ) {
 			p = &punctuations[n];
 			if (strlen(p->p) < strlen(newp->p)) {
 				idLexer::nextpunctuation[i] = n;
@@ -555,7 +555,7 @@ void idLexer::CreatePunctuationTable( const punctuation_t *punctuations ) {
 					idLexer::nextpunctuation[lastp] = i;
 				}
 				else {
-					idLexer::punctuationtable[(unsigned int) newp->p[0]] = i;
+					idLexer::punctuationtable[(unsigned char) newp->p[0]] = i;
 				}
 				break;
 			}
@@ -567,7 +567,7 @@ void idLexer::CreatePunctuationTable( const punctuation_t *punctuations ) {
 				idLexer::nextpunctuation[lastp] = i;
 			}
 			else {
-				idLexer::punctuationtable[(unsigned int) newp->p[0]] = i;
+				idLexer::punctuationtable[(unsigned char) newp->p[0]] = i;
 			}
 		}
 	}
