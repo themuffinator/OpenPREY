@@ -47,7 +47,7 @@ extern "C" {
 #define qglXSwapBuffers glXSwapBuffers
 #endif
 
-idCVar sys_videoRam( "sys_videoRam", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Texture memory on the video card (in megabytes) - 0: autodetect", 0, 512 );
+idCVar sys_videoRam( "sys_videoRam", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Texture memory on the video card (in megabytes) - 0: autodetect", 0, 16384 );
 
 Display *dpy = NULL;
 static int scrnum = 0;
