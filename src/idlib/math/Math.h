@@ -357,14 +357,13 @@ ID_INLINE float idMath::InvSqrt16( float x ) {
 }
 
 ID_INLINE float idMath::InvSqrt( float x ) {
-	dword a = ((union _flint*)(&x))->i;
-	union _flint seed;
+	uint32_t a = std::bit_cast<uint32_t>( x );
 
 	assert( initialized );
 
 	double y = x * 0.5f;
-	seed.i = (( ( (3*EXP_BIAS-1) - ( (a >> EXP_POS) & 0xFF) ) >> 1)<<EXP_POS) | iSqrt[(a >> (EXP_POS-LOOKUP_BITS)) & LOOKUP_MASK];
-	double r = seed.f;
+	uint32_t seedBits = (( ( (3*EXP_BIAS-1) - ( (a >> EXP_POS) & 0xFF) ) >> 1)<<EXP_POS) | iSqrt[(a >> (EXP_POS-LOOKUP_BITS)) & LOOKUP_MASK];
+	double r = std::bit_cast<float>( seedBits );
 	r = r * ( 1.5f - r * r * y );
 	r = r * ( 1.5f - r * r * y );
 	return (float) r;
@@ -390,7 +389,7 @@ ID_INLINE float idMath::Sqrt16( float x ) {
 }
 
 ID_INLINE float idMath::Sqrt( float x ) {
-	return x * InvSqrt( x );
+	return sqrtf( x );
 }
 
 ID_INLINE double idMath::Sqrt64( float x ) {
