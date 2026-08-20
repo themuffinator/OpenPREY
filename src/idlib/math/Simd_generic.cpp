@@ -2634,7 +2634,7 @@ void VPCALL idSIMD_Generic::DeriveTangents( idPlane * RESTRICT planes, idDrawVer
 	idPlane * RESTRICT planesPtr = planes;
 	for ( i = 0; i < numIndexes; i += 3 ) {
 		idDrawVert * RESTRICT a, * RESTRICT b, * RESTRICT c;
-		unsigned long signBit;
+		uint32_t signBit;
 		float d0[5], d1[5], f, area;
 		idVec3 n, t0, t1;
 
@@ -2675,7 +2675,7 @@ void VPCALL idSIMD_Generic::DeriveTangents( idPlane * RESTRICT planes, idDrawVer
 
 		// area sign bit
 		area = d0[3] * d1[4] - d0[4] * d1[3];
-		signBit = ( *(unsigned long *)&area ) & ( 1 << 31 );
+		signBit = std::bit_cast<uint32_t>( area ) & ( 1u << 31 );
 
 		// first tangent
 		t0[0] = d0[0] * d1[4] - d0[4] * d1[0];
@@ -2683,7 +2683,7 @@ void VPCALL idSIMD_Generic::DeriveTangents( idPlane * RESTRICT planes, idDrawVer
 		t0[2] = d0[2] * d1[4] - d0[4] * d1[2];
 
 		f = idMath::RSqrt( t0.x * t0.x + t0.y * t0.y + t0.z * t0.z );
-		*(unsigned long *)&f ^= signBit;
+		f = std::bit_cast<float>( std::bit_cast<uint32_t>( f ) ^ signBit );
 
 		t0.x *= f;
 		t0.y *= f;
@@ -2695,7 +2695,7 @@ void VPCALL idSIMD_Generic::DeriveTangents( idPlane * RESTRICT planes, idDrawVer
 		t1[2] = d0[3] * d1[2] - d0[2] * d1[3];
 
 		f = idMath::RSqrt( t1.x * t1.x + t1.y * t1.y + t1.z * t1.z );
-		*(unsigned long *)&f ^= signBit;
+		f = std::bit_cast<float>( std::bit_cast<uint32_t>( f ) ^ signBit );
 
 		t1.x *= f;
 		t1.y *= f;
