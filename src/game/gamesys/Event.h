@@ -23,7 +23,7 @@ Event are used for scheduling tasks and for linking script commands.
 #define D_EVENT_TRACE				't'
 
 #define MAX_EVENTS					4096
-#define E_EVENT_SIZEOF_VEC			((sizeof(idVec3) + (sizeof(intptr_t) - 1)) & ~(sizeof(intptr_t) - 1))
+#define E_EVENT_SIZEOF_VEC			sizeof(idVec3)
 
 //HUMANHEAD: aob - needed for networking to send the least amount of bits
 extern const int MAX_EVENTS_NUM_BITS;
