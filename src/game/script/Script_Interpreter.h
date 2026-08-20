@@ -37,7 +37,7 @@ private:
 	public://HUMANHEAD: aob - so we can pass parms in manually
 	void				PushString( const char *string );
 	void				PushVector( const idVec3 &vector );
-	void				Push( intptr_t value );
+	void				Push( int value );
 	private://HUMANHEAD: aob - undo the public declaration
 	const char			*FloatToString( float value );
 	void				AppendString( idVarDef *def, const char *from );
@@ -116,12 +116,12 @@ ID_INLINE void idInterpreter::PopParms( int numParms ) {
 idInterpreter::Push
 ====================
 */
-ID_INLINE void idInterpreter::Push( intptr_t value ) {
-	if ( localstackUsed + sizeof( intptr_t ) > LOCALSTACK_SIZE ) {
+ID_INLINE void idInterpreter::Push( int value ) {
+	if ( localstackUsed + sizeof( int ) > LOCALSTACK_SIZE ) {
 		Error( "Push: locals stack overflow\n" );
 	}
-	*( intptr_t * )&localstack[ localstackUsed ]	= value;
-	localstackUsed += sizeof( intptr_t );
+	*( int * )&localstack[ localstackUsed ]	= value;
+	localstackUsed += sizeof( int );
 }
 
 /*
