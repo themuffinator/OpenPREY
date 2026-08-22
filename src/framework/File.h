@@ -248,6 +248,7 @@ private:
 };
 
 
+
 class idFile_InZip : public idFile {
 	friend class			idFileSystemLocal;
 
@@ -272,6 +273,13 @@ private:
 	int						zipFilePos;		// zip file info position in pak
 	int						fileSize;		// size of the file
 	void *					z;				// unzip info
+
+	// Read-ahead cache for compressed PK4 entries. Many legacy parsers
+	// perform tiny 1-4 byte reads, which are expensive through zlib.
+	byte *					readCache;
+	int						readCacheStart;
+	int						readCacheLength;
+	int						logicalPos;
 };
 
 #endif /* !__FILE_H__ */

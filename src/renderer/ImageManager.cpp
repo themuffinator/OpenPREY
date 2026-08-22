@@ -826,23 +826,38 @@ idImageManager::LoadLevelImages
 ===============
 */
 int idImageManager::LoadLevelImages( bool pacifier ) {
-	int	loadCount = 0;
-	for ( int i = 0 ; i < images.Num() ; i++ ) {
+	int loadCount = 0;
+	int pendingAssetQueueAdvance = 0;
+
+	for ( int i = 0; i < images.Num(); i++ ) {
 		if ( pacifier ) {
 			//common->UpdateLevelLoadPacifier();
-
 		}
 
-		idImage	*image = images[ i ];
+		idImage *image = images[ i ];
+
 		if ( image->generatorFunction ) {
 			continue;
 		}
+
 		if ( image->levelLoadReferenced && !image->IsLoaded() ) {
 			loadCount++;
+
 			image->ActuallyLoadImage( false );
-			session->AdvanceLoadingAssetQueue( 1 );
+
+			pendingAssetQueueAdvance++;
+
+			if ( pendingAssetQueueAdvance >= 32 ) {
+				session->AdvanceLoadingAssetQueue( pendingAssetQueueAdvance );
+				pendingAssetQueueAdvance = 0;
+			}
 		}
 	}
+
+	if ( pendingAssetQueueAdvance > 0 ) {
+		session->AdvanceLoadingAssetQueue( pendingAssetQueueAdvance );
+	}
+
 	return loadCount;
 }
 

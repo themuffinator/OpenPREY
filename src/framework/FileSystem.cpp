@@ -1396,6 +1396,15 @@ const char *idFileSystemLocal::BuildOSPath( const char *base, const char *game, 
 				}
 			}
 
+			// Original Prey retail content contains a RoadHouse directory with
+			// uppercase characters. On case-sensitive systems we already fix
+			// these paths to lowercase below, so don't warn for this known
+			// shipped-content case.
+			if ( relativePath != NULL &&
+				 idStr::Icmpn( relativePath, "models/mapobjects/RoadHouse/", 28 ) == 0 ) {
+				warn = false;
+			}
+
 			if ( warn ) {
 				common->Warning( "Non-portable: path contains uppercase characters: %s", testPath.c_str() );
 			}

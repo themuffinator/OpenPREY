@@ -1071,7 +1071,7 @@ int idFile_Permanent::Read( void *buffer, int len ) {
 	int		read;
 	byte *	buf;
 	int		tries;
-	static const int readChunkBytes = 64 * 1024;
+	static const int readChunkBytes = 4 * 1024 * 1024;
 
 	if ( !(mode & ( 1 << FS_READ ) ) ) {
 		common->FatalError( "idFile_Permanent::Read: %s not opened in read mode", name.c_str() );
@@ -1088,6 +1088,7 @@ int idFile_Permanent::Read( void *buffer, int len ) {
 	tries = 0;
 	while( remaining ) {
 		block = Min( remaining, readChunkBytes );
+
 		read = fread( buf, 1, block, o );
 		if ( read == 0 ) {
 			// we might have been trying to read from a CD, which
@@ -1263,6 +1264,11 @@ idFile_InZip::idFile_InZip( void ) {
 	zipFilePos = 0;
 	fileSize = 0;
 	memset( &z, 0, sizeof( z ) );
+
+	readCache = NULL;
+	readCacheStart = 0;
+	readCacheLength = 0;
+	logicalPos = 0;
 }
 
 /*
@@ -1271,6 +1277,11 @@ idFile_InZip::~idFile_InZip
 =================
 */
 idFile_InZip::~idFile_InZip( void ) {
+	if ( readCache != NULL ) {
+		Mem_Free( readCache );
+		readCache = NULL;
+	}
+
 	unzCloseCurrentFile( z );
 	unzClose( z );
 }
@@ -1284,29 +1295,113 @@ Properly handles partial reads
 */
 int idFile_InZip::Read( void *buffer, int len ) {
 	static const int readChunkBytes = 64 * 1024;
-	byte *buf = static_cast<byte *>( buffer );
+
+	byte *out = static_cast<byte *>( buffer );
 	int totalRead = 0;
 
-	while ( totalRead < len ) {
-		const int block = Min( len - totalRead, readChunkBytes );
-		const int l = unzReadCurrentFile( z, buf + totalRead, block );
-
-		if ( l <= 0 ) {
-			// Preserve error behavior for the first failed read.
-			if ( totalRead == 0 ) {
-				return l;
-			}
-			break;
-		}
-
-		totalRead += l;
-		fileSystem->AddToReadCount( l );
-
-		if ( l < block ) {
-			break;
-		}
+	if ( len <= 0 ) {
+		return 0;
 	}
 
+	if ( readCache == NULL ) {
+		readCache = static_cast<byte *>( Mem_Alloc( readChunkBytes ) );
+		readCacheStart = 0;
+		readCacheLength = 0;
+	}
+
+	while ( totalRead < len && logicalPos < fileSize ) {
+
+		// Serve data already available in the read-ahead cache.
+		if ( logicalPos >= readCacheStart &&
+			 logicalPos < readCacheStart + readCacheLength ) {
+
+			const int cacheOffset = logicalPos - readCacheStart;
+			const int cacheAvailable = readCacheLength - cacheOffset;
+			const int copyBytes = Min( len - totalRead, cacheAvailable );
+
+			memcpy( out + totalRead, readCache + cacheOffset, copyBytes );
+
+			totalRead += copyBytes;
+			logicalPos += copyBytes;
+			continue;
+		}
+
+		const int remaining = len - totalRead;
+
+		// If this is already a large sequential read, avoid the extra
+		// cache copy and read straight into the caller's buffer.
+		if ( remaining >= readChunkBytes && unztell( z ) == logicalPos ) {
+			const int block = Min( remaining, readChunkBytes );
+			const int l = unzReadCurrentFile( z, out + totalRead, block );
+
+			if ( l <= 0 ) {
+				if ( totalRead == 0 ) {
+					return l;
+				}
+				break;
+			}
+
+			totalRead += l;
+			logicalPos += l;
+			fileSystem->AddToReadCount( l );
+
+			readCacheLength = 0;
+
+			if ( l < block ) {
+				break;
+			}
+
+			continue;
+		}
+
+		// The underlying ZIP stream normally sits at the end of the
+		// previous read-ahead block. If the logical position differs,
+		// reposition it before filling a new cache block.
+		if ( unztell( z ) != logicalPos ) {
+			unzSetCurrentFileInfoPosition( z, zipFilePos );
+			unzCloseCurrentFile( z );
+			unzOpenCurrentFile( z );
+
+			if ( logicalPos > 0 ) {
+				byte skipBuffer[ 32 * 1024 ];
+				int left = logicalPos;
+
+				while ( left > 0 ) {
+					const int block = Min( left, (int)sizeof( skipBuffer ) );
+					const int l = unzReadCurrentFile( z, skipBuffer, block );
+
+					if ( l <= 0 ) {
+						readCacheLength = 0;
+						goto ZipReadDone;
+					}
+
+					left -= l;
+				}
+			}
+		}
+
+		readCacheStart = logicalPos;
+
+		const int cacheRequest = Min(
+			readChunkBytes,
+			fileSize - logicalPos
+		);
+
+		readCacheLength = unzReadCurrentFile(
+			z,
+			readCache,
+			cacheRequest
+		);
+
+		if ( readCacheLength <= 0 ) {
+			readCacheLength = 0;
+			break;
+		}
+
+		fileSystem->AddToReadCount( readCacheLength );
+	}
+
+ZipReadDone:
 	return totalRead;
 }
 
@@ -1344,7 +1439,7 @@ idFile_InZip::Tell
 =================
 */
 int idFile_InZip::Tell( void ) {
-	return unztell( z );
+	return logicalPos;
 }
 
 /*
@@ -1375,36 +1470,103 @@ idFile_InZip::Seek
 #define ZIP_SEEK_BUF_SIZE	(1<<15)
 
 int idFile_InZip::Seek( long offset, fsOrigin_t origin ) {
-	int res, i;
-	char *buf;
+	static const int seekBufferSize = 32 * 1024;
 
-	switch( origin ) {
-		case FS_SEEK_END: {
-			offset = fileSize - offset;
-		}
-		case FS_SEEK_SET: {
-			// set the file position in the zip file (also sets the current file info)
-			unzSetCurrentFileInfoPosition( z, zipFilePos );
-			unzOpenCurrentFile( z );
-			if ( offset <= 0 ) {
-				return 0;
-			}
-		}
-		case FS_SEEK_CUR: {
-			buf = (char *) _alloca16( ZIP_SEEK_BUF_SIZE );
-			for ( i = 0; i < ( offset - ZIP_SEEK_BUF_SIZE ); i += ZIP_SEEK_BUF_SIZE ) {
-				res = unzReadCurrentFile( z, buf, ZIP_SEEK_BUF_SIZE );
-				if ( res < ZIP_SEEK_BUF_SIZE ) {
-					return -1;
-				}
-			}
-			res = i + unzReadCurrentFile( z, buf, offset - i );
-			return ( res == offset ) ? 0 : -1;
-		}
-		default: {
-			common->FatalError( "idFile_InZip::Seek: bad origin for %s\n", name.c_str() );
+	long target;
+
+	switch ( origin ) {
+		case FS_SEEK_SET:
+			target = offset;
 			break;
+
+		case FS_SEEK_CUR:
+			target = logicalPos + offset;
+			break;
+
+		case FS_SEEK_END:
+			// Preserve the engine's historical semantics here:
+			// positive offset means backwards from EOF.
+			target = fileSize - offset;
+			break;
+
+		default:
+			common->FatalError(
+				"idFile_InZip::Seek: bad origin for %s\n",
+				name.c_str()
+			);
+			return -1;
+	}
+
+	if ( target < 0 ) {
+		target = 0;
+	}
+
+	if ( target > fileSize ) {
+		target = fileSize;
+	}
+
+	int result = 0;
+
+	// The common case after read-ahead: seek somewhere inside the
+	// already-decompressed cache. This requires no ZIP work at all.
+	if ( target >= readCacheStart &&
+		 target <= readCacheStart + readCacheLength ) {
+
+		logicalPos = static_cast<int>( target );
+	} else {
+		const int underlyingPos = unztell( z );
+
+		// If the ZIP stream already happens to be at the requested
+		// position, simply update the logical position.
+		if ( underlyingPos == target ) {
+			logicalPos = static_cast<int>( target );
+			readCacheLength = 0;
+		} else {
+			unzSetCurrentFileInfoPosition( z, zipFilePos );
+			unzCloseCurrentFile( z );
+
+			if ( unzOpenCurrentFile( z ) != UNZ_OK ) {
+				result = -1;
+				goto ZipSeekDone;
+			}
+
+			byte *skipBuffer = static_cast<byte *>(
+				Mem_Alloc( seekBufferSize )
+			);
+
+			long left = target;
+
+			while ( left > 0 ) {
+				const int block = Min(
+					(int)left,
+					seekBufferSize
+				);
+
+				const int l = unzReadCurrentFile(
+					z,
+					skipBuffer,
+					block
+				);
+
+				if ( l <= 0 ) {
+					result = -1;
+					break;
+				}
+
+				left -= l;
+			}
+
+			Mem_Free( skipBuffer );
+
+			if ( result == 0 ) {
+				logicalPos = static_cast<int>( target );
+			}
+
+			readCacheLength = 0;
+			readCacheStart = logicalPos;
 		}
 	}
-	return -1;
+
+ZipSeekDone:
+	return result;
 }

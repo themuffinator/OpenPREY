@@ -177,9 +177,36 @@ idSoundSample_OpenAL::LoadGeneratedSound
 bool idSoundSample_OpenAL::LoadGeneratedSample( const idStr& filename )
 {
 #if 1
-	idFileLocal fileIn( fileSystem->OpenFileRead( filename ) );
-	if( fileIn != NULL )
+
+	idFileLocal sourceFile( fileSystem->OpenFileRead( filename ) );
+
+	if( sourceFile != NULL )
 	{
+		const int sourceLength = sourceFile->Length();
+
+		if( sourceLength <= 0 )
+		{
+			return false;
+		}
+
+		char* sourceData = (char*)Mem_Alloc( sourceLength );
+
+		const int sourceRead = sourceFile->Read( sourceData, sourceLength );
+
+		if( sourceRead != sourceLength )
+		{
+			Mem_Free( sourceData );
+			return false;
+		}
+
+		idFile_Memory memoryFile(
+			filename.c_str(),
+			(const char*)sourceData,
+			sourceLength
+		);
+
+		idFile* fileIn = &memoryFile;
+
 		uint32 magic;
 		fileIn->ReadBig( magic );
 		fileIn->ReadBig( timestamp );
@@ -195,14 +222,20 @@ bool idSoundSample_OpenAL::LoadGeneratedSample( const idStr& filename )
 		fileIn->ReadBig( totalBufferSize );
 		fileIn->ReadBig( num );
 		buffers.SetNum( num );
+
 		for( int i = 0; i < num; i++ )
 		{
 			fileIn->ReadBig( buffers[ i ].numSamples );
 			fileIn->ReadBig( buffers[ i ].bufferSize );
+
 			buffers[ i ].buffer = AllocBuffer( buffers[ i ].bufferSize, GetName() );
 			fileIn->Read( buffers[ i ].buffer, buffers[ i ].bufferSize );
+
 			buffers[ i ].buffer = GPU_CONVERT_CPU_TO_CPU_CACHED_READONLY_ADDRESS( buffers[ i ].buffer );
 		}
+
+		Mem_Free( sourceData );
+
 		return true;
 	}
 #endif
@@ -291,15 +324,33 @@ void idSoundSample_OpenAL::LoadResource()
 			{
 				loaded = false;
 			}
+			// Prefer the generated decoded cache when available.
+			if( !loaded )
+			{
+				loaded = LoadGeneratedSample( generatedName );
+			}
 
+			// Fall back to the original OGG. If it decodes successfully,
+			// save the decoded sample so later loads can skip Vorbis decode.
 			if( !loaded )
 			{
 				loaded = LoadOgg( oggName );
+
+				if( loaded )
+				{
+					idFile* fileOut = fileSystem->OpenFileWrite( generatedName );
+
+					if( fileOut != NULL )
+					{
+						WriteGeneratedSample( fileOut );
+						delete fileOut;
+					}
+				}
 			}
 
 			if( !loaded )
 			{
-				loaded = LoadGeneratedSample( generatedName ) || LoadWav( wavName );
+				loaded = LoadWav( wavName );
 			}
 
 			if( !loaded && !preferRoQ )
