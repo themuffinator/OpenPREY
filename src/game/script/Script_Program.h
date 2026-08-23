@@ -489,6 +489,7 @@ private:
 	idStaticList<function_t,MAX_FUNCS>			functions;
 	idStaticList<statement_t,MAX_STATEMENTS>	statements;
 	idList<idTypeDef *>							types;
+	idHashIndex									typeNameHash;
 	idList<idVarDefName *>						varDefNames;
 	idHashIndex									varDefNameHash;
 	idList<idVarDef *>							varDefs;
