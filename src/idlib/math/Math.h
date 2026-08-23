@@ -2,6 +2,9 @@
 #ifndef __MATH_MATH_H__
 #define __MATH_MATH_H__
 
+#include <bit>
+#include <cstdint>
+
 /*
 ===============================================================================
 
@@ -49,18 +52,18 @@
 #define	ANGLE2BYTE(x)			( idMath::FtoiFast( (x) * 256.0f / 360.0f ) & 255 )
 #define	BYTE2ANGLE(x)			( (x) * ( 360.0f / 256.0f ) )
 
-#define FLOATSIGNBITSET(f)		((*(const unsigned long *)&(f)) >> 31)
-#define FLOATSIGNBITNOTSET(f)	((~(*(const unsigned long *)&(f))) >> 31)
-#define FLOATNOTZERO(f)			((*(const unsigned long *)&(f)) & ~(1<<31) )
-#define INTSIGNBITSET(i)		(((const unsigned long)(i)) >> 31)
-#define INTSIGNBITNOTSET(i)		((~((const unsigned long)(i))) >> 31)
+#define FLOATSIGNBITSET(f)        (std::bit_cast<uint32_t>(f) >> 31)
+#define FLOATSIGNBITNOTSET(f)     ((~std::bit_cast<uint32_t>(f)) >> 31)
+#define FLOATNOTZERO(f)           (std::bit_cast<uint32_t>(f) & ~(1u << 31))
+#define INTSIGNBITSET(i)          (static_cast<uint32_t>(i) >> 31)
+#define INTSIGNBITNOTSET(i)       ((~static_cast<uint32_t>(i)) >> 31)
 
-#define	FLOAT_IS_NAN(x)			(((*(const unsigned long *)&x) & 0x7f800000) == 0x7f800000)
-#define FLOAT_IS_INF(x)			(((*(const unsigned long *)&x) & 0x7fffffff) == 0x7f800000)
-#define FLOAT_IS_INVALID(x)		( FLOAT_IS_NAN( x ) || FLOAT_IS_INF( x ) )
-#define FLOAT_IS_IND(x)			((*(const unsigned long *)&x) == 0xffc00000)
-#define	FLOAT_IS_DENORMAL(x)	(((*(const unsigned long *)&x) & 0x7f800000) == 0x00000000 && \
-								 ((*(const unsigned long *)&x) & 0x007fffff) != 0x00000000 )
+#define FLOAT_IS_NAN(x)           ((std::bit_cast<uint32_t>(x) & 0x7f800000u) == 0x7f800000u)
+#define FLOAT_IS_INF(x)           ((std::bit_cast<uint32_t>(x) & 0x7fffffffu) == 0x7f800000u)
+#define FLOAT_IS_INVALID(x)       (FLOAT_IS_NAN(x) || FLOAT_IS_INF(x))
+#define FLOAT_IS_IND(x)           (std::bit_cast<uint32_t>(x) == 0xffc00000u)
+#define FLOAT_IS_DENORMAL(x)      (((std::bit_cast<uint32_t>(x) & 0x7f800000u) == 0x00000000u) && \
+                                   ((std::bit_cast<uint32_t>(x) & 0x007fffffu) != 0x00000000u))
 
 #define IEEE_FLT_MANTISSA_BITS	23
 #define IEEE_FLT_EXPONENT_BITS	8
@@ -219,7 +222,7 @@ public:
 	static float				Rint( float f );			// returns the nearest integer
 	static int					Ftoi( float f );			// float to int conversion
 	static int					FtoiFast( float f );		// fast float to int conversion but uses current FPU round mode (default round nearest)
-	static unsigned long		Ftol(float f);			// float to long conversion
+	static unsigned int		Ftol(float f);			// float to long conversion
 	static byte					Ftob( float f );			// float to byte conversion, the result is clamped to the range [0-255]
 
 // jmarshall
@@ -328,13 +331,13 @@ private:
 };
 
 ID_INLINE float idMath::RSqrt( float x ) {
-	long i;
+	uint32_t i;
 	float y, r;
 
 	y = x * 0.5f;
-	i = *reinterpret_cast<long *>( &x );
-	i = 0x5f3759df - ( i >> 1 );
-	r = *reinterpret_cast<float *>( &i );
+	i = std::bit_cast<uint32_t>( x );
+	i = 0x5f3759dfu - ( i >> 1 );
+	r = std::bit_cast<float>( i );
 	r = r * ( 1.5f - r * r * y );
 	return r;
 }
@@ -354,14 +357,13 @@ ID_INLINE float idMath::InvSqrt16( float x ) {
 }
 
 ID_INLINE float idMath::InvSqrt( float x ) {
-	dword a = ((union _flint*)(&x))->i;
-	union _flint seed;
+	uint32_t a = std::bit_cast<uint32_t>( x );
 
 	assert( initialized );
 
 	double y = x * 0.5f;
-	seed.i = (( ( (3*EXP_BIAS-1) - ( (a >> EXP_POS) & 0xFF) ) >> 1)<<EXP_POS) | iSqrt[(a >> (EXP_POS-LOOKUP_BITS)) & LOOKUP_MASK];
-	double r = seed.f;
+	uint32_t seedBits = (( ( (3*EXP_BIAS-1) - ( (a >> EXP_POS) & 0xFF) ) >> 1)<<EXP_POS) | iSqrt[(a >> (EXP_POS-LOOKUP_BITS)) & LOOKUP_MASK];
+	double r = std::bit_cast<float>( seedBits );
 	r = r * ( 1.5f - r * r * y );
 	r = r * ( 1.5f - r * r * y );
 	return (float) r;
@@ -387,7 +389,7 @@ ID_INLINE float idMath::Sqrt16( float x ) {
 }
 
 ID_INLINE float idMath::Sqrt( float x ) {
-	return x * InvSqrt( x );
+	return sqrtf( x );
 }
 
 ID_INLINE double idMath::Sqrt64( float x ) {
@@ -1044,8 +1046,8 @@ ID_INLINE int idMath::FloatHash( const float *array, const int numFloats ) {
 	return hash;
 }
 
-ID_INLINE unsigned long idMath::Ftol(float f) {
-	return (unsigned long)f;
+ID_INLINE unsigned int idMath::Ftol(float f) {
+	return (unsigned int)f;
 }
 
 /*
@@ -1071,7 +1073,7 @@ ID_INLINE float idMath::AngleMod(float a)
 
 class rvRandom {
 private:
-	static	unsigned long	mSeed;
+	static	unsigned int	mSeed;
 public:
 							rvRandom( void ) { mSeed = 0x89abcdef; }
 
@@ -1079,7 +1081,7 @@ public:
 	static	int				Init( void );
 
 	// Init the seed to a unique number
-	static	void			Init( unsigned long seed ) { mSeed = seed; }
+	static	void			Init( unsigned int seed ) { mSeed = seed; }
 
 	// Returns a float min <= x < max (exclusive; will get max - 0.00001; but never max)
 	static	float			flrand( float min, float max );

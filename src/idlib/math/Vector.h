@@ -1151,7 +1151,7 @@ ID_INLINE idVec3 idVec3::Random( const idVec3& range, idRandom& random ) const {
 // RAVEN END
 
 ID_INLINE bool idVec3::IsZero( void ) const {
-	return ( ( ( *( const unsigned long * ) &( x ) ) | ( *( const unsigned long * ) &( y ) ) | ( *( const unsigned long * ) &( z ) ) ) & ~( 1<<31 ) ) == 0;
+	return ( ( std::bit_cast<uint32_t>( x ) | std::bit_cast<uint32_t>( y ) | std::bit_cast<uint32_t>( z ) ) & ~( 1u << 31 ) ) == 0;
 }
 
 //===============================================================

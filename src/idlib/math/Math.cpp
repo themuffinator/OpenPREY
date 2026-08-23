@@ -148,7 +148,7 @@ void idMath::PolarFromArtesian( idVec3 &view, idVec3 artesian )
 // jscott: fast and reliable random routines
 // ================================================================================================
 
-unsigned long rvRandom::mSeed;
+unsigned int rvRandom::mSeed;
 
 float rvRandom::flrand( float min, float max )
 {
