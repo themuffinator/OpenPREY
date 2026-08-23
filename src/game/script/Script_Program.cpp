@@ -1203,9 +1203,11 @@ idProgram::AllocType
 */
 idTypeDef *idProgram::AllocType( idTypeDef &type ) {
 	idTypeDef *newtype;
+	int index;
 
 	newtype	= new idTypeDef( type ); 
-	types.Append( newtype );
+	index = types.Append( newtype );
+	typeNameHash.Add( typeNameHash.GenerateKey( newtype->Name(), true ), index );
 
 	return newtype;
 }
@@ -1217,9 +1219,11 @@ idProgram::AllocType
 */
 idTypeDef *idProgram::AllocType( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) {
 	idTypeDef *newtype;
+	int index;
 
 	newtype	= new idTypeDef( etype, edef, ename, esize, aux );
-	types.Append( newtype );
+	index = types.Append( newtype );
+	typeNameHash.Add( typeNameHash.GenerateKey( newtype->Name(), true ), index );
 
 	return newtype;
 }
@@ -1233,11 +1237,11 @@ a new one and copies it out.
 ============
 */
 idTypeDef *idProgram::GetType( idTypeDef &type, bool allocate ) {
-	int i;
+	int i, hash;
 
-	//FIXME: linear search == slow
-	for( i = types.Num() - 1; i >= 0; i-- ) {
-		if ( types[ i ]->MatchesType( type ) && !strcmp( types[ i ]->Name(), type.Name() ) ) {
+	hash = typeNameHash.GenerateKey( type.Name(), true );
+	for( i = typeNameHash.First( hash ); i != -1; i = typeNameHash.Next( i ) ) {
+		if ( !strcmp( types[ i ]->Name(), type.Name() ) && types[ i ]->MatchesType( type ) ) {
 			return types[ i ];
 		}
 	}
@@ -1259,9 +1263,10 @@ Returns a preexisting complex type that matches the name, or returns NULL if not
 */
 idTypeDef *idProgram::FindType( const char *name ) {
 	idTypeDef	*check;
-	int			i;
+	int			i, hash;
 
-	for( i = types.Num() - 1; i >= 0; i-- ) {
+	hash = typeNameHash.GenerateKey( name, true );
+	for( i = typeNameHash.First( hash ); i != -1; i = typeNameHash.Next( i ) ) {
 		check = types[ i ];
 		if ( !strcmp( check->Name(), name ) ) {
 			return check;
@@ -1874,13 +1879,18 @@ bool idProgram::CompileText( const char *source, const char *text, bool console 
 	int			i;
 	idVarDef	*def;
 	idStr		ospath;
+	idStr		compileFilename;
 
 	// use a full os path for GetFilenum since it calls OSPathToRelativePath to convert filenames from the parser
 	ospath = fileSystem->RelativePathToOSPath( source );
 	filenum = GetFilenum( ospath );
+	// GetFilenum and script includes update the program's filename cache. Keep
+	// the parser filename in independent storage so those updates cannot
+	// invalidate the pointer used by the compiler and its diagnostics.
+	compileFilename = filename;
 
 	try {
-		compiler.CompileFile( text, filename, console );
+		compiler.CompileFile( text, compileFilename.c_str(), console );
 
 		// check to make sure all functions prototyped have code
 		for( i = 0; i < varDefs.Num(); i++ ) {
@@ -1989,6 +1999,7 @@ void idProgram::FreeData( void ) {
 
 	// free any special types we've created
 	types.DeleteContents( true );
+	typeNameHash.Free();
 
 	filenum = 0;
 
@@ -2194,6 +2205,10 @@ void idProgram::Restart( void ) {
 		delete types[ i ];
 	}
 	types.SetNum( top_types, false );
+	typeNameHash.Free();
+	for( i = 0; i < types.Num(); i++ ) {
+		typeNameHash.Add( typeNameHash.GenerateKey( types[ i ]->Name(), true ), i );
+	}
 
 	for( i = top_defs; i < varDefs.Num(); i++ ) {
 		delete varDefs[ i ];

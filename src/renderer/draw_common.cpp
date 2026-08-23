@@ -354,7 +354,6 @@ static bool RB_ResolveGLSLProgram( newShaderStage_t *stage ) {
 
 	return true;
 }
-
 static bool RB_IsMainScenePostProcessView( void ) {
 	if ( !backEnd.viewDef || backEnd.viewDef->isSubview ) {
 		return false;

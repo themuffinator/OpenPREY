@@ -652,16 +652,12 @@ idSoundSample* idSoundSystemLocal::LoadSample( const char* name )
 	idSoundSample* sample = new idSoundSample;
 	sample->SetName( canonical );
 	sampleHash.Add( hashKey, samples.Append( sample ) );
-	//if( !insideLevelLoad )
-	//{
+	// Sound samples are preloaded with their shaders so gameplay does not stall
+	// on first playback. Generated idwav caches keep repeat loads inexpensive.
 		// Sound sample referenced before any map is loaded
 		sample->SetNeverPurge();
 		sample->LoadResource();
-	//}
-	//else
-	//{
 		sample->SetLevelLoadReferenced();
-	//}
 
 	if( cvarSystem->GetCVarBool( "fs_buildgame" ) )
 	{

@@ -496,7 +496,7 @@ void R_CreateLightRefs( idRenderLightLocal *light ) {
 		for ( areaReference_t *ref = light->references; ref; ref = ref->ownerNext ) {
 			++refCount;
 		}
-		common->Printf( "LightRefs: index=%d area=%d numAreas=%d frustumVerts=%d refs=%d shader='%s' point=%d radius=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f)\n",
+		common->DPrintf( "LightRefs: index=%d area=%d numAreas=%d frustumVerts=%d refs=%d shader='%s' point=%d radius=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f)\n",
 			light->index,
 			light->areaNum,
 			light->world ? light->world->NumAreas() : -1,

@@ -331,10 +331,15 @@ void Sys_InitNetworking(void)
 	num_interfaces = 0;
 
 	s = socket( AF_INET, SOCK_DGRAM, 0 );
+	if ( s < 0 ) {
+		common->Warning( "InitNetworking: unable to enumerate network interfaces: %s", strerror( errno ) );
+		return;
+	}
 	ifc.ifc_len = MAX_INTERFACES*sizeof( ifreq );
 	ifc.ifc_buf = buf;
 	if ( ioctl( s, SIOCGIFCONF, &ifc ) < 0 ) {
-		common->FatalError( "InitNetworking: SIOCGIFCONF error - %s\n", strerror( errno ) );
+		common->Warning( "InitNetworking: unable to enumerate network interfaces: %s", strerror( errno ) );
+		close( s );
 		return;
 	}
 	ifindex = 0;
@@ -377,6 +382,7 @@ void Sys_InitNetworking(void)
 		}
 		ifindex += sizeof( ifreq );
 	}
+	close( s );
 #endif
 }
 

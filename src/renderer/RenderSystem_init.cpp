@@ -2459,4 +2459,3 @@ void idRenderSystemLocal::GetCardCaps( bool &oldCard, bool &nv10or20 ) {
 	oldCard = false;
 	nv10or20 = false;
 }
-

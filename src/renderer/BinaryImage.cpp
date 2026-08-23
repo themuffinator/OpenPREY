@@ -350,12 +350,41 @@ Load the preprocessed image from the generated folder.
 ID_TIME_T idBinaryImage::LoadFromGeneratedFile( ID_TIME_T sourceFileTime ) {
 	idStr binaryFileName;
 	MakeGeneratedFileName( binaryFileName );
+
 	idFileLocal bFile = fileSystem->OpenFileRead( binaryFileName );
+
 	if ( bFile == NULL ) {
 		return FILE_NOT_FOUND_TIMESTAMP;
 	}
-	if ( LoadFromGeneratedFile( bFile, sourceFileTime ) ) {
-		return bFile->Timestamp();
+
+	const ID_TIME_T fileTimestamp = bFile->Timestamp();
+	const int fileLength = bFile->Length();
+
+	if ( fileLength <= 0 ) {
+		return FILE_NOT_FOUND_TIMESTAMP;
+	}
+
+	byte* fileData = (byte*)Mem_Alloc( fileLength );
+
+	const int bytesRead = bFile->Read( fileData, fileLength );
+
+	if ( bytesRead != fileLength ) {
+		Mem_Free( fileData );
+		return FILE_NOT_FOUND_TIMESTAMP;
+	}
+
+	idFile_Memory memoryFile(
+		binaryFileName.c_str(),
+		(const char*)fileData,
+		fileLength
+	);
+
+	const bool loaded = LoadFromGeneratedFile( &memoryFile, sourceFileTime );
+
+	Mem_Free( fileData );
+
+	if ( loaded ) {
+		return fileTimestamp;
 	}
 	return FILE_NOT_FOUND_TIMESTAMP;
 }
@@ -384,7 +413,21 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileT
 	if ( BIMAGE_MAGIC != fileData.headerMagic ) {
 		return false;
 	}
-	if (fileData.sourceFileTime != sourceFileTime && !fileSystem->InProductionMode()) {
+	// A generated image with no usable source timestamp may have 0 stored
+	// in the cache while the filesystem reports FILE_NOT_FOUND_TIMESTAMP.
+	// Treat both values as the same "unknown timestamp" state so these
+	// generated images are not rebuilt on every load.
+	const bool cachedTimeUnknown =
+		fileData.sourceFileTime == 0 ||
+		fileData.sourceFileTime == FILE_NOT_FOUND_TIMESTAMP;
+
+	const bool sourceTimeUnknown =
+		sourceFileTime == 0 ||
+		sourceFileTime == FILE_NOT_FOUND_TIMESTAMP;
+
+	if ( !fileSystem->InProductionMode() &&
+		fileData.sourceFileTime != sourceFileTime &&
+		!( cachedTimeUnknown && sourceTimeUnknown ) ) {
 		return false;
 	}
 
@@ -397,6 +440,7 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileT
 
 	for ( int i = 0; i < numImages; i++ ) {
 		idBinaryImageData &img = images[ i ];
+
 		if ( bFile->Read( &img, sizeof( bimageImage_t ) ) <= 0 ) {
 			return false;
 		}
@@ -414,6 +458,7 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileT
 		// just the multiplication of dimensions
 		assert( img.dataSize >= img.width * img.height * BitsForFormat( (textureFormat_t)fileData.format ) / 8 );
 		img.Alloc( img.dataSize );
+
 		if ( img.data == NULL ) {
 			return false;
 		}
@@ -422,6 +467,7 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileT
 			return false;
 		}
 	}
+
 
 	return true;
 }
@@ -447,5 +493,4 @@ void idBinaryImage::GetGeneratedFileName( idStr & gfn, const char *name ) {
 	gfn.Replace( " ", "" );
 	gfn.ToLower();
 }
-
 

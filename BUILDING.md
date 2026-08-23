@@ -43,6 +43,12 @@ glew  openal  x11  xext  xxf86vm
 
 Install them through your distro's package manager before configuring (e.g. `libglew-dev`, `libopenal-dev`, `libx11-dev`, `libxext-dev`, `libxxf86vm-dev` on Debian/Ubuntu).
 
+On CachyOS or Arch Linux:
+
+```bash
+sudo pacman -S --needed base-devel meson ninja python glew openal libx11 libxext libxxf86vm
+```
+
 ### Windows Note
 
 On Windows, always invoke Meson through `tools/build/meson_setup.ps1` rather than calling `meson` directly from an arbitrary shell. The wrapper ensures MSVC tools (`cl.exe`, `link.exe`, etc.) are on `PATH` before setup, compile, and install steps.
@@ -117,6 +123,7 @@ Pass any of these with `-D<option>=<value>` on the `meson setup` command line:
 | `platform_backend` | `sdl3` | `sdl3`, `legacy_win32`, or `native` |
 | `use_pch` | `true` | Use precompiled headers |
 | `enforce_msvc_2026` | `false` | Fail configure if MSVC is older than 19.46+ (Windows only) |
+| `linux_cpu_optimization` | `portable` | Use `native` to tune a Linux build for the CPU that compiles it |
 
 ---
 
@@ -172,7 +179,7 @@ meson install -C builddir --no-rebuild --skip-subprojects
 
 ```bash
 # 1. Configure
-bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=debug --wrap-mode=forcefallback -Dplatform_backend=sdl3
+bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=debug -Dplatform_backend=native
 
 # 2. Compile
 bash tools/build/meson_setup.sh compile -C builddir
@@ -185,7 +192,7 @@ bash tools/build/meson_setup.sh compile -C builddir
 
 ```bash
 # 1. Configure
-bash tools/build/meson_setup.sh setup builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dplatform_backend=sdl3
+bash tools/build/meson_setup.sh setup builddir . --backend ninja --buildtype=release -Dplatform_backend=native
 
 # 2. Compile
 bash tools/build/meson_setup.sh compile -C builddir
@@ -193,6 +200,25 @@ bash tools/build/meson_setup.sh compile -C builddir
 # 3. Stage distributable package into .install/
 bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 ```
+
+### CachyOS Local Optimized Build
+
+For a build used only on the machine that compiles it, enable native CPU tuning and link-time optimization. `-march=native` may use CPU instructions unavailable on another computer, so keep the default `portable` setting for distributed packages.
+
+```bash
+bash tools/build/meson_setup.sh setup --wipe builddir . \
+  --backend ninja --buildtype=release \
+  -Dplatform_backend=native \
+  -Dlinux_cpu_optimization=native \
+  -Db_lto=true -Db_ndebug=if-release
+
+bash tools/build/meson_setup.sh compile -C builddir
+bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
+
+./.install/OpenPrey-client_x64 +set r_fullscreen 0
+```
+
+Meson already supplies `-O3` for a release build. Avoid adding a second optimization level through `CFLAGS` or `CXXFLAGS`; the native option applies consistently to the engine, dedicated server, and game module.
 
 ---
 

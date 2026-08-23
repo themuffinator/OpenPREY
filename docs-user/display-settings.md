@@ -109,6 +109,14 @@ When the render surface spans multiple monitors:
 
 ## Useful Console Examples
 
+### Faster Map Transitions
+
+```cfg
+seta image_preload 0
+```
+
+This skips synchronous loading of every texture before entering a map. It can substantially shorten loading screens, at the cost of brief stutter when a texture is first used. Set `image_preload 1` to restore preload-first behavior.
+
 ### Recommended Modern Defaults
 
 ```cfg

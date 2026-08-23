@@ -37,6 +37,7 @@ This document defines platform direction for OpenPrey and how SDL3 + Meson are u
 
 - Meson is the canonical build system.
 - External dependencies should be resolved through Meson dependency/subproject flow.
+- Linux release packages use portable CPU code by default. Developers may select `-Dlinux_cpu_optimization=native` for machine-local builds; distributable builds must remain portable.
 - `tools/build/meson_setup.ps1` is the standard Windows entry point.
 - `tools/build/meson_setup.sh` is the standard non-Windows entry point.
 - `builddir/` is the standard build output directory.

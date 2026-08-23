@@ -47,3 +47,11 @@ option(
   value: false,
   description: 'Fail configure when MSVC is older than the VS 2026 baseline (19.46+).',
 )
+
+option(
+  'linux_cpu_optimization',
+  type: 'combo',
+  choices: ['portable', 'native'],
+  value: 'portable',
+  description: 'Linux CPU tuning: portable builds run on other x86-64 systems; native tunes binaries for the build machine.',
+)
