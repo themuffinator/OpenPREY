@@ -663,6 +663,7 @@ idClip::idClip
 idClip::idClip( void ) {
 	numClipSectors = 0;
 	clipSectors = NULL;
+	worldModel = NULL;
 	worldBounds.Zero();
 	numRotations = numTranslations = numMotions = numRenderModelTraces = numContents = numContacts = 0;
 }
@@ -751,6 +752,7 @@ void idClip::Init( void ) {
 	touchCount = -1;
 	// get world map bounds
 	h = collisionModelManager->LoadModel( "worldMap", false );
+	worldModel = h;
 	collisionModelManager->GetModelBounds( h, worldBounds );
 
 // HUMANHEAD pdm: Support for level appending
@@ -1063,7 +1065,7 @@ void idClip::GetClipSectorsStaticContents( void ) {
 			org.x = ( x / nodeScale.x ) + nodeOffset.x;
 			org.y = ( y / nodeScale.y ) + nodeOffset.y;
 
-			int contents = collisionModelManager->Contents( org, trm, mat3_identity, -1, 0, vec3_origin, mat3_default );
+			int contents = collisionModelManager->Contents( org, trm, mat3_identity, -1, worldModel, vec3_origin, mat3_default );
 			clipSectors[ x + ( y << CLIPSECTOR_DEPTH ) ].contents = contents;
 		}
 	}
@@ -1303,7 +1305,7 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numTranslations++;
-		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 		if ( results.fraction == 0.0f ) {
 			return true;		// blocked immediately by the world
@@ -1394,7 +1396,7 @@ bool idClip::TranslationWithExceptions( trace_t &results, const idVec3 &start, c
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numTranslations++;
-		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 		if ( results.fraction == 0.0f ) {
 			return true;		// blocked immediately by the world
@@ -1489,7 +1491,7 @@ bool idClip::Rotation( trace_t &results, const idVec3 &start, const idRotation &
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numRotations++;
-		collisionModelManager->Rotation( &results, start, rotation, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		collisionModelManager->Rotation( &results, start, rotation, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 		if ( results.fraction == 0.0f ) {
 			return true;		// blocked immediately by the world
@@ -1600,7 +1602,7 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// translational collision with world
 		idClip::numTranslations++;
-		collisionModelManager->Translation( &translationalTrace, start, end, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		collisionModelManager->Translation( &translationalTrace, start, end, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 		translationalTrace.c.entityNum = translationalTrace.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 	} else {
 		memset( &translationalTrace, 0, sizeof( translationalTrace ) );
@@ -1677,7 +1679,7 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// rotational collision with world
 		idClip::numRotations++;
-		collisionModelManager->Rotation( &rotationalTrace, endPosition, endRotation, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		collisionModelManager->Rotation( &rotationalTrace, endPosition, endRotation, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 		rotationalTrace.c.entityNum = rotationalTrace.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 	} else {
 		memset( &rotationalTrace, 0, sizeof( rotationalTrace ) );
@@ -1763,7 +1765,7 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numContacts++;
-		numContacts = collisionModelManager->Contacts( contacts, maxContacts, start, dir, depth, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		numContacts = collisionModelManager->Contacts( contacts, maxContacts, start, dir, depth, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 	} else {
 		numContacts = 0;
 	}
@@ -1839,7 +1841,7 @@ int idClip::Contents( const idVec3 &start, const idClipModel *mdl, const idMat3 
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		// test world
 		idClip::numContents++;
-		contents = collisionModelManager->Contents( start, trm, trmAxis, contentMask, 0, vec3_origin, mat3_default );
+		contents = collisionModelManager->Contents( start, trm, trmAxis, contentMask, worldModel, vec3_origin, mat3_default );
 	} else {
 		contents = 0;
 	}
