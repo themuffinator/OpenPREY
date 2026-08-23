@@ -75,6 +75,16 @@ static bool R_ShouldSuppressMissingImageWarning( const char *imageName ) {
 	if ( idStr::Icmp( imageName, "textures/common_misc/flickerflare" ) == 0 ) {
 		return true;
 	}
+
+	// Prey retail does not provide these optional Roadhouse loading-screen
+	// border images. The loading GUI works correctly without them.
+	if ( idStr::Icmp( imageName, "guis/assets/loading/roadhouse_left" ) == 0 ||
+		 idStr::Icmp( imageName, "guis/assets/loading/roadhouse_right" ) == 0 ||
+		 idStr::Icmp( imageName, "guis/assets/loading/roadhouse_top" ) == 0 ||
+		 idStr::Icmp( imageName, "guis/assets/loading/roadhouse_bottom" ) == 0 ) {
+		return true;
+	}
+
 	return false;
 }
 

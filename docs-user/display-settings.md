@@ -109,6 +109,14 @@ When the render surface spans multiple monitors:
 
 ## Useful Console Examples
 
+### Faster Map Transitions
+
+```cfg
+seta image_preload 0
+```
+
+Deferred image loading is the default because it substantially shortens loading screens on texture-heavy maps such as Downward Spiral. It may cause brief stutter when a texture is first used. Set `image_preload 1` to opt into preload-first behavior.
+
 ### Recommended Modern Defaults
 
 ```cfg
