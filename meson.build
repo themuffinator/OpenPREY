@@ -272,6 +272,21 @@ endif
 shared_cpp_args = ['-DUSE_OPENAL', '-DGLEW_NO_GLU', '-DHUMANHEAD=1']
 shared_c_args = ['-DGLEW_NO_GLU', '-DHUMANHEAD=1']
 engine_link_args = []
+linux_cpu_optimization = get_option('linux_cpu_optimization')
+
+if host_system != 'linux' and linux_cpu_optimization != 'portable'
+  warning('linux_cpu_optimization is only meaningful on Linux hosts.')
+endif
+
+if host_system == 'linux' and linux_cpu_optimization == 'native'
+  native_cpu_args = ['-march=native', '-mtune=native']
+  if cc.has_multi_arguments(native_cpu_args) and cpp.has_multi_arguments(native_cpu_args)
+    shared_cpp_args += native_cpu_args
+    shared_c_args += native_cpu_args
+  else
+    error('The selected C/C++ compiler does not support native Linux CPU tuning.')
+  endif
+endif
 
 if host_system == 'windows'
   shared_cpp_args += ['-D_WINDOWS', '-DWIN32']
@@ -523,6 +538,7 @@ summary(
     'C++ standard': get_option('cpp_std'),
     'Platform backend requested': platform_backend_requested,
     'Platform backend': platform_backend,
+    'Linux CPU optimization': linux_cpu_optimization,
     'Build engine': build_engine,
     'engine client binary': engine_client_binary_name,
     'engine dedicated binary': engine_ded_binary_name,
