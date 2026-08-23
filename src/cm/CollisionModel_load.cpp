@@ -3264,7 +3264,7 @@ idCollisionModelLocal *idCollisionModelManagerLocal::LoadRenderModel( const char
 	// shutdown the hash
 	ShutdownHash();
 
-	common->Printf( "loaded collision model %s\n", model->name.c_str() );
+	common->DPrintf( "loaded collision model %s\n", model->name.c_str() );
 
 	return model;
 }

@@ -325,6 +325,7 @@ private:
 #endif //HUMANHEAD END
 	int						numClipSectors;
 	struct clipSector_s *	clipSectors;
+	cmHandle_t				worldModel;
 	idBounds				worldBounds;
 	idClipModel				temporaryClipModel;
 	idClipModel				defaultClipModel;

@@ -47,7 +47,7 @@ extern "C" {
 #define qglXSwapBuffers glXSwapBuffers
 #endif
 
-idCVar sys_videoRam( "sys_videoRam", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Texture memory on the video card (in megabytes) - 0: autodetect", 0, 512 );
+idCVar sys_videoRam( "sys_videoRam", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Texture memory on the video card (in megabytes) - 0: autodetect", 0, 16384 );
 
 Display *dpy = NULL;
 static int scrnum = 0;
@@ -613,9 +613,52 @@ int Sys_GetVideoRam( void ) {
 		return run_once;
 	}
 
-	if ( sys_videoRam.GetInteger() ) {
+	const int configuredVideoRam = sys_videoRam.GetInteger();
+	if ( configuredVideoRam > 0 && configuredVideoRam != 512 ) {
 		run_once = sys_videoRam.GetInteger();
 		return sys_videoRam.GetInteger();
+	}
+
+	// Modern DRM drivers expose dedicated VRAM in bytes through sysfs. Check
+	// all cards and use the largest value because connector aliases and render
+	// nodes can expose the same GPU more than once.
+	unsigned long long detectedBytes = 0;
+	for ( int card = 0; card < 16; card++ ) {
+		char path[ 128 ];
+		idStr::snPrintf( path, sizeof( path ),
+			"/sys/class/drm/card%d/device/mem_info_vram_total", card );
+
+		const int fd = open( path, O_RDONLY );
+		if ( fd == -1 ) {
+			continue;
+		}
+
+		char valueBuffer[ 64 ];
+		const int length = read( fd, valueBuffer, sizeof( valueBuffer ) - 1 );
+		close( fd );
+		if ( length <= 0 ) {
+			continue;
+		}
+
+		valueBuffer[ length ] = '\0';
+		const unsigned long long bytes = strtoull( valueBuffer, NULL, 10 );
+		if ( bytes > detectedBytes ) {
+			detectedBytes = bytes;
+		}
+	}
+
+	if ( detectedBytes > 0 ) {
+		run_once = static_cast<int>( detectedBytes / ( 1024ull * 1024ull ) );
+		common->Printf( "detected %d MB video ram through DRM sysfs\n", run_once );
+		return run_once;
+	}
+
+	// Older builds capped this archived override at 512 MB. If modern
+	// detection is unavailable, preserve that configured value as a fallback.
+	if ( configuredVideoRam == 512 ) {
+		common->Printf( "using legacy configured 512 MB video ram fallback\n" );
+		run_once = configuredVideoRam;
+		return run_once;
 	}
 
 	// try a few strategies to guess the amount of video ram

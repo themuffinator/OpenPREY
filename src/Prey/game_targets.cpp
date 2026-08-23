@@ -618,7 +618,7 @@ void hhTarget_EndLevel::Event_Activate(idEntity *activator) {
 		guiLoading->StateChanged(gameLocal.time);
 
 		// HUMANHEAD CJR:  If the player hits this and they are spiritwalking, stop the spiritwalk before loading the next level
-		if ( activator->IsType( hhPlayer::Type ) ) {
+		if ( activator && activator->IsType( hhPlayer::Type ) ) {
 			hhPlayer *player = static_cast<hhPlayer *>( activator );
 			if ( player ) {
 
@@ -846,4 +846,3 @@ void hhTarget_Hide::Event_Activate( idEntity *activator ) {
 		}
 	}
 }
-
