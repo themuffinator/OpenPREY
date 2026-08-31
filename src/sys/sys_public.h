@@ -521,7 +521,7 @@ typedef enum {
 
 typedef struct {
 	const char *	name;
-	int				threadHandle;
+	uintptr_t		threadHandle;
 	unsigned long	threadId;
 } xthreadInfo;
 
