@@ -621,7 +621,7 @@ void idBrittleFracture::Think( void ) {
 			}
 
 			//HUMANHEAD rww
-			if (cheapShards && shard->isCheap) { //stupid fake physics
+			if (shard->isCheap) { //stupid fake physics
 				const float fakeVelocityFactor = 0.03f;
 				const float fakeVelocityGravityFactor = 0.03f;
 				float factor = (float)(endTime - startTime)/USERCMD_MSEC;
@@ -873,6 +873,14 @@ void idBrittleFracture::DropShard( shard_t *shard, const idVec3 &point, const id
 	//HUMANHEAD rww - randomly create shards with no real physics
 	shard->isCheap = false;
 	if (cheapShards && cheapShards > (rand()%100)) {
+		shard->isCheap = true;
+		cheapShardsTime = gameLocal.time;
+	}
+	// Some shipped Prey fractures do not specify cheapShards and can release a
+	// large number of rigid bodies at once.  Use the original visual-only shard
+	// simulation for the whole large fracture; even a few of these thin shards
+	// can make collision contact evaluation dominate a frame.
+	if ( shards.Num() > 32 ) {
 		shard->isCheap = true;
 		cheapShardsTime = gameLocal.time;
 	}

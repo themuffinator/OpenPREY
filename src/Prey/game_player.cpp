@@ -3096,7 +3096,7 @@ void hhPlayer::PerformImpulse( int impulse ) {
 					PostEventMS( &EV_PrepareToResurrect, 0 );
 				}
 			}
-			else if (inventory.requirements.bCanSpiritWalk) {
+			else if ( gameLocal.RequirementMet( this, spawnArgs.GetString( "requirement_spiritwalk" ), 0 ) ) {
 				ToggleSpiritWalk();
 			}
 			break;
@@ -7376,6 +7376,12 @@ void hhPlayer::Restore( idRestoreGame *savefile ) {
 	if ( bLighter ) {
 		lighterHandle = gameRenderWorld->AddLightDef( &lighter );
 	}
+
+	// Recompute capability flags from the restored inventory and map state.
+	// The cached bitfield can be stale in legacy saves taken immediately after
+	// acquiring a power, which otherwise makes the bound spirit-walk impulse
+	// appear to do nothing.
+	inventory.EvaluateRequirements( this );
 }
 
 int hhPlayer::GetSpiritPower() {

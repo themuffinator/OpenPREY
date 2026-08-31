@@ -1045,4 +1045,3 @@ void idTarget_FadeSoundClass::Event_RestoreVolume() {
 	// restore volume
 	gameSoundWorld->FadeSoundClasses( fadeClass, 0, restoreTime ); // HUMANHEAD rdr - changed from ->FadeSoundClasses( 0, fadeDB, fadeTime );
 }
-

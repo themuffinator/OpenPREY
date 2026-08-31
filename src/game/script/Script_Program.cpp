@@ -1001,7 +1001,7 @@ idScriptObject::Restore
 */
 void idScriptObject::Restore( idRestoreGame *savefile ) {
 	idStr typeName;
-	size_t size;
+	int size;
 
 	savefile->ReadString( typeName );
 
@@ -1014,8 +1014,8 @@ void idScriptObject::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idScriptObject::Restore: failed to restore object of type '%s'.", typeName.c_str() );
 	}
 
-	savefile->ReadInt( (int &)size );
-	if ( size != type->Size() ) {
+	savefile->ReadInt( size );
+	if ( size < 0 || static_cast<size_t>( size ) != type->Size() ) {
 		savefile->Error( "idScriptObject::Restore: size of object '%s' doesn't match size in save game.", typeName.c_str() );
 	}
 
@@ -2124,9 +2124,15 @@ bool idProgram::Restore( idRestoreGame *savefile ) {
 
 	savefile->ReadInt( saved_checksum );
 	checksum = CalculateChecksum();
-
 	if ( saved_checksum != checksum ) {
-		result = false;
+		// Linux x86-64 builds prior to savegame version 115 calculated MD4
+		// with 64-bit words and included uninitialized digest bytes. Preserve
+		// those saves; version 115 and later use a deterministic checksum.
+		if ( cvarSystem->GetCVarInteger( "g_restoreSaveGameVersion" ) == 114 ) {
+			gameLocal.Warning( "Loading legacy savegame with an unreliable script checksum" );
+		} else {
+			result = false;
+		}
 	}
 
 	return result;

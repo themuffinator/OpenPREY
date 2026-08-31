@@ -11,6 +11,35 @@
 
 #include "prey_local.h"
 
+static void RepairInvalidSimpleForceFieldBounds( hhForceField *field, hhPhysics_StaticForceField &physics ) {
+	const idBounds physicsBounds = physics.GetBounds();
+	const idVec3 physicsSize = physicsBounds[1] - physicsBounds[0];
+	if ( physicsSize.x < MAX_WORLD_COORD && physicsSize.y < MAX_WORLD_COORD && physicsSize.z < MAX_WORLD_COORD ) {
+		return;
+	}
+
+	const renderEntity_t *renderEntity = field->GetRenderEntity();
+	if ( !renderEntity || !renderEntity->hModel ) {
+		return;
+	}
+
+	const idBounds renderBounds = renderEntity->hModel->Bounds( renderEntity );
+	const idVec3 renderSize = renderBounds[1] - renderBounds[0];
+	if ( renderBounds.IsCleared() || renderSize.x >= MAX_WORLD_COORD || renderSize.y >= MAX_WORLD_COORD || renderSize.z >= MAX_WORLD_COORD ) {
+		return;
+	}
+
+	const int contents = physics.GetContents();
+	const bool enabled = physics.GetClipModel()->IsEnabled();
+	physics.SetClipModel( new idClipModel( idTraceModel( renderBounds ) ), 1.0f );
+	physics.SetContents( contents );
+	if ( !enabled ) {
+		physics.DisableClip();
+	}
+	gameLocal.Warning( "Repaired invalid simple forcefield bounds on '%s' (%s to %s)",
+		field->GetName(), physicsBounds[0].ToString(), physicsBounds[1].ToString() );
+}
+
 CLASS_DECLARATION( idEntity, hhForceField )
 	EVENT( EV_Activate,	   				hhForceField::Event_Activate )
 END_CLASS
@@ -44,6 +73,7 @@ void hhForceField::Spawn(void) {
 		physicsObj.SetOrigin( GetOrigin() );
 		physicsObj.SetAxis( GetAxis() );
 		SetPhysics( &physicsObj );
+		RepairInvalidSimpleForceFieldBounds( this, physicsObj );
 	}
 	else {
 		// Non-simple has real per-poly collision with it's model, uses default static physics because we don't have a tracemodel.
@@ -97,6 +127,7 @@ void hhForceField::Restore( idRestoreGame *savefile ) {
 	// Only restore physics if we were using it before
 	if (spawnArgs.GetBool("isSimpleBox")) {
 		RestorePhysics( &physicsObj );
+		RepairInvalidSimpleForceFieldBounds( this, physicsObj );
 	}
 }
 

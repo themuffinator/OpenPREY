@@ -350,6 +350,15 @@ void hhMonsterAI::Think( void ) {
 	UpdateParticles();
 	UpdateWounds();
 	Present();
+
+	// The head is a separate bound entity and may already have presented this
+	// frame.  Refresh it after the monster's final movement and animation pose.
+	if ( head.GetEntity() ) {
+		head.GetEntity()->GetPhysics()->Evaluate( 0, gameLocal.time );
+		head.GetEntity()->UpdateVisuals();
+		head.GetEntity()->Present();
+	}
+
 	UpdateDamageEffects();
 	LinkCombat();
 

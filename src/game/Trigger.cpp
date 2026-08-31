@@ -5,6 +5,7 @@
 #pragma hdrstop
 
 #include "Game_local.h"
+#include "../Prey/game_vehicle.h"
 
 
 /*
@@ -441,6 +442,16 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 	}
 
 	bool player = other->IsType( idPlayer::Type );
+	// Prey shuttles carry the player as a bound pilot.  Their physics clip
+	// touches trigger volumes, while the bound player clip does not; treat a
+	// piloted vehicle as its player activator for normal trigger semantics.
+	if ( !player && other->IsType( hhVehicle::Type ) ) {
+		idActor *pilot = static_cast<hhVehicle *>( other )->GetPilot();
+		if ( pilot && pilot->IsType( idPlayer::Type ) ) {
+			other = pilot;
+			player = true;
+		}
+	}
 	if ( player ) {
 		if ( !touchClient ) {
 			return;

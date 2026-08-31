@@ -1068,6 +1068,23 @@ void idActor::Restore( idRestoreGame *savefile ) {
 
 	LinkScriptVariable( AI_BOUND );		// HUMANHEAD mdl
 	LinkScriptVariable( AI_VEHICLE );	// HUMANHEAD mdl
+
+	// Older OpenPrey saves could archive a living monster after its physics had
+	// fallen outside the collision world while its render entity remained at the
+	// encounter.  Such actors appear black for a frame and then vanish.  Recover
+	// only this invalid state; legitimate dead/falling actors retain their saved
+	// position and normal world gravity.
+	if ( health > 0 && !IsType( idPlayer::Type ) &&
+		!gameLocal.clip.GetWorldBounds().Expand( 128.0f ).IntersectsBounds( GetPhysics()->GetAbsBounds() ) ) {
+		idVec3 spawnOrigin;
+		spawnArgs.GetVector( "origin", "0 0 0", spawnOrigin );
+		gameLocal.Warning( "restoring living actor '%s' from outside world at (%s) to spawn origin (%s)",
+			name.c_str(), GetPhysics()->GetOrigin().ToString( 0 ), spawnOrigin.ToString( 0 ) );
+		GetPhysics()->SetOrigin( spawnOrigin );
+		GetPhysics()->SetLinearVelocity( vec3_origin );
+		GetPhysics()->SetAngularVelocity( vec3_origin );
+		UpdateVisuals();
+	}
 }
 
 //HUMANHEAD rww
