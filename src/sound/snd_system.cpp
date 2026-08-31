@@ -652,16 +652,12 @@ idSoundSample* idSoundSystemLocal::LoadSample( const char* name )
 	idSoundSample* sample = new idSoundSample;
 	sample->SetName( canonical );
 	sampleHash.Add( hashKey, samples.Append( sample ) );
-	//if( !insideLevelLoad )
-	//{
+	// Sound samples are preloaded with their shaders so gameplay does not stall
+	// on first playback. Generated idwav caches keep repeat loads inexpensive.
 		// Sound sample referenced before any map is loaded
 		sample->SetNeverPurge();
 		sample->LoadResource();
-	//}
-	//else
-	//{
 		sample->SetLevelLoadReferenced();
-	//}
 
 	if( cvarSystem->GetCVarBool( "fs_buildgame" ) )
 	{
@@ -1027,7 +1023,9 @@ void idSoundSystemLocal::CollectActiveSubtitles()
 			{
 				continue;
 			}
-			if( chan->volumeDB <= DB_SILENCE )
+			// Protected VO must remain captioned even when the mixer has driven
+			// its audible level to the silence threshold.
+			if( chan->volumeDB <= DB_SILENCE && chan->CanMute() )
 			{
 				continue;
 			}

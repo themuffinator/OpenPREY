@@ -941,7 +941,82 @@ void idPhysics_Player::CorrectAllSolid( trace_t &trace, int contents ) {
 		gameLocal.Printf( "%i:allsolid\n", c_pmove );
 	}
 
-	// FIXME: jitter around to find a free spot ?
+	// A save can restore the player on a collision seam where the trace model
+	// overlaps two opposing world surfaces.  SlideMove cannot escape because
+	// every trace starts solid, so probe a small, deterministic neighborhood
+	// and move to the nearest free position.
+	const idVec3 originalOrigin = current.origin;
+	const idVec3 up = -gravityNormal;
+	const idVec3 side = clipModelAxis[ 0 ];
+	const idVec3 forward = clipModelAxis[ 1 ];
+	const idVec3 directions[] = {
+		up,
+		side, -side, forward, -forward,
+		( side + forward ).ToNormal(),
+		( side - forward ).ToNormal(),
+		( -side + forward ).ToNormal(),
+		( -side - forward ).ToNormal()
+	};
+	const float distances[] = { 1.0f, 2.0f, 4.0f, 8.0f, 12.0f, 16.0f, 24.0f, 32.0f };
+	idVec3 fallbackOrigin = originalOrigin;
+	bool haveFallbackOrigin = false;
+
+	for ( int distanceIndex = 0; distanceIndex < sizeof( distances ) / sizeof( distances[ 0 ] ); distanceIndex++ ) {
+		for ( int directionIndex = 0; directionIndex < sizeof( directions ) / sizeof( directions[ 0 ] ); directionIndex++ ) {
+			const idVec3 candidate = originalOrigin + directions[ directionIndex ] * distances[ distanceIndex ];
+			const int candidateContents = gameLocal.clip.Contents( candidate, clipModel, clipModelAxis, GetClipMask(), self );
+			if ( candidateContents & GetClipMask() ) {
+				continue;
+			}
+
+			contactInfo_t candidateContacts[ 10 ];
+			idVec6 contactDirection;
+			contactDirection.SubVec3( 0 ) = gravityNormal;
+			contactDirection.SubVec3( 1 ) = vec3_origin;
+			const int numCandidateContacts = gameLocal.clip.Contacts( candidateContacts, 10, candidate,
+				contactDirection, CONTACT_EPSILON, clipModel, clipModelAxis, GetClipMask(), self );
+			idVec3 candidateNormal = vec3_origin;
+			for ( int contactIndex = 0; contactIndex < numCandidateContacts; contactIndex++ ) {
+				candidateNormal += candidateContacts[ contactIndex ].normal;
+			}
+			if ( numCandidateContacts == 0 ) {
+				if ( !haveFallbackOrigin ) {
+					fallbackOrigin = candidate;
+					haveFallbackOrigin = true;
+				}
+				continue;
+			}
+			if ( candidateNormal.Normalize() == 0.0f || candidateNormal * -gravityNormal < MIN_WALK_NORMAL ) {
+				continue;
+			}
+
+			{
+				current.origin = candidate;
+				const float velocityIntoGravity = current.velocity * gravityNormal;
+				if ( velocityIntoGravity > 0.0f ) {
+					current.velocity -= gravityNormal * velocityIntoGravity;
+				}
+				clipModel->SetPosition( current.origin, clipModelAxis );
+				trace.fraction = 1.0f;
+				trace.endpos = current.origin;
+				trace.endAxis = clipModelAxis;
+				return;
+			}
+		}
+	}
+
+	if ( haveFallbackOrigin ) {
+		current.origin = fallbackOrigin;
+		const float velocityIntoGravity = current.velocity * gravityNormal;
+		if ( velocityIntoGravity > 0.0f ) {
+			current.velocity -= gravityNormal * velocityIntoGravity;
+		}
+		clipModel->SetPosition( current.origin, clipModelAxis );
+		trace.fraction = 1.0f;
+		trace.endpos = current.origin;
+		trace.endAxis = clipModelAxis;
+		return;
+	}
 
 	if ( trace.fraction >= 1.0f ) {
 		memset( &trace, 0, sizeof( trace ) );
@@ -2113,4 +2188,3 @@ void idPhysics_Player::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 	}
 }
-

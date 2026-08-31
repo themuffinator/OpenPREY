@@ -128,6 +128,18 @@ void hhSafeDeathVolume::Event_Touch( idEntity *other, trace_t *trace ) {
 		return;
 	}
 
+	// EV_Touch is generated when the player's collision hull merely overlaps
+	// the volume.  Death volumes are commonly placed immediately below or
+	// beside walkable geometry, so killing on that broad hull contact can catch
+	// a player who is still safely on the floor.  Require the player's physics
+	// origin to have actually entered this volume.
+	idClipModel* volume = GetPhysics()->GetClipModel();
+	if( !volume || !gameLocal.clip.ContentsModel(
+			player->GetPhysics()->GetOrigin(), NULL, mat3_identity, -1,
+			volume->Handle(), volume->GetOrigin(), volume->GetAxis() ) ) {
+		return;
+	}
+
 	if( player->IsSpiritOrDeathwalking() ) {
 		player->StopSpiritWalk();
 	} else {

@@ -37,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 idImageManager	imageManager;
 idImageManager * globalImages = &imageManager;
 
-idCVar preLoad_Images( "preLoad_Images", "1", CVAR_SYSTEM | CVAR_BOOL, "preload images during beginlevelload" );
+idCVar image_preload( "image_preload", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "preload referenced images before entering a level" );
 
 static void R_NormalizeInternalImageName( idStr& name ) {
 	// Runtime render targets are referenced from materials with option hashes
@@ -826,23 +826,38 @@ idImageManager::LoadLevelImages
 ===============
 */
 int idImageManager::LoadLevelImages( bool pacifier ) {
-	int	loadCount = 0;
-	for ( int i = 0 ; i < images.Num() ; i++ ) {
+	int loadCount = 0;
+	int pendingAssetQueueAdvance = 0;
+
+	for ( int i = 0; i < images.Num(); i++ ) {
 		if ( pacifier ) {
 			//common->UpdateLevelLoadPacifier();
-
 		}
 
-		idImage	*image = images[ i ];
+		idImage *image = images[ i ];
+
 		if ( image->generatorFunction ) {
 			continue;
 		}
+
 		if ( image->levelLoadReferenced && !image->IsLoaded() ) {
 			loadCount++;
+
 			image->ActuallyLoadImage( false );
-			session->AdvanceLoadingAssetQueue( 1 );
+
+			pendingAssetQueueAdvance++;
+
+			if ( pendingAssetQueueAdvance >= 32 ) {
+				session->AdvanceLoadingAssetQueue( pendingAssetQueueAdvance );
+				pendingAssetQueueAdvance = 0;
+			}
 		}
 	}
+
+	if ( pendingAssetQueueAdvance > 0 ) {
+		session->AdvanceLoadingAssetQueue( pendingAssetQueueAdvance );
+	}
+
 	return loadCount;
 }
 
@@ -877,6 +892,11 @@ void idImageManager::EndLevelLoad() {
 
 	common->Printf( "----- idImageManager::EndLevelLoad -----\n" );
 	int start = Sys_Milliseconds();
+	// Loading these on demand from idImage::Bind is not safe with the SMP
+	// renderer.  In particular, GUI surfaces can first reference an image on
+	// the back end, producing blank or corrupt terminal displays.  Keep the
+	// archived cvar for configuration compatibility, but always finish loading
+	// level-referenced images before rendering begins.
 	int	loadCount = LoadLevelImages( true );
 
 	int	end = Sys_Milliseconds();

@@ -6323,4 +6323,3 @@ void idEntity::Event_SetContents(int contents) {
 void idEntity::Event_SetClipmask(int clipmask) {
 	GetPhysics()->SetClipMask(clipmask);
 }
-

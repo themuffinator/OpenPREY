@@ -543,7 +543,6 @@ bool idCollisionModelManagerLocal::TranslateTrmThroughPolygon( cm_traceWork_t *t
 	cm_trmPolygon_t *bp;
 	cm_vertex_t *v;
 	cm_edge_t *e;
-
 	// if already checked this polygon
 	if ( p->checkcount == idCollisionModelManagerLocal::checkCount ) {
 		return false;

@@ -477,6 +477,7 @@ bool idDeclParticle::Parse( const char *text, const int textLength ) {
 	src.SkipUntilString( "{" );
 
 	depthHack = 0.0f;
+	bool hasDeclaredBounds = false;
 
 	while (1) {
 		if ( !src.ReadToken( &token ) ) {
@@ -503,11 +504,16 @@ bool idDeclParticle::Parse( const char *text, const int textLength ) {
 			continue;
 		}
 		if ( !token.Icmp( "bounds" ) ) {
-			// Prey particle decls may provide precomputed top-level bounds.
-			// We currently derive bounds from stages; consume these values for compatibility.
-			for ( int i = 0; i < 6; i++ ) {
-				src.ParseFloat();
-			}
+			// Prey's particle editor writes conservative declaration bounds.  Using
+			// them avoids the very expensive Doom 3 fallback below, which samples
+			// every stage at 16 ms intervals for 1000 random particles.
+			bounds[0].x = src.ParseFloat();
+			bounds[0].y = src.ParseFloat();
+			bounds[0].z = src.ParseFloat();
+			bounds[1].x = src.ParseFloat();
+			bounds[1].y = src.ParseFloat();
+			bounds[1].z = src.ParseFloat();
+			hasDeclaredBounds = true;
 			continue;
 		}
 
@@ -519,10 +525,18 @@ bool idDeclParticle::Parse( const char *text, const int textLength ) {
 	//
 	// calculate the bounds
 	//
-	bounds.Clear();
-	for( int i = 0; i < stages.Num(); i++ ) {
-		GetStageBounds( stages[i] );
-		bounds.AddBounds( stages[i]->bounds );
+	if ( hasDeclaredBounds && bounds.GetVolume() > 0.1f ) {
+		// Individual stage bounds are used for surface culling.  The declaration
+		// bound encloses every stage, so applying it to each is conservative.
+		for ( int i = 0; i < stages.Num(); i++ ) {
+			stages[i]->bounds = bounds;
+		}
+	} else {
+		bounds.Clear();
+		for( int i = 0; i < stages.Num(); i++ ) {
+			GetStageBounds( stages[i] );
+			bounds.AddBounds( stages[i]->bounds );
+		}
 	}
 
 	if ( bounds.GetVolume() <= 0.1f ) {

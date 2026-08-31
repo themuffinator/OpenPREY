@@ -109,6 +109,14 @@ When the render surface spans multiple monitors:
 
 ## Useful Console Examples
 
+### Faster Map Transitions
+
+```cfg
+seta image_preload 0
+```
+
+OpenPrey currently preloads all level-referenced images before rendering begins, even when `image_preload` is disabled. Deferred first-use loading is unsafe with the SMP renderer because a GUI surface may first request an image from the back end, producing blank or corrupt terminal displays. The cvar remains archived for configuration compatibility.
+
 ### Recommended Modern Defaults
 
 ```cfg

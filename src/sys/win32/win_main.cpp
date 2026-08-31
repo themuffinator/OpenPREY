@@ -110,7 +110,7 @@ void Sys_CreateThread(xthread_t function, void* parms, xthreadPriority priority,
 		parms,	// LPVOID lpvThreadParm,
 		0,		//   DWORD fdwCreate,
 		&info.threadId);
-	info.threadHandle = (int)temp;
+	info.threadHandle = (uintptr_t)temp;
 	if (priority == THREAD_HIGHEST) {
 		SetThreadPriority((HANDLE)info.threadHandle, THREAD_PRIORITY_HIGHEST);		//  we better sleep enough to do this
 	}

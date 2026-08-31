@@ -82,7 +82,7 @@ private:
 	bool						ParseEdges( idLexer &src );
 	bool						ParseFaces( idLexer &src );
 	bool						ParseReachabilities( idLexer &src, int areaNum );
-	bool						ParseAreas( idLexer &src );
+	bool						ParseAreas( idLexer &src, bool hasAreaFeatures );
 	bool						ParseNodes( idLexer &src );
 	bool						ParsePortals( idLexer &src );
 	bool						ParseClusters( idLexer &src );

@@ -17,22 +17,22 @@ static int globalOutputRunningSize = 0;
 // simple types.  function types are dynamically allocated
 idTypeDef		type_void( ev_void, &def_void, "void", 0, NULL );
 idTypeDef		type_scriptevent( ev_scriptevent, &def_scriptevent, "scriptevent", sizeof( intptr_t ), NULL );
-idTypeDef		type_namespace( ev_namespace, &def_namespace, "namespace", sizeof( intptr_t ), NULL );
+idTypeDef		type_namespace( ev_namespace, &def_namespace, "namespace", sizeof( int ), NULL );
 //HUMANHEAD: aob - changed types to inherited types
 idTypeDefString	type_string( ev_string, &def_string, "string", MAX_STRING_LEN, NULL );
-idTypeDefFloat	type_float( ev_float, &def_float, "float", sizeof( intptr_t ), NULL );
+idTypeDefFloat	type_float( ev_float, &def_float, "float", sizeof( float ), NULL );
 idTypeDefVector	type_vector( ev_vector, &def_vector, "vector", E_EVENT_SIZEOF_VEC, NULL );
-idTypeDefEntity	type_entity( ev_entity, &def_entity, "entity", sizeof( intptr_t ), NULL );					// stored as entity number
+idTypeDefEntity	type_entity( ev_entity, &def_entity, "entity", sizeof( int ), NULL );					// stored as entity number
 //HUMANHEAD END
-idTypeDef		type_field( ev_field, &def_field, "field", sizeof( intptr_t ), NULL );
-idTypeDef		type_function( ev_function, &def_function, "function", sizeof( intptr_t ), &type_void );
-idTypeDef		type_virtualfunction( ev_virtualfunction, &def_virtualfunction, "virtual function", sizeof( intptr_t ), NULL );
+idTypeDef		type_field( ev_field, &def_field, "field", sizeof( int ), NULL );
+idTypeDef		type_function( ev_function, &def_function, "function", sizeof( int ), &type_void );
+idTypeDef		type_virtualfunction( ev_virtualfunction, &def_virtualfunction, "virtual function", sizeof( int ), NULL );
 idTypeDef		type_pointer( ev_pointer, &def_pointer, "pointer", sizeof( intptr_t ), NULL );
-idTypeDef		type_object( ev_object, &def_object, "object", sizeof( intptr_t ), NULL );					// stored as entity number
-idTypeDef		type_jumpoffset( ev_jumpoffset, &def_jumpoffset, "<jump>", sizeof( intptr_t ), NULL );		// only used for jump opcodes
-idTypeDef		type_argsize( ev_argsize, &def_argsize, "<argsize>", sizeof( intptr_t ), NULL );				// only used for function call and thread opcodes
+idTypeDef		type_object( ev_object, &def_object, "object", sizeof( int ), NULL );					// stored as entity number
+idTypeDef		type_jumpoffset( ev_jumpoffset, &def_jumpoffset, "<jump>", sizeof( int ), NULL );		// only used for jump opcodes
+idTypeDef		type_argsize( ev_argsize, &def_argsize, "<argsize>", sizeof( int ), NULL );				// only used for function call and thread opcodes
 //HUMANHEAD: aob - changed types to inherited types
-idTypeDefBool	type_boolean( ev_boolean, &def_boolean, "boolean", sizeof( intptr_t ), NULL );
+idTypeDefBool	type_boolean( ev_boolean, &def_boolean, "boolean", sizeof( int ), NULL );
 //HUMANHEAD END
 
 idVarDef	def_void( &type_void );
@@ -1001,7 +1001,7 @@ idScriptObject::Restore
 */
 void idScriptObject::Restore( idRestoreGame *savefile ) {
 	idStr typeName;
-	size_t size;
+	int size;
 
 	savefile->ReadString( typeName );
 
@@ -1014,8 +1014,8 @@ void idScriptObject::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idScriptObject::Restore: failed to restore object of type '%s'.", typeName.c_str() );
 	}
 
-	savefile->ReadInt( (int &)size );
-	if ( size != type->Size() ) {
+	savefile->ReadInt( size );
+	if ( size < 0 || static_cast<size_t>( size ) != type->Size() ) {
 		savefile->Error( "idScriptObject::Restore: size of object '%s' doesn't match size in save game.", typeName.c_str() );
 	}
 
@@ -1203,9 +1203,11 @@ idProgram::AllocType
 */
 idTypeDef *idProgram::AllocType( idTypeDef &type ) {
 	idTypeDef *newtype;
+	int index;
 
 	newtype	= new idTypeDef( type ); 
-	types.Append( newtype );
+	index = types.Append( newtype );
+	typeNameHash.Add( typeNameHash.GenerateKey( newtype->Name(), true ), index );
 
 	return newtype;
 }
@@ -1217,9 +1219,11 @@ idProgram::AllocType
 */
 idTypeDef *idProgram::AllocType( etype_t etype, idVarDef *edef, const char *ename, int esize, idTypeDef *aux ) {
 	idTypeDef *newtype;
+	int index;
 
 	newtype	= new idTypeDef( etype, edef, ename, esize, aux );
-	types.Append( newtype );
+	index = types.Append( newtype );
+	typeNameHash.Add( typeNameHash.GenerateKey( newtype->Name(), true ), index );
 
 	return newtype;
 }
@@ -1233,11 +1237,11 @@ a new one and copies it out.
 ============
 */
 idTypeDef *idProgram::GetType( idTypeDef &type, bool allocate ) {
-	int i;
+	int i, hash;
 
-	//FIXME: linear search == slow
-	for( i = types.Num() - 1; i >= 0; i-- ) {
-		if ( types[ i ]->MatchesType( type ) && !strcmp( types[ i ]->Name(), type.Name() ) ) {
+	hash = typeNameHash.GenerateKey( type.Name(), true );
+	for( i = typeNameHash.First( hash ); i != -1; i = typeNameHash.Next( i ) ) {
+		if ( !strcmp( types[ i ]->Name(), type.Name() ) && types[ i ]->MatchesType( type ) ) {
 			return types[ i ];
 		}
 	}
@@ -1259,9 +1263,10 @@ Returns a preexisting complex type that matches the name, or returns NULL if not
 */
 idTypeDef *idProgram::FindType( const char *name ) {
 	idTypeDef	*check;
-	int			i;
+	int			i, hash;
 
-	for( i = types.Num() - 1; i >= 0; i-- ) {
+	hash = typeNameHash.GenerateKey( name, true );
+	for( i = typeNameHash.First( hash ); i != -1; i = typeNameHash.Next( i ) ) {
 		check = types[ i ];
 		if ( !strcmp( check->Name(), name ) ) {
 			return check;
@@ -1874,13 +1879,18 @@ bool idProgram::CompileText( const char *source, const char *text, bool console 
 	int			i;
 	idVarDef	*def;
 	idStr		ospath;
+	idStr		compileFilename;
 
 	// use a full os path for GetFilenum since it calls OSPathToRelativePath to convert filenames from the parser
 	ospath = fileSystem->RelativePathToOSPath( source );
 	filenum = GetFilenum( ospath );
+	// GetFilenum and script includes update the program's filename cache. Keep
+	// the parser filename in independent storage so those updates cannot
+	// invalidate the pointer used by the compiler and its diagnostics.
+	compileFilename = filename;
 
 	try {
-		compiler.CompileFile( text, filename, console );
+		compiler.CompileFile( text, compileFilename.c_str(), console );
 
 		// check to make sure all functions prototyped have code
 		for( i = 0; i < varDefs.Num(); i++ ) {
@@ -1989,6 +1999,7 @@ void idProgram::FreeData( void ) {
 
 	// free any special types we've created
 	types.DeleteContents( true );
+	typeNameHash.Free();
 
 	filenum = 0;
 
@@ -2113,9 +2124,15 @@ bool idProgram::Restore( idRestoreGame *savefile ) {
 
 	savefile->ReadInt( saved_checksum );
 	checksum = CalculateChecksum();
-
 	if ( saved_checksum != checksum ) {
-		result = false;
+		// Linux x86-64 builds prior to savegame version 115 calculated MD4
+		// with 64-bit words and included uninitialized digest bytes. Preserve
+		// those saves; version 115 and later use a deterministic checksum.
+		if ( cvarSystem->GetCVarInteger( "g_restoreSaveGameVersion" ) == 114 ) {
+			gameLocal.Warning( "Loading legacy savegame with an unreliable script checksum" );
+		} else {
+			result = false;
+		}
 	}
 
 	return result;
@@ -2194,6 +2211,10 @@ void idProgram::Restart( void ) {
 		delete types[ i ];
 	}
 	types.SetNum( top_types, false );
+	typeNameHash.Free();
+	for( i = 0; i < types.Num(); i++ ) {
+		typeNameHash.Add( typeNameHash.GenerateKey( types[ i ]->Name(), true ), i );
+	}
 
 	for( i = top_defs; i < varDefs.Num(); i++ ) {
 		delete varDefs[ i ];

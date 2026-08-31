@@ -359,6 +359,7 @@ idCVar g_testModelBlend(			"g_testModelBlend",			"0",			CVAR_GAME | CVAR_INTEGER
 idCVar g_testDeath(					"g_testDeath",				"0",			CVAR_GAME | CVAR_BOOL, "" );
 idCVar g_exportMask(				"g_exportMask",				"",				CVAR_GAME | CVAR_ARCHIVE, "" );	// HUMANHEAD: made archive
 idCVar g_flushSave(					"g_flushSave",				"0",			CVAR_GAME | CVAR_BOOL, "1 = don't buffer file writing for save games." );
+idCVar g_restoreSaveGameVersion(	"g_restoreSaveGameVersion",	"0",			CVAR_GAME | CVAR_INTEGER, "savegame version currently being restored" );
 
 idCVar aas_test(					"aas_test",					"0",			CVAR_GAME | CVAR_INTEGER, "" );
 idCVar aas_showAreas(				"aas_showAreas",			"0",			CVAR_GAME | CVAR_BOOL, "" );

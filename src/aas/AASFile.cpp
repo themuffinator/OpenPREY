@@ -986,7 +986,7 @@ void idAASFileLocal::LinkReversedReachability( void ) {
 idAASFileLocal::ParseAreas
 ================
 */
-bool idAASFileLocal::ParseAreas( idLexer &src ) {
+bool idAASFileLocal::ParseAreas( idLexer &src, bool hasAreaFeatures ) {
 	int numAreas, i;
 	aasArea_t area;
 
@@ -1004,10 +1004,15 @@ bool idAASFileLocal::ParseAreas( idLexer &src ) {
 		area.numFaces = src.ParseInt();
 		area.cluster = src.ParseInt();
 		area.clusterAreaNum = src.ParseInt();
-// jmarshall - AAS 1.08 
-		area.numFeatures = src.ParseInt();
-		area.firstFeature = src.ParseInt();
-// jmarshall end
+		// AAS 1.08 added the Raven tactical-feature range to each area. Retail
+		// PREY ships 1.07 files whose area records end after clusterAreaNum.
+		if ( hasAreaFeatures ) {
+			area.numFeatures = src.ParseInt();
+			area.firstFeature = src.ParseInt();
+		} else {
+			area.numFeatures = 0;
+			area.firstFeature = 0;
+		}
 		src.ExpectTokenString( ")" );
 		areas.Append( area );
 		ParseReachabilities( src, i );
@@ -1168,6 +1173,7 @@ bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC ) {
 		common->Warning( "AAS file '%s' has version %s instead of %s", name.c_str(), token.c_str(), AAS_FILEVERSION );
 		return false;
 	}
+	const bool hasAreaFeatures = token == AAS_FILEVERSION;
 
 	if ( !src.ExpectTokenType( TT_NUMBER, TT_INTEGER, &token ) ) {
 		common->Warning( "AAS file '%s' has no map file CRC", name.c_str() );
@@ -1176,8 +1182,17 @@ bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC ) {
 
 	c = token.GetUnsignedLongValue();
 	if ( mapFileCRC && c != mapFileCRC ) {
-		common->DPrintf( "AAS file '%s' is out of date\n", name.c_str() );
-		return false;
+		if ( hasAreaFeatures ) {
+			common->DPrintf( "AAS file '%s' is out of date\n", name.c_str() );
+			return false;
+		}
+		// Retail PREY AAS 1.07 files can carry the same legacy geometry CRC seen
+		// in the shipped collision data. The original Windows map parser produced
+		// a slightly different CRC for some maps, although the compiled AAS still
+		// matches the retail geometry. Parse and validate the complete file below
+		// instead of disabling all navigation for the map.
+		common->Warning( "AAS file '%s' has legacy map CRC %u (runtime %u); using shipped navigation data",
+			name.c_str(), c, mapFileCRC );
 	}
 
 	// clear the file in memory
@@ -1211,7 +1226,7 @@ bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC ) {
 			if ( !ParseIndex( src, faceIndex ) ) { return false; }
 		}
 		else if ( token == "areas" ) {
-			if ( !ParseAreas( src ) ) { return false; }
+			if ( !ParseAreas( src, hasAreaFeatures ) ) { return false; }
 		}
 		else if ( token == "nodes" ) {
 			if ( !ParseNodes( src ) ) { return false; }

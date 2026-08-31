@@ -1665,6 +1665,19 @@ void idEntity::Event_Remove( void ) {
 		Hide();
 		return;
 	}
+	// Do not let scripted corpse cleanup visibly pop an active ragdoll out of
+	// the scene. Retry once it has left the player's current PVS.
+	if ( gameLocal.GameState() == GAMESTATE_ACTIVE && health <= 0 &&
+		IsType( idAFEntity_Base::Type ) &&
+		static_cast<idAFEntity_Base *>( this )->IsActiveAF() &&
+		gameLocal.InPlayerPVS( this ) ) {
+		PostEventMS( &EV_Remove, 250 );
+		return;
+	}
+	// Entity-owned physics objects are destroyed before the idEntity base.
+	// Detach now so their destructors cannot follow a stale bind master while
+	// switching the entity back to its default physics object.
+	Unbind();
 	delete this;
 }
 //HUMANHEAD END

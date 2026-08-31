@@ -762,20 +762,37 @@ void hhPhysics_Player::CheckGround( void ) {
 	// setup a ground trace from the contacts
 	groundTrace.endpos = current.origin;
 	groundTrace.endAxis = clipModelAxis;
+	bool hasWalkableContact = false;
 	if ( contacts.Num() ) {
 		groundTrace.fraction = 0.0f;
-		groundTrace.c = contacts[0];
-		for ( i = 1; i < contacts.Num(); i++ ) {
-			groundTrace.c.normal += contacts[i].normal;
+		idVec3 supportingNormal = vec3_origin;
+		int supportingContact = -1;
+		for ( i = 0; i < contacts.Num(); i++ ) {
+			if ( contacts[i].normal * -gravityNormal >= MIN_WALK_NORMAL ) {
+				if ( supportingContact < 0 ) {
+					supportingContact = i;
+				}
+				supportingNormal += contacts[i].normal;
+			}
 		}
-		groundTrace.c.normal.Normalize();
+		if ( supportingContact >= 0 ) {
+			groundTrace.c = contacts[supportingContact];
+			groundTrace.c.normal = supportingNormal;
+			hasWalkableContact = groundTrace.c.normal.Normalize() != 0.0f;
+		} else {
+			groundTrace.c = contacts[0];
+			for ( i = 1; i < contacts.Num(); i++ ) {
+				groundTrace.c.normal += contacts[i].normal;
+			}
+			groundTrace.c.normal.Normalize();
+		}
 	}
 	else {
 		groundTrace.fraction = 1.0f;
 	}
 
 	contents = gameLocal.clip.Contents( current.origin, clipModel, clipModelAxis, GetClipMask(), self );
-	if ( contents & GetClipMask() ) { // HUMANHEAD cjr:  added GetClipMask() instead of hardcoded MASK_SOLID - was causing problems with spiritwalk
+	if ( ( contents & GetClipMask() ) && !hasWalkableContact ) { // HUMANHEAD cjr:  added GetClipMask() instead of hardcoded MASK_SOLID - was causing problems with spiritwalk
 		// do something corrective if stuck in solid
 		CorrectAllSolid( groundTrace, contents );
 	}
@@ -1169,4 +1186,3 @@ float hhPhysics_Player::GetContactEpsilon(void) const {
 		return PLAYER_CONTACT_EPSILON;
 	}
 }
-

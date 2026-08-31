@@ -164,13 +164,15 @@ Sys_CreateThread
 void Sys_CreateThread( xthread_t function, void *parms, xthreadPriority priority, xthreadInfo& info, const char *name, xthreadInfo **threads, int *thread_count ) {
 	Sys_EnterCriticalSection( );		
 	pthread_attr_t attr;
+	pthread_t thread;
 	pthread_attr_init( &attr );
 	if ( pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_JOINABLE ) != 0 ) {
 		common->Error( "ERROR: pthread_attr_setdetachstate %s failed\n", name );
 	}
-	if ( pthread_create( ( pthread_t* )&info.threadHandle, &attr, ( pthread_function_t )function, parms ) != 0 ) {
+	if ( pthread_create( &thread, &attr, ( pthread_function_t )function, parms ) != 0 ) {
 		common->Error( "ERROR: pthread_create %s failed\n", name );
 	}
+	info.threadHandle = ( uintptr_t )thread;
 	pthread_attr_destroy( &attr );
 	info.name = name;
 	if ( *thread_count < MAX_THREADS ) {
@@ -289,4 +291,3 @@ void Posix_InitPThreads( ) {
 		g_threads[ i ] = NULL;
 	}	
 }
-

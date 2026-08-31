@@ -431,6 +431,14 @@ void Sys_ShowConsole( int visLevel, bool quitOnClose ) { }
 
 // only relevant when specified on command line
 const char *Sys_DefaultCDPath( void ) {
+	static idStr executableDirectory;
+
+	executableDirectory = Sys_EXEPath();
+	if ( executableDirectory.Length() ) {
+		executableDirectory.StripFilename();
+		return executableDirectory.c_str();
+	}
+
 	return Posix_Cwd();
 }
 

@@ -1919,4 +1919,3 @@ void hhVehicle::Event_ReleaseScriptControl() {
 void hhVehicle::Event_EjectPilot() {
 	EjectPilot();
 }
-

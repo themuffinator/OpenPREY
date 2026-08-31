@@ -121,7 +121,7 @@
 // Savegame Version
 // Update when you can no longer maintain compatibility with previous savegames.
 // For testing, we're using the build number to ensure no one ever tries to load a stale savegame
-#define SAVEGAME_VERSION				114
+#define SAVEGAME_VERSION				115
 
 // editor info
 #define EDITOR_WINDOWTEXT				"QuakeEdit"

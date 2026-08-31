@@ -160,6 +160,7 @@ idCVar r_shaderLevel( "r_shaderLevel", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_
 idCVar r_forceAmbient( "r_forceAmbient", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "force ambient lighting level" );
 idCVar r_skipBlendLights( "r_skipBlendLights", "0", CVAR_RENDERER | CVAR_BOOL, "skip all blend lights" );
 idCVar r_skipFogLights( "r_skipFogLights", "0", CVAR_RENDERER | CVAR_BOOL, "skip all fog lights" );
+idCVar r_fogDensity( "r_fogDensity", "3.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "fog density multiplier" );
 idCVar r_skipDeforms( "r_skipDeforms", "0", CVAR_RENDERER | CVAR_BOOL, "leave all deform materials in their original state" );
 idCVar r_skipFrontEnd( "r_skipFrontEnd", "0", CVAR_RENDERER | CVAR_BOOL, "bypasses all front end work, but 2D gui rendering still draws" );
 idCVar r_skipUpdates( "r_skipUpdates", "0", CVAR_RENDERER | CVAR_BOOL, "1 = don't accept any entity or light updates, making everything static" );
@@ -211,7 +212,8 @@ idCVar r_useDepthBoundsTest( "r_useDepthBoundsTest", "1", CVAR_RENDERER | CVAR_B
 
 idCVar r_screenFraction( "r_screenFraction", "100", CVAR_RENDERER | CVAR_INTEGER, "for testing fill rate, the resolution of the entire screen can be changed" );
 idCVar r_demonstrateBug( "r_demonstrateBug", "0", CVAR_RENDERER | CVAR_BOOL, "used during development to show IHV's their problems" );
-idCVar r_usePortals( "r_usePortals", "1", CVAR_RENDERER | CVAR_BOOL, " 1 = use portals to perform area culling, otherwise draw everything" );
+idCVar r_usePortals( "r_usePortals", "1", CVAR_RENDERER | CVAR_BOOL, "1 = use portals to perform area culling, otherwise draw everything" );
+idCVar r_usePortalViewBlocks( "r_usePortalViewBlocks", "0", CVAR_RENDERER | CVAR_BOOL, "honor game-controlled portal view blocking during area traversal" );
 idCVar r_portalsDistanceCull( "r_portalsDistanceCull", "1", CVAR_RENDERER | CVAR_BOOL, "enable distance-cull checks using portal fade cull ranges" );
 idCVar r_singleLight( "r_singleLight", "-1", CVAR_RENDERER | CVAR_INTEGER, "suppress all but one light" );
 idCVar r_singleEntity( "r_singleEntity", "-1", CVAR_RENDERER | CVAR_INTEGER, "suppress all but one entity" );
@@ -2459,4 +2461,3 @@ void idRenderSystemLocal::GetCardCaps( bool &oldCard, bool &nv10or20 ) {
 	oldCard = false;
 	nv10or20 = false;
 }
-

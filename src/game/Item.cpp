@@ -546,6 +546,12 @@ idItem::Event_Trigger
 ================
 */
 void idItem::Event_Trigger( idEntity *activator ) {
+	// Scripted sys.trigger(item) calls Activate without an activator.  Items
+	// triggered this way are intended to be awarded to the local player (for
+	// example the spirit-walk power in Downward Spiral).
+	if ( !activator ) {
+		activator = gameLocal.GetLocalPlayer();
+	}
 
 	if ( !canPickUp && spawnArgs.GetBool( "triggerFirst" ) ) {
 		canPickUp = true;
@@ -1061,4 +1067,3 @@ void idItemRemover::Event_Trigger( idEntity *activator ) {
 
 ===============================================================================
 */
-

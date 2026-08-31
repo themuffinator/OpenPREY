@@ -1296,13 +1296,16 @@ void idRestoreGame::ReadRenderEntity( renderEntity_t &renderEntity ) {
 	ReadInt( renderEntity.suppressShadowInViewID );
 	ReadInt( renderEntity.suppressShadowInLightID );
 	ReadInt( renderEntity.allowSurfaceInViewID );
+	renderEntity.suppressSurfaceMask = 0;
 
 	ReadVec3( renderEntity.origin );
 	ReadMat3( renderEntity.axis );
 
 	ReadMaterial( renderEntity.customShader );
 	ReadMaterial( renderEntity.referenceShader );
+	renderEntity.overlayShader = NULL;
 	ReadSkin( renderEntity.customSkin );
+	renderEntity.referenceSoundHandle = 0;
 
 	ReadInt( index );
 	renderEntity.referenceSound = gameSoundWorld->EmitterForIndex( index );
@@ -1356,6 +1359,9 @@ void idRestoreGame::ReadRenderEntity( renderEntity_t &renderEntity ) {
 	ReadBool( renderEntity.onlyInvisibleInSpirit );
 	ReadBool( renderEntity.lowSkippable );	//HUMANHEAD bjk
 	ReadFloat( renderEntity.eyeDistance );
+	renderEntity.weaponDepthHackInViewID = 0;
+	renderEntity.shadowLODDistance = 0.0f;
+	renderEntity.suppressLOD = 0;
 
 #if _HH_RENDERDEMO_HACKS
 	renderEntity.notInRenderDemos = 0;
@@ -1660,4 +1666,3 @@ void idRestoreGame::ReadStringList( idList<idStr> &list ) {
 		list.Append( tmp );
 	}
 }
-
