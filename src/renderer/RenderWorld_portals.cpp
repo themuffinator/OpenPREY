@@ -127,10 +127,10 @@ bool idRenderWorldLocal::PortalIsFoggedOut( const portal_t *p ) {
 	float	a;
 
 	if ( alpha <= 1.0f ) {
-		a = -0.5f / DEFAULT_FOG_DISTANCE;
+		a = -0.5f * r_fogDensity.GetFloat() / DEFAULT_FOG_DISTANCE;
 	} else {
 		// otherwise, distance = alpha color
-		a = -0.5f / alpha;
+		a = -0.5f * r_fogDensity.GetFloat() / alpha;
 	}
 
 	forward[0] = a * tr.viewDef->worldSpace.modelViewMatrix[2];
@@ -182,7 +182,7 @@ void idRenderWorldLocal::FloodViewThroughArea_r( const idVec3 origin, int areaNu
 	// go through all the portals
 	for ( p = area->portals; p; p = p->next ) {
 		// an enclosing door may have sealed the portal off
-		if ( p->doublePortal->blockingBits & PS_BLOCK_VIEW ) {
+		if ( r_usePortalViewBlocks.GetBool() && ( p->doublePortal->blockingBits & PS_BLOCK_VIEW ) ) {
 			continue;
 		}
 
@@ -320,7 +320,31 @@ void idRenderWorldLocal::FlowViewThroughPortals( const idVec3 origin, int numPla
 		}
 
 		// flood out through portals, setting area viewCount
-		FloodViewThroughArea_r( origin, tr.viewDef->areaNum, &ps );
+		const int startArea = tr.viewDef->areaNum;
+		FloodViewThroughArea_r( origin, startArea, &ps );
+
+		// PREY places gameplay geometry directly across some area boundaries.
+		// Seed two open portal rings from the root frustum so small BSP/winding
+		// disagreements cannot black out nearby rooms. Recursive traversal from
+		// each seed still performs normal portal culling beyond those rooms,
+		// avoiding the full-map draw cost of r_usePortals 0.
+		for ( portal_t *p = portalAreas[ startArea ].portals; p; p = p->next ) {
+			if ( r_usePortalViewBlocks.GetBool() && ( p->doublePortal->blockingBits & PS_BLOCK_VIEW ) ) {
+				continue;
+			}
+			if ( portalAreas[ p->intoArea ].viewCount != tr.viewCount ) {
+				FloodViewThroughArea_r( origin, p->intoArea, &ps );
+			}
+
+			for ( portal_t *second = portalAreas[ p->intoArea ].portals; second; second = second->next ) {
+				if ( r_usePortalViewBlocks.GetBool() && ( second->doublePortal->blockingBits & PS_BLOCK_VIEW ) ) {
+					continue;
+				}
+				if ( portalAreas[ second->intoArea ].viewCount != tr.viewCount ) {
+					FloodViewThroughArea_r( origin, second->intoArea, &ps );
+				}
+			}
+		}
 	}
 }
 

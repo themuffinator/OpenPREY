@@ -316,7 +316,14 @@ static float AdjustForCushionChannels( const idStaticList< idActiveChannel, MAX_
 	for( int i = 0; i < activeEmitterChannels.Num(); i++ )
 	{
 		idSoundChannel* chan = activeEmitterChannels[i].channel;
-		chan->volumeDB = MapVolumeFromFadeDB( chan->volumeDB, driftedDB );
+		// Dialogue is protected from hardware-channel eviction because it cannot
+		// be restarted without breaking speech and lip sync.  Do not silence it
+		// through the cushion ramp either: subtitle collection follows the final
+		// audible volume, so fading protected VO here drops both speech and CC.
+		if( chan->CanMute() )
+		{
+			chan->volumeDB = MapVolumeFromFadeDB( chan->volumeDB, driftedDB );
+		}
 	}
 
 	return driftedDB;

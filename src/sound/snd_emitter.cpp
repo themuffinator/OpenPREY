@@ -219,7 +219,10 @@ Never actually mute VO because we can't restart them precisely enough for lip sy
 */
 bool idSoundChannel::CanMute() const
 {
-	return true;
+	// Keep dialogue resident in the hardware voice set.  Prey frequently mixes
+	// quiet, global player lines with dense ambient soundscapes; allowing those
+	// lines to compete by volume can cull both their audio and subtitles.
+	return ( parms.soundShaderFlags & ( SSF_VO | SSF_IS_VO ) ) == 0;
 }
 
 /*
@@ -410,6 +413,13 @@ void idSoundChannel::UpdateHardware( float volumeAdd, int currentTime )
 	if( endTime > 0 && endTime < currentTime )
 	{
 		return;
+	}
+	// Prey keeps player dialogue alive while other channel fades run.  Keep a
+	// protected VO channel audible as well as captioned if a later mixer pass
+	// has already driven its cached level to the silence floor.
+	if( !CanMute() && volumeDB <= DB_SILENCE )
+	{
+		volumeDB = VolumeScaleToDB( parms.volume );
 	}
 
 	// convert volumes from decibels to linear

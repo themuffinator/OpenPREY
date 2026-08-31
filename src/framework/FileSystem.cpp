@@ -940,11 +940,17 @@ public:
 			return;
 		}
 
+		const int previousReadCount = readCount;
 		readCount += c;
 
-		// Keep loading progress responsive on PC as data is read.
-		// idSessionLocal::PacifierUpdate is internally throttled and no-ops outside map load.
-		session->PacifierUpdate();
+		// Savegames and other binary formats perform millions of tiny scalar reads.
+		// Calling into the loading GUI for every one is substantially more expensive
+		// than the I/O itself, even though PacifierUpdate throttles actual redraws.
+		// Crossing a 64 KiB boundary provides smooth progress without penalizing
+		// small reads; large reads still update at least once per call.
+		if ( c >= 64 * 1024 || ( previousReadCount >> 16 ) != ( readCount >> 16 ) ) {
+			session->PacifierUpdate();
+		}
 	}
 	virtual int				GetReadCount( void ) { return readCount; }
 	virtual void			FindDLL( const char *basename, char dllPath[ MAX_OSPATH ], bool updateChecksum );

@@ -2253,6 +2253,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// load and spawn all other entities ( from a savegame possibly )
 	if ( loadingSaveGame && savegameFile ) {
+		cvarSystem->SetCVarInteger( "g_restoreSaveGameVersion", savegameVersion );
 		if ( game->InitFromSaveGame( fullMapName, rw, sw, savegameFile ) == false ) {
 			// If the loadgame failed, restart the map with the player persistent data
 			loadingSaveGame = false;
@@ -2262,6 +2263,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 			game->SetServerInfo( mapSpawnData.serverInfo );
 			game->InitFromNewMap( fullMapName, rw, sw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
 		}
+		cvarSystem->SetCVarInteger( "g_restoreSaveGameVersion", 0 );
 	} else {
 		game->SetServerInfo( mapSpawnData.serverInfo );
 		game->InitFromNewMap( fullMapName, rw, sw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
@@ -2805,7 +2807,7 @@ bool idSessionLocal::LoadGame( const char *saveName, const char *preferredGameDi
 	// check the version, if it doesn't match, cancel the loadgame,
 	// but still load the map with the persistant playerInfo from the header
 	// so that the player doesn't lose too much progress.
-	if ( savegameVersion != SAVEGAME_VERSION && savegameVersion != 1 ) {
+	if ( savegameVersion != SAVEGAME_VERSION && savegameVersion != 114 && savegameVersion != 1 ) {
 		common->Warning( "Savegame Version mismatch: aborting loadgame and starting level with persistent data" );
 		loadingSaveGame = false;
 		fileSystem->CloseFile( savegameFile );

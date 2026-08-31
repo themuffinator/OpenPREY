@@ -2172,7 +2172,10 @@ void idWindow::DrawBackground(const idRectangle &drawRect) {
 	const bool usesRetailSuperWindowFrame = hasFrameDecoration && ( windowDefType.Icmp( "superWindowDef" ) == 0 );
 	const idRectangle backgroundRect = usesRetailSuperWindowFrame ? GetWindowMarginsInsetRect( this, drawRect ) : drawRect;
 
-	if ( backColor.w() && backgroundRect.w > 0.0f && backgroundRect.h > 0.0f ) {
+	// PREY GUIs use negative rectangle extents to mirror image sections (for
+	// example, the other three quadrants of the wall-walk terminal).  The draw
+	// path handles those signed extents, so do not discard them here.
+	if ( backColor.w() && backgroundRect.w != 0.0f && backgroundRect.h != 0.0f ) {
 		dc->DrawFilledRect( backgroundRect.x, backgroundRect.y, backgroundRect.w, backgroundRect.h, backColor );
 	}
 
@@ -2192,7 +2195,7 @@ void idWindow::DrawBackground(const idRectangle &drawRect) {
 		}
 	}
 
-	if ( background && matColor.w() && backgroundRect.w > 0.0f && backgroundRect.h > 0.0f ) {
+	if ( background && matColor.w() && backgroundRect.w != 0.0f && backgroundRect.h != 0.0f ) {
 		float scalex, scaley;
 		if ( flags & WIN_NATURALMAT ) {
 			scalex = backgroundRect.w / background->GetImageWidth();
@@ -6076,7 +6079,10 @@ idWindow::Interactive
 ================
 */
 bool idWindow::Interactive() {
-	if ( scripts[ ON_ACTION ] ) {
+	// Release-only controls are still interactive.  Prey's shuttle console GUI
+	// intentionally performs its activation from onActionRelease, so ignoring
+	// that script prevents focus acquisition and the GUI hand never raises.
+	if ( scripts[ ON_ACTION ] || scripts[ ON_ACTIONRELEASE ] ) {
 		return true;
 	}
 	int c = children.Num();

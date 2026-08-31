@@ -115,7 +115,7 @@ When the render surface spans multiple monitors:
 seta image_preload 0
 ```
 
-This skips synchronous loading of every texture before entering a map. It can substantially shorten loading screens, at the cost of brief stutter when a texture is first used. Set `image_preload 1` to restore preload-first behavior.
+OpenPrey currently preloads all level-referenced images before rendering begins, even when `image_preload` is disabled. Deferred first-use loading is unsafe with the SMP renderer because a GUI surface may first request an image from the back end, producing blank or corrupt terminal displays. The cvar remains archived for configuration compatibility.
 
 ### Recommended Modern Defaults
 

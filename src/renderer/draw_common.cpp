@@ -2739,10 +2739,10 @@ static void RB_FogPass( const drawSurf_t *drawSurfs,  const drawSurf_t *drawSurf
 
 	// if they left the default value on, set a fog distance of 500
 	if ( backEnd.lightColor[3] <= 1.0 ) {
-		a = -0.5f / DEFAULT_FOG_DISTANCE;
+		a = -0.5f * r_fogDensity.GetFloat() / DEFAULT_FOG_DISTANCE;
 	} else {
 		// otherwise, distance = alpha color
-		a = -0.5f / backEnd.lightColor[3];
+		 a = -0.5f * r_fogDensity.GetFloat() / backEnd.lightColor[3];
 	}
 
 	GL_State( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_EQUAL );

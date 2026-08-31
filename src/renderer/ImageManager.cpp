@@ -892,7 +892,12 @@ void idImageManager::EndLevelLoad() {
 
 	common->Printf( "----- idImageManager::EndLevelLoad -----\n" );
 	int start = Sys_Milliseconds();
-	int	loadCount = image_preload.GetBool() ? LoadLevelImages( true ) : 0;
+	// Loading these on demand from idImage::Bind is not safe with the SMP
+	// renderer.  In particular, GUI surfaces can first reference an image on
+	// the back end, producing blank or corrupt terminal displays.  Keep the
+	// archived cvar for configuration compatibility, but always finish loading
+	// level-referenced images before rendering begins.
+	int	loadCount = LoadLevelImages( true );
 
 	int	end = Sys_Milliseconds();
 	common->Printf( "%5i images loaded in %5.1f seconds\n", loadCount, (end-start) * 0.001 );

@@ -658,9 +658,14 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 
 	crc = token.GetUnsignedLongValue();
 	if ( mapFileCRC && crc != mapFileCRC ) {
-		common->Printf( "%s is out of date\n", fileName.c_str() );
-		delete src;
-		return false;
+		// Retail PREY collision files can carry a geometry CRC produced by the
+		// original Windows map parser that differs slightly from our parsed map
+		// CRC.  Regenerating those files changes thousands of collision features
+		// and can introduce blocked stairs and holes that swallow ragdolls.  The
+		// CM parser still validates the complete file below, so prefer the shipped
+		// collision data and report the compatibility mismatch.
+		common->Warning( "%s has legacy map CRC %u (runtime %u); using shipped collision data",
+			fileName.c_str(), crc, mapFileCRC );
 	}
 
 	// parse the file

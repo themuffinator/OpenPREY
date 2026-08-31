@@ -1023,7 +1023,9 @@ void idSoundSystemLocal::CollectActiveSubtitles()
 			{
 				continue;
 			}
-			if( chan->volumeDB <= DB_SILENCE )
+			// Protected VO must remain captioned even when the mixer has driven
+			// its audible level to the silence threshold.
+			if( chan->volumeDB <= DB_SILENCE && chan->CanMute() )
 			{
 				continue;
 			}

@@ -2269,7 +2269,9 @@ R_GlobalShaderOverride
 ===============
 */
 bool R_GlobalShaderOverride( const idMaterial **shader ) {
-
+	if ( !shader || !*shader ) {
+		return false;
+	}
 	if ( !(*shader)->IsDrawn() ) {
 		return false;
 	}
